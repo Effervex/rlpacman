@@ -47,6 +47,7 @@ public class ActionSwitch {
 			else
 				prioritisedActions[i] = PacManHighAction.NOTHING.ordinal();
 		}
+		
 		return prioritisedActions;
 	}
 	

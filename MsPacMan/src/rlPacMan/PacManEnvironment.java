@@ -19,6 +19,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	private static final double DENSITY_RADIUS = 10;
+	public static final int PLAYER_SPEED = 30;
 	private PacMan environment_;
 	private int prevScore_;
 	private Observation obs_;
@@ -73,7 +74,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			if (environment_.experimentMode_)
 				Thread.currentThread().sleep(0);
 			else
-				Thread.currentThread().sleep(40);
+				Thread.currentThread().sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -85,6 +86,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 				environment_.tick(false);
 			}
 		}
+
+		// If we're not in full experiment mode, redraw the scene.
 		if (!environment_.experimentMode_) {
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
@@ -106,7 +109,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			if (environment_.experimentMode_)
 				Thread.currentThread().sleep(0);
 			else
-				Thread.currentThread().sleep(40);
+				Thread.currentThread().sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -123,11 +126,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 			}
 		}
 
+		// If we're not in full experiment mode, redraw the scene.
 		if (!environment_.experimentMode_) {
+			drawActions(arg0.intArray);
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
+			environment_.m_bottomCanvas.repaint();
 		} else {
 			environment_.m_gameUI.update(null);
+			environment_.m_bottomCanvas.setActionsList(null);
 		}
 		environment_.m_topCanvas.repaint();
 		environment_.m_gameUI.m_bRedrawAll = false;
@@ -135,6 +142,28 @@ public class PacManEnvironment implements EnvironmentInterface {
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				calculateReward(), calculateObservations(), isTerminal());
 		return rot;
+	}
+
+	/**
+	 * Draws the agent's action switch.
+	 * 
+	 * @param actions
+	 *            The agent's current actions. Should always be the same size
+	 *            with possible null elements.
+	 */
+	private void drawActions(int[] actions) {
+		String[] actionList = new String[actions.length];
+		for (int i = 0; i < actions.length; i++) {
+			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
+			// If the action is null
+			if (actions[i] == PacManHighAction.NOTHING.ordinal()) {
+				buffer.append("null");
+			} else {
+				buffer.append(PacManHighAction.values()[actions[i]]);
+			}
+			actionList[i] = buffer.toString();
+		}
+		environment_.m_bottomCanvas.setActionsList(actionList);
 	}
 
 	/**

@@ -1,7 +1,9 @@
 package rlPacMan;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.DecimalFormat;
 import java.util.*;
@@ -88,6 +90,37 @@ public class CrossEntropyExperiment {
 	}
 
 	/**
+	 * A constructor for the typical arguments plus a state of the generators
+	 * file.
+	 * 
+	 * @param populationSize
+	 *            The size of the population used in calculations.
+	 * @param episodeCount
+	 *            The number of episodes to perform.
+	 * @param selectionRatio
+	 *            The percentage of 'elite' samples to use from the population.
+	 * @param stepSize
+	 *            The step size for learning weights.
+	 * @param slotDecayRate
+	 *            The rate at which the slot probabilities decay per episode.
+	 * @param policySize
+	 *            The maximum number of rules in the policy.
+	 */
+	@SuppressWarnings("unchecked")
+	public CrossEntropyExperiment(int populationSize, int episodeCount,
+			double selectionRatio, double stepSize, double slotDecayRate,
+			int policySize, String generatorFile) {
+		this(populationSize, episodeCount, selectionRatio, stepSize,
+				slotDecayRate, policySize);
+		// Load the generators from their previous state.
+		try {
+			loadGenerators(new File(generatorFile));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
 	 * Runs the experiment.
 	 */
 	public void runExperiment() {
@@ -100,6 +133,7 @@ public class CrossEntropyExperiment {
 		// Most outputs/frozen tests will be performed at the end of each of
 		// these.
 		PolicyValue bestPolicy = null;
+		float[] episodeAverage = new float[episodes_];
 		for (int t = 0; t < episodes_; t++) {
 			// Forming a population of solutions
 			SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
@@ -108,6 +142,9 @@ public class CrossEntropyExperiment {
 				// pol = paperPolicy();
 				// Send the agent a generated policy
 				RLGlue.RL_agent_message(pol.toParseableString());
+				System.out.println("Policy:");
+				System.out.println(pol);
+				
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 					RLGlue.RL_episode(0);
@@ -127,7 +164,7 @@ public class CrossEntropyExperiment {
 
 			// Update the weights for all distributions using only the elite
 			// samples
-			updateWeights(pvs.iterator(), population_ * selectionRatio_);
+			episodeAverage[t] = updateWeights(pvs.iterator(), population_ * selectionRatio_);
 		}
 
 		// Save the final results
@@ -137,6 +174,14 @@ public class CrossEntropyExperiment {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		// Output the episode averages
+		System.out.println("Average episode elite scores:");
+		for (int e = 0; e < episodeAverage.length; e++) {
+			System.out.println(episodeAverage[e]);
+		}
+		
+		RLGlue.RL_cleanup();
 	}
 
 	/**
@@ -192,19 +237,6 @@ public class CrossEntropyExperiment {
 		FileWriter wr = new FileWriter(GENERATOR_FILE);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		writeDistributions(buf);
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Writes the distributions in a specific format.
-	 * 
-	 * @param buf
-	 *            The buffered writer.
-	 */
-	private void writeDistributions(BufferedWriter buf) throws Exception {
 		StringBuffer strBuffer = new StringBuffer();
 		// Write the slot generator
 		for (int i = 0; i < slotGenerator_.size(); i++) {
@@ -214,7 +246,6 @@ public class CrossEntropyExperiment {
 		strBuffer.append("\n");
 		buf.write(strBuffer.toString());
 		// Write the rule generators
-		RuleBase rb = RuleBase.getInstance();
 		for (int r = 0; r < ruleGenerators_.length; r++) {
 			strBuffer = new StringBuffer();
 			for (int i = 0; i < ruleGenerators_[r].size(); i++) {
@@ -226,6 +257,44 @@ public class CrossEntropyExperiment {
 			strBuffer.append("\n");
 			buf.write(strBuffer.toString());
 		}
+
+		buf.close();
+		wr.close();
+	}
+
+	/**
+	 * Loads the generators/distributions from file.
+	 * 
+	 * @param file
+	 *            The file to laod from.
+	 * @throws Exception
+	 *             Should something go awry.
+	 */
+	private void loadGenerators(File file) throws Exception {
+		FileReader reader = new FileReader(file);
+		BufferedReader buf = new BufferedReader(reader);
+
+		// Parse the slots
+		String[] split = buf.readLine().split(ELEMENT_DELIMITER);
+		for (String element : split) {
+			String[] eleSplit = element.split(PROB_DELIMITER);
+			slotGenerator_.set(Integer.parseInt(eleSplit[0]), Double
+					.parseDouble(eleSplit[1]));
+		}
+
+		// Parse the rules
+		for (int s = 0; s < ruleGenerators_.length; s++) {
+			split = buf.readLine().split(ELEMENT_DELIMITER);
+			for (String element : split) {
+				String[] eleSplit = element.split(PROB_DELIMITER);
+				ruleGenerators_[s].set(RuleBase.getInstance().getRule(
+						Integer.parseInt(eleSplit[0])), Double
+						.parseDouble(eleSplit[1]));
+			}
+		}
+		
+		buf.close();
+		reader.close();
 	}
 
 	private Policy paperPolicy() {
@@ -248,12 +317,15 @@ public class CrossEntropyExperiment {
 	 * @param numElite
 	 *            The number of samples to form the 'elite' samples.
 	 */
-	private void updateWeights(Iterator<PolicyValue> iter, double numElite) {
+	private float updateWeights(Iterator<PolicyValue> iter, double numElite) {
 		// Keep count of the rules seen (and slots used)
 		int[][] slotCounter = new int[POLICY_SIZE][1 + ruleCount_];
+		float total = 0;
 		// Only selecting the top elite samples
 		for (int k = 0; k < numElite; k++) {
-			Policy eliteSolution = iter.next().getPolicy();
+			PolicyValue pv = iter.next();
+			total += pv.value_;
+			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
 			Rule[] polRules = eliteSolution.getRules();
@@ -289,6 +361,8 @@ public class CrossEntropyExperiment {
 			if (!ruleGenerators_[s].sumsToOne())
 				ruleGenerators_[s].normaliseProbs();
 		}
+		
+		return (float) (total / numElite);
 	}
 
 	/**
@@ -318,10 +392,18 @@ public class CrossEntropyExperiment {
 	 *            the arguments for the program.
 	 */
 	public static void main(String[] args) {
-		CrossEntropyExperiment theExperiment = new CrossEntropyExperiment(
-				Integer.parseInt(args[0]), Integer.parseInt(args[1]), Double
-						.parseDouble(args[2]), Double.parseDouble(args[3]),
-				Double.parseDouble(args[4]), Integer.parseInt(args[5]));
+		CrossEntropyExperiment theExperiment = null;
+		if (args.length == 6) {
+			theExperiment = new CrossEntropyExperiment(Integer
+					.parseInt(args[0]), Integer.parseInt(args[1]), Double
+					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
+					.parseDouble(args[4]), Integer.parseInt(args[5]));
+		} else if (args.length == 7) {
+			theExperiment = new CrossEntropyExperiment(Integer
+					.parseInt(args[0]), Integer.parseInt(args[1]), Double
+					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
+					.parseDouble(args[4]), Integer.parseInt(args[5]), args[6]);
+		}
 		theExperiment.runExperiment();
 	}
 

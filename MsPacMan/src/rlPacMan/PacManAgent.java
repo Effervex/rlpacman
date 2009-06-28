@@ -45,11 +45,6 @@ public class PacManAgent implements AgentInterface {
 		
 		Action action = new Action(0, 0);
 		action.intArray = chooseAction(arg0.doubleArray);
-		
-		System.out.println("Policy:");
-		System.out.println(policy_);
-		System.out.println("First Action Switch:");
-		System.out.println(actionsModule_);
 		return action;
 	}
 
@@ -57,6 +52,7 @@ public class PacManAgent implements AgentInterface {
 	public Action agent_step(double arg0, Observation arg1) {
 		Action action = new Action(0, 0);
 		action.intArray = chooseAction(arg1.doubleArray);
+		
 		return action;
 	}
 
@@ -69,13 +65,6 @@ public class PacManAgent implements AgentInterface {
 	 *         switches.
 	 */
 	private int[] chooseAction(double[] observations) {
-//		int[] fasd = new int[1];
-//		if (observations[PacManObservations.NEAREST_ED_GHOST.ordinal()] < 99)
-//			fasd[0] = PacManHighAction.FROM_GHOST.ordinal();
-//		else
-//			fasd[0] = PacManHighAction.TO_POWER_DOT.ordinal();
-//		return fasd;
-		
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(observations, actionsModule_);
 		

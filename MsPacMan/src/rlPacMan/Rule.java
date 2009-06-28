@@ -192,6 +192,15 @@ public class Rule {
 		else
 			actionSwitch.switchOff(action_);
 	}
+	
+	/**
+	 * Checks if this rule is an activation rule.
+	 * 
+	 * @return True if it is, false otherwise.
+	 */
+	public boolean isActivator() {
+		return actionOn_;
+	}
 
 	/**
 	 * Creates a string representation of the rule.
