@@ -62,7 +62,7 @@ public class Policy {
 	@Override
 	public String toString() {
 		int priorityNumber = priorityRules_.length
-		/ ActionSwitch.NUM_PRIORITIES;
+				/ ActionSwitch.NUM_PRIORITIES;
 		StringBuffer buffer = new StringBuffer();
 		for (int i = 0; i < priorityRules_.length; i++) {
 			if (priorityRules_[i] != null) {
@@ -98,8 +98,8 @@ public class Policy {
 	}
 
 	/**
-	 * Evaluates the policy for applicable rules and applies the first to
-	 * trigger.
+	 * Evaluates the policy for applicable rules within each priority. If
+	 * multiple rules are applicable, only apply the highest priority ones.
 	 * 
 	 * @param observations
 	 *            The current observations.
@@ -110,12 +110,25 @@ public class Policy {
 		int priorityNumber = priorityRules_.length
 				/ ActionSwitch.NUM_PRIORITIES;
 		// Check every slot, from top-to-bottom until one activates
+		int firingPriority = -1;
 		for (int i = 0; i < priorityRules_.length; i++) {
+			// Check if the rule exists and if it does, if it applies.
 			if ((priorityRules_[i] != null)
 					&& (priorityRules_[i].evaluateCondition(observations,
 							actionSwitch))) {
-				priorityRules_[i].applyAction(actionSwitch, (i
-						/ priorityNumber));
+				// Check if this rule is at the same priority as other firing
+				// rules
+				//int thisPriority = i / priorityNumber;
+				int thisPriority = firingPriority;
+				if ((firingPriority == -1)
+						|| (thisPriority == firingPriority)) {
+					// Apply the rule and set the firing priority
+					priorityRules_[i].applyAction(actionSwitch,
+							(i / priorityNumber));
+					firingPriority = thisPriority;
+				} else {
+					return;
+				}
 			}
 		}
 	}
