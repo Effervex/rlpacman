@@ -3,6 +3,7 @@ package rlPacMan;
 public enum PacManHighAction {
 	TO_DOT, // Go towards the nearest dot
 	TO_POWER_DOT, // Go towards the nearest power dot
+	TO_FRUIT, // Go towards the fruit (NEW ACTION)
 	FROM_POWER_DOT, // Go in the direction opposite to the nearest power dot
 	TO_ED_GHOST, // Go towards the nearest edible ghost
 	FROM_GHOST, // Go in a direction opposite the nearest ghost

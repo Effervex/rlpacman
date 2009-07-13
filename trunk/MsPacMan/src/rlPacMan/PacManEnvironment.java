@@ -1,9 +1,11 @@
 package rlPacMan;
 
-import java.awt.event.KeyListener;
-
 import java.awt.Point;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -19,7 +21,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	private static final double DENSITY_RADIUS = 10;
-	public static final int PLAYER_SPEED = 30;
+	public static final int PLAYER_SPEED = 20;
 	private PacMan environment_;
 	private int prevScore_;
 	private Observation obs_;
@@ -28,20 +30,18 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private Set<Point> pacJunctions_;
 	private Map<Point, Integer> junctionSafety_;
 	private Point gridStart_;
+	private ArrayList<Double>[] observationFreqs_;
+	private boolean noteFreqs_ = false;
 
-	@Override
+	// @Override
 	public void env_cleanup() {
 		environment_ = null;
 	}
 
-	@Override
+	// @Override
 	public String env_init() {
 		environment_ = new PacMan();
 		environment_.init();
-		// Deregistering the key listeners
-		for (KeyListener kl : environment_.getKeyListeners()) {
-			// environment_.removeKeyListener(kl);
-		}
 
 		environment_.pack();
 		environment_.setVisible(true);
@@ -59,16 +59,32 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return null;
 	}
 
-	@Override
+	// @Override
 	public String env_message(String arg0) {
 		// Return the score
 		if (arg0.equals("score"))
 			return model_.m_player.m_score + "";
+		if (arg0.equals("noteObs")) {
+			noteFreqs_ = true;
+			observationFreqs_ = new ArrayList[PacManObservations.values().length];
+			for (int i = 0; i < observationFreqs_.length; i++) {
+				observationFreqs_[i] = new ArrayList<Double>();
+			}
+		}
+		if (arg0.equals("writeFreqs")) {
+			writeFreqs();
+		}
 		return null;
 	}
 
-	@Override
+	// @Override
 	public Observation env_start() {
+		environment_.reinit();
+
+		model_ = environment_.getGameModel();
+
+		// Initialise the observations
+		resetObservations();
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
 			if (environment_.experimentMode_)
@@ -91,10 +107,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (!environment_.experimentMode_) {
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
+			environment_.m_topCanvas.repaint();
 		} else {
 			environment_.m_gameUI.update(null);
 		}
-		environment_.m_topCanvas.repaint();
 		environment_.m_gameUI.m_bRedrawAll = false;
 
 		prevScore_ = 0;
@@ -102,7 +118,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return calculateObservations();
 	}
 
-	@Override
+	// @Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
@@ -120,8 +136,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		synchronized (environment_) {
 			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
 				environment_.tick(false);
-				if (model_.m_stage > 1) {
-					model_.m_stage = 1;
+				// If the agent has gone through 10 stages, end the episode
+				if (model_.m_stage > 10) {
+					return new Reward_observation_terminal(0,
+							calculateObservations(), true);
 				}
 			}
 		}
@@ -131,12 +149,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 			drawActions(arg0.intArray);
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
+			environment_.m_topCanvas.repaint();
 			environment_.m_bottomCanvas.repaint();
 		} else {
 			environment_.m_gameUI.update(null);
 			environment_.m_bottomCanvas.setActionsList(null);
 		}
-		environment_.m_topCanvas.repaint();
 		environment_.m_gameUI.m_bRedrawAll = false;
 
 		Reward_observation_terminal rot = new Reward_observation_terminal(
@@ -213,6 +231,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 								distanceGrid_,
 								(int) obs_.doubleArray[PacManObservations.NEAREST_ED_GHOST
 										.ordinal()]);
+				break;
+			case TO_FRUIT:
+				levelDirections = ActionConverter.toFruit(model_, thePlayer,
+						distanceGrid_);
 				break;
 			case FROM_GHOST:
 				levelDirections = ActionConverter.fromGhost(model_, thePlayer,
@@ -388,6 +410,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 		obs_.doubleArray[PacManObservations.TOTAL_DIST_TO_GHOSTS.ordinal()] = totalDistance;
 
+		// Calculate the fruit distance
+		if ((model_.m_fruit.m_nTicks2Show == 0)
+				&& (model_.m_fruit.m_bAvailable)) {
+			obs_.doubleArray[PacManObservations.NEAREST_FRUIT.ordinal()] = distanceGrid_[model_.m_fruit.m_locX][model_.m_fruit.m_locY];
+		}
+
+		if (noteFreqs_) {
+			// Update the observation values
+			for (int i = 1; i < obs_.doubleArray.length; i++) {
+				double val = obs_.doubleArray[i];
+				if (val < Integer.MAX_VALUE)
+					observationFreqs_[i].add(val);
+			}
+		}
+
 		return obs_;
 	}
 
@@ -430,10 +467,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		Ghost duplicate = (Ghost) ghost.clone();
 		// Setting up greedy behaviour
 		duplicate.m_bCanFollow = true;
-		duplicate.m_bCanPredict = false;
-		duplicate.m_bCanBackTrack = false;
 		duplicate.m_bCanUseNextBest = false;
 		duplicate.m_bInsaneAI = true;
+		duplicate.m_bChaseMode = true;
+		duplicate.m_bOldChaseMode = true;
 		duplicate.m_deltaMax = 1;
 		duplicate.m_deltaStartX = 0;
 		duplicate.m_destinationX = -1;
@@ -709,6 +746,36 @@ public class PacManEnvironment implements EnvironmentInterface {
 	}
 
 	/**
+	 * Writes the frequencies to file.
+	 */
+	private void writeFreqs() {
+		if (observationFreqs_ != null) {
+			try {
+				File output = new File("freqs");
+				output.createNewFile();
+				
+				FileWriter writer = new FileWriter(output);
+				BufferedWriter bf = new BufferedWriter(writer);
+				bf.write("CONSTANT=1.0\n");
+				
+				for (int i = 1; i < observationFreqs_.length; i++) {
+					Collections.sort(observationFreqs_[i]);
+					for (int j = 1; j <= 5; j++) {
+						int splitIndex = (int) (observationFreqs_[i].size() * (j / 6.0));
+						bf.write(observationFreqs_[i].get(splitIndex) + ",");
+					}
+					bf.write("\n");
+				}
+				
+				bf.close();
+				writer.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	/**
 	 * A static enclosing class for handling action conversions from high to
 	 * low.
 	 * 
@@ -924,6 +991,30 @@ public class PacManEnvironment implements EnvironmentInterface {
 				Player thePlayer, int[][] distanceGrid, int nearestGhostDist) {
 			return oppositeDirection(model, thePlayer, chaseGhost(model,
 					distanceGrid, nearestGhostDist, false));
+		}
+
+		/**
+		 * The to fruit action moves the player towards the fruit, taking the
+		 * shortest possible route.
+		 * 
+		 * @param model
+		 *            The current game model.
+		 * @param thePlayer
+		 *            The player.
+		 * @param distanceGrid
+		 *            The distance grid for the player.
+		 * @return The possible direction/s to take for chasing the fruit (if
+		 *         existant).
+		 */
+		public static ArrayList<PacManLowAction> toFruit(GameModel model,
+				Player thePlayer, int[][] distanceGrid) {
+			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
+			// If there is a fruit, chase it
+			if (model.m_fruit.m_nTicks2Show == 0) {
+				endDirections.add(followPath(model.m_fruit.m_locX,
+						model.m_fruit.m_locY, distanceGrid));
+			}
+			return endDirections;
 		}
 
 		/**

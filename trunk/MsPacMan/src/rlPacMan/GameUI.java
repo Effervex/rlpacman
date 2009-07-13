@@ -104,6 +104,7 @@ public class GameUI extends Canvas {
 
 	// Update will only redraw the changed game cells..
 	public void update(Graphics g) {
+		try {
 		if (g != null) {
 			if (m_bRedrawAll) {
 				m_bRedrawAll = false;
@@ -144,10 +145,14 @@ public class GameUI extends Canvas {
 		// Blitz buffer onto screen
 		if (g != null)
 			g.drawImage(m_offImage, 0, 0, this);
+		} catch (Exception e) {
+		//e.printStackTrace();
+		}
 	}
 
 	// Draws everything
 	public void paint(Graphics g) {
+		try {
 		Dimension dim = getSize();
 
 		// Create double buffer if it does not exist or is not
@@ -204,6 +209,9 @@ public class GameUI extends Canvas {
 
 		// Blitz buffer into actual graphic
 		g.drawImage(m_offImage, 0, 0, this);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	// Displays the About page containing the PAC-MAN banner
@@ -295,7 +303,7 @@ public class GameUI extends Canvas {
 
 	}
 
-	public void updateIntro(Graphics g) {
+	public void updateIntro(Graphics g) throws Exception {
 		int x, y;
 
 		if (m_imagePacman != null) {
@@ -433,7 +441,7 @@ public class GameUI extends Canvas {
 	}
 
 	// draw paused string
-	public void drawPausedString(Graphics g) {
+	public void drawPausedString(Graphics g) throws Exception {
 		int x;
 		int y;
 		FontMetrics fm;
@@ -457,7 +465,7 @@ public class GameUI extends Canvas {
 	}
 
 	// draw game over string
-	public void drawGameOverString(Graphics g) {
+	public void drawGameOverString(Graphics g) throws Exception {
 		int x;
 		int y;
 		FontMetrics fm;
@@ -481,7 +489,7 @@ public class GameUI extends Canvas {
 	}
 
 	// draw begin string
-	public void drawReadyString(Graphics g) {
+	public void drawReadyString(Graphics g) throws Exception {
 		int x;
 		int y;
 		FontMetrics fm;
@@ -512,7 +520,7 @@ public class GameUI extends Canvas {
 
 	// Draw Ghost Hide out Door.
 	// Treat door as special case in UI and always redraw it.
-	public void drawHideoutDoor(Graphics g) {
+	public void drawHideoutDoor(Graphics g) throws Exception {
 		g.setColor(Color.pink);
 		g.fillRect(m_gridInset + (m_gameModel.m_doorLocX - 1) * CELL_LENGTH,
 				m_gridInset + m_gameModel.m_doorLocY * CELL_LENGTH + WALL2
@@ -523,7 +531,7 @@ public class GameUI extends Canvas {
 	// and then draw the contents of the cell.
 	// bClearExtra is used to clean up the rendering of Things that exceed the
 	// boundbox of the each grid cell.
-	public void drawGameCell(Graphics g, int x, int y, boolean bClearExtra) {
+	public void drawGameCell(Graphics g, int x, int y, boolean bClearExtra) throws Exception {
 		int x1 = m_gridInset + x * CELL_LENGTH;
 		int y1 = m_gridInset + y * CELL_LENGTH;
 		int gameCell;
@@ -771,7 +779,7 @@ public class GameUI extends Canvas {
 	// cell, but it still rendering a part of itself to the previous cell.
 	// In this case, m_locationX and Y refer to the new cell, even though
 	// the thing is spilling over into the previous cell
-	public void redrawLastLocation(Graphics g, Thing thing) {
+	public void redrawLastLocation(Graphics g, Thing thing) throws Exception {
 		if (thing.m_lastLocX < 0 && thing.m_lastLocY < 0)
 			return;
 

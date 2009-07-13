@@ -24,7 +24,7 @@ public class PacMan extends JFrame {
 	/** The agent interfacing with this program. */
 	protected AgentInterface agent_;
 	protected KeyAdapter keyAdapter_;
-	
+
 	public boolean experimentMode_ = true;
 
 	public void init() {
@@ -65,6 +65,15 @@ public class PacMan extends JFrame {
 		validate();
 		// m_soundMgr = new SoundManager(this, getCodeBase());
 		// m_soundMgr.loadSoundClips();
+	}
+	
+	public void reinit() {
+		m_gameModel = new GameModel(this);
+		m_gameUI.m_gameModel = m_gameModel;
+		m_topCanvas.m_gameModel = m_gameModel;
+		m_bottomCanvas.m_gameModel = m_gameModel;
+		
+		m_globalTickCount = 0;
 	}
 
 	public URL getCodeBase() {
@@ -342,6 +351,8 @@ public class PacMan extends JFrame {
 		// Tick the sound manager (mainly to check if the Chomping loop needs to
 		// be stopped)
 		// m_soundMgr.tickSound();
+		
+		m_gameModel.swapModes();
 	}
 
 	// Ticked when the game is running the intro
@@ -681,8 +692,9 @@ class PacManKeyAdapter extends KeyAdapter {
 		case KeyEvent.VK_ESCAPE:
 			System.exit(0);
 			break;
-			
+
 		case KeyEvent.VK_SPACE:
+		case KeyEvent.VK_NUMPAD0:
 			m_pacMan.experimentMode_ = !m_pacMan.experimentMode_;
 			break;
 		}
