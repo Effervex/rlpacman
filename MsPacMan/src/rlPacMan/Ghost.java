@@ -1,8 +1,19 @@
 package rlPacMan;
 
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 class Ghost extends Thing {
+	// Blinky (Red) behaviour (Aggressive)
+	public static final byte BLINKY = 0;
+	// Pinky behaviour (Ambush)
+	public static final byte PINKY = 1;
+	// Inky (Blue) behaviour (Erratic)
+	public static final byte INKY = 2;
+	// Clyde (Orange) behaviour (Ignorant)
+	public static final byte CLYDE = 3;
+
 	int[] m_ghostMouthX; // X points of Ghost's crooked mouth when Pacman
 	// powersup
 	int[] m_ghostMouthY; // Y points of Ghost's crooked mouth when Pacman
@@ -14,9 +25,12 @@ class Ghost extends Thing {
 	int m_lastDirection;
 	int m_destinationX;
 	int m_destinationY;
-	int m_targetX; // The actual X target of this ghost. May not be related to the player 
-	int m_targetY; // The actual Y target of this ghost. May not be related to the player
+	int m_targetX; // The actual X target of this ghost. May not be related to
+	// the player
+	int m_targetY; // The actual Y target of this ghost. May not be related to
+	// the player
 	Color m_color;
+	byte m_type;
 	int m_nTicks2Exit; // Ticks before ghost is allowed to exit.
 	int m_nExitMilliSec; // Milliseconds before exiting.
 	int m_nTicks2Flee = 0; // How long the Ghost will run from Pacman
@@ -25,26 +39,57 @@ class Ghost extends Thing {
 	int m_eatenPoints; // Point worth for eaten Ghost
 	int m_nTicks2Popup; // Ticks to display eaten points
 	boolean m_bEnteringDoor = false;
+	boolean m_bChaseMode = false; // Chase Pacman, or scatter when false
+	boolean m_bOldChaseMode = false;
+	private int m_cornerX; // The ghost's corner to scatter to when chase mode
+	// is off.
+	private int m_cornerY; // The ghost's corner to scatter to when chase mode
+	// is off.
 
 	// Variables to toggle Ghost AI
-	boolean m_bCanFollow = false; // Can ghosts follow each other, i.e. Same
+	boolean m_bCanFollow = true; // Can ghosts follow each other, i.e. Same
 	// destination and direction
-	boolean m_bCanPredict = true; // Can ghosts predict pacman's destination
 	boolean m_bCanBackTrack = false; // Can ghost go back the direction they
 	// came
 	boolean m_bCanUseNextBest = true; // Can ghost try the next best direction
 	// first 25% of the time
 	boolean m_bInsaneAI = false; // No holds barred!
+	
 
 	Ghost(GameModel gameModel, byte type, int startX, int startY,
-			boolean bMiddle, Color color, int nExitMilliSec) {
+			boolean bMiddle, int nExitMilliSec) {
 		super(gameModel, type, startX, startY, bMiddle);
 		m_deltaMax = m_ghostDeltaMax;
 		m_destinationX = -1;
 		m_destinationY = -1;
 		m_targetX = -1;
 		m_targetY = -1;
-		m_color = color;
+
+		// Setting the ghosts colour and behaviour based on type
+		m_type = type;
+		switch (type) {
+		case BLINKY:
+			m_color = Color.RED;
+			m_cornerX = m_gameModel.m_gameSizeX - 1;
+			m_cornerY = 0;
+			break;
+		case PINKY:
+			m_color = Color.PINK;
+			m_cornerX = 0;
+			m_cornerY = 0;
+			break;
+		case INKY:
+			m_color = Color.CYAN;
+			m_cornerX = m_gameModel.m_gameSizeX - 1;
+			m_cornerY = m_gameModel.m_gameSizeY - 1;
+			break;
+		case CLYDE:
+			m_color = Color.ORANGE;
+			m_cornerX = 0;
+			m_cornerY = m_gameModel.m_gameSizeY - 1;
+			break;
+		}
+
 		m_bInsideRoom = true;
 		m_nExitMilliSec = nExitMilliSec;
 		m_nTicks2Exit = m_nExitMilliSec / gameModel.m_pacMan.m_delay;
@@ -56,8 +101,8 @@ class Ghost extends Thing {
 	 * @return A clone of the ghost.
 	 */
 	public Object clone() {
-		Ghost clone = new Ghost(m_gameModel, Thing.GHOST, m_locX, m_locY, true,
-				Color.WHITE, m_nExitMilliSec);
+		Ghost clone = new Ghost(m_gameModel, Ghost.BLINKY, m_locX, m_locY,
+				true, m_nExitMilliSec);
 		clone.m_lastDirection = m_lastDirection;
 		clone.m_destinationX = m_destinationX;
 		clone.m_destinationY = m_destinationY;
@@ -69,7 +114,8 @@ class Ghost extends Thing {
 		clone.m_eatenPoints = m_eatenPoints;
 		clone.m_nTicks2Popup = m_nTicks2Popup;
 		clone.m_bEnteringDoor = m_bEnteringDoor;
-
+		clone.m_cornerX = m_cornerX;
+		clone.m_cornerY = m_cornerY;
 		clone.m_bInsideRoom = m_bInsideRoom;
 
 		clone.m_locX = m_locX;
@@ -77,7 +123,7 @@ class Ghost extends Thing {
 		clone.m_lastLocX = m_lastLocX;
 		clone.m_lastLocY = m_lastLocY;
 		clone.m_direction = m_direction;
-		clone.m_startX = m_startX; 
+		clone.m_startX = m_startX;
 		clone.m_startY = m_startY;
 		clone.m_deltaStartX = m_deltaStartX;
 		return clone;
@@ -196,9 +242,9 @@ class Ghost extends Thing {
 			// if so, flash white.
 			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay
 					&& (m_nTicks2Flee % (200 / m_gameModel.m_pacMan.m_delay)) < (100 / m_gameModel.m_pacMan.m_delay))
-				g2.setColor(m_color.white);
+				g2.setColor(Color.WHITE);
 			else
-				g2.setColor(m_color.blue);
+				g2.setColor(Color.BLUE);
 		}
 
 		// If the ghost is eaten, then do not draw the body
@@ -298,7 +344,7 @@ class Ghost extends Thing {
 							(int) (ghostEyeY), (int) (ghostEyeWidth),
 							(int) ghostEyeHeight);
 
-			if (m_bInsaneAI)
+			if (m_bInsaneAI || m_bChaseMode)
 				g2.setColor(Color.red);
 			else
 				g2.setColor(Color.blue);
@@ -368,6 +414,7 @@ class Ghost extends Thing {
 							(int) (ghostEyeDiameter), (int) (ghostEyeDiameter));
 
 		}
+
 		m_boundingBox.setBounds((int) (ghostX), (int) (ghostY),
 				ghostHeadDiameter, ghostHeadDiameter);
 		m_boundingBox.grow(-ghostHeadDiameter / 4, -ghostHeadDiameter / 4);
@@ -376,8 +423,10 @@ class Ghost extends Thing {
 		// ghostHeight / 5);
 
 		// TODO: Draw bounding box for testing
-		// g2.setColor (Color.white);
-		// g2.drawRect (m_boundingBox.x, m_boundingBox.y, m_boundingBox.width,
+		// g2.setColor(m_color);
+		// g2
+		// .drawRect(m_targetX * gameUI.CELL_LENGTH, m_targetY
+		// * gameUI.CELL_LENGTH, m_boundingBox.width,
 		// m_boundingBox.height);
 
 	}
@@ -486,8 +535,7 @@ class Ghost extends Thing {
 				&& m_bEnteringDoor == false
 				&& m_bEaten == false
 				&& (m_destinationX != m_gameModel.m_doorLocX && m_destinationY != m_gameModel.m_doorLocY - 1)
-				&& (m_gameModel.m_pacMan.m_globalTickCount % m_gameModel.m_nTicks2Backoff) == 0
-				&& m_bInsaneAI == false) {
+				&& (m_bChaseMode != m_bOldChaseMode) && m_bInsaneAI == false) {
 			m_destinationX = -1;
 			m_destinationY = -1;
 			bBackoff = true;
@@ -517,48 +565,19 @@ class Ghost extends Thing {
 		// Get the next direction of the ghost.
 		// This is where different AIs can be plugged.
 		setNextDirection(prevDirection, bBackoff);
+		m_bOldChaseMode = m_bChaseMode;
 	}
 
 	void setNextDirection(byte prevDirection, boolean bBackoff) {
 		int deltaX, deltaY, targetX, targetY;
+		Point target;
 		Point nextLocation = new Point();
 		byte[] bestDirection = new byte[4];
 
-		// If the ghost is inside the room, he needs to move to the door to get
-		// out.
-		if (m_bInsideRoom) {
-			targetX = m_gameModel.m_doorLocX;
-			targetY = m_gameModel.m_doorLocY;
-		} else if (m_bEaten) {
-			// If the ghost is eaten, it needs to return to the hideout.
-			targetX = m_gameModel.m_doorLocX;
-			targetY = m_gameModel.m_doorLocY - 1;
+		target = setTarget();
 
-		} else {
-			// Otherwise, he is outside the door and chasing Pacman
-			if (!m_bInsaneAI && m_bCanPredict) {
-				// Get Pacman's destination and use that as the target.
-				getDestination(m_gameModel.m_player.m_direction,
-						m_gameModel.m_player.m_locX,
-						m_gameModel.m_player.m_locY, nextLocation, m_gameModel);
-				targetX = nextLocation.x;
-				targetY = nextLocation.y;
-
-			} else {
-				// Get Pacman's location and use that as the target.
-				targetX = m_gameModel.m_player.m_locX;
-				targetY = m_gameModel.m_player.m_locY;
-			}
-			
-			// Overriden to chase target if there is one
-			if ((m_targetX >= 0) && (m_targetX >= 0)) {
-				targetX = m_targetX;
-				targetY = m_targetY;
-			}
-		}
-
-		deltaX = m_locX - targetX;
-		deltaY = m_locY - targetY;
+		deltaX = m_locX - target.x;
+		deltaY = m_locY - target.y;
 
 		if (Math.abs(deltaX) > Math.abs(deltaY)) {
 			if (deltaX > 0) {
@@ -607,14 +626,20 @@ class Ghost extends Thing {
 			}
 		}
 
-		// There's a 50% chance that the ghost will try the sub-optimal
+		// There's a 20% chance that the ghost will try the sub-optimal
 		// direction first.
 		// This will keep the ghosts from following each other and to trap
 		// Pacman.
-		if (!m_bInsaneAI && m_bCanUseNextBest && Math.random() < .50) {
-			byte temp = bestDirection[0];
-			bestDirection[0] = bestDirection[1];
-			bestDirection[1] = temp;
+		if (!m_bInsaneAI && m_bCanUseNextBest && Math.random() < .2) {
+			ArrayList<Byte> directions = new ArrayList<Byte>();
+			directions.add(UP);
+			directions.add(DOWN);
+			directions.add(RIGHT);
+			directions.add(LEFT);
+			bestDirection[0] = directions.remove((int) (Math.random() * directions.size()));
+			bestDirection[1] = directions.remove((int) (Math.random() * directions.size()));
+			bestDirection[2] = directions.remove((int) (Math.random() * directions.size()));
+			bestDirection[3] = directions.remove((int) (Math.random() * directions.size()));
 		}
 
 		// If the ghost is fleeing and not eaten, then reverse the array of best
@@ -686,6 +711,123 @@ class Ghost extends Thing {
 		// REMOVE
 		// if (m_gameModel.m_ghosts[0] == this)
 		// System.out.println (m_direction + " " + targetX + " " + targetY);
+	}
+
+	/**
+	 * Sets the ghost's target, depending on what type of ghost it is.
+	 * 
+	 * @return The target location for the ghost to move towards.
+	 */
+	private Point setTarget() {
+		int targetX = 0;
+		int targetY = 0;
+
+		// If the ghost is inside the room, he needs to move to the door to get
+		// out.
+		if (m_bInsideRoom) {
+			targetX = m_gameModel.m_doorLocX;
+			targetY = m_gameModel.m_doorLocY;
+		} else if (m_bEaten) {
+			// If the ghost is eaten, it needs to return to the hideout.
+			targetX = m_gameModel.m_doorLocX;
+			targetY = m_gameModel.m_doorLocY - 1;
+
+		} else {
+			// Otherwise, he is outside the door and chasing Pacman
+			if (!m_bInsaneAI) {
+				// If chasing, go for Pacman
+				if (m_bChaseMode) {
+					// Not insanely chasing Pacman, using regular behaviour
+					switch (m_type) {
+					case BLINKY:
+						// Blinky simply goes for Pacman's current location
+						targetX = m_gameModel.m_player.m_locX;
+						targetY = m_gameModel.m_player.m_locY;
+						break;
+					case PINKY:
+					case INKY:
+						// Pinky goes for the location 4 tiles away from
+						// Pacman's
+						// location in the direction of Pacman.
+
+						// Inky sort of uses the same logic as Pinky for the
+						// first
+						// part of it's calculation.
+
+						int offset = 4;
+						if (m_type == INKY)
+							offset = 2;
+
+						// Set the target a certain offset from Pacman
+						targetX = m_gameModel.m_player.m_locX;
+						targetY = m_gameModel.m_player.m_locY;
+						switch (m_gameModel.m_player.m_direction) {
+						case Thing.UP:
+							targetY -= offset;
+							break;
+						case Thing.DOWN:
+							targetY += offset;
+							break;
+						case Thing.LEFT:
+							targetX -= offset;
+							break;
+						case Thing.RIGHT:
+							targetX += offset;
+							break;
+						}
+
+						// If we're looking at Pinky, break here
+						if (m_type == PINKY)
+							break;
+
+						// Continue calculations for Inky
+						int blinkyPosX = m_gameModel.m_ghosts[BLINKY].m_locX;
+						int blinkyPosY = m_gameModel.m_ghosts[BLINKY].m_locY;
+						targetX = (2 * targetX) - blinkyPosX;
+						targetY = (2 * targetY) - blinkyPosY;
+						break;
+					case CLYDE:
+						// Clyde's behaviour is greedy when distant, but
+						// ignorant
+						// when close to Pacman.
+
+						// Calculate the distance Clyde is from Pacman
+						double distance = Point.distance(
+								m_gameModel.m_player.m_locX,
+								m_gameModel.m_player.m_locY, m_locX, m_locY);
+						// If distant, go directly for Pacman
+						if (distance > 8) {
+							targetX = m_gameModel.m_player.m_locX;
+							targetY = m_gameModel.m_player.m_locY;
+						} else {
+							targetX = m_cornerX;
+							targetY = m_cornerY;
+						}
+					}
+				} else {
+					targetX = m_cornerX;
+					targetY = m_cornerY;
+				}
+			} else {
+				// Get Pacman's location and use that as the target.
+				targetX = m_gameModel.m_player.m_locX;
+				targetY = m_gameModel.m_player.m_locY;
+			}
+
+			// Overriden to chase target if there is one
+			if ((m_targetX >= 0) && (m_targetX >= 0)) {
+				targetX = m_targetX;
+				targetY = m_targetY;
+			}
+		}
+		// TODO Remove these and uncomment the previous code. Also remove draw
+		// code
+		// Modulo the x coordinate for wrapping
+		if ((targetX >= m_gameModel.m_gameSizeX) || (targetX < 0))
+			targetX = (targetX + m_gameModel.m_gameSizeX)
+					% m_gameModel.m_gameSizeX;
+
+		return new Point(targetX, targetY);
 	}
 
 	// This method returns true if this ghost is traveling to the same

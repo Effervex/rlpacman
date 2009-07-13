@@ -53,7 +53,7 @@ public class Policy {
 			if (priorityRules_[i] != null)
 				buffer
 						.append(RuleBase.getInstance().indexOf(
-								priorityRules_[i]));
+								priorityRules_[i], i));
 		}
 		buffer.append(DELIMITER + "END");
 		return buffer.toString();
@@ -89,9 +89,9 @@ public class Policy {
 		Policy policy = new Policy(split.length - 2);
 		for (int i = 1; i < split.length - 1; i++) {
 			// If there is a rule
-			if (!split[i].isEmpty()) {
+			if (split[i].length() != 0) {
 				policy.addRule(i - 1, RuleBase.getInstance().getRule(
-						Integer.parseInt(split[i])));
+						Integer.parseInt(split[i]), i - 1));
 			}
 		}
 		return policy;
@@ -108,7 +108,7 @@ public class Policy {
 	 */
 	public void evaluatePolicy(double[] observations, ActionSwitch actionSwitch) {
 		int priorityNumber = priorityRules_.length
-				/ ActionSwitch.NUM_PRIORITIES;
+				/ ActionSwitch.NUM_PRIORITIES + 1;
 		// Check every slot, from top-to-bottom until one activates
 		int firingPriority = -1;
 		for (int i = 0; i < priorityRules_.length; i++) {

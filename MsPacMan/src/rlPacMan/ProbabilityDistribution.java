@@ -202,72 +202,72 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			probabilities_.set(i, probabilities_.get(i) / sum);
 	}
 
-	@Override
+	//@Override
 	public int size() {
 		return values_.size();
 	}
 
-	@Override
+	//@Override
 	public boolean add(T arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public void clear() {
 		// TODO Auto-generated method stub
 
 	}
 
-	@Override
+	//@Override
 	public boolean contains(Object arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public boolean containsAll(Collection<?> arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public boolean isEmpty() {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public Iterator<T> iterator() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
+	//@Override
 	public boolean remove(Object arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public boolean removeAll(Collection<?> arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public boolean retainAll(Collection<?> arg0) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
-	@Override
+	//@Override
 	public Object[] toArray() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	@Override
+	//@Override
 	public <T> T[] toArray(T[] arg0) {
 		// TODO Auto-generated method stub
 		return null;

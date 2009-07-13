@@ -13,12 +13,10 @@ import org.rlcommunity.rlglue.codec.RLGlue;
 public class CrossEntropyExperiment {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
-	/** The size of the policy. */
-	private static final int POLICY_SIZE = 30;
 	/** The best policy found output file. */
-	private static final File POLICY_FILE = new File("bestPolicy.txt");
+	private final File policyFile_;
 	/** The generator states file. */
-	private static final File GENERATOR_FILE = new File("generatorOutput.txt");
+	private final File generatorFile_;
 	private static final String ELEMENT_DELIMITER = ",";
 	private static final String PROB_DELIMITER = ":";
 
@@ -36,6 +34,8 @@ public class CrossEntropyExperiment {
 	private ProbabilityDistribution<Integer> slotGenerator_;
 	/** The cross-entropy generators for the rules within the policy. */
 	private ProbabilityDistribution<Rule>[] ruleGenerators_;
+	/** The maximum size of the policy. */
+	private final int policySize_;
 	/** The number of rules present. */
 	private final int ruleCount_;
 	/** The time that the experiment started. */
@@ -61,29 +61,33 @@ public class CrossEntropyExperiment {
 	@SuppressWarnings("unchecked")
 	public CrossEntropyExperiment(int populationSize, int episodeCount,
 			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize) {
+			int policySize, boolean handCoded, String policyFile, String generatorFile) {
 		population_ = populationSize;
 		episodes_ = episodeCount;
 		selectionRatio_ = selectionRatio;
 		stepSize_ = stepSize;
 		slotDecayRate_ = slotDecayRate;
 		slotGenerator_ = new ProbabilityDistribution<Integer>();
+		policySize_ = policySize;
 		// Using hand-coded rules
 		ruleGenerators_ = new ProbabilityDistribution[policySize];
+		RuleBase.initInstance(handCoded, policySize);
 		// Filling the generators
 		for (int i = 0; i < policySize; i++) {
 			slotGenerator_.add(i, 0.5);
 			ruleGenerators_[i] = new ProbabilityDistribution<Rule>();
-			ruleGenerators_[i].addAll(RuleBase.getInstance(true).getRules());
+			ruleGenerators_[i].addAll(RuleBase.getInstance().getRules(i));
 		}
 		ruleCount_ = ruleGenerators_[0].size();
 
 		// Create the output files if necessary
+		policyFile_ = new File(policyFile);
+		generatorFile_ = new File(generatorFile);
 		try {
-			if (!POLICY_FILE.exists())
-				POLICY_FILE.createNewFile();
-			if (!GENERATOR_FILE.exists())
-				GENERATOR_FILE.createNewFile();
+			if (!policyFile_.exists())
+				policyFile_.createNewFile();
+			if (!generatorFile_.exists())
+				generatorFile_.createNewFile();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -109,12 +113,13 @@ public class CrossEntropyExperiment {
 	@SuppressWarnings("unchecked")
 	public CrossEntropyExperiment(int populationSize, int episodeCount,
 			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, String generatorFile) {
+			int policySize, boolean handCoded, String policyFile, String generatorFile,
+			String genInputFile) {
 		this(populationSize, episodeCount, selectionRatio, stepSize,
-				slotDecayRate, policySize);
-		// Load the generators from their previous state.
+				slotDecayRate, policySize, handCoded, policyFile, generatorFile);
+		// Load the generators from the input file
 		try {
-			loadGenerators(new File(generatorFile));
+			loadGenerators(new File(genInputFile));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -144,10 +149,10 @@ public class CrossEntropyExperiment {
 				RLGlue.RL_agent_message(pol.toParseableString());
 				System.out.println("Policy:");
 				System.out.println(pol);
-				
+
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-					RLGlue.RL_episode(0);
+					RLGlue.RL_episode(1000000);
 					score += Float.parseFloat(RLGlue.RL_env_message("score"));
 				}
 				score /= AVERAGE_ITERATIONS;
@@ -164,23 +169,24 @@ public class CrossEntropyExperiment {
 
 			// Update the weights for all distributions using only the elite
 			// samples
-			episodeAverage[t] = updateWeights(pvs.iterator(), population_ * selectionRatio_);
+			episodeAverage[t] = updateWeights(pvs.iterator(), population_
+					* selectionRatio_);
+			
+			// Save the results at each episode
+			try {
+				saveGenerators(t);
+				saveBestPolicy(bestPolicy);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
-		// Save the final results
-		try {
-			saveGenerators();
-			saveBestPolicy(bestPolicy);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
 		// Output the episode averages
 		System.out.println("Average episode elite scores:");
 		for (int e = 0; e < episodeAverage.length; e++) {
 			System.out.println(episodeAverage[e]);
 		}
-		
+
 		RLGlue.RL_cleanup();
 	}
 
@@ -217,7 +223,7 @@ public class CrossEntropyExperiment {
 	 *            The best policy, in string format.
 	 */
 	private void saveBestPolicy(PolicyValue bestPolicy) throws Exception {
-		FileWriter wr = new FileWriter(POLICY_FILE);
+		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		buf.write(bestPolicy.getPolicy().toParseableString() + "\n");
@@ -233,8 +239,8 @@ public class CrossEntropyExperiment {
 	 * @throws Exception
 	 *             Should something go awry.
 	 */
-	private void saveGenerators() throws Exception {
-		FileWriter wr = new FileWriter(GENERATOR_FILE);
+	private void saveGenerators(int episode) throws Exception {
+		FileWriter wr = new FileWriter(generatorFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		StringBuffer strBuffer = new StringBuffer();
@@ -257,6 +263,7 @@ public class CrossEntropyExperiment {
 			strBuffer.append("\n");
 			buf.write(strBuffer.toString());
 		}
+		buf.write(episode);
 
 		buf.close();
 		wr.close();
@@ -288,23 +295,23 @@ public class CrossEntropyExperiment {
 			for (String element : split) {
 				String[] eleSplit = element.split(PROB_DELIMITER);
 				ruleGenerators_[s].set(RuleBase.getInstance().getRule(
-						Integer.parseInt(eleSplit[0])), Double
+						Integer.parseInt(eleSplit[0]), s), Double
 						.parseDouble(eleSplit[1]));
 			}
 		}
-		
+
 		buf.close();
 		reader.close();
 	}
 
 	private Policy paperPolicy() {
 		Policy pol = new Policy(9);
-		pol.addRule(0, RuleBase.getInstance().getRule(2));
-		pol.addRule(1, RuleBase.getInstance().getRule(12));
-		pol.addRule(3, RuleBase.getInstance().getRule(22));
-		pol.addRule(4, RuleBase.getInstance().getRule(34));
-		pol.addRule(5, RuleBase.getInstance().getRule(26));
-		pol.addRule(6, RuleBase.getInstance().getRule(0));
+		pol.addRule(0, RuleBase.getInstance().getRule(2, 0));
+		pol.addRule(1, RuleBase.getInstance().getRule(12, 0));
+		pol.addRule(3, RuleBase.getInstance().getRule(22, 0));
+		pol.addRule(4, RuleBase.getInstance().getRule(34, 0));
+		pol.addRule(5, RuleBase.getInstance().getRule(26, 0));
+		pol.addRule(6, RuleBase.getInstance().getRule(0, 0));
 		return pol;
 	}
 
@@ -319,7 +326,7 @@ public class CrossEntropyExperiment {
 	 */
 	private float updateWeights(Iterator<PolicyValue> iter, double numElite) {
 		// Keep count of the rules seen (and slots used)
-		int[][] slotCounter = new int[POLICY_SIZE][1 + ruleCount_];
+		int[][] slotCounter = new int[policySize_][1 + ruleCount_];
 		float total = 0;
 		// Only selecting the top elite samples
 		for (int k = 0; k < numElite; k++) {
@@ -334,13 +341,13 @@ public class CrossEntropyExperiment {
 				if (polRules[i] != null) {
 					slotCounter[i][0]++;
 					slotCounter[i][1 + RuleBase.getInstance().indexOf(
-							polRules[i])]++;
+							polRules[i], i)]++;
 				}
 			}
 		}
 
 		// Apply the weights to the distributions
-		double indivStepSize = stepSize_ / numElite;
+		double indivStepSize = stepSize_;
 		for (int s = 0; s < slotGenerator_.size(); s++) {
 			// Change the slot probabilities, factoring in decay
 			double ratio = slotCounter[s][0] / numElite;
@@ -361,7 +368,7 @@ public class CrossEntropyExperiment {
 			if (!ruleGenerators_[s].sumsToOne())
 				ruleGenerators_[s].normaliseProbs();
 		}
-		
+
 		return (float) (total / numElite);
 	}
 
@@ -373,11 +380,11 @@ public class CrossEntropyExperiment {
 	 *         distributions.
 	 */
 	private Policy generatePolicy() {
-		Policy policy = new Policy(POLICY_SIZE);
+		Policy policy = new Policy(policySize_);
 
 		// Run through the policy, adding any rule with probability p and a
 		// particular rule with probability q.
-		for (int i = 0; i < POLICY_SIZE; i++) {
+		for (int i = 0; i < policySize_; i++) {
 			if (slotGenerator_.bernoulliSample(i) != null) {
 				policy.addRule(i, ruleGenerators_[i].sample());
 			}
@@ -393,18 +400,21 @@ public class CrossEntropyExperiment {
 	 */
 	public static void main(String[] args) {
 		CrossEntropyExperiment theExperiment = null;
-		if (args.length == 6) {
+		if (args.length == 9) {
 			theExperiment = new CrossEntropyExperiment(Integer
 					.parseInt(args[0]), Integer.parseInt(args[1]), Double
 					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]));
-		} else if (args.length == 7) {
+					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean.parseBoolean(args[6]),
+					args[7], args[8]);
+		} else if (args.length == 10) {
 			theExperiment = new CrossEntropyExperiment(Integer
 					.parseInt(args[0]), Integer.parseInt(args[1]), Double
 					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), args[6]);
+					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean.parseBoolean(args[6]),
+					args[7], args[8], args[9]);
 		}
 		theExperiment.runExperiment();
+		System.exit(0);
 	}
 
 	/**
@@ -451,7 +461,7 @@ public class CrossEntropyExperiment {
 			return value_;
 		}
 
-		@Override
+		// @Override
 		public int compareTo(PolicyValue o) {
 			if ((o == null) || (!(o instanceof PolicyValue)))
 				return -1;
@@ -468,7 +478,7 @@ public class CrossEntropyExperiment {
 			}
 		}
 
-		@Override
+		// @Override
 		public boolean equals(Object obj) {
 			if ((obj == null) || (!(obj instanceof PolicyValue)))
 				return false;
@@ -481,7 +491,7 @@ public class CrossEntropyExperiment {
 			return false;
 		}
 
-		@Override
+		// @Override
 		public int hashCode() {
 			return (int) (value_ * policy_.hashCode());
 		}

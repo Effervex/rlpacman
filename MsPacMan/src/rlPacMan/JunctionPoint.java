@@ -13,7 +13,7 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 		distance_ = dist;
 	}
 
-	@Override
+	//@Override
 	public int compareTo(JunctionPoint otherPoint) {
 		// Mainly comaparable by distance
 		if (otherPoint.distance_ < distance_)
@@ -29,7 +29,7 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 		return 0;
 	}
 
-	@Override
+	//@Override
 	public boolean equals(Object obj) {
 		if ((obj == null) || (!(obj instanceof JunctionPoint)))
 			return false;
@@ -42,7 +42,7 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 		return false;
 	}
 
-	@Override
+	//@Override
 	public int hashCode() {
 		return distance_ + direction_ + location_.hashCode();
 	}

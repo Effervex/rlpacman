@@ -1,5 +1,7 @@
 package rlPacMan;
 
+import java.util.ArrayList;
+
 /**
  * This class represents a rule given in and 'if (condition) then (action)'. The
  * condition is given as an inequity/s from PacManObservations and the action is
@@ -8,8 +10,12 @@ package rlPacMan;
  * @author Samuel J. Sarjant
  */
 public class Rule {
-	public static boolean GREATER_THAN = true; // X > 5
-	public static boolean LESS_THAN = false; // X < 5
+	public static final boolean GREATER_THAN = true; // X > 5
+	public static final boolean LESS_THAN = false; // X < 5
+	public static final String OBSERVATION = "o";
+	public static final String ACTION = "a";
+	public static final String PRE_SEPARATOR = ":";
+	public static final String ACTION_SEPARATOR = "=";
 
 	private PacManObservations[] conditionObs_;
 	private PacManHighAction conditionAc_;
@@ -192,7 +198,7 @@ public class Rule {
 		else
 			actionSwitch.switchOff(action_);
 	}
-	
+
 	/**
 	 * Checks if this rule is an activation rule.
 	 * 
@@ -200,6 +206,120 @@ public class Rule {
 	 */
 	public boolean isActivator() {
 		return actionOn_;
+	}
+
+	/**
+	 * Converts the rule into parseable format.
+	 * 
+	 * @return A parsable String representing the rule.
+	 */
+	public String toParseableString() {
+		StringBuffer buffer = new StringBuffer();
+
+		// Just action case
+		if (conditionObs_.length == 0) {
+			buffer.append(ACTION + PRE_SEPARATOR + conditionAc_.ordinal()
+					+ PRE_SEPARATOR + conditionOps_[0]);
+		} else {
+			buffer.append(OBSERVATION + PRE_SEPARATOR + conditionObs_[0]
+					+ PRE_SEPARATOR + conditionOps_[0] + PRE_SEPARATOR
+					+ conditionVals_[0]);
+			// Check for more observations
+			int i = 1;
+			if (conditionObs_.length > 1) {
+				for (; i < conditionObs_.length; i++) {
+					buffer.append(PRE_SEPARATOR);
+					buffer.append(OBSERVATION + PRE_SEPARATOR
+							+ conditionObs_[i] + PRE_SEPARATOR
+							+ conditionOps_[i] + PRE_SEPARATOR
+							+ conditionVals_[i]);
+				}
+			}
+			// Check for action case
+			if (conditionAc_ != null) {
+				buffer.append(PRE_SEPARATOR);
+				buffer.append(ACTION + PRE_SEPARATOR + conditionAc_.ordinal()
+						+ PRE_SEPARATOR + conditionOps_[i]);
+			}
+		}
+
+		// Then action
+		buffer.append(ACTION_SEPARATOR);
+		buffer.append(action_.ordinal() + PRE_SEPARATOR + actionOn_);
+		return buffer.toString();
+	}
+
+	/**
+	 * Parses a rule from a string representation of the rule.
+	 * 
+	 * @param ruleString
+	 *            The rule in String form.
+	 * @return The Rule from the String or null.
+	 */
+	public static Rule parseRule(String ruleString) {
+		ArrayList<Integer> observations = new ArrayList<Integer>();
+		ArrayList<Boolean> operators = new ArrayList<Boolean>();
+		ArrayList<Integer> values = new ArrayList<Integer>();
+		int preAction = -1;
+		PacManHighAction action = null;
+		boolean actionVal = false;
+
+		String[] split = ruleString.split(ACTION_SEPARATOR);
+		String[] preconditionSplit = split[0].split(PRE_SEPARATOR);
+
+		// Parsing the pre conditions
+		int index = 0;
+		while (index < preconditionSplit.length) {
+			if (preconditionSplit[index].equals(OBSERVATION)) {
+				// Observation splits
+				index++;
+				observations.add(Integer.parseInt(preconditionSplit[index]));
+				index++;
+				operators.add(Boolean.parseBoolean(preconditionSplit[index]));
+				index++;
+				values.add(Integer.parseInt(preconditionSplit[index]));
+				index++;
+			} else if (preconditionSplit[index].equals(ACTION)) {
+				// Action splits
+				index++;
+				preAction = Integer.parseInt(preconditionSplit[index]);
+				index++;
+				operators.add(Boolean.parseBoolean(preconditionSplit[index]));
+				index++;
+			}
+		}
+
+		// Parsing the action
+		String[] actionSplit = split[1].split(PRE_SEPARATOR);
+		action = PacManHighAction.values()[Integer.parseInt(actionSplit[0])];
+		actionVal = Boolean.parseBoolean(actionSplit[1]);
+
+		// Choosing the appropriate constructor
+		if (observations.isEmpty()) {
+			// One action
+			return new Rule(PacManHighAction.values()[preAction], operators
+					.get(0), action, actionVal);
+		} else {
+			if (preAction != -1) {
+				// One obs and one action
+				return new Rule(
+						PacManObservations.values()[observations.get(0)],
+						operators.get(0), values.get(0), PacManHighAction
+								.values()[preAction], operators.get(1), action,
+						actionVal);
+			} else {
+				if (observations.size() == 1) {
+					return new Rule(PacManObservations.values()[observations
+							.get(0)], operators.get(0), values.get(0), action,
+							actionVal);
+				} else {
+					return new Rule(PacManObservations.values()[observations
+							.get(0)], operators.get(0), values.get(0),
+							PacManObservations.values()[observations.get(1)],
+							operators.get(1), values.get(1), action, actionVal);
+				}
+			}
+		}
 	}
 
 	/**
@@ -225,9 +345,9 @@ public class Rule {
 			if (conditionAc_ != null) {
 				buffer.append("and ");
 				actionToString(buffer, conditionAc_, conditionOps_[i]);
-			}	
+			}
 		}
-		
+
 		// Then action
 		buffer.append("then ");
 		actionToString(buffer, action_, actionOn_);
@@ -237,8 +357,10 @@ public class Rule {
 	/**
 	 * Appends an observation in string format.
 	 * 
-	 * @param buffer The StringBuffer to append to.
-	 * @param index The index of the observation.
+	 * @param buffer
+	 *            The StringBuffer to append to.
+	 * @param index
+	 *            The index of the observation.
 	 */
 	private void observationToString(StringBuffer buffer, int index) {
 		buffer.append(conditionObs_[index]);
@@ -252,11 +374,15 @@ public class Rule {
 	/**
 	 * Appends an action in string format.
 	 * 
-	 * @param buffer The StringBuffer to append to.
-	 * @param action The action.
-	 * @param switched The action switch.
+	 * @param buffer
+	 *            The StringBuffer to append to.
+	 * @param action
+	 *            The action.
+	 * @param switched
+	 *            The action switch.
 	 */
-	private void actionToString(StringBuffer buffer, PacManHighAction action, boolean switched) {
+	private void actionToString(StringBuffer buffer, PacManHighAction action,
+			boolean switched) {
 		buffer.append(action);
 		if (switched)
 			buffer.append("+ ");
