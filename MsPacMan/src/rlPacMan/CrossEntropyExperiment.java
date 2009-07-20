@@ -124,6 +124,39 @@ public class CrossEntropyExperiment {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * A constructor for the typical arguments plus a state of the generators
+	 * file.
+	 * 
+	 * @param populationSize
+	 *            The size of the population used in calculations.
+	 * @param episodeCount
+	 *            The number of episodes to perform.
+	 * @param selectionRatio
+	 *            The percentage of 'elite' samples to use from the population.
+	 * @param stepSize
+	 *            The step size for learning weights.
+	 * @param slotDecayRate
+	 *            The rate at which the slot probabilities decay per episode.
+	 * @param policySize
+	 *            The maximum number of rules in the policy.
+	 */
+	@SuppressWarnings("unchecked")
+	public CrossEntropyExperiment(int populationSize, int episodeCount,
+			double selectionRatio, double stepSize, double slotDecayRate,
+			int policySize, String ruleFile, String policyFile, String generatorFile,
+			String genInputFile) {
+		this(populationSize, episodeCount, selectionRatio, stepSize,
+				slotDecayRate, policySize, false, policyFile, generatorFile);
+		// Load the generators from the input file
+		try {
+			RuleBase.initInstance(new File(ruleFile));
+			loadGenerators(new File(genInputFile));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 	/**
 	 * Runs the experiment.
@@ -146,7 +179,8 @@ public class CrossEntropyExperiment {
 				Policy pol = generatePolicy();
 				// pol = paperPolicy();
 				// Send the agent a generated policy
-				RLGlue.RL_agent_message(pol.toParseableString());
+				//RLGlue.RL_agent_message(pol.toParseableString());
+				RLGlue.RL_agent_message("Policy,,,,7,,,,,,,,,,,71,,,40,,,88,,49,,,,,37,,12,97,,,7,,,,91,,,,,,,,,73,,,53,77,,,63,,27,,,,,,,79,80,,,12,,69,73,80,,,,47,,,,,87,,,,11,47,,,,,,,,37,68,,,,,,,END");
 				System.out.println("Policy:");
 				System.out.println(pol);
 
@@ -412,6 +446,12 @@ public class CrossEntropyExperiment {
 					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
 					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean.parseBoolean(args[6]),
 					args[7], args[8], args[9]);
+		} else if (args.length == 11) {
+			theExperiment = new CrossEntropyExperiment(Integer
+					.parseInt(args[0]), Integer.parseInt(args[1]), Double
+					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
+					.parseDouble(args[4]), Integer.parseInt(args[5]), args[7],
+					args[8], args[9], args[10]);
 		}
 		theExperiment.runExperiment();
 		System.exit(0);

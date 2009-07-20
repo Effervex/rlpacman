@@ -74,7 +74,7 @@ public class RuleBase {
 			BufferedReader bf = new BufferedReader(reader);
 
 			String input = null;
-			while (!(input = bf.readLine()).equals("")) {
+			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
 				ArrayList<Rule> ruleBase = new ArrayList<Rule>();
 				// Split the base into rules
 				String[] split = input.split(RULE_DELIMITER);
@@ -113,6 +113,8 @@ public class RuleBase {
 				}
 				bf.write("\n");
 			}
+
+			System.out.println("Random rulebases saved to: " + ruleBaseFile);
 
 			bf.close();
 			writer.close();
@@ -389,6 +391,18 @@ public class RuleBase {
 	 */
 	public static void initInstance(boolean handCoded, int policySize) {
 		instance_ = new RuleBase(handCoded, policySize);
+		if (!handCoded) {
+			try {
+				File ruleBaseFile = new File("ruleBase.txt");
+				if (!ruleBaseFile.exists())
+					ruleBaseFile.createNewFile();
+				instance_.saveRulesToFile(ruleBaseFile);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
 	}
 
 	/**
