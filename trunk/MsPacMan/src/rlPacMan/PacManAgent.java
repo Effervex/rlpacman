@@ -34,6 +34,7 @@ public class PacManAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.substring(0, Policy.PREFIX.length()).equals(Policy.PREFIX)) {
 			policy_ = Policy.parsePolicy(arg0);
+			System.out.println(policy_);
 		}
 		return null;
 	}

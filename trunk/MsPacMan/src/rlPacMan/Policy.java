@@ -10,6 +10,7 @@ public class Policy {
 	public static final char DELIMITER = ',';
 	/** The rules of this policy, under their respective priorites. */
 	private Rule[] priorityRules_;
+	private boolean[] triggered_;
 
 	/**
 	 * A constructor for creating a new policy.
@@ -20,6 +21,7 @@ public class Policy {
 	@SuppressWarnings("unchecked")
 	public Policy(int policySize) {
 		priorityRules_ = new Rule[policySize];
+		triggered_ = new boolean[policySize];
 	}
 
 	/**
@@ -44,6 +46,20 @@ public class Policy {
 	}
 
 	/**
+	 * Gets the rules that fired from this policy.
+	 * 
+	 * @return The rules that fired in this policy
+	 */
+	public Rule[] getFiringRules() {
+		Rule[] firedRules = new Rule[priorityRules_.length];
+		for (int i = 0; i < firedRules.length; i++) {
+			if (triggered_[i])
+				firedRules[i] = priorityRules_[i];
+		}
+		return firedRules;
+	}
+
+	/**
 	 * Returns a string version of the policy, parseable by an agent.
 	 */
 	public String toParseableString() {
@@ -51,9 +67,8 @@ public class Policy {
 		for (int i = 0; i < priorityRules_.length; i++) {
 			buffer.append(DELIMITER);
 			if (priorityRules_[i] != null)
-				buffer
-						.append(RuleBase.getInstance().indexOf(
-								priorityRules_[i], i));
+				buffer.append(RuleBase.getInstance().indexOf(priorityRules_[i],
+						i));
 		}
 		buffer.append(DELIMITER + "END");
 		return buffer.toString();
@@ -118,10 +133,9 @@ public class Policy {
 							actionSwitch))) {
 				// Check if this rule is at the same priority as other firing
 				// rules
-				//int thisPriority = i / priorityNumber;
+				// int thisPriority = i / priorityNumber;
 				int thisPriority = firingPriority;
-				if ((firingPriority == -1)
-						|| (thisPriority == firingPriority)) {
+				if ((firingPriority == -1) || (thisPriority == firingPriority)) {
 					// Apply the rule and set the firing priority
 					priorityRules_[i].applyAction(actionSwitch,
 							(i / priorityNumber));

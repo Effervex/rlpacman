@@ -166,7 +166,7 @@ public class Rule {
 			PacManObservations obs = conditionObs_[i];
 			// X > Value (failure)
 			if ((conditionOps_[i] == GREATER_THAN)
-					&& (observations[obs.ordinal()] <= conditionVals_[i])) {
+					&& (observations[obs.ordinal()] < conditionVals_[i])) {
 				return false;
 			} else if ((conditionOps_[i] == LESS_THAN)
 					&& (observations[obs.ordinal()] >= conditionVals_[i])) {
@@ -221,7 +221,7 @@ public class Rule {
 			buffer.append(ACTION + PRE_SEPARATOR + conditionAc_.ordinal()
 					+ PRE_SEPARATOR + conditionOps_[0]);
 		} else {
-			buffer.append(OBSERVATION + PRE_SEPARATOR + conditionObs_[0]
+			buffer.append(OBSERVATION + PRE_SEPARATOR + conditionObs_[0].ordinal()
 					+ PRE_SEPARATOR + conditionOps_[0] + PRE_SEPARATOR
 					+ conditionVals_[0]);
 			// Check for more observations
@@ -230,7 +230,7 @@ public class Rule {
 				for (; i < conditionObs_.length; i++) {
 					buffer.append(PRE_SEPARATOR);
 					buffer.append(OBSERVATION + PRE_SEPARATOR
-							+ conditionObs_[i] + PRE_SEPARATOR
+							+ conditionObs_[i].ordinal() + PRE_SEPARATOR
 							+ conditionOps_[i] + PRE_SEPARATOR
 							+ conditionVals_[i]);
 				}
@@ -259,7 +259,7 @@ public class Rule {
 	public static Rule parseRule(String ruleString) {
 		ArrayList<Integer> observations = new ArrayList<Integer>();
 		ArrayList<Boolean> operators = new ArrayList<Boolean>();
-		ArrayList<Integer> values = new ArrayList<Integer>();
+		ArrayList<Double> values = new ArrayList<Double>();
 		int preAction = -1;
 		PacManHighAction action = null;
 		boolean actionVal = false;
@@ -277,7 +277,7 @@ public class Rule {
 				index++;
 				operators.add(Boolean.parseBoolean(preconditionSplit[index]));
 				index++;
-				values.add(Integer.parseInt(preconditionSplit[index]));
+				values.add(Double.parseDouble(preconditionSplit[index]));
 				index++;
 			} else if (preconditionSplit[index].equals(ACTION)) {
 				// Action splits
@@ -323,6 +323,7 @@ public class Rule {
 	}
 
 	/**
+
 	 * Creates a string representation of the rule.
 	 */
 	public String toString() {
@@ -365,7 +366,7 @@ public class Rule {
 	private void observationToString(StringBuffer buffer, int index) {
 		buffer.append(conditionObs_[index]);
 		if (conditionOps_[index] == GREATER_THAN)
-			buffer.append(">");
+			buffer.append(">=");
 		else
 			buffer.append("<");
 		buffer.append(conditionVals_[index] + " ");
