@@ -101,10 +101,10 @@ public class Thing
    public static boolean getDestination (int direction, int locX, int locY, Point point, GameModel model)
    {
       // If the request direction is blocked by a wall, then just return the current location
-      if ((direction == UP && (model.m_gameState[locX][locY] & model.GS_NORTH) != 0) ||
-          (direction == LEFT && (model.m_gameState[locX][locY] & model.GS_WEST) != 0) ||
-          (direction == DOWN && (model.m_gameState[locX][locY] & model.GS_SOUTH) != 0) ||
-          (direction == RIGHT && (model.m_gameState[locX][locY] & model.GS_EAST) != 0))
+      if ((direction == UP && (model.m_gameState[locX][locY] & GameModel.GS_NORTH) != 0) ||
+          (direction == LEFT && (model.m_gameState[locX][locY] & GameModel.GS_WEST) != 0) ||
+          (direction == DOWN && (model.m_gameState[locX][locY] & GameModel.GS_SOUTH) != 0) ||
+          (direction == RIGHT && (model.m_gameState[locX][locY] & GameModel.GS_EAST) != 0))
       {
          point.setLocation (locX, locY);
          return false;
@@ -143,10 +143,10 @@ public class Thing
       {
          if (direction == UP || direction == DOWN)
          {
-            if ((model.m_gameState[locX][locY] & model.GS_EAST) == 0 ||
-                (model.m_gameState[locX][locY] & model.GS_WEST) == 0 ||
-                (model.m_gameState[locX][locY] & model.GS_NORTH) != 0 ||
-                (model.m_gameState[locX][locY] & model.GS_SOUTH) != 0)  
+            if ((model.m_gameState[locX][locY] & GameModel.GS_EAST) == 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_WEST) == 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_NORTH) != 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_SOUTH) != 0)  
             {
                point.setLocation (locX, locY);
                break;
@@ -173,10 +173,10 @@ public class Thing
                }
             }
          } else {
-            if ((model.m_gameState[locX][locY] & model.GS_NORTH) == 0 ||
-                (model.m_gameState[locX][locY] & model.GS_SOUTH) == 0 ||
-                (model.m_gameState[locX][locY] & model.GS_EAST) != 0 ||
-                (model.m_gameState[locX][locY] & model.GS_WEST) != 0)  
+            if ((model.m_gameState[locX][locY] & GameModel.GS_NORTH) == 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_SOUTH) == 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_EAST) != 0 ||
+                (model.m_gameState[locX][locY] & GameModel.GS_WEST) != 0)  
             {
                point.setLocation (locX, locY);
                break;
