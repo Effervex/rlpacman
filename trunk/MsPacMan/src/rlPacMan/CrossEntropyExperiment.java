@@ -18,7 +18,6 @@ public class CrossEntropyExperiment {
 	/** The generator states file. */
 	private final File generatorFile_;
 	private static final String ELEMENT_DELIMITER = ",";
-	private static final String PROB_DELIMITER = ":";
 
 	/** The population size of the experiment. */
 	private int population_;
@@ -61,7 +60,8 @@ public class CrossEntropyExperiment {
 	@SuppressWarnings("unchecked")
 	public CrossEntropyExperiment(int populationSize, int episodeCount,
 			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, boolean handCoded, String policyFile, String generatorFile) {
+			int policySize, boolean handCoded, String policyFile,
+			String generatorFile) {
 		population_ = populationSize;
 		episodes_ = episodeCount;
 		selectionRatio_ = selectionRatio;
@@ -113,8 +113,8 @@ public class CrossEntropyExperiment {
 	@SuppressWarnings("unchecked")
 	public CrossEntropyExperiment(int populationSize, int episodeCount,
 			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, boolean handCoded, String policyFile, String generatorFile,
-			String genInputFile) {
+			int policySize, boolean handCoded, String policyFile,
+			String generatorFile, String genInputFile) {
 		this(populationSize, episodeCount, selectionRatio, stepSize,
 				slotDecayRate, policySize, handCoded, policyFile, generatorFile);
 		// Load the generators from the input file
@@ -124,7 +124,7 @@ public class CrossEntropyExperiment {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * A constructor for the typical arguments plus a state of the generators
 	 * file.
@@ -145,8 +145,8 @@ public class CrossEntropyExperiment {
 	@SuppressWarnings("unchecked")
 	public CrossEntropyExperiment(int populationSize, int episodeCount,
 			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, String ruleFile, String policyFile, String generatorFile,
-			String genInputFile) {
+			int policySize, String ruleFile, String policyFile,
+			String generatorFile, String genInputFile) {
 		this(populationSize, episodeCount, selectionRatio, stepSize,
 				slotDecayRate, policySize, false, policyFile, generatorFile);
 		// Load the generators from the input file
@@ -206,7 +206,7 @@ public class CrossEntropyExperiment {
 			// samples
 			episodeAverage[t] = updateWeights(pvs.iterator(), population_
 					* selectionRatio_);
-			
+
 			// Save the results at each episode
 			try {
 				saveGenerators(t);
@@ -281,23 +281,22 @@ public class CrossEntropyExperiment {
 		StringBuffer strBuffer = new StringBuffer();
 		// Write the slot generator
 		for (int i = 0; i < slotGenerator_.size(); i++) {
-			strBuffer.append(i + PROB_DELIMITER + slotGenerator_.getProb(i)
-					+ ELEMENT_DELIMITER);
+			strBuffer.append(slotGenerator_.getProb(i) + ELEMENT_DELIMITER);
 		}
 		strBuffer.append("\n");
 		buf.write(strBuffer.toString());
 		// Write the rule generators
-		for (int r = 0; r < ruleGenerators_.length; r++) {
+		for (int slot = 0; slot < ruleGenerators_.length; slot++) {
 			strBuffer = new StringBuffer();
-			for (int i = 0; i < ruleGenerators_[r].size(); i++) {
-				strBuffer.append(i
-						+ PROB_DELIMITER
-						+ ruleGenerators_[r].getProb(ruleGenerators_[r]
-								.getElement(i)) + ELEMENT_DELIMITER);
+			for (int i = 0; i < ruleGenerators_[slot].size(); i++) {
+				strBuffer.append(ruleGenerators_[slot]
+						.getProb(ruleGenerators_[slot].getElement(i))
+						+ ELEMENT_DELIMITER);
 			}
 			strBuffer.append("\n");
 			buf.write(strBuffer.toString());
 		}
+		// TODO Also save the rules
 		buf.write(episode);
 
 		buf.close();
@@ -318,20 +317,15 @@ public class CrossEntropyExperiment {
 
 		// Parse the slots
 		String[] split = buf.readLine().split(ELEMENT_DELIMITER);
-		for (String element : split) {
-			String[] eleSplit = element.split(PROB_DELIMITER);
-			slotGenerator_.set(Integer.parseInt(eleSplit[0]), Double
-					.parseDouble(eleSplit[1]));
+		for (int i = 0; i < split.length; i++) {
+			slotGenerator_.set(i, Double.parseDouble(split[i]));
 		}
 
 		// Parse the rules
 		for (int s = 0; s < ruleGenerators_.length; s++) {
 			split = buf.readLine().split(ELEMENT_DELIMITER);
-			for (String element : split) {
-				String[] eleSplit = element.split(PROB_DELIMITER);
-				ruleGenerators_[s].set(RuleBase.getInstance().getRule(
-						Integer.parseInt(eleSplit[0]), s), Double
-						.parseDouble(eleSplit[1]));
+			for (int i = 0; i < split.length; i++) {
+				ruleGenerators_[s].set(i, Double.parseDouble(split[i]));
 			}
 		}
 
@@ -392,11 +386,10 @@ public class CrossEntropyExperiment {
 
 			// Update the internal rule distributions
 			for (int r = 0; r < ruleGenerators_[s].size(); r++) {
-				Rule rule = ruleGenerators_[s].getElement(r);
 				ratio = slotCounter[s][r + 1] / numElite;
 				newValue = indivStepSize * ratio + (1 - indivStepSize)
-						* ruleGenerators_[s].getProb(rule);
-				ruleGenerators_[s].set(rule, newValue);
+						* ruleGenerators_[s].getProb(r);
+				ruleGenerators_[s].set(r, newValue);
 			}
 
 			// Might be best to check the probabilities
@@ -439,14 +432,14 @@ public class CrossEntropyExperiment {
 			theExperiment = new CrossEntropyExperiment(Integer
 					.parseInt(args[0]), Integer.parseInt(args[1]), Double
 					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean.parseBoolean(args[6]),
-					args[7], args[8]);
+					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean
+					.parseBoolean(args[6]), args[7], args[8]);
 		} else if (args.length == 10) {
 			theExperiment = new CrossEntropyExperiment(Integer
 					.parseInt(args[0]), Integer.parseInt(args[1]), Double
 					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean.parseBoolean(args[6]),
-					args[7], args[8], args[9]);
+					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean
+					.parseBoolean(args[6]), args[7], args[8], args[9]);
 		} else if (args.length == 11) {
 			theExperiment = new CrossEntropyExperiment(Integer
 					.parseInt(args[0]), Integer.parseInt(args[1]), Double
