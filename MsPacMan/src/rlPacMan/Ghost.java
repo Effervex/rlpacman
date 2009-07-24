@@ -1,8 +1,8 @@
 package rlPacMan;
 
 import java.awt.*;
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 class Ghost extends Thing {
 	// Blinky (Red) behaviour (Aggressive)
@@ -100,6 +100,7 @@ class Ghost extends Thing {
 	 * 
 	 * @return A clone of the ghost.
 	 */
+	@Override
 	public Object clone() {
 		Ghost clone = new Ghost(m_gameModel, Ghost.BLINKY, m_locX, m_locY,
 				true, m_nExitMilliSec);
@@ -130,6 +131,7 @@ class Ghost extends Thing {
 	}
 
 	// Overriden to draw Ghosts
+	@Override
 	public void draw(GameUI gameUI, Graphics g2) {
 		if (!m_bVisible)
 			return;
@@ -377,14 +379,14 @@ class Ghost extends Thing {
 							(int) (ghostEyeDiameter), (int) (ghostEyeDiameter));
 			// Draw Crooked Grin
 			for (int i = 0; i < m_ghostMouthX.length - 1; i++) {
-				g2.drawLine((int) (ghostX + m_ghostMouthX[i]),
-						(int) (ghostY + m_ghostMouthY[i]),
-						(int) (ghostX + m_ghostMouthX[i + 1]),
-						(int) (ghostY + m_ghostMouthY[i + 1]));
-				g2.drawLine((int) (ghostX + m_ghostMouthX[i] - 1),
-						(int) (ghostY + m_ghostMouthY[i]), (int) (ghostX
+				g2.drawLine((ghostX + m_ghostMouthX[i]),
+						(ghostY + m_ghostMouthY[i]),
+						(ghostX + m_ghostMouthX[i + 1]),
+						(ghostY + m_ghostMouthY[i + 1]));
+				g2.drawLine((ghostX + m_ghostMouthX[i] - 1),
+						(ghostY + m_ghostMouthY[i]), (ghostX
 								+ m_ghostMouthX[i + 1] - 1),
-						(int) (ghostY + m_ghostMouthY[i + 1]));
+						(ghostY + m_ghostMouthY[i + 1]));
 			}
 
 		} else {
@@ -415,7 +417,7 @@ class Ghost extends Thing {
 
 		}
 
-		m_boundingBox.setBounds((int) (ghostX), (int) (ghostY),
+		m_boundingBox.setBounds((ghostX), (ghostY),
 				ghostHeadDiameter, ghostHeadDiameter);
 		m_boundingBox.grow(-ghostHeadDiameter / 4, -ghostHeadDiameter / 4);
 		// m_boundingBox.setBounds ((int)(ghostX + deltaPixelX), (int)(ghostY +
@@ -432,6 +434,7 @@ class Ghost extends Thing {
 	}
 
 	// Overriden to update Ghost's directions
+	@Override
 	public void tickThing() {
 		boolean bBackoff = false;
 		// Don't let the ghost go back the way it came.
@@ -569,7 +572,7 @@ class Ghost extends Thing {
 	}
 
 	void setNextDirection(byte prevDirection, boolean bBackoff) {
-		int deltaX, deltaY, targetX, targetY;
+		int deltaX, deltaY;
 		Point target;
 		Point nextLocation = new Point();
 		byte[] bestDirection = new byte[4];
@@ -656,7 +659,7 @@ class Ghost extends Thing {
 
 		for (int i = 0; i < 4; i++) {
 			if (bestDirection[i] == UP
-					&& (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_NORTH) == 0
+					&& (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_NORTH) == 0
 					&& m_deltaLocX == 0 && prevDirection != DOWN) {
 				if (!getDestination(UP, m_locX, m_locY, nextLocation,
 						m_gameModel))
@@ -668,7 +671,7 @@ class Ghost extends Thing {
 					break;
 
 			} else if (bestDirection[i] == DOWN
-					&& (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_SOUTH) == 0
+					&& (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_SOUTH) == 0
 					&& m_deltaLocX == 0 && prevDirection != UP) {
 				if (!getDestination(DOWN, m_locX, m_locY, nextLocation,
 						m_gameModel))
@@ -680,7 +683,7 @@ class Ghost extends Thing {
 					break;
 
 			} else if (bestDirection[i] == RIGHT
-					&& (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_EAST) == 0
+					&& (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_EAST) == 0
 					&& m_deltaLocY == 0 && prevDirection != LEFT)
 
 			{
@@ -694,7 +697,7 @@ class Ghost extends Thing {
 					break;
 
 			} else if (bestDirection[i] == LEFT
-					&& (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_WEST) == 0
+					&& (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_WEST) == 0
 					&& m_deltaLocY == 0 && prevDirection != RIGHT) {
 				if (!getDestination(LEFT, m_locX, m_locY, nextLocation,
 						m_gameModel))
@@ -792,7 +795,7 @@ class Ghost extends Thing {
 						// when close to Pacman.
 
 						// Calculate the distance Clyde is from Pacman
-						double distance = Point.distance(
+						double distance = Point2D.distance(
 								m_gameModel.m_player.m_locX,
 								m_gameModel.m_player.m_locY, m_locX, m_locY);
 						// If distant, go directly for Pacman
@@ -884,6 +887,7 @@ class Ghost extends Thing {
 	// the
 	// fleeing ghost
 	// return: 0 for no collision, 1 for ate a ghost, 2 for pacman died
+	@Override
 	public int checkCollision(Player player) {
 		Rectangle intersectRect;
 		intersectRect = m_boundingBox.intersection(player.m_boundingBox);
@@ -920,6 +924,7 @@ class Ghost extends Thing {
 	}
 
 	// This is called each time the game is restarted
+	@Override
 	public void returnToStart() {
 		super.returnToStart();
 		m_destinationX = -1;
