@@ -333,16 +333,16 @@ public class CrossEntropyExperiment {
 		reader.close();
 	}
 
-	private Policy paperPolicy() {
-		Policy pol = new Policy(9);
-		pol.addRule(0, RuleBase.getInstance().getRule(2, 0));
-		pol.addRule(1, RuleBase.getInstance().getRule(12, 0));
-		pol.addRule(3, RuleBase.getInstance().getRule(22, 0));
-		pol.addRule(4, RuleBase.getInstance().getRule(34, 0));
-		pol.addRule(5, RuleBase.getInstance().getRule(26, 0));
-		pol.addRule(6, RuleBase.getInstance().getRule(0, 0));
-		return pol;
-	}
+//	private Policy paperPolicy() {
+//		Policy pol = new Policy(9);
+//		pol.addRule(0, RuleBase.getInstance().getRule(2, 0));
+//		pol.addRule(1, RuleBase.getInstance().getRule(12, 0));
+//		pol.addRule(3, RuleBase.getInstance().getRule(22, 0));
+//		pol.addRule(4, RuleBase.getInstance().getRule(34, 0));
+//		pol.addRule(5, RuleBase.getInstance().getRule(26, 0));
+//		pol.addRule(6, RuleBase.getInstance().getRule(0, 0));
+//		return pol;
+//	}
 
 	/**
 	 * Updates the weights in the probability distributions according to their

@@ -124,7 +124,7 @@ class Fruit extends Thing
       {
          double randomNum = Math.random ();
          if (randomNum < .25 && prevDirection != DOWN &&
-             (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_NORTH) == 0)
+             (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_NORTH) == 0)
          {
             if (!getDestination (UP, m_locX, m_locY, nextLocation, m_gameModel))
                continue;
@@ -134,7 +134,7 @@ class Fruit extends Thing
             break;
          
          } else if (randomNum < .50 && prevDirection != LEFT &&
-                    (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_EAST) == 0)
+                    (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_EAST) == 0)
          {
             if (!getDestination (RIGHT, m_locX, m_locY, nextLocation, m_gameModel))
                continue;
@@ -144,7 +144,7 @@ class Fruit extends Thing
             break;
          
          } else if (randomNum < .75 && prevDirection != UP &&
-                    (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_SOUTH) == 0)
+                    (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_SOUTH) == 0)
          {
             if (!getDestination (DOWN, m_locX, m_locY, nextLocation, m_gameModel))
                continue;
@@ -154,7 +154,7 @@ class Fruit extends Thing
             break;
          
          } else if (randomNum < 1.0 && prevDirection != RIGHT &&
-                    (m_gameModel.m_gameState[m_locX][m_locY] & m_gameModel.GS_WEST) == 0)
+                    (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_WEST) == 0)
          {
             if (!getDestination (LEFT, m_locX, m_locY, nextLocation, m_gameModel))
                continue;
