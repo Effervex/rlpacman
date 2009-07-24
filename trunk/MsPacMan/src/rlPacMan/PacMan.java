@@ -25,7 +25,7 @@ public class PacMan extends JFrame {
 	protected AgentInterface agent_;
 	protected KeyAdapter keyAdapter_;
 
-	public boolean experimentMode_ = false;
+	public boolean experimentMode_ = true;
 
 	public void init() {
 		setTicksPerSec(35);

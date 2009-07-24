@@ -73,6 +73,19 @@ public class Policy {
 		buffer.append(DELIMITER + "END");
 		return buffer.toString();
 	}
+	
+	/**
+	 * Converts the triggered array into a string.
+	 * 
+	 * @return A string equal to the state of the triggered list.
+	 */
+	public String getFiredString() {
+		StringBuffer buffer = new StringBuffer();
+		for (int i = 0; i < triggered_.length; i++) {
+			buffer.append(triggered_[i] + "" + DELIMITER);
+		}
+		return buffer.toString();
+	}
 
 	@Override
 	public String toString() {
@@ -139,11 +152,24 @@ public class Policy {
 					// Apply the rule and set the firing priority
 					priorityRules_[i].applyAction(actionSwitch,
 							(i / priorityNumber));
+					triggered_[i] = true;
 					firingPriority = thisPriority;
 				} else {
 					return;
 				}
 			}
+		}
+	}
+
+	/**
+	 * Sets the fired rules of this policy to that given in string form.
+	 * 
+	 * @param firedString
+	 */
+	public void setFired(String firedString) {
+		String[] split = firedString.split(DELIMITER + "");
+		for (int i = 0; i < split.length; i++) {
+			triggered_[i] = Boolean.parseBoolean(split[i]);
 		}
 	}
 }
