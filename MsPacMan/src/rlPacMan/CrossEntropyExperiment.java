@@ -179,8 +179,7 @@ public class CrossEntropyExperiment {
 				Policy pol = generatePolicy();
 				// pol = paperPolicy();
 				// Send the agent a generated policy
-				//RLGlue.RL_agent_message(pol.toParseableString());
-				RLGlue.RL_agent_message("Policy,,,,7,,,,,,,,,,,71,,,40,,,88,,49,,,,,37,,12,97,,,7,,,,91,,,,,,,,,73,,,53,77,,,63,,27,,,,,,,79,80,,,12,,69,73,80,,,,47,,,,,87,,,,11,47,,,,,,,,37,68,,,,,,,END");
+				RLGlue.RL_agent_message(pol.toParseableString());
 				System.out.println("Policy:");
 				System.out.println(pol);
 
@@ -190,6 +189,8 @@ public class CrossEntropyExperiment {
 					score += Float.parseFloat(RLGlue.RL_env_message("score"));
 				}
 				score /= AVERAGE_ITERATIONS;
+				// Set the fired rules back to this policy
+				pol.setFired(RLGlue.RL_agent_message("getFired"));
 				PolicyValue thisPolicy = new PolicyValue(pol, score);
 				pvs.add(thisPolicy);
 				// Storing the best policy
@@ -369,7 +370,7 @@ public class CrossEntropyExperiment {
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Rule[] polRules = eliteSolution.getRules();
+			Rule[] polRules = eliteSolution.getFiringRules();
 			for (int i = 0; i < polRules.length; i++) {
 				// If there is a rule
 				if (polRules[i] != null) {
