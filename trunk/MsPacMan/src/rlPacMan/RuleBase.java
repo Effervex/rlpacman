@@ -102,6 +102,9 @@ public class RuleBase {
 	 */
 	public void saveRulesToFile(File ruleBaseFile) {
 		try {
+			if (!ruleBaseFile.exists())
+				ruleBaseFile.createNewFile();
+			
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
 
@@ -109,6 +112,39 @@ public class RuleBase {
 			for (int i = 0; i < rules_.length; i++) {
 				// For each of the rules
 				for (Rule r : rules_[i]) {
+					bf.write(r.toParseableString() + RULE_DELIMITER);
+				}
+				bf.write("\n");
+			}
+
+			System.out.println("Random rulebases saved to: " + ruleBaseFile);
+
+			bf.close();
+			writer.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Save rules to a file from a given distribution. Rules may be duplicates.
+	 * 
+	 * @param ruleBaseFile
+	 *            The file to save the rules to.
+	 */
+	public static void saveRulesToFile(File ruleBaseFile,
+			ProbabilityDistribution<Rule>[] rules) {
+		try {
+			if (!ruleBaseFile.exists())
+				ruleBaseFile.createNewFile();
+			
+			FileWriter writer = new FileWriter(ruleBaseFile);
+			BufferedWriter bf = new BufferedWriter(writer);
+
+			// For each of the rule bases
+			for (int i = 0; i < rules.length; i++) {
+				// For each of the rules
+				for (Rule r : rules[i]) {
 					bf.write(r.toParseableString() + RULE_DELIMITER);
 				}
 				bf.write("\n");
@@ -394,8 +430,6 @@ public class RuleBase {
 		if (!handCoded) {
 			try {
 				File ruleBaseFile = new File("ruleBase.txt");
-				if (!ruleBaseFile.exists())
-					ruleBaseFile.createNewFile();
 				instance_.saveRulesToFile(ruleBaseFile);
 
 			} catch (Exception e) {
