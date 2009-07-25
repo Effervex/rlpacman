@@ -267,7 +267,27 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			sum += iter.next().getProbability();
 		}
 		sum /= (2 * size);
+
+		// Remove the rules (one at a time to avoid removing duplicates)
+		for (ItemProb ip : removables) {
+			itemProbs_.remove(ip);
+		}
 		return sum;
+	}
+
+	/**
+	 * Clones this distribution. This is a shallow clone that does not clone the
+	 * elements. Also, the random generator is not cloned.
+	 * 
+	 * @return A clone of this distribution (but not the elements contained
+	 *         within).
+	 */
+	public ProbabilityDistribution<T> clone() {
+		ProbabilityDistribution<T> clone = new ProbabilityDistribution<T>();
+		for (ItemProb ip : itemProbs_) {
+			clone.add(ip.getItem(), ip.getProbability());
+		}
+		return clone;
 	}
 
 	// @Override
@@ -307,8 +327,11 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	// @Override
 	public Iterator<T> iterator() {
-		// TODO Auto-generated method stub
-		return null;
+		ArrayList<T> items = new ArrayList<T>(itemProbs_.size());
+		for (ItemProb ip : itemProbs_) {
+			items.add(ip.getItem());
+		}
+		return items.iterator();
 	}
 
 	// @Override

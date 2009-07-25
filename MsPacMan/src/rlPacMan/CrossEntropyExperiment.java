@@ -18,6 +18,8 @@ public class CrossEntropyExperiment {
 	/** The generator states file. */
 	private final File generatorFile_;
 	private static final String ELEMENT_DELIMITER = ",";
+	private static final float RATIO_SHARED = 0.08f;
+	private static final float DIST_CONSTANT = 0.4f;
 
 	/** The population size of the experiment. */
 	private int population_;
@@ -333,16 +335,16 @@ public class CrossEntropyExperiment {
 		reader.close();
 	}
 
-//	private Policy paperPolicy() {
-//		Policy pol = new Policy(9);
-//		pol.addRule(0, RuleBase.getInstance().getRule(2, 0));
-//		pol.addRule(1, RuleBase.getInstance().getRule(12, 0));
-//		pol.addRule(3, RuleBase.getInstance().getRule(22, 0));
-//		pol.addRule(4, RuleBase.getInstance().getRule(34, 0));
-//		pol.addRule(5, RuleBase.getInstance().getRule(26, 0));
-//		pol.addRule(6, RuleBase.getInstance().getRule(0, 0));
-//		return pol;
-//	}
+	// private Policy paperPolicy() {
+	// Policy pol = new Policy(9);
+	// pol.addRule(0, RuleBase.getInstance().getRule(2, 0));
+	// pol.addRule(1, RuleBase.getInstance().getRule(12, 0));
+	// pol.addRule(3, RuleBase.getInstance().getRule(22, 0));
+	// pol.addRule(4, RuleBase.getInstance().getRule(34, 0));
+	// pol.addRule(5, RuleBase.getInstance().getRule(26, 0));
+	// pol.addRule(6, RuleBase.getInstance().getRule(0, 0));
+	// return pol;
+	// }
 
 	/**
 	 * Updates the weights in the probability distributions according to their
@@ -397,7 +399,82 @@ public class CrossEntropyExperiment {
 				ruleGenerators_[s].normaliseProbs();
 		}
 
+		// Modify the distributions by reintegration rules from neighbouring
+		// distributions.
+		ruleGenerators_ = reintegrateRules(RATIO_SHARED, DIST_CONSTANT);
+
 		return (float) (total / numElite);
+	}
+
+	/**
+	 * Reintegrates the rules from neighbouring distributions.
+	 * 
+	 * @param sharedRatio
+	 *            The ratio of rules to share from the rules within the
+	 *            distributions.
+	 * @param distConstant
+	 *            The constant to apply to the share ratio based on distance
+	 *            from the distribution.
+	 * @return The new rule distribution.
+	 */
+	@SuppressWarnings("unchecked")
+	private ProbabilityDistribution<Rule>[] reintegrateRules(float sharedRatio,
+			float distConstant) {
+		// Has to use forward step distribution so full sweeps can be performed.
+		ProbabilityDistribution<Rule>[] newDistributions = new ProbabilityDistribution[ruleGenerators_.length];
+
+		// Run through each distribution
+		for (int slot = 0; slot < newDistributions.length; slot++) {
+			// Clone the old distribution
+			newDistributions[slot] = ruleGenerators_[slot].clone();
+			
+			int thisPriority = Policy
+					.getPriority(slot, newDistributions.length);
+			
+			// Get rules from either side of this slot.
+			ArrayList<Rule> sharedRules = new ArrayList<Rule>();
+			int sideModifier = -1;
+			// Cover both sides of this slot
+			do {
+				// Loop variables
+				int neighbourSlot = sideModifier + slot;
+				int neighbourPriority = Policy.getPriority(neighbourSlot,
+						newDistributions.length);
+				int numRules = Math
+						.round(sharedRatio * ruleCount_);
+
+				// Only use valid slots (same priority)
+				while ((neighbourSlot >= 0) // Above 0
+						&& (neighbourSlot < newDistributions.length) // Below
+						// max
+						&& (neighbourPriority == thisPriority) // Same priority
+						&& (numRules > 0)) // Getting at least one rule
+				{
+					// Get the n best rules
+					sharedRules.addAll(ruleGenerators_[neighbourSlot]
+							.getNBest(numRules));
+
+					// Update the variables
+					neighbourSlot += sideModifier;
+					neighbourPriority = Policy.getPriority(neighbourSlot,
+							newDistributions.length);
+					numRules *= distConstant;
+				}
+
+				sideModifier *= -1;
+			} while (sideModifier == 1);
+
+			// Now replace the N worst rules from this distribution with the N
+			// shared rules.
+			double reintegralProbability = newDistributions[slot].removeNWorst(sharedRules.size());
+			newDistributions[slot].addAll(sharedRules, reintegralProbability);
+			newDistributions[slot].normaliseProbs();
+		}
+		
+		// Save the rules to file as they will not be standard
+		RuleBase.saveRulesToFile(new File("reintegralRuleBase.txt"), newDistributions);
+
+		return newDistributions;
 	}
 
 	/**

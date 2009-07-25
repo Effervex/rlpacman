@@ -73,7 +73,7 @@ public class Policy {
 		buffer.append(DELIMITER + "END");
 		return buffer.toString();
 	}
-	
+
 	/**
 	 * Converts the triggered array into a string.
 	 * 
@@ -89,16 +89,26 @@ public class Policy {
 
 	@Override
 	public String toString() {
-		int priorityNumber = priorityRules_.length
-				/ ActionSwitch.NUM_PRIORITIES;
 		StringBuffer buffer = new StringBuffer();
 		for (int i = 0; i < priorityRules_.length; i++) {
 			if (priorityRules_[i] != null) {
-				buffer.append("[" + (i / priorityNumber + 1) + "]: ");
+				buffer.append("[" + getPriority(i, priorityRules_.length) + "]: ");
 				buffer.append(priorityRules_[i] + "\n");
 			}
 		}
 		return buffer.toString();
+	}
+
+	/**
+	 * Gets the priority of a slot within the policy.
+	 * 
+	 * @param slot The slot within the policy.
+	 * @return A value between 1-NUM_PRIORITIES.
+	 */
+	public static int getPriority(int slot, int policySize) {
+		int priorityNumber = policySize
+				/ ActionSwitch.NUM_PRIORITIES + 1;
+		return slot / priorityNumber + 1;
 	}
 
 	/**
@@ -135,8 +145,6 @@ public class Policy {
 	 *            The current actions.
 	 */
 	public void evaluatePolicy(double[] observations, ActionSwitch actionSwitch) {
-		int priorityNumber = priorityRules_.length
-				/ ActionSwitch.NUM_PRIORITIES + 1;
 		// Check every slot, from top-to-bottom until one activates
 		int firingPriority = -1;
 		for (int i = 0; i < priorityRules_.length; i++) {
@@ -151,7 +159,7 @@ public class Policy {
 				if ((firingPriority == -1) || (thisPriority == firingPriority)) {
 					// Apply the rule and set the firing priority
 					priorityRules_[i].applyAction(actionSwitch,
-							(i / priorityNumber));
+							getPriority(i, priorityRules_.length) - 1);
 					triggered_[i] = true;
 					firingPriority = thisPriority;
 				} else {
