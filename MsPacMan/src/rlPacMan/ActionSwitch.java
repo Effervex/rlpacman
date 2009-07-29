@@ -9,7 +9,7 @@ public class ActionSwitch {
 	/** The number of priorities. */
 	public static final int NUM_PRIORITIES = 3;
 	/** The prioritised list of switched actions. Max 3. */ 
-	private PacManHighAction[] activeActions_ = new PacManHighAction[NUM_PRIORITIES];
+	private Action[] activeActions_ = new PacManHighAction[NUM_PRIORITIES];
 	
 	/**
 	 * Switches on a high action at the given priority.
@@ -17,7 +17,7 @@ public class ActionSwitch {
 	 * @param action The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(PacManHighAction action, int priority) {
+	public void switchOn(Action action, int priority) {
 		activeActions_[priority] = action;
 	}
 	
@@ -26,7 +26,7 @@ public class ActionSwitch {
 	 * 
 	 * @param action The action to be switched off.
 	 */
-	public void switchOff(PacManHighAction action) {
+	public void switchOff(Action action) {
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action))) {
 				activeActions_[i] = null;
@@ -57,7 +57,7 @@ public class ActionSwitch {
 	 * @param action The action to check.
 	 * @return True if it is on, false otherwise
 	 */
-	public boolean isActionActive(PacManHighAction action) {
+	public boolean isActionActive(Action action) {
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
 				return true;

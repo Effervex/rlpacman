@@ -276,6 +276,54 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	/**
+	 * Updates this distribution using the cross-entropy method.
+	 * 
+	 * @param numSamples
+	 *            The number of samples used for the counts.
+	 * @param counts
+	 *            The counts of each of the elements.
+	 * @param offsetIndex
+	 *            The starting index of the counts.
+	 * @param stepSize
+	 *            The step size for the update.
+	 * @param valueModifier
+	 *            The value modifier for the update.
+	 */
+	public void updateDistribution(double numSamples, int[] counts,
+			int offsetIndex, double stepSize, double valueModifier) {
+		// For each of the rules within the distribution
+		for (int i = 0; i < itemProbs_.size(); i++) {
+			// Update every element within the distribution
+			updateElement(numSamples, counts[i + offsetIndex], stepSize,
+					valueModifier, i);
+		}
+	}
+
+	/**
+	 * Updates a single element within the distribution.
+	 * 
+	 * @param numSamples
+	 *            The number of samples used for the counts.
+	 * @param count
+	 *            The count for this element.
+	 * @param stepSize
+	 *            The step size for the update.
+	 * @param valueModifier
+	 *            The value modifier for the update.
+	 * @param index
+	 *            The index of the element to update.
+	 */
+	public void updateElement(double numSamples, int count, double stepSize,
+			double valueModifier, int index) {
+		// Calculate the new ratio.
+		double ratio = count / numSamples;
+		// Update the value
+		double newValue = stepSize * ratio + (1 - stepSize) * getProb(index);
+		// Set the new value multiplied by the modifier.
+		set(index, newValue * valueModifier);
+	}
+
+	/**
 	 * Clones this distribution. This is a shallow clone that does not clone the
 	 * elements. Also, the random generator is not cloned.
 	 * 

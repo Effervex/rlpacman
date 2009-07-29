@@ -30,6 +30,12 @@ public class RuleBase {
 
 	/** The random number generator to use. */
 	private Random random_ = new Random();
+	
+	/** The cross-entropy generators for the conditions within the rules. */
+	private ProbabilityDistribution<Condition>[] conditionGenerators_;
+	
+	/** The cross-entropy generators for the actions within the rules. */
+	private ProbabilityDistribution<Action>[] actionsGenerators_;
 
 	/**
 	 * A private constructor for generating a rule base from hand or random.
@@ -40,15 +46,15 @@ public class RuleBase {
 	 *            The number of rule bases to generate if random.
 	 */
 	private RuleBase(boolean handCoded, int ruleBases) {
-		if (handCoded) {
-			rules_ = new ArrayList[1];
-			rules_[0] = loadHandCodedRules();
-		} else {
-			rules_ = new ArrayList[ruleBases];
-			for (int i = 0; i < ruleBases; i++) {
+		rules_ = new ArrayList[ruleBases];
+		for (int i = 0; i < ruleBases; i++) {
+			if (handCoded) {
+				rules_[i] = loadHandCodedRules();
+			} else {
 				rules_[i] = generateRandomRules(RANDOM_RULE_NUMBER);
 			}
 		}
+		initialiseRuleGenerators(ruleBases);
 	}
 
 	/**
@@ -59,6 +65,38 @@ public class RuleBase {
 	 */
 	private RuleBase(File ruleBaseFile) {
 		loadRulesFromFile(ruleBaseFile);
+		initialiseRuleGenerators(rules_.length);
+	}
+
+	/**
+	 * Initialises the rule generators.
+	 */
+	private void initialiseRuleGenerators(int ruleBases) {
+		conditionGenerators_ = new ProbabilityDistribution[ruleBases];
+		actionsGenerators_ = new ProbabilityDistribution[ruleBases];
+		
+		// Compile the conditions to add
+		ArrayList<Condition> conditions = new ArrayList<Condition>();
+		ArrayList<Action> actions = new ArrayList<Action>();
+		// Adding the observations
+		for (PacManObservations obs : PacManObservations.values()) {
+			conditions.add(obs);
+		}
+		// Adding the actions
+		for (PacManHighAction act : PacManHighAction.values()) {
+			if (!act.equals(PacManHighAction.NOTHING)) {
+				conditions.add(act);
+				actions.add(act);
+			}
+		}
+		// Initialising the generators.
+		for (int i = 0; i < ruleBases; i++) {
+			conditionGenerators_[i] = new ProbabilityDistribution<Condition>();
+			conditionGenerators_[i].addAll(conditions);
+			
+			actionsGenerators_[i] = new ProbabilityDistribution<Action>();
+			actionsGenerators_[i].addAll(actions);
+		}
 	}
 
 	/**
@@ -104,7 +142,7 @@ public class RuleBase {
 		try {
 			if (!ruleBaseFile.exists())
 				ruleBaseFile.createNewFile();
-			
+
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
 
@@ -127,26 +165,30 @@ public class RuleBase {
 	}
 
 	/**
-	 * Save rules to a file from a given distribution. Rules may be duplicates.
+	 * Save rules to a file from a given distribution while updating the
+	 * RuleBase with the new rules. Rules may be duplicates.
 	 * 
 	 * @param ruleBaseFile
 	 *            The file to save the rules to.
 	 */
-	public static void saveRulesToFile(File ruleBaseFile,
+	public void saveRulesToFile(File ruleBaseFile,
 			ProbabilityDistribution<Rule>[] rules) {
 		try {
 			if (!ruleBaseFile.exists())
 				ruleBaseFile.createNewFile();
-			
+
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
 
 			// For each of the rule bases
 			for (int i = 0; i < rules.length; i++) {
 				// For each of the rules
+				ArrayList<Rule> newRules = new ArrayList<Rule>(rules_[i].size());
 				for (Rule r : rules[i]) {
+					newRules.add(r);
 					bf.write(r.toParseableString() + RULE_DELIMITER);
 				}
+				rules_[i] = newRules;
 				bf.write("\n");
 			}
 
@@ -305,60 +347,71 @@ public class RuleBase {
 	 */
 	private ArrayList<Rule> generateRandomRules(int baseSize) {
 		ArrayList<Rule> randomRules = new ArrayList<Rule>();
-		int observationsSize = PacManObservations.values().length;
-		int actionsSize = PacManHighAction.values().length - 1;
 
 		// For each of the rules in the rule base
 		for (int s = 0; s < baseSize; s++) {
-			ArrayList<PacManObservations> obs = new ArrayList<PacManObservations>();
-			ArrayList<Double> vals = new ArrayList<Double>();
-			PacManHighAction preAction = null;
-
-			int numIters = random_.nextInt(2);
-			// Number of iterations
-			for (int i = 0; i <= numIters; i++) {
-				// Choose a random set, either observations or actions
-				int index = random_.nextInt(observationsSize + actionsSize);
-				if (index < observationsSize) {
-					// Choose an observation
-					PacManObservations observation = PacManObservations
-							.values()[index];
-					obs.add(observation);
-					index = random_.nextInt(observation.getSetOfVals().length);
-					vals.add(observation.getSetOfVals()[index]);
-				} else {
-					// Choose an action
-					index -= observationsSize;
-					preAction = PacManHighAction.values()[index];
-				}
-			}
-
-			PacManHighAction action = PacManHighAction.values()[random_
-					.nextInt(actionsSize)];
-			// Creating the rule
-			if (preAction != null) {
-				// Rule has an action
-				if (obs.size() == 0) {
-					// Just an action
-					randomRules.add(new Rule(preAction, random_.nextBoolean(),
-							action, random_.nextBoolean()));
-				} else {
-					randomRules.add(new Rule(obs.get(0), random_.nextBoolean(),
-							vals.get(0), preAction, random_.nextBoolean(),
-							action, random_.nextBoolean()));
-				}
-			} else {
-				if (obs.size() == 1) {
-					randomRules.add(new Rule(obs.get(0), random_.nextBoolean(),
-							vals.get(0), action, random_.nextBoolean()));
-				} else {
-					randomRules.add(new Rule(obs.get(0), random_.nextBoolean(),
-							vals.get(0), obs.get(1), random_.nextBoolean(),
-							vals.get(1), action, random_.nextBoolean()));
-				}
-			}
+			randomRules.add(generateRule());
 		}
 		return randomRules;
+	}
+
+	/**
+	 * Generates a random rule using the set of observations and actions. A rule
+	 * can consist of 1 or 2 conditions.
+	 * 
+	 * @return The randomly generated rule.
+	 */
+	public static Rule generateRule() {
+		Random random = new Random();
+		int observationsSize = PacManObservations.values().length;
+		int actionsSize = PacManHighAction.values().length - 1;
+
+		ArrayList<PacManObservations> obs = new ArrayList<PacManObservations>();
+		ArrayList<Double> vals = new ArrayList<Double>();
+		PacManHighAction preAction = null;
+
+		int numIters = random.nextInt(2);
+		// Number of iterations
+		for (int i = 0; i <= numIters; i++) {
+			// Choose a random set, either observations or actions
+			int index = random.nextInt(observationsSize + actionsSize);
+			if (index < observationsSize) {
+				// Choose an observation
+				PacManObservations observation = PacManObservations.values()[index];
+				obs.add(observation);
+				index = random.nextInt(observation.getSetOfVals().length);
+				vals.add(observation.getSetOfVals()[index]);
+			} else {
+				// Choose an action
+				index -= observationsSize;
+				preAction = PacManHighAction.values()[index];
+			}
+		}
+
+		PacManHighAction action = PacManHighAction.values()[random
+				.nextInt(actionsSize)];
+		// Creating the rule
+		if (preAction != null) {
+			// Rule has an action
+			if (obs.size() == 0) {
+				// Just an action
+				return new Rule(preAction, random.nextBoolean(), action, random
+						.nextBoolean());
+			} else {
+				return new Rule(obs.get(0), random.nextBoolean(), vals.get(0),
+						preAction, random.nextBoolean(), action, random
+								.nextBoolean());
+			}
+		} else {
+			if (obs.size() == 1) {
+				return new Rule(obs.get(0), random.nextBoolean(), vals.get(0),
+						action, random.nextBoolean());
+			} else {
+				return new Rule(obs.get(0), random.nextBoolean(), vals.get(0),
+						obs.get(1), random.nextBoolean(), vals.get(1), action,
+						random.nextBoolean());
+			}
+		}
 	}
 
 	/**
@@ -447,5 +500,19 @@ public class RuleBase {
 	 */
 	public static void initInstance(File ruleBaseFile) {
 		instance_ = new RuleBase(ruleBaseFile);
+	}
+
+	/**
+	 * The string version of this RuleBase
+	 */
+	public String toString() {
+		StringBuffer buffer = new StringBuffer();
+		for (int i = 0; i < rules_.length; i++) {
+			buffer.append("Slot " + i + ":\n");
+			for (Rule r : rules_[i]) {
+				buffer.append(" " + r + "\n");
+			}
+		}
+		return buffer.toString();
 	}
 }

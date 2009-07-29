@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 /**
  * This class represents a rule given in and 'if (condition) then (action)'. The
@@ -17,11 +18,10 @@ public class Rule {
 	public static final String PRE_SEPARATOR = ":";
 	public static final String ACTION_SEPARATOR = "=";
 
-	private PacManObservations[] conditionObs_;
-	private PacManHighAction conditionAc_;
+	private Condition[] conditionObs_;
 	private boolean[] conditionOps_;
 	private double[] conditionVals_;
-	private PacManHighAction action_;
+	private Action action_;
 	private boolean actionOn_;
 
 	/**
@@ -114,13 +114,19 @@ public class Rule {
 	public Rule(PacManObservations obs, boolean op, double value,
 			PacManHighAction condAction, boolean acSwitch,
 			PacManHighAction action, boolean switched) {
-		this(obs, op, value, action, switched);
-
-		conditionAc_ = condAction;
+		conditionObs_ = new Condition[2];
+		conditionObs_[0] = obs;
+		conditionObs_[1] = condAction;
 
 		conditionOps_ = new boolean[2];
 		conditionOps_[0] = op;
 		conditionOps_[1] = acSwitch;
+
+		conditionVals_ = new double[1];
+		conditionVals_[0] = value;
+
+		action_ = action;
+		actionOn_ = switched;
 	}
 
 	/**
@@ -137,8 +143,8 @@ public class Rule {
 	 */
 	public Rule(PacManHighAction condAction, boolean acSwitch,
 			PacManHighAction action, boolean switched) {
-		conditionObs_ = new PacManObservations[0];
-		conditionAc_ = condAction;
+		conditionObs_ = new PacManHighAction[1];
+		conditionObs_[0] = condAction;
 
 		conditionOps_ = new boolean[1];
 		conditionOps_[0] = acSwitch;
@@ -163,25 +169,25 @@ public class Rule {
 		int i = 0;
 		// Check every observation
 		for (i = 0; i < conditionObs_.length; i++) {
-			PacManObservations obs = conditionObs_[i];
-			// X > Value (failure)
-			if ((conditionOps_[i] == GREATER_THAN)
-					&& (observations[obs.ordinal()] < conditionVals_[i])) {
-				return false;
-			} else if ((conditionOps_[i] == LESS_THAN)
-					&& (observations[obs.ordinal()] >= conditionVals_[i])) {
-				// X < Value (failure)
-				return false;
+			Condition cond = conditionObs_[i];
+			if (cond instanceof PacManObservations) {
+				// X > Value (failure)
+				if ((conditionOps_[i] == GREATER_THAN)
+						&& (observations[cond.ordinal()] < conditionVals_[i])) {
+					return false;
+				} else if ((conditionOps_[i] == LESS_THAN)
+						&& (observations[cond.ordinal()] >= conditionVals_[i])) {
+					// X < Value (failure)
+					return false;
+				}
+			} else if (cond instanceof PacManHighAction) {
+				// Action check (failure)
+				if (!actionSwitch.isActionActive((Action) cond)) {
+					return false;
+				}
 			}
 		}
 
-		// If there is an action condition, check that
-		if (conditionAc_ != null) {
-			// Action check (failure)
-			if (!actionSwitch.isActionActive(conditionAc_)) {
-				return false;
-			}
-		}
 		return true;
 	}
 
@@ -217,29 +223,29 @@ public class Rule {
 		StringBuffer buffer = new StringBuffer();
 
 		// Just action case
-		if (conditionObs_.length == 0) {
-			buffer.append(ACTION + PRE_SEPARATOR + conditionAc_.ordinal()
+		if (conditionObs_[0] instanceof Action) {
+			buffer.append(ACTION + PRE_SEPARATOR + conditionObs_[0].ordinal()
 					+ PRE_SEPARATOR + conditionOps_[0]);
 		} else {
-			buffer.append(OBSERVATION + PRE_SEPARATOR + conditionObs_[0].ordinal()
-					+ PRE_SEPARATOR + conditionOps_[0] + PRE_SEPARATOR
-					+ conditionVals_[0]);
+			buffer.append(OBSERVATION + PRE_SEPARATOR
+					+ conditionObs_[0].ordinal() + PRE_SEPARATOR
+					+ conditionOps_[0] + PRE_SEPARATOR + conditionVals_[0]);
 			// Check for more observations
 			int i = 1;
 			if (conditionObs_.length > 1) {
 				for (; i < conditionObs_.length; i++) {
 					buffer.append(PRE_SEPARATOR);
-					buffer.append(OBSERVATION + PRE_SEPARATOR
-							+ conditionObs_[i].ordinal() + PRE_SEPARATOR
-							+ conditionOps_[i] + PRE_SEPARATOR
-							+ conditionVals_[i]);
+					if (conditionObs_[i] instanceof Action) {
+						buffer.append(ACTION + PRE_SEPARATOR
+								+ conditionObs_[i].ordinal() + PRE_SEPARATOR
+								+ conditionOps_[i]);
+					} else {
+						buffer.append(OBSERVATION + PRE_SEPARATOR
+								+ conditionObs_[i].ordinal() + PRE_SEPARATOR
+								+ conditionOps_[i] + PRE_SEPARATOR
+								+ conditionVals_[i]);
+					}
 				}
-			}
-			// Check for action case
-			if (conditionAc_ != null) {
-				buffer.append(PRE_SEPARATOR);
-				buffer.append(ACTION + PRE_SEPARATOR + conditionAc_.ordinal()
-						+ PRE_SEPARATOR + conditionOps_[i]);
 			}
 		}
 
@@ -323,15 +329,15 @@ public class Rule {
 	}
 
 	/**
-
+	 * 
 	 * Creates a string representation of the rule.
 	 */
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("if ");
 		// Just action case
-		if (conditionObs_.length == 0) {
-			actionToString(buffer, conditionAc_, conditionOps_[0]);
+		if (conditionObs_[0] instanceof Action) {
+			actionToString(buffer, (Action) conditionObs_[0], conditionOps_[0]);
 		} else {
 			observationToString(buffer, 0);
 			// Check for more observations
@@ -339,13 +345,12 @@ public class Rule {
 			if (conditionObs_.length > 1) {
 				for (; i < conditionObs_.length; i++) {
 					buffer.append("and ");
-					observationToString(buffer, i);
+					if (conditionObs_[i] instanceof Action)
+						actionToString(buffer, (Action) conditionObs_[i],
+								conditionOps_[i]);
+					else
+						observationToString(buffer, i);
 				}
-			}
-			// Check for action case
-			if (conditionAc_ != null) {
-				buffer.append("and ");
-				actionToString(buffer, conditionAc_, conditionOps_[i]);
 			}
 		}
 
@@ -353,6 +358,31 @@ public class Rule {
 		buffer.append("then ");
 		actionToString(buffer, action_, actionOn_);
 		return buffer.toString();
+	}
+
+	// @Override
+	public boolean equals(Object obj) {
+		if ((obj == null) || (!(obj instanceof Rule)))
+			return false;
+
+		Rule otherRule = (Rule) obj;
+		if (Arrays.equals(conditionObs_, otherRule.conditionObs_)) {
+			if (Arrays.equals(conditionOps_, otherRule.conditionOps_)) {
+				if (Arrays.equals(conditionVals_, otherRule.conditionVals_)) {
+					if (action_.equals(otherRule.action_)) {
+						if (actionOn_ == otherRule.actionOn_) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	// @Override
+	public int hashCode() {
+		return toString().hashCode();
 	}
 
 	/**
@@ -382,7 +412,7 @@ public class Rule {
 	 * @param switched
 	 *            The action switch.
 	 */
-	private void actionToString(StringBuffer buffer, PacManHighAction action,
+	private void actionToString(StringBuffer buffer, Action action,
 			boolean switched) {
 		buffer.append(action);
 		if (switched)

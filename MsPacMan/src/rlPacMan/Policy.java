@@ -8,7 +8,7 @@ package rlPacMan;
 public class Policy {
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = ',';
-	/** The rules of this policy, under their respective priorites. */
+	/** The rules of this policy, under their respective priorities. */
 	private Rule[] priorityRules_;
 	private boolean[] triggered_;
 
@@ -69,6 +69,7 @@ public class Policy {
 			if (priorityRules_[i] != null)
 				buffer.append(RuleBase.getInstance().indexOf(priorityRules_[i],
 						i));
+			// TODO Problem here
 		}
 		buffer.append(DELIMITER + "END");
 		return buffer.toString();
