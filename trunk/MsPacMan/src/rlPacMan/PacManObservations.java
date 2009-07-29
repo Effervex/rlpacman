@@ -5,9 +5,9 @@ package rlPacMan;
  * 
  * All distances are given as Manhattan distances, unless stated otherwise.
  * 
- * @author Samuel J. Sarjant TODO Observation values
+ * @author Samuel J. Sarjant
  */
-public enum PacManObservations {
+public enum PacManObservations implements Condition {
 	// A constant value of 1
 	CONSTANT(new double[] { 1, 1, 1, 1, 1 }),
 	// The distance to the nearest dot (if any)

@@ -18,7 +18,6 @@ public class CrossEntropyExperiment {
 	/** The generator states file. */
 	private final File generatorFile_;
 	private static final String ELEMENT_DELIMITER = ",";
-	private static final float RATIO_SHARED = 0.08f;
 	private static final float DIST_CONSTANT = 0.4f;
 
 	/** The population size of the experiment. */
@@ -41,6 +40,8 @@ public class CrossEntropyExperiment {
 	private final int ruleCount_;
 	/** The time that the experiment started. */
 	private long experimentStart_;
+	/** The ratio of shared/regenerated rules. */
+	private float ratioShared_ = 0.08f;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -174,6 +175,7 @@ public class CrossEntropyExperiment {
 		// these.
 		PolicyValue bestPolicy = null;
 		float[] episodeAverage = new float[episodes_];
+		float runningAverage = 0;
 		for (int t = 0; t < episodes_; t++) {
 			// Forming a population of solutions
 			SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
@@ -193,6 +195,7 @@ public class CrossEntropyExperiment {
 				score /= AVERAGE_ITERATIONS;
 				// Set the fired rules back to this policy
 				pol.setFired(RLGlue.RL_agent_message("getFired"));
+
 				PolicyValue thisPolicy = new PolicyValue(pol, score);
 				pvs.add(thisPolicy);
 				// Storing the best policy
@@ -206,8 +209,10 @@ public class CrossEntropyExperiment {
 
 			// Update the weights for all distributions using only the elite
 			// samples
+			float value = (t == 0) ? 0 : episodeAverage[t - 1];
 			episodeAverage[t] = updateWeights(pvs.iterator(), population_
-					* selectionRatio_);
+					* selectionRatio_, value, runningAverage);
+			runningAverage = ((episodeAverage[t] - value) + runningAverage) / 2;
 
 			// Save the results at each episode
 			try {
@@ -298,7 +303,6 @@ public class CrossEntropyExperiment {
 			strBuffer.append("\n");
 			buf.write(strBuffer.toString());
 		}
-		// TODO Also save the rules
 		buf.write(episode);
 
 		buf.close();
@@ -354,10 +358,62 @@ public class CrossEntropyExperiment {
 	 *            The iterator over the samples.
 	 * @param numElite
 	 *            The number of samples to form the 'elite' samples.
+	 * @param lastEpisode
+	 *            The average elites value for the last episode. Used for
+	 *            determining if the performance is settling.
+	 * @param runningAverage
+	 *            The running average score among the elites. Used for
+	 *            determining if the performance is settling.
 	 */
-	private float updateWeights(Iterator<PolicyValue> iter, double numElite) {
+	private float updateWeights(Iterator<PolicyValue> iter, double numElite,
+			float lastEpisode, float runningAverage) {
 		// Keep count of the rules seen (and slots used)
 		int[][] slotCounter = new int[policySize_][1 + ruleCount_];
+		float episodeValue = countRules(iter, numElite, slotCounter);
+		float thisAverage = ((episodeValue - lastEpisode) + runningAverage) / 2;
+
+		// Apply the weights to the distributions
+		for (int s = 0; s < slotGenerator_.size(); s++) {
+			// Change the slot probabilities, factoring in decay
+			slotGenerator_.updateElement(numElite, slotCounter[s][0],
+					stepSize_, slotDecayRate_, s);
+
+			// Update the internal rule distributions
+			ruleGenerators_[s].updateDistribution(numElite, slotCounter[s], 1,
+					stepSize_, 1);
+
+			// Might be best to check the probabilities
+			if (!ruleGenerators_[s].sumsToOne())
+				ruleGenerators_[s].normaliseProbs();
+		}
+
+		// Further updates on the distributions
+		if (thisAverage < 0) {
+			// Modify the distributions by reintegration rules from neighbouring
+			// distributions.
+			ruleGenerators_ = reintegrateRules(ratioShared_, DIST_CONSTANT);
+			// regenerateRules(RATIO_SHARED);
+
+			// ratioShared_ *= slotDecayRate_;
+		}
+
+		return episodeValue;
+	}
+
+	/**
+	 * Counts the rules from the elite samples and stores their frequencies and
+	 * total score.
+	 * 
+	 * @param iter
+	 *            The iterator through the samples.
+	 * @param numElite
+	 *            The number of elite samples to iterate through.
+	 * @param slotCounter
+	 *            The storage for the rule counts.
+	 * @return The average value of the elite samples.
+	 */
+	private float countRules(Iterator<PolicyValue> iter, double numElite,
+			int[][] slotCounter) {
 		float total = 0;
 		// Only selecting the top elite samples
 		for (int k = 0; k < numElite; k++) {
@@ -366,7 +422,7 @@ public class CrossEntropyExperiment {
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Rule[] polRules = eliteSolution.getFiringRules();
+			Rule[] polRules = eliteSolution.getRules();
 			for (int i = 0; i < polRules.length; i++) {
 				// If there is a rule
 				if (polRules[i] != null) {
@@ -377,33 +433,9 @@ public class CrossEntropyExperiment {
 			}
 		}
 
-		// Apply the weights to the distributions
-		double indivStepSize = stepSize_;
-		for (int s = 0; s < slotGenerator_.size(); s++) {
-			// Change the slot probabilities, factoring in decay
-			double ratio = slotCounter[s][0] / numElite;
-			double newValue = indivStepSize * ratio + (1 - indivStepSize)
-					* slotGenerator_.getProb(s);
-			slotGenerator_.set(s, newValue * slotDecayRate_);
-
-			// Update the internal rule distributions
-			for (int r = 0; r < ruleGenerators_[s].size(); r++) {
-				ratio = slotCounter[s][r + 1] / numElite;
-				newValue = indivStepSize * ratio + (1 - indivStepSize)
-						* ruleGenerators_[s].getProb(r);
-				ruleGenerators_[s].set(r, newValue);
-			}
-
-			// Might be best to check the probabilities
-			if (!ruleGenerators_[s].sumsToOne())
-				ruleGenerators_[s].normaliseProbs();
-		}
-
-		// Modify the distributions by reintegration rules from neighbouring
-		// distributions.
-		ruleGenerators_ = reintegrateRules(RATIO_SHARED, DIST_CONSTANT);
-
-		return (float) (total / numElite);
+		// Maintaining values
+		float episodeValue = (float) (total / numElite);
+		return episodeValue;
 	}
 
 	/**
@@ -427,10 +459,10 @@ public class CrossEntropyExperiment {
 		for (int slot = 0; slot < newDistributions.length; slot++) {
 			// Clone the old distribution
 			newDistributions[slot] = ruleGenerators_[slot].clone();
-			
+
 			int thisPriority = Policy
 					.getPriority(slot, newDistributions.length);
-			
+
 			// Get rules from either side of this slot.
 			ArrayList<Rule> sharedRules = new ArrayList<Rule>();
 			int sideModifier = -1;
@@ -440,8 +472,7 @@ public class CrossEntropyExperiment {
 				int neighbourSlot = sideModifier + slot;
 				int neighbourPriority = Policy.getPriority(neighbourSlot,
 						newDistributions.length);
-				int numRules = Math
-						.round(sharedRatio * ruleCount_);
+				int numRules = Math.round(sharedRatio * ruleCount_);
 
 				// Only use valid slots (same priority)
 				while ((neighbourSlot >= 0) // Above 0
@@ -466,15 +497,47 @@ public class CrossEntropyExperiment {
 
 			// Now replace the N worst rules from this distribution with the N
 			// shared rules.
-			double reintegralProbability = newDistributions[slot].removeNWorst(sharedRules.size());
+			double reintegralProbability = newDistributions[slot]
+					.removeNWorst(sharedRules.size());
 			newDistributions[slot].addAll(sharedRules, reintegralProbability);
 			newDistributions[slot].normaliseProbs();
 		}
-		
+
 		// Save the rules to file as they will not be standard
-		RuleBase.saveRulesToFile(new File("reintegralRuleBase.txt"), newDistributions);
+		RuleBase.getInstance().saveRulesToFile(
+				new File("reintegralRuleBase.txt"), newDistributions);
 
 		return newDistributions;
+	}
+
+	/**
+	 * Regenerates new rules after removing a number of bad rules, increasing
+	 * the likelihood of having a useful rule set. This method is best used with
+	 * random rules.
+	 * 
+	 * @param regenRatio
+	 *            The ratio of rules to be regenerated.
+	 */
+	private void regenerateRules(float regenRatio) {
+		// TODO Maintain a distribution of the individual operations and actions
+		int numRegened = (int) (ruleCount_ * regenRatio);
+		// For each slot
+		for (int slot = 0; slot < ruleGenerators_.length; slot++) {
+			double regenProbability = ruleGenerators_[slot]
+					.removeNWorst(numRegened);
+			// For each newly generated rule
+			for (int i = 0; i < numRegened; i++) {
+				ruleGenerators_[slot].add(RuleBase.generateRule(),
+						regenProbability);
+			}
+			ruleGenerators_[slot].normaliseProbs();
+		}
+
+		// Save the rules to file
+		System.out.println(RuleBase.getInstance());
+		RuleBase.getInstance().saveRulesToFile(
+				new File("regeneratedRuleBase.txt"), ruleGenerators_);
+		System.out.println(RuleBase.getInstance());
 	}
 
 	/**

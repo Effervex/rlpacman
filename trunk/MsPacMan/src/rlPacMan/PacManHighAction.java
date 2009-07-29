@@ -1,6 +1,6 @@
 package rlPacMan;
 
-public enum PacManHighAction {
+public enum PacManHighAction implements Condition, Action {
 	TO_DOT, // Go towards the nearest dot
 	TO_POWER_DOT, // Go towards the nearest power dot
 	TO_FRUIT, // Go towards the fruit (NEW ACTION)
