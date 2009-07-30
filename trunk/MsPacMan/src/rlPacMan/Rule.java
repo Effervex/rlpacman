@@ -38,9 +38,9 @@ public class Rule {
 	 * @param switched
 	 *            Whether to activate or deactivate the action.
 	 */
-	public Rule(PacManObservations obs, boolean op, double value,
+	public Rule(PacManObservation obs, boolean op, double value,
 			PacManHighAction action, boolean switched) {
-		conditionObs_ = new PacManObservations[1];
+		conditionObs_ = new PacManObservation[1];
 		conditionObs_[0] = obs;
 
 		conditionOps_ = new boolean[1];
@@ -73,10 +73,10 @@ public class Rule {
 	 * @param switched
 	 *            Whether to activate or deactivate the action.
 	 */
-	public Rule(PacManObservations obs0, boolean op0, double value0,
-			PacManObservations obs1, boolean op1, double value1,
+	public Rule(PacManObservation obs0, boolean op0, double value0,
+			PacManObservation obs1, boolean op1, double value1,
 			PacManHighAction action, boolean switched) {
-		conditionObs_ = new PacManObservations[2];
+		conditionObs_ = new PacManObservation[2];
 		conditionObs_[0] = obs0;
 		conditionObs_[1] = obs1;
 
@@ -111,7 +111,7 @@ public class Rule {
 	 * @param switched
 	 *            Whether to activate or deactivate the action.
 	 */
-	public Rule(PacManObservations obs, boolean op, double value,
+	public Rule(PacManObservation obs, boolean op, double value,
 			PacManHighAction condAction, boolean acSwitch,
 			PacManHighAction action, boolean switched) {
 		conditionObs_ = new Condition[2];
@@ -170,7 +170,7 @@ public class Rule {
 		// Check every observation
 		for (i = 0; i < conditionObs_.length; i++) {
 			Condition cond = conditionObs_[i];
-			if (cond instanceof PacManObservations) {
+			if (cond instanceof PacManObservation) {
 				// X > Value (failure)
 				if ((conditionOps_[i] == GREATER_THAN)
 						&& (observations[cond.ordinal()] < conditionVals_[i])) {
@@ -309,19 +309,19 @@ public class Rule {
 			if (preAction != -1) {
 				// One obs and one action
 				return new Rule(
-						PacManObservations.values()[observations.get(0)],
+						PacManObservation.values()[observations.get(0)],
 						operators.get(0), values.get(0), PacManHighAction
 								.values()[preAction], operators.get(1), action,
 						actionVal);
 			} else {
 				if (observations.size() == 1) {
-					return new Rule(PacManObservations.values()[observations
+					return new Rule(PacManObservation.values()[observations
 							.get(0)], operators.get(0), values.get(0), action,
 							actionVal);
 				} else {
-					return new Rule(PacManObservations.values()[observations
+					return new Rule(PacManObservation.values()[observations
 							.get(0)], operators.get(0), values.get(0),
-							PacManObservations.values()[observations.get(1)],
+							PacManObservation.values()[observations.get(1)],
 							operators.get(1), values.get(1), action, actionVal);
 				}
 			}
@@ -419,5 +419,23 @@ public class Rule {
 			buffer.append("+ ");
 		else
 			buffer.append("- ");
+	}
+
+	/**
+	 * Gets the conditions of this rule, but not the operators or values.
+	 * 
+	 * @return The conditions of the rule.
+	 */
+	public Condition[] getConditions() {
+		return conditionObs_;
+	}
+	
+	/**
+	 * Returns the action for this rule, but not the operator for it.
+	 * 
+	 * @return The rule action.
+	 */
+	public Action getAction() {
+		return action_;
 	}
 }

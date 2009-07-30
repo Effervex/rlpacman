@@ -7,7 +7,7 @@ package rlPacMan;
  * 
  * @author Samuel J. Sarjant
  */
-public enum PacManObservations implements Condition {
+public enum PacManObservation implements Condition {
 	// A constant value of 1
 	CONSTANT(new double[] { 1, 1, 1, 1, 1 }),
 	// The distance to the nearest dot (if any)
@@ -46,7 +46,7 @@ public enum PacManObservations implements Condition {
 	 * @param vals
 	 *            The set of observation values to use.
 	 */
-	private PacManObservations(double[] vals) {
+	private PacManObservation(double[] vals) {
 		setOfVals_ = vals;
 	}
 

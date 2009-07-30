@@ -17,8 +17,7 @@ public class CrossEntropyExperiment {
 	private final File policyFile_;
 	/** The generator states file. */
 	private final File generatorFile_;
-	private static final String ELEMENT_DELIMITER = ",";
-	private static final float DIST_CONSTANT = 0.4f;
+	public static final String ELEMENT_DELIMITER = ",";
 
 	/** The population size of the experiment. */
 	private int population_;
@@ -32,12 +31,8 @@ public class CrossEntropyExperiment {
 	private double slotDecayRate_;
 	/** The cross-entropy generator for the slots in the policy. */
 	private ProbabilityDistribution<Integer> slotGenerator_;
-	/** The cross-entropy generators for the rules within the policy. */
-	private ProbabilityDistribution<Rule>[] ruleGenerators_;
 	/** The maximum size of the policy. */
 	private final int policySize_;
-	/** The number of rules present. */
-	private final int ruleCount_;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The ratio of shared/regenerated rules. */
@@ -72,16 +67,11 @@ public class CrossEntropyExperiment {
 		slotDecayRate_ = slotDecayRate;
 		slotGenerator_ = new ProbabilityDistribution<Integer>();
 		policySize_ = policySize;
-		// Using hand-coded rules
-		ruleGenerators_ = new ProbabilityDistribution[policySize];
 		RuleBase.initInstance(handCoded, policySize);
 		// Filling the generators
 		for (int i = 0; i < policySize; i++) {
 			slotGenerator_.add(i, 0.5);
-			ruleGenerators_[i] = new ProbabilityDistribution<Rule>();
-			ruleGenerators_[i].addAll(RuleBase.getInstance().getRules(i));
 		}
-		ruleCount_ = ruleGenerators_[0].size();
 
 		// Create the output files if necessary
 		policyFile_ = new File(policyFile);
@@ -293,16 +283,7 @@ public class CrossEntropyExperiment {
 		strBuffer.append("\n");
 		buf.write(strBuffer.toString());
 		// Write the rule generators
-		for (int slot = 0; slot < ruleGenerators_.length; slot++) {
-			strBuffer = new StringBuffer();
-			for (int i = 0; i < ruleGenerators_[slot].size(); i++) {
-				strBuffer.append(ruleGenerators_[slot]
-						.getProb(ruleGenerators_[slot].getElement(i))
-						+ ELEMENT_DELIMITER);
-			}
-			strBuffer.append("\n");
-			buf.write(strBuffer.toString());
-		}
+		RuleBase.getInstance().writeGenerators(buf);
 		buf.write(episode);
 
 		buf.close();
@@ -328,12 +309,7 @@ public class CrossEntropyExperiment {
 		}
 
 		// Parse the rules
-		for (int s = 0; s < ruleGenerators_.length; s++) {
-			split = buf.readLine().split(ELEMENT_DELIMITER);
-			for (int i = 0; i < split.length; i++) {
-				ruleGenerators_[s].set(i, Double.parseDouble(split[i]));
-			}
-		}
+		RuleBase.getInstance().readGenerators(buf);
 
 		buf.close();
 		reader.close();
@@ -368,7 +344,8 @@ public class CrossEntropyExperiment {
 	private float updateWeights(Iterator<PolicyValue> iter, double numElite,
 			float lastEpisode, float runningAverage) {
 		// Keep count of the rules seen (and slots used)
-		int[][] slotCounter = new int[policySize_][1 + ruleCount_];
+		int[][] slotCounter = new int[policySize_][1 + RuleBase.getInstance()
+				.size()];
 		float episodeValue = countRules(iter, numElite, slotCounter);
 		float thisAverage = ((episodeValue - lastEpisode) + runningAverage) / 2;
 
@@ -379,23 +356,13 @@ public class CrossEntropyExperiment {
 					stepSize_, slotDecayRate_, s);
 
 			// Update the internal rule distributions
-			ruleGenerators_[s].updateDistribution(numElite, slotCounter[s], 1,
-					stepSize_, 1);
-
-			// Might be best to check the probabilities
-			if (!ruleGenerators_[s].sumsToOne())
-				ruleGenerators_[s].normaliseProbs();
+			RuleBase.getInstance().updateDistribution(s, numElite,
+					slotCounter[s], 1, stepSize_, 1);
 		}
 
 		// Further updates on the distributions
-		if (thisAverage < 0) {
-			// Modify the distributions by reintegration rules from neighbouring
-			// distributions.
-			ruleGenerators_ = reintegrateRules(ratioShared_, DIST_CONSTANT);
-			// regenerateRules(RATIO_SHARED);
-
-			// ratioShared_ *= slotDecayRate_;
-		}
+		ratioShared_ = RuleBase.getInstance().postUpdateOperations(thisAverage,
+				ratioShared_, stepSize_);
 
 		return episodeValue;
 	}
@@ -439,108 +406,6 @@ public class CrossEntropyExperiment {
 	}
 
 	/**
-	 * Reintegrates the rules from neighbouring distributions.
-	 * 
-	 * @param sharedRatio
-	 *            The ratio of rules to share from the rules within the
-	 *            distributions.
-	 * @param distConstant
-	 *            The constant to apply to the share ratio based on distance
-	 *            from the distribution.
-	 * @return The new rule distribution.
-	 */
-	@SuppressWarnings("unchecked")
-	private ProbabilityDistribution<Rule>[] reintegrateRules(float sharedRatio,
-			float distConstant) {
-		// Has to use forward step distribution so full sweeps can be performed.
-		ProbabilityDistribution<Rule>[] newDistributions = new ProbabilityDistribution[ruleGenerators_.length];
-
-		// Run through each distribution
-		for (int slot = 0; slot < newDistributions.length; slot++) {
-			// Clone the old distribution
-			newDistributions[slot] = ruleGenerators_[slot].clone();
-
-			int thisPriority = Policy
-					.getPriority(slot, newDistributions.length);
-
-			// Get rules from either side of this slot.
-			ArrayList<Rule> sharedRules = new ArrayList<Rule>();
-			int sideModifier = -1;
-			// Cover both sides of this slot
-			do {
-				// Loop variables
-				int neighbourSlot = sideModifier + slot;
-				int neighbourPriority = Policy.getPriority(neighbourSlot,
-						newDistributions.length);
-				int numRules = Math.round(sharedRatio * ruleCount_);
-
-				// Only use valid slots (same priority)
-				while ((neighbourSlot >= 0) // Above 0
-						&& (neighbourSlot < newDistributions.length) // Below
-						// max
-						&& (neighbourPriority == thisPriority) // Same priority
-						&& (numRules > 0)) // Getting at least one rule
-				{
-					// Get the n best rules
-					sharedRules.addAll(ruleGenerators_[neighbourSlot]
-							.getNBest(numRules));
-
-					// Update the variables
-					neighbourSlot += sideModifier;
-					neighbourPriority = Policy.getPriority(neighbourSlot,
-							newDistributions.length);
-					numRules *= distConstant;
-				}
-
-				sideModifier *= -1;
-			} while (sideModifier == 1);
-
-			// Now replace the N worst rules from this distribution with the N
-			// shared rules.
-			double reintegralProbability = newDistributions[slot]
-					.removeNWorst(sharedRules.size());
-			newDistributions[slot].addAll(sharedRules, reintegralProbability);
-			newDistributions[slot].normaliseProbs();
-		}
-
-		// Save the rules to file as they will not be standard
-		RuleBase.getInstance().saveRulesToFile(
-				new File("reintegralRuleBase.txt"), newDistributions);
-
-		return newDistributions;
-	}
-
-	/**
-	 * Regenerates new rules after removing a number of bad rules, increasing
-	 * the likelihood of having a useful rule set. This method is best used with
-	 * random rules.
-	 * 
-	 * @param regenRatio
-	 *            The ratio of rules to be regenerated.
-	 */
-	private void regenerateRules(float regenRatio) {
-		// TODO Maintain a distribution of the individual operations and actions
-		int numRegened = (int) (ruleCount_ * regenRatio);
-		// For each slot
-		for (int slot = 0; slot < ruleGenerators_.length; slot++) {
-			double regenProbability = ruleGenerators_[slot]
-					.removeNWorst(numRegened);
-			// For each newly generated rule
-			for (int i = 0; i < numRegened; i++) {
-				ruleGenerators_[slot].add(RuleBase.generateRule(),
-						regenProbability);
-			}
-			ruleGenerators_[slot].normaliseProbs();
-		}
-
-		// Save the rules to file
-		System.out.println(RuleBase.getInstance());
-		RuleBase.getInstance().saveRulesToFile(
-				new File("regeneratedRuleBase.txt"), ruleGenerators_);
-		System.out.println(RuleBase.getInstance());
-	}
-
-	/**
 	 * Generates a random policy using the weights present in the probability
 	 * distribution.
 	 * 
@@ -554,7 +419,8 @@ public class CrossEntropyExperiment {
 		// particular rule with probability q.
 		for (int i = 0; i < policySize_; i++) {
 			if (slotGenerator_.bernoulliSample(i) != null) {
-				policy.addRule(i, ruleGenerators_[i].sample());
+				policy.addRule(i, RuleBase.getInstance().getRuleGenerator(i)
+						.sample());
 			}
 		}
 		return policy;
