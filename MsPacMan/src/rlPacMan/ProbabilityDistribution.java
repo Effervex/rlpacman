@@ -69,6 +69,19 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	/**
+	 * Adds an element with a probability of 1. It is recommended that the
+	 * distribution is normalised or manually modified after this operation.
+	 * 
+	 * @param element
+	 *            The element being added.
+	 * @return True if the element was added.
+	 */
+	public boolean add(T element) {
+		itemProbs_.add(new ItemProb(element, 1));
+		return true;
+	}
+
+	/**
 	 * Adds an element with a specified probability.
 	 * 
 	 * @param element
@@ -291,11 +304,14 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 */
 	public void updateDistribution(double numSamples, int[] counts,
 			int offsetIndex, double stepSize, double valueModifier) {
-		// For each of the rules within the distribution
-		for (int i = 0; i < itemProbs_.size(); i++) {
-			// Update every element within the distribution
-			updateElement(numSamples, counts[i + offsetIndex], stepSize,
-					valueModifier, i);
+		if (numSamples != 0) {
+			// For each of the rules within the distribution
+			for (int i = 0; i < itemProbs_.size(); i++) {
+
+				// Update every element within the distribution
+				updateElement(numSamples, counts[i + offsetIndex], stepSize,
+						valueModifier, i);
+			}
 		}
 	}
 
@@ -343,10 +359,22 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		return itemProbs_.size();
 	}
 
-	// @Override
-	public boolean add(T arg0) {
-		// TODO Auto-generated method stub
-		return false;
+	/**
+	 * Gets the index of an element, or -1.
+	 * 
+	 * @param element
+	 *            The element being searched for.
+	 * @return The index of the element, or -1 if not present.
+	 */
+	public int indexOf(T element) {
+		int i = 0;
+		Iterator<ItemProb> iter = itemProbs_.iterator();
+		while (iter.hasNext()) {
+			if (iter.next().element_.equals(element))
+				return i;
+			i++;
+		}
+		return -1;
 	}
 
 	// @Override
@@ -407,9 +435,27 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	// @Override
+	@SuppressWarnings("hiding")
 	public <T> T[] toArray(T[] arg0) {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	/**
+	 * Returns a string version of this distribution.
+	 * 
+	 * @return The string version of this probability distribution.
+	 */
+	public String toString() {
+		StringBuffer buffer = new StringBuffer();
+		Iterator<ItemProb> iter = itemProbs_.iterator();
+		if (iter.hasNext())
+			buffer.append("[" + iter.next());
+		while (iter.hasNext()) {
+			buffer.append(", " + iter.next());
+		}
+		buffer.append("]");
+		return buffer.toString();
 	}
 
 	/**
@@ -491,6 +537,13 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		@Override
 		public int hashCode() {
 			return (int) (element_.hashCode() * prob_);
+		}
+
+		@Override
+		public String toString() {
+			StringBuffer buffer = new StringBuffer();
+			buffer.append("(" + element_ + ": " + prob_ + ")");
+			return buffer.toString();
 		}
 	}
 }
