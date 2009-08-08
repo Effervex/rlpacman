@@ -174,8 +174,6 @@ public class CrossEntropyExperiment {
 				// pol = paperPolicy();
 				// Send the agent a generated policy
 				RLGlue.RL_agent_message(pol.toParseableString());
-				System.out.println("Policy:");
-				System.out.println(pol);
 
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {

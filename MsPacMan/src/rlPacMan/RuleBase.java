@@ -6,9 +6,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Random;
+
+import rlPacMan.PacManHighAction.PacManActionSet;
+import rlPacMan.PacManObservation.PacManObservationSet;
 
 /**
  * A singleton implementation of the current rule base.
@@ -41,7 +43,7 @@ public class RuleBase {
 	private ProbabilityDistribution<Condition>[] conditionGenerators_;
 
 	/** The cross-entropy generators for the actions within the rules. */
-	private ProbabilityDistribution<Action>[] actionsGenerators_;
+	private ProbabilityDistribution<ActionCondition>[] actionsGenerators_;
 
 	/** The random number generator. */
 	private Random random_ = new Random();
@@ -76,7 +78,10 @@ public class RuleBase {
 						.addAll(generateRandomRules(RANDOM_RULE_NUMBER));
 			}
 		}
-		initialiseRuleGenerators(ruleBases);
+
+		// Only use condition generators if we're using random rules
+		if (!handCoded)
+			initialiseConditionGenerators(ruleBases);
 	}
 
 	/**
@@ -87,13 +92,13 @@ public class RuleBase {
 	 */
 	private RuleBase(File ruleBaseFile) {
 		loadRulesFromFile(ruleBaseFile);
-		initialiseRuleGenerators(ruleGenerators_.length);
+		initialiseConditionGenerators(ruleGenerators_.length);
 	}
 
 	/**
-	 * Initialises the rule generators.
+	 * Initialises the condition generators.
 	 */
-	private void initialiseRuleGenerators(int ruleBases) {
+	private void initialiseConditionGenerators(int ruleBases) {
 		if (regenerationStrategy_ == SINGLE) {
 			ruleBases = 1;
 		} else if (regenerationStrategy_ == PRIORITY) {
@@ -102,27 +107,15 @@ public class RuleBase {
 		conditionGenerators_ = new ProbabilityDistribution[ruleBases];
 		actionsGenerators_ = new ProbabilityDistribution[ruleBases];
 
-		// Compile the conditions to add
-		ArrayList<Condition> conditions = new ArrayList<Condition>();
-		ArrayList<Action> actions = new ArrayList<Action>();
-		// Adding the observations
-		for (PacManObservation obs : PacManObservation.values()) {
-			conditions.add(obs);
-		}
-		// Adding the actions
-		for (PacManHighAction act : PacManHighAction.values()) {
-			if (!act.equals(PacManHighAction.NOTHING)) {
-				conditions.add(act);
-				actions.add(act);
-			}
-		}
-		// Initialising the generators.
-		for (int i = 0; i < ruleBases; i++) {
-			conditionGenerators_[i] = new ProbabilityDistribution<Condition>();
-			conditionGenerators_[i].addAll(conditions);
+		// Adding the conditions to the first generator.
+		conditionGenerators_[0] = new ProbabilityDistribution<Condition>();
+		actionsGenerators_[0] = new ProbabilityDistribution<ActionCondition>();
+		addConditions(conditionGenerators_[0], actionsGenerators_[0]);
 
-			actionsGenerators_[i] = new ProbabilityDistribution<Action>();
-			actionsGenerators_[i].addAll(actions);
+		// Cloning the initialised generator.
+		for (int i = 1; i < ruleBases; i++) {
+			conditionGenerators_[i] = conditionGenerators_[0].clone();
+			actionsGenerators_[i] = actionsGenerators_[0].clone();
 		}
 
 		// May need holding variables during the update process.
@@ -135,6 +128,54 @@ public class RuleBase {
 			actionCounts_ = new int[1][];
 			totalCount_ = new int[1][2];
 		}
+	}
+
+	/**
+	 * Adds all possible conditions to the generator sets.
+	 * 
+	 * @param obsGenerator
+	 *            The observation generator to add to.
+	 * @param actGenerator
+	 *            the action generator to add to.
+	 */
+	private void addConditions(ProbabilityDistribution<Condition> obsGenerator,
+			ProbabilityDistribution<ActionCondition> actGenerator) {
+		// Work out the base weight for each item
+		// Note the 2 is because each condition has a binary comparator
+		// TODO Abstract away the PacMan part.
+		double baseWeight = 1.0 / (2 * (PacManObservationSet.values().length
+				+ PacManActionSet.values().length - 1));
+
+		for (PacManObservationSet obs : PacManObservationSet.values()) {
+			double thisWeight = baseWeight / obs.getSetOfVals().length;
+			// For each of the double values, add the observation with a
+			// decreased weight
+			for (double obsVal : obs.getSetOfVals()) {
+				obsGenerator.add(new PacManObservation(obs, true, obsVal),
+						thisWeight);
+				obsGenerator.add(new PacManObservation(obs, false, obsVal),
+						thisWeight);
+			}
+		}
+
+		double actionWeight = 1.0 / (2 * (PacManActionSet.values().length - 1));
+		// Adding the actions
+		for (PacManActionSet act : PacManActionSet.values()) {
+			if (!act.equals(PacManActionSet.NOTHING)) {
+				PacManHighAction actionOn = new PacManHighAction(act, true);
+				PacManHighAction actionOff = new PacManHighAction(act, false);
+				obsGenerator.add(actionOn, baseWeight);
+				obsGenerator.add(actionOff, baseWeight);
+				actGenerator.add(actionOn, actionWeight);
+				actGenerator.add(actionOff, actionWeight);
+			}
+		}
+
+		// Check the values sum to one
+		if (!obsGenerator.sumsToOne())
+			obsGenerator.normaliseProbs();
+		if (!actGenerator.sumsToOne())
+			actGenerator.normaliseProbs();
 	}
 
 	/**
@@ -259,128 +300,221 @@ public class RuleBase {
 		ArrayList<Rule> handRules = new ArrayList<Rule>();
 
 		// Go to dot
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.TO_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.TO_DOT, true)));
 		// Go to centre of dots
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.TO_CENTRE_OF_DOTS, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.TO_CENTRE_OF_DOTS, true)));
 		// From nearest ghost 1
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST, Rule.LESS_THAN,
-				3, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// From nearest ghost 2
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST, Rule.LESS_THAN,
-				4, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 4), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// From nearest ghost 3
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST, Rule.LESS_THAN,
-				5, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// Stop running from nearest ghost 1
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST,
-				Rule.GREATER_THAN, 5, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, false)));
 		// Stop running from nearest ghost 2
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST,
-				Rule.GREATER_THAN, 6, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 6), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, false)));
 		// Stop running from nearest ghost 3
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST,
-				Rule.GREATER_THAN, 7, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 7), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, false)));
 		// Towards safe junction
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.TO_SAFE_JUNCTION, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Towards maximally safe junction 1
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.LESS_THAN, 3, PacManHighAction.TO_SAFE_JUNCTION, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Towards maximally safe junction 2
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.LESS_THAN, 2, PacManHighAction.TO_SAFE_JUNCTION, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.LESS_THAN, 2), new PacManHighAction(
+				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Maximally safe junction off 1
-		handRules
-				.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-						Rule.GREATER_THAN, 3,
-						PacManHighAction.TO_SAFE_JUNCTION, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.GREATER_EQ_THAN, 3), new PacManHighAction(
+				PacManActionSet.TO_SAFE_JUNCTION, false)));
 		// Safe to stop running 1
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.GREATER_THAN, 3, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.GREATER_EQ_THAN, 3), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, false)));
 		// Maximally safe junction off 2
-		handRules
-				.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-						Rule.GREATER_THAN, 5,
-						PacManHighAction.TO_SAFE_JUNCTION, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				PacManActionSet.TO_SAFE_JUNCTION, false)));
 		// Safe to stop running 2
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.GREATER_THAN, 5, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, false)));
 		// Keep on moving from ghosts
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// Eat edible ghosts
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.TO_ED_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.TO_ED_GHOST, true)));
 		// Ghost coming, chase powerdots
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST, Rule.LESS_THAN,
-				4, PacManHighAction.TO_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 4), new PacManHighAction(
+				PacManActionSet.TO_POWER_DOT, true)));
 		// If edible ghosts, don't chase power dots
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.LESS_THAN, 99, PacManHighAction.TO_POWER_DOT, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				PacManActionSet.TO_POWER_DOT, false)));
 		// If edible ghosts and we're close to a powerdot, move away from it
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.LESS_THAN, 99, PacManObservation.NEAREST_POWER_DOT,
-				Rule.LESS_THAN, 5, PacManHighAction.FROM_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.LESS_THAN, 99), new PacManObservation(
+				PacManObservationSet.NEAREST_POWER_DOT,
+				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				PacManActionSet.FROM_POWER_DOT, true)));
 		// If edible ghosts, move away from powerdots
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.LESS_THAN, 99, PacManHighAction.FROM_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				PacManActionSet.FROM_POWER_DOT, true)));
 		// If no edible ghosts, stop moving from powerdots
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.GREATER_THAN, 99, PacManHighAction.FROM_POWER_DOT, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 99),
+				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, false)));
 		// If no edible ghosts, chase powerdots
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.GREATER_THAN, 99, PacManHighAction.TO_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 99),
+				new PacManHighAction(PacManActionSet.TO_POWER_DOT, true)));
 		// If we're close to a ghost and powerdot, chase the powerdot 1
-		handRules.add(new Rule(PacManObservation.NEAREST_POWER_DOT,
-				Rule.LESS_THAN, 2, PacManObservation.NEAREST_GHOST,
-				Rule.LESS_THAN, 5, PacManHighAction.TO_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_POWER_DOT,
+				ObservationCondition.LESS_THAN, 2), new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				PacManActionSet.TO_POWER_DOT, true)));
 		// If we're close to a ghost and powerdot, chase the powerdot 2
-		handRules.add(new Rule(PacManObservation.NEAREST_POWER_DOT,
-				Rule.LESS_THAN, 4, PacManObservation.NEAREST_GHOST,
-				Rule.LESS_THAN, 5, PacManHighAction.TO_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_POWER_DOT,
+				ObservationCondition.LESS_THAN, 4), new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				PacManActionSet.TO_POWER_DOT, true)));
 		// In the clear
-		handRules.add(new Rule(PacManObservation.NEAREST_GHOST,
-				Rule.GREATER_THAN, 7, PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.GREATER_THAN, 4, PacManHighAction.FROM_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 7),
+				new PacManObservation(PacManObservationSet.MAX_JUNCTION_SAFETY,
+						ObservationCondition.GREATER_EQ_THAN, 4),
+				new PacManHighAction(PacManActionSet.FROM_GHOST, false)));
 		// Ghosts are not close, eat a dot 1
-		handRules.add(new Rule(PacManObservation.GHOST_DENSITY, Rule.LESS_THAN,
-				1.5, PacManObservation.NEAREST_POWER_DOT, Rule.LESS_THAN, 5,
-				PacManHighAction.FROM_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.GHOST_DENSITY,
+				ObservationCondition.LESS_THAN, 1.5), new PacManObservation(
+				PacManObservationSet.NEAREST_POWER_DOT,
+				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				PacManActionSet.FROM_POWER_DOT, true)));
 		// Far from power dot, stop running
-		handRules.add(new Rule(PacManObservation.NEAREST_POWER_DOT,
-				Rule.GREATER_THAN, 10, PacManHighAction.FROM_POWER_DOT, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_POWER_DOT,
+				ObservationCondition.GREATER_EQ_THAN, 10),
+				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, false)));
 		// Ghosts are too spread, move away from power dot
-		handRules.add(new Rule(PacManObservation.TOTAL_DIST_TO_GHOSTS,
-				Rule.GREATER_THAN, 30, PacManHighAction.FROM_POWER_DOT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.TOTAL_DIST_TO_GHOSTS,
+				ObservationCondition.GREATER_EQ_THAN, 30),
+				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, true)));
 		// Unsafe junction, run from ghosts 1
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.LESS_THAN, 3, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// Unsafe junction, run from ghosts 2
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.LESS_THAN, 2, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.LESS_THAN, 2), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// Unsafe junction, run from ghosts 3
-		handRules.add(new Rule(PacManObservation.MAX_JUNCTION_SAFETY,
-				Rule.LESS_THAN, 1, PacManHighAction.FROM_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.MAX_JUNCTION_SAFETY,
+				ObservationCondition.LESS_THAN, 1), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 		// Move from ghost centre
-		handRules.add(new Rule(PacManObservation.CONSTANT, Rule.GREATER_THAN,
-				0, PacManHighAction.FROM_GHOST_CENTRE, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.CONSTANT,
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				PacManActionSet.FROM_GHOST_CENTRE, true)));
 		// Stop chasing edible ghosts if none
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.GREATER_THAN, 99, PacManHighAction.TO_ED_GHOST, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.GREATER_EQ_THAN, 99),
+				new PacManHighAction(PacManActionSet.TO_ED_GHOST, false)));
 		// Chasing edible ghosts
-		handRules.add(new Rule(PacManObservation.NEAREST_ED_GHOST,
-				Rule.LESS_THAN, 99, PacManHighAction.TO_ED_GHOST, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				PacManActionSet.TO_ED_GHOST, true)));
 		// If not running from powerdot, move towards it
-		handRules.add(new Rule(PacManHighAction.FROM_POWER_DOT, false,
-				PacManHighAction.TO_POWER_DOT, true));
+		handRules.add(new Rule(new PacManHighAction(
+				PacManActionSet.FROM_POWER_DOT, false), new PacManHighAction(
+				PacManActionSet.TO_POWER_DOT, true)));
 		// If there is a fruit, chase it
-		handRules.add(new Rule(PacManObservation.NEAREST_FRUIT, Rule.LESS_THAN,
-				99, PacManHighAction.TO_FRUIT, true));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_FRUIT,
+				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				PacManActionSet.TO_FRUIT, true)));
 		// If there isn't a fruit, stop chasing it
-		handRules.add(new Rule(PacManObservation.NEAREST_FRUIT,
-				Rule.GREATER_THAN, 99, PacManHighAction.TO_FRUIT, false));
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_FRUIT,
+				ObservationCondition.GREATER_EQ_THAN, 99),
+				new PacManHighAction(PacManActionSet.TO_FRUIT, false)));
+		// If ghosts are edible and not flashing, chase them
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.NEAREST_ED_GHOST,
+				ObservationCondition.LESS_THAN, 99), new PacManObservation(
+				PacManObservationSet.GHOSTS_FLASHING,
+				ObservationCondition.LESS_THAN, 1), new PacManHighAction(
+				PacManActionSet.TO_ED_GHOST, true)));
+		// If the ghosts are flashing, stop chasing them
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.GHOSTS_FLASHING,
+				ObservationCondition.GREATER_EQ_THAN, 1), new PacManHighAction(
+				PacManActionSet.TO_ED_GHOST, false)));
+		// If the ghosts are flashing, run from them
+		handRules.add(new Rule(new PacManObservation(
+				PacManObservationSet.GHOSTS_FLASHING,
+				ObservationCondition.GREATER_EQ_THAN, 1), new PacManHighAction(
+				PacManActionSet.FROM_GHOST, true)));
 
 		return handRules;
 	}
@@ -409,11 +543,10 @@ public class RuleBase {
 	 * @return The randomly generated rule.
 	 */
 	private Rule generateRule(boolean useDistributions, int ruleSlot) {
-		int observationsSize = PacManObservation.values().length;
-		int actionsSize = PacManHighAction.values().length - 1;
+		int observationsSize = PacManObservationSet.values().length;
+		int actionsSize = PacManActionSet.values().length - 1;
 
 		ArrayList<PacManObservation> obs = new ArrayList<PacManObservation>();
-		ArrayList<Double> vals = new ArrayList<Double>();
 		PacManHighAction preAction = null;
 
 		int numIters = random_.nextInt(2);
@@ -423,28 +556,28 @@ public class RuleBase {
 			if (useDistributions) {
 				Condition cond = conditionGenerators_[getRegenIndex(ruleSlot)]
 						.sample();
-				if (cond instanceof Action)
+				if (cond instanceof ActionCondition)
 					preAction = (PacManHighAction) cond;
 				else {
 					PacManObservation observation = (PacManObservation) cond;
 					obs.add(observation);
-					int index = random_
-							.nextInt(observation.getSetOfVals().length);
-					vals.add(observation.getSetOfVals()[index]);
 				}
 			} else {
 				// Choose a random set, either observations or actions
 				int index = random_.nextInt(observationsSize + actionsSize);
 				if (index < observationsSize) {
 					// Choose an observation
-					PacManObservation observation = PacManObservation.values()[index];
-					obs.add(observation);
+					PacManObservationSet observation = PacManObservation
+							.getConditionAt(index);
 					index = random_.nextInt(observation.getSetOfVals().length);
-					vals.add(observation.getSetOfVals()[index]);
+					double value = observation.getSetOfVals()[index];
+					obs.add(new PacManObservation(observation, random_
+							.nextBoolean(), value));
 				} else {
 					// Choose an action
 					index -= observationsSize;
-					preAction = PacManHighAction.values()[index];
+					preAction = new PacManHighAction(PacManHighAction
+							.getConditionAt(index), random_.nextBoolean());
 				}
 			}
 		}
@@ -455,7 +588,9 @@ public class RuleBase {
 			action = (PacManHighAction) actionsGenerators_[getRegenIndex(ruleSlot)]
 					.sample();
 		} else {
-			action = PacManHighAction.values()[random_.nextInt(actionsSize)];
+			action = new PacManHighAction(PacManHighAction
+					.getConditionAt(random_.nextInt(actionsSize)), random_
+					.nextBoolean());
 		}
 
 		// Creating the rule
@@ -463,21 +598,15 @@ public class RuleBase {
 			// Rule has an action
 			if (obs.size() == 0) {
 				// Just an action
-				return new Rule(preAction, random_.nextBoolean(), action,
-						random_.nextBoolean());
+				return new Rule(preAction, action);
 			} else {
-				return new Rule(obs.get(0), random_.nextBoolean(), vals.get(0),
-						preAction, random_.nextBoolean(), action, random_
-								.nextBoolean());
+				return new Rule(obs.get(0), preAction, action);
 			}
 		} else {
 			if (obs.size() == 1) {
-				return new Rule(obs.get(0), random_.nextBoolean(), vals.get(0),
-						action, random_.nextBoolean());
+				return new Rule(obs.get(0), action);
 			} else {
-				return new Rule(obs.get(0), random_.nextBoolean(), vals.get(0),
-						obs.get(1), random_.nextBoolean(), vals.get(1), action,
-						random_.nextBoolean());
+				return new Rule(obs.get(0), obs.get(1), action);
 			}
 		}
 	}
@@ -508,30 +637,38 @@ public class RuleBase {
 		if (!ruleGenerators_[distIndex].sumsToOne())
 			ruleGenerators_[distIndex].normaliseProbs();
 
-		// We also want to note down the conditions and actions within the elite
-		// rules.
-		int[] conditionCounts = new int[conditionGenerators_[getRegenIndex(distIndex)]
-				.size()];
-		int[] actionCounts = new int[actionsGenerators_[getRegenIndex(distIndex)]
-				.size()];
-		int[] totalCounts = calculateConditionActionCounts(counts, offsetIndex,
-				conditionCounts, actionCounts, distIndex);
-		// If we're performing individual updates, go ahead
-		if (regenerationStrategy_ == INDIVIDUAL) {
-			// Update the distributions
-			conditionGenerators_[getRegenIndex(distIndex)].updateDistribution(
-					totalCounts[0], conditionCounts, 0, stepSize, 1);
-			actionsGenerators_[getRegenIndex(distIndex)].updateDistribution(
-					totalCounts[1], actionCounts, 0, stepSize, 1);
-		} else {
-			// Otherwise, store the counts and totals and perform the update in
-			// the post-update operations.
-			conditionCounts_[getRegenIndex(distIndex)] = sumArrays(
-					conditionCounts_[getRegenIndex(distIndex)], conditionCounts);
-			actionCounts_[getRegenIndex(distIndex)] = sumArrays(
-					actionCounts_[getRegenIndex(distIndex)], actionCounts);
-			totalCount_[getRegenIndex(distIndex)] = sumArrays(
-					totalCount_[getRegenIndex(distIndex)], totalCounts);
+		// Only note this down if we have generators
+		if (conditionGenerators_ != null && actionsGenerators_ != null) {
+			// We also want to note down the conditions and actions within the
+			// elite
+			// rules.
+			int[] conditionCounts = new int[conditionGenerators_[getRegenIndex(distIndex)]
+					.size()];
+			int[] actionCounts = new int[actionsGenerators_[getRegenIndex(distIndex)]
+					.size()];
+			int[] totalCounts = calculateConditionActionCounts(counts,
+					offsetIndex, conditionCounts, actionCounts, distIndex);
+			// If we're performing individual updates, go ahead
+			if (regenerationStrategy_ == INDIVIDUAL) {
+				// Update the distributions
+				conditionGenerators_[getRegenIndex(distIndex)]
+						.updateDistribution(totalCounts[0], conditionCounts, 0,
+								stepSize, 1);
+				actionsGenerators_[getRegenIndex(distIndex)]
+						.updateDistribution(totalCounts[1], actionCounts, 0,
+								stepSize, 1);
+			} else {
+				// Otherwise, store the counts and totals and perform the update
+				// in
+				// the post-update operations.
+				conditionCounts_[getRegenIndex(distIndex)] = sumArrays(
+						conditionCounts_[getRegenIndex(distIndex)],
+						conditionCounts);
+				actionCounts_[getRegenIndex(distIndex)] = sumArrays(
+						actionCounts_[getRegenIndex(distIndex)], actionCounts);
+				totalCount_[getRegenIndex(distIndex)] = sumArrays(
+						totalCount_[getRegenIndex(distIndex)], totalCounts);
+			}
 		}
 	}
 
@@ -546,13 +683,17 @@ public class RuleBase {
 	 */
 	public float postUpdateOperations(float thisAverage, float ratioChanged,
 			double stepSize) {
-		// Update the condition and action counts if needed
-		if (regenerationStrategy_ != INDIVIDUAL) {
-			for (int i = 0; i < totalCount_.length; i++) {
-				conditionGenerators_[i].updateDistribution(totalCount_[i][0],
-						conditionCounts_[i], 0, stepSize, 1);
-				actionsGenerators_[i].updateDistribution(totalCount_[i][1],
-						actionCounts_[i], 0, stepSize, 1);
+		// Only update the condition generators if they exist
+		if (conditionGenerators_ != null && actionsGenerators_ != null) {
+			// Update the condition and action counts if needed
+			if (regenerationStrategy_ != INDIVIDUAL) {
+				for (int i = 0; i < totalCount_.length; i++) {
+					conditionGenerators_[i].updateDistribution(
+							totalCount_[i][0], conditionCounts_[i], 0,
+							stepSize, 1);
+					actionsGenerators_[i].updateDistribution(totalCount_[i][1],
+							actionCounts_[i], 0, stepSize, 1);
+				}
 			}
 		}
 
@@ -560,7 +701,8 @@ public class RuleBase {
 		// Modify the distributions by reintegration rules from neighbouring
 		// distributions.
 		// ruleGenerators_ = reintegrateRules(ratioChanged, DIST_CONSTANT);
-		regenerateRules(ratioChanged);
+		if (conditionGenerators_ != null && actionsGenerators_ != null)
+			regenerateRules(ratioChanged);
 
 		// ratioShared_ *= slotDecayRate_;
 		// }
