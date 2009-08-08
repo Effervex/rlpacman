@@ -152,7 +152,7 @@ public class Policy {
 		for (int i = 0; i < priorityRules_.length; i++) {
 			// Check if the rule exists and if it does, if it applies.
 			if ((priorityRules_[i] != null)
-					&& (priorityRules_[i].evaluateCondition(observations,
+					&& (priorityRules_[i].evaluateConditions(observations,
 							actionSwitch))) {
 				// Check if this rule is at the same priority as other firing
 				// rules

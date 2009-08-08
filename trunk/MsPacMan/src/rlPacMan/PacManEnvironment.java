@@ -19,6 +19,9 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import rlPacMan.PacManHighAction.PacManActionSet;
+import rlPacMan.PacManObservation.PacManObservationSet;
+
 public class PacManEnvironment implements EnvironmentInterface {
 	private static final double DENSITY_RADIUS = 10;
 	public static final int PLAYER_SPEED = 20;
@@ -66,7 +69,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			return model_.m_player.m_score + "";
 		if (arg0.equals("noteObs")) {
 			noteFreqs_ = true;
-			observationFreqs_ = new ArrayList[PacManObservation.values().length];
+			observationFreqs_ = new ArrayList[PacManObservationSet.values().length];
 			for (int i = 0; i < observationFreqs_.length; i++) {
 				observationFreqs_[i] = new ArrayList<Double>();
 			}
@@ -174,10 +177,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		for (int i = 0; i < actions.length; i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
 			// If the action is null
-			if (actions[i] == PacManHighAction.NOTHING.ordinal()) {
+			if (actions[i] == PacManActionSet.NOTHING.ordinal()) {
 				buffer.append("null");
 			} else {
-				buffer.append(PacManHighAction.values()[actions[i]]);
+				buffer.append(PacManHighAction.getConditionAt(actions[i]));
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -200,10 +203,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		do {
 			ArrayList<PacManLowAction> levelDirections = null;
 			// The actions returned are guaranteed not to move into a wall.
-			switch (PacManHighAction.values()[highActions[i]]) {
+			switch (PacManHighAction.getConditionAt(highActions[i])) {
 			case TO_DOT:
 				levelDirections = ActionConverter.toDot(model_, distanceGrid_,
-						(int) obs_.doubleArray[PacManObservation.NEAREST_DOT
+						(int) obs_.doubleArray[PacManObservationSet.NEAREST_DOT
 								.ordinal()]);
 				break;
 			case TO_POWER_DOT:
@@ -212,7 +215,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 								model_,
 								thePlayer,
 								distanceGrid_,
-								(int) obs_.doubleArray[PacManObservation.NEAREST_POWER_DOT
+								(int) obs_.doubleArray[PacManObservationSet.NEAREST_POWER_DOT
 										.ordinal()], true);
 				break;
 			case FROM_POWER_DOT:
@@ -221,7 +224,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 								model_,
 								thePlayer,
 								distanceGrid_,
-								(int) obs_.doubleArray[PacManObservation.NEAREST_POWER_DOT
+								(int) obs_.doubleArray[PacManObservationSet.NEAREST_POWER_DOT
 										.ordinal()], false);
 				break;
 			case TO_ED_GHOST:
@@ -229,7 +232,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 						.toEdGhost(
 								model_,
 								distanceGrid_,
-								(int) obs_.doubleArray[PacManObservation.NEAREST_ED_GHOST
+								(int) obs_.doubleArray[PacManObservationSet.NEAREST_ED_GHOST
 										.ordinal()]);
 				break;
 			case TO_FRUIT:
@@ -237,16 +240,19 @@ public class PacManEnvironment implements EnvironmentInterface {
 						distanceGrid_);
 				break;
 			case FROM_GHOST:
-				levelDirections = ActionConverter.fromGhost(model_, thePlayer,
-						distanceGrid_,
-						(int) obs_.doubleArray[PacManObservation.NEAREST_GHOST
-								.ordinal()]);
+				levelDirections = ActionConverter
+						.fromGhost(
+								model_,
+								thePlayer,
+								distanceGrid_,
+								(int) obs_.doubleArray[PacManObservationSet.NEAREST_GHOST
+										.ordinal()]);
 				break;
 			case TO_SAFE_JUNCTION:
 				levelDirections = ActionConverter
 						.toSafeJunction(
 								junctionSafety_,
-								(int) obs_.doubleArray[PacManObservation.MAX_JUNCTION_SAFETY
+								(int) obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
 										.ordinal()], distanceGrid_);
 				break;
 			case FROM_GHOST_CENTRE:
@@ -329,17 +335,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 		double ghostY = 0;
 		int numGhosts = 0;
 		Set<Point> ghostCoords = new HashSet<Point>();
-		obs_.doubleArray[PacManObservation.NEAREST_GHOST.ordinal()] = Integer.MAX_VALUE;
-		obs_.doubleArray[PacManObservation.NEAREST_ED_GHOST.ordinal()] = Integer.MAX_VALUE;
+		obs_.doubleArray[PacManObservationSet.NEAREST_GHOST.ordinal()] = Integer.MAX_VALUE;
+		obs_.doubleArray[PacManObservationSet.NEAREST_ED_GHOST.ordinal()] = Integer.MAX_VALUE;
 		for (int i = 0; i < model_.m_ghosts.length; i++) {
 			// If the ghost is active and hostile
 			Ghost ghost = model_.m_ghosts[i];
 			if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
 				int isEd = 0;
 				if (ghost.m_nTicks2Flee <= 0) {
-					isEd = PacManObservation.NEAREST_GHOST.ordinal();
+					isEd = PacManObservationSet.NEAREST_GHOST.ordinal();
 				} else {
-					isEd = PacManObservation.NEAREST_ED_GHOST.ordinal();
+					isEd = PacManObservationSet.NEAREST_ED_GHOST.ordinal();
+					// Check flashing
+					if (ghost.isFlashing())
+						obs_.doubleArray[PacManObservationSet.GHOSTS_FLASHING
+								.ordinal()] = 1;
 				}
 				obs_.doubleArray[isEd] = Math.min(obs_.doubleArray[isEd],
 						distanceGrid_[ghost.m_locX][ghost.m_locY]);
@@ -365,20 +375,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 		// Work out the ghost centre dist
 		if (numGhosts != 0) {
-			obs_.doubleArray[PacManObservation.GHOST_CENTRE_DIST.ordinal()] = Point
+			obs_.doubleArray[PacManObservationSet.GHOST_CENTRE_DIST.ordinal()] = Point
 					.distance(ghostX / numGhosts, ghostY / numGhosts,
 							model_.m_player.m_locX, model_.m_player.m_locY);
 
 			// Calculate the density
-			obs_.doubleArray[PacManObservation.GHOST_DENSITY.ordinal()] = calculateDensity(ghostCoords);
+			obs_.doubleArray[PacManObservationSet.GHOST_DENSITY.ordinal()] = calculateDensity(ghostCoords);
 		}
 
 		// Choose the maximally safe junction
-		obs_.doubleArray[PacManObservation.MAX_JUNCTION_SAFETY.ordinal()] = Integer.MIN_VALUE;
+		obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY.ordinal()] = Integer.MIN_VALUE;
 		for (Point p : pacJunctions_) {
-			if (junctionSafety_.get(p) > obs_.doubleArray[PacManObservation.MAX_JUNCTION_SAFETY
+			if (junctionSafety_.get(p) > obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
 					.ordinal()])
-				obs_.doubleArray[PacManObservation.MAX_JUNCTION_SAFETY
+				obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
 						.ordinal()] = junctionSafety_.get(p);
 		}
 
@@ -408,12 +418,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 			currentThing = closestThing;
 			thingsToVisit.remove(currentThing);
 		}
-		obs_.doubleArray[PacManObservation.TOTAL_DIST_TO_GHOSTS.ordinal()] = totalDistance;
+		obs_.doubleArray[PacManObservationSet.TOTAL_DIST_TO_GHOSTS.ordinal()] = totalDistance;
 
 		// Calculate the fruit distance
 		if ((model_.m_fruit.m_nTicks2Show == 0)
 				&& (model_.m_fruit.m_bAvailable)) {
-			obs_.doubleArray[PacManObservation.NEAREST_FRUIT.ordinal()] = distanceGrid_[model_.m_fruit.m_locX][model_.m_fruit.m_locY];
+			obs_.doubleArray[PacManObservationSet.NEAREST_FRUIT.ordinal()] = distanceGrid_[model_.m_fruit.m_locX][model_.m_fruit.m_locY];
 		}
 
 		if (noteFreqs_) {
@@ -581,7 +591,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				dotX = model_.m_player.m_locX;
 				dotY = model_.m_player.m_locY;
 			}
-			observations[PacManObservation.DOT_CENTRE_DIST.ordinal()] = Point
+			observations[PacManObservationSet.DOT_CENTRE_DIST.ordinal()] = Point
 					.distance(dotX / i, dotY / i, model_.m_player.m_locX,
 							model_.m_player.m_locY);
 			return closeJunctions;
@@ -654,15 +664,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Update any observations
 
 			if ((model_.m_gameState[x][y] & GameModel.GS_FOOD) != 0) {
-				if (distance < observations[PacManObservation.NEAREST_DOT
+				if (distance < observations[PacManObservationSet.NEAREST_DOT
 						.ordinal()])
-					observations[PacManObservation.NEAREST_DOT.ordinal()] = distance;
+					observations[PacManObservationSet.NEAREST_DOT.ordinal()] = distance;
 				dots.add(new Point(x, y));
 			}
 			if (((model_.m_gameState[x][y] & GameModel.GS_POWERUP) != 0)
-					&& (distance < observations[PacManObservation.NEAREST_POWER_DOT
+					&& (distance < observations[PacManObservationSet.NEAREST_POWER_DOT
 							.ordinal()]))
-				observations[PacManObservation.NEAREST_POWER_DOT.ordinal()] = distance;
+				observations[PacManObservationSet.NEAREST_POWER_DOT.ordinal()] = distance;
 
 			// Check if the new position is a junction
 			isJunct = isJunction(new Point(x, y), distance);
@@ -734,11 +744,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private void resetObservations() {
 		if (obs_ == null)
-			obs_ = new Observation(0, PacManObservation.values().length);
+			obs_ = new Observation(0, PacManObservationSet.values().length);
 		for (int i = 0; i < obs_.doubleArray.length; i++) {
 			obs_.doubleArray[i] = Integer.MAX_VALUE;
 		}
-		obs_.doubleArray[PacManObservation.CONSTANT.ordinal()] = 1;
+		obs_.doubleArray[PacManObservationSet.CONSTANT.ordinal()] = 1;
+		obs_.doubleArray[PacManObservationSet.GHOSTS_FLASHING.ordinal()] = 0;
 
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
 		for (int x = 0; x < distanceGrid_.length; x++)
@@ -753,11 +764,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 			try {
 				File output = new File("freqs");
 				output.createNewFile();
-				
+
 				FileWriter writer = new FileWriter(output);
 				BufferedWriter bf = new BufferedWriter(writer);
 				bf.write("CONSTANT=1.0\n");
-				
+
 				for (int i = 1; i < observationFreqs_.length; i++) {
 					Collections.sort(observationFreqs_[i]);
 					for (int j = 1; j <= 5; j++) {
@@ -766,7 +777,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 					}
 					bf.write("\n");
 				}
-				
+
 				bf.close();
 				writer.close();
 			} catch (Exception e) {

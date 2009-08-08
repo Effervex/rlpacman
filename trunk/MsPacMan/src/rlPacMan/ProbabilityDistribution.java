@@ -197,7 +197,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		for (ItemProb ip : itemProbs_) {
 			sum += ip.getProbability();
 		}
-		if (sum == 1)
+		if ((sum >= 0.9999) && (sum <= 1.0001))
 			return true;
 		return false;
 	}

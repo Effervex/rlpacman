@@ -1,5 +1,8 @@
 package rlPacMan;
 
+import rlPacMan.Condition.ConditionObject;
+import rlPacMan.PacManHighAction.PacManActionSet;
+
 /**
  * This class represents an actions module. It controls which actions are switched on and off
  * @author Samuel J. Sarjant
@@ -9,7 +12,7 @@ public class ActionSwitch {
 	/** The number of priorities. */
 	public static final int NUM_PRIORITIES = 3;
 	/** The prioritised list of switched actions. Max 3. */ 
-	private Action[] activeActions_ = new PacManHighAction[NUM_PRIORITIES];
+	private ConditionObject[] activeActions_ = new ConditionObject[NUM_PRIORITIES];
 	
 	/**
 	 * Switches on a high action at the given priority.
@@ -17,7 +20,7 @@ public class ActionSwitch {
 	 * @param action The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(Action action, int priority) {
+	public void switchOn(ConditionObject action, int priority) {
 		activeActions_[priority] = action;
 	}
 	
@@ -26,7 +29,7 @@ public class ActionSwitch {
 	 * 
 	 * @param action The action to be switched off.
 	 */
-	public void switchOff(Action action) {
+	public void switchOff(ConditionObject action) {
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action))) {
 				activeActions_[i] = null;
@@ -45,7 +48,7 @@ public class ActionSwitch {
 			if (activeActions_[i] != null)
 				prioritisedActions[i] = activeActions_[i].ordinal();
 			else
-				prioritisedActions[i] = PacManHighAction.NOTHING.ordinal();
+				prioritisedActions[i] = PacManActionSet.NOTHING.ordinal();
 		}
 		
 		return prioritisedActions;
@@ -57,7 +60,7 @@ public class ActionSwitch {
 	 * @param action The action to check.
 	 * @return True if it is on, false otherwise
 	 */
-	public boolean isActionActive(Action action) {
+	public boolean isActionActive(ConditionObject action) {
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
 				return true;

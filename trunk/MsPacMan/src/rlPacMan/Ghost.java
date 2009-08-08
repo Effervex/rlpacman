@@ -54,7 +54,8 @@ class Ghost extends Thing {
 	boolean m_bCanUseNextBest = true; // Can ghost try the next best direction
 	// first 25% of the time
 	boolean m_bInsaneAI = false; // No holds barred!
-	
+	// If the ghost is flashing.
+	private boolean flashing_;
 
 	Ghost(GameModel gameModel, byte type, int startX, int startY,
 			boolean bMiddle, int nExitMilliSec) {
@@ -242,11 +243,17 @@ class Ghost extends Thing {
 		} else {
 			// Check if the Powerup is almost out for this ghost,
 			// if so, flash white.
-			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay
-					&& (m_nTicks2Flee % (200 / m_gameModel.m_pacMan.m_delay)) < (100 / m_gameModel.m_pacMan.m_delay))
-				g2.setColor(Color.WHITE);
-			else
+			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay) {
+				flashing_ = true;
+				if ((m_nTicks2Flee % (200 / m_gameModel.m_pacMan.m_delay)) < (100 / m_gameModel.m_pacMan.m_delay)) {
+					g2.setColor(Color.WHITE);
+				} else {
+					g2.setColor(Color.BLUE);
+				}
+			} else {
+				flashing_ = false;
 				g2.setColor(Color.BLUE);
+			}
 		}
 
 		// If the ghost is eaten, then do not draw the body
@@ -417,8 +424,8 @@ class Ghost extends Thing {
 
 		}
 
-		m_boundingBox.setBounds((ghostX), (ghostY),
-				ghostHeadDiameter, ghostHeadDiameter);
+		m_boundingBox.setBounds((ghostX), (ghostY), ghostHeadDiameter,
+				ghostHeadDiameter);
 		m_boundingBox.grow(-ghostHeadDiameter / 4, -ghostHeadDiameter / 4);
 		// m_boundingBox.setBounds ((int)(ghostX + deltaPixelX), (int)(ghostY +
 		// deltaPixelY + ghostHeight / 5), ghostHeight, ghostHeight -
@@ -639,10 +646,14 @@ class Ghost extends Thing {
 			directions.add(DOWN);
 			directions.add(RIGHT);
 			directions.add(LEFT);
-			bestDirection[0] = directions.remove((int) (Math.random() * directions.size()));
-			bestDirection[1] = directions.remove((int) (Math.random() * directions.size()));
-			bestDirection[2] = directions.remove((int) (Math.random() * directions.size()));
-			bestDirection[3] = directions.remove((int) (Math.random() * directions.size()));
+			bestDirection[0] = directions
+					.remove((int) (Math.random() * directions.size()));
+			bestDirection[1] = directions
+					.remove((int) (Math.random() * directions.size()));
+			bestDirection[2] = directions
+					.remove((int) (Math.random() * directions.size()));
+			bestDirection[3] = directions
+					.remove((int) (Math.random() * directions.size()));
 		}
 
 		// If the ghost is fleeing and not eaten, then reverse the array of best
@@ -941,5 +952,14 @@ class Ghost extends Thing {
 		m_bEaten = false;
 		m_nTicks2Popup = 0;
 		m_bEnteringDoor = false;
+	}
+
+	/**
+	 * Checks if this ghost is flashing.
+	 * 
+	 * @return The state of the ghost's flashing.
+	 */
+	public boolean isFlashing() {
+		return flashing_;
 	}
 }
