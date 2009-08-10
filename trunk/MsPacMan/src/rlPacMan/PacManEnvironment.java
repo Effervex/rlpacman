@@ -47,15 +47,18 @@ public class PacManEnvironment implements EnvironmentInterface {
 		environment_.init();
 
 		environment_.pack();
-		environment_.setVisible(true);
+		if (!environment_.experimentMode_)
+			environment_.setVisible(true);
+		else
+			environment_.setVisible(false);
 
 		model_ = environment_.getGameModel();
 
 		// Initialise the observations
 		resetObservations();
-
+		
 		try {
-			Thread.currentThread().sleep(4096);
+			Thread.sleep(4096);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -90,9 +93,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		resetObservations();
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
-			if (environment_.experimentMode_)
-				Thread.currentThread().sleep(0);
-			else
+			if (!environment_.experimentMode_)
 				Thread.currentThread().sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -125,9 +126,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
-			if (environment_.experimentMode_)
-				Thread.currentThread().sleep(0);
-			else
+			if (!environment_.experimentMode_)
 				Thread.currentThread().sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -506,7 +505,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				duplicate.m_bEnteringDoor = false;
 				duplicate.m_bEaten = false;
 			} else {
-				duplicate.tickThing();
+				duplicate.tickThing(model_.m_pacMan.m_gameUI);
 				model_.m_pacMan.Move(duplicate);
 			}
 			distance++;

@@ -105,110 +105,112 @@ public class GameUI extends Canvas {
 	// Update will only redraw the changed game cells..
 	public void update(Graphics g) {
 		try {
-		if (g != null) {
-			if (m_bRedrawAll) {
-				m_bRedrawAll = false;
-				paint(g);
-				return;
+			if (g != null) {
+				if (m_bRedrawAll) {
+					m_bRedrawAll = false;
+					paint(g);
+					return;
+				}
+
+				if (m_bShowIntro) {
+					updateIntro(g);
+					return;
+				}
+
+				// Redraw the gamestate of the location last occupied by each
+				// thing
+				for (int i = 0; i < m_gameModel.m_things.length; i++) {
+					redrawLastLocation(m_offGraphics, m_gameModel.m_things[i]);
+				}
+
+				// Redraw any cells that have been marked as always redraw
+				for (Enumeration e = m_redrawHash.elements(); e
+						.hasMoreElements();) {
+					Point p = ((Point) e.nextElement()).getLocation();
+					drawGameCell(m_offGraphics, p.x, p.y, false);
+				}
+
+				// Redraw the Hideout Door
+				drawHideoutDoor(m_offGraphics);
+
+				// Draw Player and Ghosts
+				for (int i = 0; i < m_gameModel.m_things.length; i++) {
+					m_gameModel.m_things[i].draw(this, m_offGraphics);
+				}
+
+				// Draw the Ready string (seen right before playing starts)
+				if (m_bDrawReady) {
+					drawReadyString(m_offGraphics);
+				}
+
+				// Blitz buffer onto screen
+				if (g != null)
+					g.drawImage(m_offImage, 0, 0, this);
 			}
-
-			if (m_bShowIntro) {
-				updateIntro(g);
-				return;
-			}
-		}
-
-		// Redraw the gamestate of the location last occupied by each thing
-		for (int i = 0; i < m_gameModel.m_things.length; i++) {
-			redrawLastLocation(m_offGraphics, m_gameModel.m_things[i]);
-		}
-
-		// Redraw any cells that have been marked as always redraw
-		for (Enumeration e = m_redrawHash.elements(); e.hasMoreElements();) {
-			Point p = ((Point) e.nextElement()).getLocation();
-			drawGameCell(m_offGraphics, p.x, p.y, false);
-		}
-
-		// Redraw the Hideout Door
-		drawHideoutDoor(m_offGraphics);
-
-		// Draw Player and Ghosts
-		for (int i = 0; i < m_gameModel.m_things.length; i++) {
-			m_gameModel.m_things[i].draw(this, m_offGraphics);
-		}
-
-		// Draw the Ready string (seen right before playing starts)
-		if (m_bDrawReady) {
-			drawReadyString(m_offGraphics);
-		}
-
-		// Blitz buffer onto screen
-		if (g != null)
-			g.drawImage(m_offImage, 0, 0, this);
 		} catch (Exception e) {
-		//e.printStackTrace();
+			// e.printStackTrace();
 		}
 	}
 
 	// Draws everything
 	public void paint(Graphics g) {
 		try {
-		Dimension dim = getSize();
+			Dimension dim = getSize();
 
-		// Create double buffer if it does not exist or is not
-		// the right size
-		if (m_offImage == null || m_offDim.width != dim.width
-				|| m_offDim.height != dim.height) {
-			m_offDim = dim;
-			m_offImage = createImage(m_offDim.width, m_offDim.height);
-			m_offGraphics = m_offImage.getGraphics();
-		}
-
-		// Clear everything
-		m_offGraphics.setColor(Color.black);
-		m_offGraphics.fillRect(0, 0, m_offDim.width, m_offDim.height);
-
-		if (m_bShowIntro) {
-			paintIntro(g);
-			return;
-		}
-
-		if (m_bShowAbout) {
-			paintAbout(g);
-			return;
-		}
-
-		m_offGraphics.setColor(Color.blue);
-
-		// Draw from left to right
-		for (int x = 0; x < m_gameModel.m_gameSizeX; x++) {
-			// Draw the column
-			for (int y = 0; y < m_gameModel.m_gameSizeY; y++) {
-				drawGameCell(m_offGraphics, x, y, false);
+			// Create double buffer if it does not exist or is not
+			// the right size
+			if (m_offImage == null || m_offDim.width != dim.width
+					|| m_offDim.height != dim.height) {
+				m_offDim = dim;
+				m_offImage = createImage(m_offDim.width, m_offDim.height);
+				m_offGraphics = m_offImage.getGraphics();
 			}
-		}
 
-		setClip(m_offGraphics);
+			// Clear everything
+			m_offGraphics.setColor(Color.black);
+			m_offGraphics.fillRect(0, 0, m_offDim.width, m_offDim.height);
 
-		// Draw Hideout Door
-		drawHideoutDoor(m_offGraphics);
+			if (m_bShowIntro) {
+				paintIntro(g);
+				return;
+			}
 
-		// Draw PacMan Player and Ghosts
-		for (int i = 0; i < m_gameModel.m_things.length; i++)
-			m_gameModel.m_things[i].draw(this, m_offGraphics);
+			if (m_bShowAbout) {
+				paintAbout(g);
+				return;
+			}
 
-		// Draw the Ready string (seen right before playing starts)
-		if (m_bDrawReady)
-			drawReadyString(m_offGraphics);
+			m_offGraphics.setColor(Color.blue);
 
-		if (m_bDrawGameOver)
-			drawGameOverString(m_offGraphics);
+			// Draw from left to right
+			for (int x = 0; x < m_gameModel.m_gameSizeX; x++) {
+				// Draw the column
+				for (int y = 0; y < m_gameModel.m_gameSizeY; y++) {
+					drawGameCell(m_offGraphics, x, y, false);
+				}
+			}
 
-		if (m_bDrawPaused)
-			drawPausedString(m_offGraphics);
+			setClip(m_offGraphics);
 
-		// Blitz buffer into actual graphic
-		g.drawImage(m_offImage, 0, 0, this);
+			// Draw Hideout Door
+			drawHideoutDoor(m_offGraphics);
+
+			// Draw PacMan Player and Ghosts
+			for (int i = 0; i < m_gameModel.m_things.length; i++)
+				m_gameModel.m_things[i].draw(this, m_offGraphics);
+
+			// Draw the Ready string (seen right before playing starts)
+			if (m_bDrawReady)
+				drawReadyString(m_offGraphics);
+
+			if (m_bDrawGameOver)
+				drawGameOverString(m_offGraphics);
+
+			if (m_bDrawPaused)
+				drawPausedString(m_offGraphics);
+
+			// Blitz buffer into actual graphic
+			g.drawImage(m_offImage, 0, 0, this);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -531,7 +533,8 @@ public class GameUI extends Canvas {
 	// and then draw the contents of the cell.
 	// bClearExtra is used to clean up the rendering of Things that exceed the
 	// boundbox of the each grid cell.
-	public void drawGameCell(Graphics g, int x, int y, boolean bClearExtra) throws Exception {
+	public void drawGameCell(Graphics g, int x, int y, boolean bClearExtra)
+			throws Exception {
 		int x1 = m_gridInset + x * CELL_LENGTH;
 		int y1 = m_gridInset + y * CELL_LENGTH;
 		int gameCell;
