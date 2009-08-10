@@ -427,22 +427,12 @@ class Ghost extends Thing {
 		m_boundingBox.setBounds((ghostX), (ghostY), ghostHeadDiameter,
 				ghostHeadDiameter);
 		m_boundingBox.grow(-ghostHeadDiameter / 4, -ghostHeadDiameter / 4);
-		// m_boundingBox.setBounds ((int)(ghostX + deltaPixelX), (int)(ghostY +
-		// deltaPixelY + ghostHeight / 5), ghostHeight, ghostHeight -
-		// ghostHeight / 5);
-
-		// TODO: Draw bounding box for testing
-		// g2.setColor(m_color);
-		// g2
-		// .drawRect(m_targetX * gameUI.CELL_LENGTH, m_targetY
-		// * gameUI.CELL_LENGTH, m_boundingBox.width,
-		// m_boundingBox.height);
-
 	}
 
 	// Overriden to update Ghost's directions
 	@Override
-	public void tickThing() {
+	public void tickThing(GameUI gameUI) {
+		super.tickThing(gameUI);
 		boolean bBackoff = false;
 		// Don't let the ghost go back the way it came.
 		byte prevDirection = STILL;
@@ -721,10 +711,6 @@ class Ghost extends Thing {
 
 			}
 		}
-
-		// REMOVE
-		// if (m_gameModel.m_ghosts[0] == this)
-		// System.out.println (m_direction + " " + targetX + " " + targetY);
 	}
 
 	/**
@@ -961,5 +947,19 @@ class Ghost extends Thing {
 	 */
 	public boolean isFlashing() {
 		return flashing_;
+	}
+
+	@Override
+	protected void updatePixelVals(GameUI gameUI) {
+		pixelSize_ = gameUI.CELL_LENGTH + gameUI.WALL1 + gameUI.WALL1;
+		pixelX_ = gameUI.m_gridInset
+				+ (int) (m_locX * gameUI.CELL_LENGTH - pixelSize_ / 2.0
+						+ gameUI.CELL_LENGTH / 2.0 + m_deltaLocX
+						* (gameUI.CELL_LENGTH / (m_deltaMax * 2.0 - 1)));
+		pixelY_ = gameUI.m_gridInset
+				+ (int) (m_locY * gameUI.CELL_LENGTH - pixelSize_ / 2.0
+						+ gameUI.CELL_LENGTH / 2.0 + m_deltaLocY
+						* (gameUI.CELL_LENGTH / (m_deltaMax * 2.0 - 1)));
+		pixelShrink_ = -pixelSize_ / 4;
 	}
 }

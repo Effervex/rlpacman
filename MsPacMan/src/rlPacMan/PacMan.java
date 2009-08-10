@@ -325,7 +325,7 @@ public class PacMan extends JFrame {
 
 		// Tick and then Move each Thing (includes Pacman and Ghosts)
 		for (int i = 0; i < m_gameModel.m_things.length; i++) {
-			m_gameModel.m_things[i].tickThing();
+			m_gameModel.m_things[i].tickThing(m_gameUI);
 			if (m_gameModel.m_things[i].canMove())
 				Move(m_gameModel.m_things[i]);
 		}
@@ -407,7 +407,7 @@ public class PacMan extends JFrame {
 
 		// Tick and then Move each Thing (includes Pacman and Ghosts)
 		for (int i = 0; i < m_gameModel.m_things.length; i++) {
-			m_gameModel.m_things[i].tickThing();
+			m_gameModel.m_things[i].tickThing(m_gameUI);
 			if (m_gameModel.m_things[i].canMove())
 				Move(m_gameModel.m_things[i]);
 		}
