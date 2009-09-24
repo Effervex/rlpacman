@@ -220,22 +220,22 @@ public class Rule {
 		// Choosing the appropriate constructor
 		if (observations.isEmpty()) {
 			// One action
-			return new Rule(new PacManHighAction(actions.get(0), operators
-					.get(0)), new PacManHighAction(actions.get(1), operators
+			return new Rule(new PacManAction(actions.get(0), operators
+					.get(0)), new PacManAction(actions.get(1), operators
 					.get(1)));
 		} else {
 			if (actions.size() > 1) {
 				// One obs and one action
 				return new Rule(new PacManObservation(observations.get(0),
-						operators.get(0), values.get(0)), new PacManHighAction(
+						operators.get(0), values.get(0)), new PacManAction(
 						actions.get(0), operators.get(1)),
-						new PacManHighAction(actions.get(1), operators.get(2)));
+						new PacManAction(actions.get(1), operators.get(2)));
 			} else {
 				// One observation rule
 				if (observations.size() == 1) {
 					return new Rule(new PacManObservation(observations.get(0),
 							operators.get(0), values.get(0)),
-							new PacManHighAction(actions.get(0), operators
+							new PacManAction(actions.get(0), operators
 									.get(1)));
 				} else {
 					// Two observation rule
@@ -243,7 +243,7 @@ public class Rule {
 							operators.get(0), values.get(0)),
 							new PacManObservation(observations.get(1),
 									operators.get(1), values.get(1)),
-							new PacManHighAction(actions.get(0), operators
+							new PacManAction(actions.get(0), operators
 									.get(2)));
 				}
 			}

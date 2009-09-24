@@ -5,14 +5,14 @@ package rlPacMan;
  * 
  * @author Samuel J. Sarjant
  */
-public class PacManHighAction extends ActionCondition {
+public class PacManAction extends ActionCondition {
 	/**
 	 * A constructor for a Ms. PacMan action with operator.
 	 * 
 	 * @param action The action.
 	 * @param actionOperator The operator on the action.
 	 */
-	public PacManHighAction(PacManActionSet action, boolean actionOperator) {
+	public PacManAction(PacManActionSet action, boolean actionOperator) {
 		super(action, actionOperator);
 	}
 	
@@ -22,8 +22,12 @@ public class PacManHighAction extends ActionCondition {
 	 * @param actionIndex The index of the action.
 	 * @param actionOperator The operator of the action.
 	 */
-	public PacManHighAction(int actionIndex, boolean actionOperator) {
+	public PacManAction(int actionIndex, boolean actionOperator) {
 		this(getConditionAt(actionIndex), actionOperator);
+	}
+	
+	public PacManAction() {
+		
 	}
 
 	/**
@@ -40,12 +44,16 @@ public class PacManHighAction extends ActionCondition {
 		return values[index];
 	}
 	
+	public ConditionObject[] getEnumValues() {
+		return PacManActionSet.values();
+	}
+	
 	/**
 	 * An enumeration of the actions present in ms. PacMan.
 	 * 
 	 * @author Samuel J. Sarjant
 	 */
-	public static enum PacManActionSet implements Condition.ConditionObject {
+	public static enum PacManActionSet implements ActionConditionObject {
 		TO_DOT, // Go towards the nearest dot
 		TO_POWER_DOT, // Go towards the nearest power dot
 		TO_FRUIT, // Go towards the fruit (NEW ACTION)
@@ -64,9 +72,8 @@ public class PacManHighAction extends ActionCondition {
 		// TO_GHOST_FREE_AREA, // Head towards the location where the minimum
 		// ghost
 		// distance is largest
-		TO_CENTRE_OF_DOTS, // An unlisted action that moves in a direction that
+		TO_CENTRE_OF_DOTS; // An unlisted action that moves in a direction that
 		// minimises the Euclidean distance from the centre of
 		// the dots.
-		NOTHING; // The default action
 	}
 }

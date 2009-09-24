@@ -1,7 +1,6 @@
 package rlPacMan;
 
 import rlPacMan.Condition.ConditionObject;
-import rlPacMan.PacManHighAction.PacManActionSet;
 
 /**
  * This class represents an actions module. It controls which actions are switched on and off
@@ -48,7 +47,7 @@ public class ActionSwitch {
 			if (activeActions_[i] != null)
 				prioritisedActions[i] = activeActions_[i].ordinal();
 			else
-				prioritisedActions[i] = PacManActionSet.NOTHING.ordinal();
+				prioritisedActions[i] = -1;
 		}
 		
 		return prioritisedActions;

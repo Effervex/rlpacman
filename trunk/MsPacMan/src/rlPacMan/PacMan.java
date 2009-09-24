@@ -9,7 +9,8 @@ import javax.swing.JFrame;
 
 import org.rlcommunity.rlglue.codec.*;
 
-public class PacMan extends JFrame {
+public class PacMan {
+	private JFrame gui_;
 	protected GameModel m_gameModel;
 	protected TopCanvas m_topCanvas;
 	protected BottomCanvas m_bottomCanvas;
@@ -23,9 +24,9 @@ public class PacMan extends JFrame {
 
 	/** The agent interfacing with this program. */
 	protected AgentInterface agent_;
-	protected KeyAdapter keyAdapter_;
+	protected PacManKeyAdapter keyAdapter_;
 
-	public boolean experimentMode_ = true;
+	public boolean experimentMode_ = false;
 
 	public void init() {
 		setTicksPerSec(35);
@@ -36,43 +37,47 @@ public class PacMan extends JFrame {
 		m_topCanvas = new TopCanvas(m_gameModel, 200, 200);
 		m_bottomCanvas = new BottomCanvas(this, m_gameModel, 200, 250);
 
-		GridBagLayout gridBag = new GridBagLayout();
-		GridBagConstraints c = new GridBagConstraints();
-
-		setLayout(gridBag);
-
-		c.gridwidth = 1;
-		c.gridheight = 3;
-
-		gridBag.setConstraints(m_gameUI, c);
-		add(m_gameUI);
-
-		c.gridwidth = GridBagConstraints.REMAINDER;
-		c.gridheight = 1;
-		gridBag.setConstraints(m_topCanvas, c);
-		add(m_topCanvas);
-
-		gridBag.setConstraints(m_bottomCanvas, c);
-		add(m_bottomCanvas);
-
-		requestFocus();
-		// Add event subscribers
 		keyAdapter_ = new PacManKeyAdapter(this);
-		addKeyListener(keyAdapter_);
+		if (!experimentMode_) {
+			gui_ = new JFrame("Reinforcement Learning Ms. PacMan");
+			
+			GridBagLayout gridBag = new GridBagLayout();
+			GridBagConstraints c = new GridBagConstraints();
 
-		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			gui_.setLayout(gridBag);
 
-		validate();
-		// m_soundMgr = new SoundManager(this, getCodeBase());
-		// m_soundMgr.loadSoundClips();
+			c.gridwidth = 1;
+			c.gridheight = 3;
+
+			gridBag.setConstraints(m_gameUI, c);
+			gui_.add(m_gameUI);
+
+			c.gridwidth = GridBagConstraints.REMAINDER;
+			c.gridheight = 1;
+			gridBag.setConstraints(m_topCanvas, c);
+			gui_.add(m_topCanvas);
+
+			gridBag.setConstraints(m_bottomCanvas, c);
+			gui_.add(m_bottomCanvas);
+
+			gui_.requestFocus();
+			// Add event subscribers
+			gui_.addKeyListener(keyAdapter_);
+
+			gui_.validate();
+
+			gui_.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			gui_.pack();
+			gui_.setVisible(true);
+		}
 	}
-	
+
 	public void reinit() {
 		m_gameModel = new GameModel(this);
 		m_gameUI.m_gameModel = m_gameModel;
 		m_topCanvas.m_gameModel = m_gameModel;
 		m_bottomCanvas.m_gameModel = m_gameModel;
-		
+
 		m_globalTickCount = 0;
 	}
 
@@ -84,6 +89,15 @@ public class PacMan extends JFrame {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	/**
+	 * Gets the JFrame this object uses.
+	 * 
+	 * @return The JFram of the PacMan object.
+	 */
+	public JFrame getFrame() {
+		return gui_;
 	}
 
 	// Master ticker that runs various parts of the game
@@ -351,7 +365,7 @@ public class PacMan extends JFrame {
 		// Tick the sound manager (mainly to check if the Chomping loop needs to
 		// be stopped)
 		// m_soundMgr.tickSound();
-		
+
 		m_gameModel.swapModes();
 	}
 
@@ -570,8 +584,7 @@ public class PacMan extends JFrame {
 	 *            The simulated key press.
 	 */
 	public void simulateKeyPress(int event) {
-		KeyEvent ke = new KeyEvent(this, 0, 0, 0, event, ' ');
-		keyAdapter_.keyPressed(ke);
+		keyAdapter_.activateEvent(event);
 	}
 
 	// Can't run Pacman as an application since it use sound-related methods.
@@ -583,120 +596,120 @@ public class PacMan extends JFrame {
 
 		// Initialize instance
 		pacMan.init();
-		pacMan.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-		pacMan.pack();
-		pacMan.setVisible(true);
 
 		pacMan.start();
 	}
 
-}
+	/*
+	 * class MainFrame extends Frame { MainFrame (String title) { super (title); }
+	 * 
+	 * public boolean handleEvent (Event e) { if (e.id ==Event.WINDOW_DESTROY) {
+	 * System.exit (0); } return super.handleEvent (e); } }
+	 */
 
-/*
- * class MainFrame extends Frame { MainFrame (String title) { super (title); }
- * 
- * public boolean handleEvent (Event e) { if (e.id ==Event.WINDOW_DESTROY) {
- * System.exit (0); } return super.handleEvent (e); } }
- */
+	// Ticker thread that updates the game state and refreshes the UI
+	// 
+	class Ticker extends Thread {
 
-// Ticker thread that updates the game state and refreshes the UI
-// 
-class Ticker extends Thread {
+		PacMan m_pacMan;
 
-	PacMan m_pacMan;
+		public Ticker(PacMan pacMan) {
+			m_pacMan = pacMan;
+		}
 
-	public Ticker(PacMan pacMan) {
-		m_pacMan = pacMan;
-	}
+		public void run() {
+			while (Thread.currentThread() == m_pacMan.m_ticker) {
+				try {
+					this.sleep(m_pacMan.m_delay);
 
-	public void run() {
-		while (Thread.currentThread() == m_pacMan.m_ticker) {
-			try {
-				this.sleep(m_pacMan.m_delay);
+				} catch (InterruptedException e) {
+					break;
+				}
 
-			} catch (InterruptedException e) {
-				break;
+				m_pacMan.tick(true);
+				if (m_pacMan.getFrame() != null)
+					m_pacMan.getFrame().requestFocus();
 			}
-
-			m_pacMan.tick(true);
-			m_pacMan.requestFocus();
 		}
 	}
-}
 
-// Key event handlers
-class PacManKeyAdapter extends KeyAdapter {
-	PacMan m_pacMan;
+	// Key event handlers
+	class PacManKeyAdapter extends KeyAdapter {
+		PacMan m_pacMan;
 
-	PacManKeyAdapter(PacMan pacMan) {
-		super();
-		m_pacMan = pacMan;
-	}
+		PacManKeyAdapter(PacMan pacMan) {
+			super();
+			m_pacMan = pacMan;
+		}
 
-	public void keyPressed(KeyEvent event) {
-		switch (event.getKeyCode()) {
+		public void keyPressed(KeyEvent event) {
+			activateEvent(event.getKeyCode());
+		}
 
-		case KeyEvent.VK_LEFT:
-			m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.LEFT;
-			break;
+		public void activateEvent(int event) {
+			switch (event) {
 
-		case KeyEvent.VK_RIGHT:
-			m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.RIGHT;
-			break;
-
-		case KeyEvent.VK_UP:
-			m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.UP;
-			break;
-
-		case KeyEvent.VK_DOWN:
-			m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.DOWN;
-			break;
-
-		case KeyEvent.VK_N:
-			m_pacMan.m_gameModel.m_state = GameModel.STATE_NEWGAME;
-			m_pacMan.m_gameUI.m_bDrawPaused = false;
-			break;
-
-		case KeyEvent.VK_P:
-			if (m_pacMan.m_gameModel.m_state == GameModel.STATE_GAMEOVER)
+			case KeyEvent.VK_LEFT:
+				m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.LEFT;
 				break;
 
-			if (m_pacMan.m_gameModel.m_state == GameModel.STATE_PAUSED) {
-				m_pacMan.m_gameModel.m_state = m_pacMan.m_gameModel.m_pausedState;
+			case KeyEvent.VK_RIGHT:
+				m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.RIGHT;
+				break;
+
+			case KeyEvent.VK_UP:
+				m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.UP;
+				break;
+
+			case KeyEvent.VK_DOWN:
+				m_pacMan.m_gameModel.m_player.m_requestedDirection = Thing.DOWN;
+				break;
+
+			case KeyEvent.VK_N:
+				m_pacMan.m_gameModel.m_state = GameModel.STATE_NEWGAME;
 				m_pacMan.m_gameUI.m_bDrawPaused = false;
-				m_pacMan.m_gameUI.m_bRedrawAll = true;
+				break;
 
-			} else {
-				m_pacMan.m_gameModel.m_pausedState = m_pacMan.m_gameModel.m_state;
-				m_pacMan.m_gameModel.m_state = GameModel.STATE_PAUSED;
+			case KeyEvent.VK_P:
+				if (m_pacMan.m_gameModel.m_state == GameModel.STATE_GAMEOVER)
+					break;
+
+				if (m_pacMan.m_gameModel.m_state == GameModel.STATE_PAUSED) {
+					m_pacMan.m_gameModel.m_state = m_pacMan.m_gameModel.m_pausedState;
+					m_pacMan.m_gameUI.m_bDrawPaused = false;
+					m_pacMan.m_gameUI.m_bRedrawAll = true;
+
+				} else {
+					m_pacMan.m_gameModel.m_pausedState = m_pacMan.m_gameModel.m_state;
+					m_pacMan.m_gameModel.m_state = GameModel.STATE_PAUSED;
+				}
+				break;
+
+			case KeyEvent.VK_A:
+				m_pacMan.m_gameModel.m_state = GameModel.STATE_ABOUT;
+				m_pacMan.m_gameModel.m_nTicks2AboutShow = 0;
+				break;
+
+			// case KeyEvent.VK_S:
+			// m_pacMan.m_soundMgr.m_bEnabled = !m_pacMan.m_soundMgr.m_bEnabled;
+			// if (m_pacMan.m_soundMgr.m_bEnabled == false)
+			// m_pacMan.m_soundMgr.stop();
+			// m_pacMan.m_bottomCanvas.repaint();
+			// break;
+
+			case KeyEvent.VK_I:
+				m_pacMan.toggleGhostAI();
+				break;
+
+			case KeyEvent.VK_ESCAPE:
+				System.exit(0);
+				break;
+
+			case KeyEvent.VK_SPACE:
+			case KeyEvent.VK_NUMPAD0:
+				m_pacMan.experimentMode_ = !m_pacMan.experimentMode_;
+				break;
 			}
-			break;
-
-		case KeyEvent.VK_A:
-			m_pacMan.m_gameModel.m_state = GameModel.STATE_ABOUT;
-			m_pacMan.m_gameModel.m_nTicks2AboutShow = 0;
-			break;
-
-		// case KeyEvent.VK_S:
-		// m_pacMan.m_soundMgr.m_bEnabled = !m_pacMan.m_soundMgr.m_bEnabled;
-		// if (m_pacMan.m_soundMgr.m_bEnabled == false)
-		// m_pacMan.m_soundMgr.stop();
-		// m_pacMan.m_bottomCanvas.repaint();
-		// break;
-
-		case KeyEvent.VK_I:
-			m_pacMan.toggleGhostAI();
-			break;
-
-		case KeyEvent.VK_ESCAPE:
-			System.exit(0);
-			break;
-
-		case KeyEvent.VK_SPACE:
-		case KeyEvent.VK_NUMPAD0:
-			m_pacMan.experimentMode_ = !m_pacMan.experimentMode_;
-			break;
 		}
 	}
 }

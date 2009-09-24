@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Random;
 
-import rlPacMan.PacManHighAction.PacManActionSet;
+import rlPacMan.Condition.ConditionObject;
+import rlPacMan.ObservationCondition.ValuedConditionObject;
+import rlPacMan.PacManAction.PacManActionSet;
 import rlPacMan.PacManObservation.PacManObservationSet;
 
 /**
@@ -49,39 +51,38 @@ public class RuleBase {
 	private Random random_ = new Random();
 
 	/** The regeneration strategy to use. */
-	private byte regenerationStrategy_ = PRIORITY;
+	private byte regenerationStrategy_ = INDIVIDUAL;
 
 	/** Holding variables until the post-update operation is called. */
 	private int[][] conditionCounts_;
 	private int[][] actionCounts_;
 	private int[][] totalCount_;
 
+	/** The file the initial rulebase is read from. */
+	private final File initialFile_;
+
+	/** The class prefix for the experiment. */
+	private String classPrefix_;
+
 	/**
-	 * A private constructor for generating a rule base from hand or random.
+	 * A private constructor for generating a rule base from random.
 	 * 
-	 * @param handCoded
-	 *            If the rule base uses hand-coded rules or random rules.
 	 * @param ruleBases
 	 *            The number of rule bases to generate if random.
+	 * @param classPrefix
+	 *            The class prefix to the environment classes.
 	 */
-	private RuleBase(boolean handCoded, int ruleBases) {
+	private RuleBase(int ruleBases, String classPrefix) {
+		classPrefix_ = classPrefix;
 		ruleGenerators_ = new ProbabilityDistribution[ruleBases];
-		ArrayList<Rule> handCodedRules = null;
-		if (handCoded)
-			handCodedRules = loadHandCodedRules();
 		for (int i = 0; i < ruleBases; i++) {
 			ruleGenerators_[i] = new ProbabilityDistribution<Rule>();
-			if (handCoded) {
-				ruleGenerators_[i].addAll(handCodedRules);
-			} else {
-				ruleGenerators_[i]
-						.addAll(generateRandomRules(RANDOM_RULE_NUMBER));
-			}
+			ruleGenerators_[i].addAll(generateRandomRules(RANDOM_RULE_NUMBER));
 		}
 
-		// Only use condition generators if we're using random rules
-		if (!handCoded)
-			initialiseConditionGenerators(ruleBases);
+		initialFile_ = null;
+
+		initialiseConditionGenerators(ruleBases, classPrefix);
 	}
 
 	/**
@@ -91,14 +92,39 @@ public class RuleBase {
 	 *            The file from which to load the rules.
 	 */
 	private RuleBase(File ruleBaseFile) {
-		loadRulesFromFile(ruleBaseFile);
-		initialiseConditionGenerators(ruleGenerators_.length);
+		initialFile_ = ruleBaseFile;
+		String prefix = loadRulesFromFile(initialFile_);
+		initialiseConditionGenerators(ruleGenerators_.length, prefix);
+	}
+
+	/**
+	 * Resets the instance to it's default values.
+	 */
+	public void resetInstance() {
+		// Resetting the rule values
+		if (initialFile_ != null) {
+			loadRulesFromFile(initialFile_);
+		}
+		for (ProbabilityDistribution<Rule> pd : ruleGenerators_) {
+			pd.resetProbs();
+		}
+		// Resetting the condition and action values
+		if (conditionGenerators_ != null) {
+			for (ProbabilityDistribution<Condition> pd : conditionGenerators_) {
+				pd.resetProbs();
+			}
+		}
+		if (actionsGenerators_ != null) {
+			for (ProbabilityDistribution<ActionCondition> pd : actionsGenerators_) {
+				pd.resetProbs();
+			}
+		}
 	}
 
 	/**
 	 * Initialises the condition generators.
 	 */
-	private void initialiseConditionGenerators(int ruleBases) {
+	private void initialiseConditionGenerators(int ruleBases, String classPrefix) {
 		if (regenerationStrategy_ == SINGLE) {
 			ruleBases = 1;
 		} else if (regenerationStrategy_ == PRIORITY) {
@@ -110,7 +136,12 @@ public class RuleBase {
 		// Adding the conditions to the first generator.
 		conditionGenerators_[0] = new ProbabilityDistribution<Condition>();
 		actionsGenerators_[0] = new ProbabilityDistribution<ActionCondition>();
-		addConditions(conditionGenerators_[0], actionsGenerators_[0]);
+		try {
+			addConditions(conditionGenerators_[0], actionsGenerators_[0],
+					classPrefix);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		// Cloning the initialised generator.
 		for (int i = 1; i < ruleBases; i++) {
@@ -139,36 +170,45 @@ public class RuleBase {
 	 *            the action generator to add to.
 	 */
 	private void addConditions(ProbabilityDistribution<Condition> obsGenerator,
-			ProbabilityDistribution<ActionCondition> actGenerator) {
+			ProbabilityDistribution<ActionCondition> actGenerator,
+			String classPrefix) {
 		// Work out the base weight for each item
-		// Note the 2 is because each condition has a binary comparator
-		// TODO Abstract away the PacMan part.
-		double baseWeight = 1.0 / (2 * (PacManObservationSet.values().length
-				+ PacManActionSet.values().length - 1));
+		// Note the 2 is because each
 
-		for (PacManObservationSet obs : PacManObservationSet.values()) {
+		ConditionObject[] observationVals = ObservationCondition
+				.getObservationValues(classPrefix);
+		ConditionObject[] actionVals = ActionCondition
+				.getActionValues(classPrefix);
+
+		double baseWeight = 1.0 / (2 * (observationVals.length + actionVals.length));
+
+		for (ConditionObject cond : observationVals) {
+			ValuedConditionObject obs = (ValuedConditionObject) cond;
 			double thisWeight = baseWeight / obs.getSetOfVals().length;
 			// For each of the double values, add the observation with a
 			// decreased weight
 			for (double obsVal : obs.getSetOfVals()) {
-				obsGenerator.add(new PacManObservation(obs, true, obsVal),
-						thisWeight);
-				obsGenerator.add(new PacManObservation(obs, false, obsVal),
-						thisWeight);
+				ObservationCondition observation = ObservationCondition
+						.createObservation(classPrefix, obs, false, obsVal);
+				obsGenerator.add(observation, thisWeight);
+
+				observation = ObservationCondition.createObservation(
+						classPrefix, obs, true, obsVal);
+				obsGenerator.add(observation, thisWeight);
 			}
 		}
 
-		double actionWeight = 1.0 / (2 * (PacManActionSet.values().length - 1));
+		double actionWeight = 1.0 / (2 * actionVals.length);
 		// Adding the actions
-		for (PacManActionSet act : PacManActionSet.values()) {
-			if (!act.equals(PacManActionSet.NOTHING)) {
-				PacManHighAction actionOn = new PacManHighAction(act, true);
-				PacManHighAction actionOff = new PacManHighAction(act, false);
-				obsGenerator.add(actionOn, baseWeight);
-				obsGenerator.add(actionOff, baseWeight);
-				actGenerator.add(actionOn, actionWeight);
-				actGenerator.add(actionOff, actionWeight);
-			}
+		for (ConditionObject act : actionVals) {
+			ActionCondition action = ActionCondition.createAction(classPrefix,
+					act, false);
+			obsGenerator.add(action, baseWeight);
+			actGenerator.add(action, actionWeight);
+
+			action = ActionCondition.createAction(classPrefix, act, true);
+			obsGenerator.add(action, baseWeight);
+			actGenerator.add(action, actionWeight);
 		}
 
 		// Check the values sum to one
@@ -183,14 +223,22 @@ public class RuleBase {
 	 * 
 	 * @param ruleBaseFile
 	 *            The file to load the rules from.
+	 * @return The prefix of the experiment classes used to generate the rules.
 	 */
-	private void loadRulesFromFile(File ruleBaseFile) {
+	private String loadRulesFromFile(File ruleBaseFile) {
 		ArrayList<ProbabilityDistribution<Rule>> ruleBases = new ArrayList<ProbabilityDistribution<Rule>>();
+		String classPrefix = null;
 		try {
 			FileReader reader = new FileReader(ruleBaseFile);
 			BufferedReader bf = new BufferedReader(reader);
 
-			String input = null;
+			String input = bf.readLine();
+			// First, read the environment class prefix
+			classPrefix = input;
+			if (classPrefix == null)
+				throw new Exception("No class prefix found!");
+
+			// Then read the rules in.
 			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
 				ProbabilityDistribution<Rule> ruleBase = new ProbabilityDistribution<Rule>();
 				// Split the base into rules
@@ -210,6 +258,8 @@ public class RuleBase {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		return classPrefix;
 	}
 
 	/**
@@ -218,13 +268,16 @@ public class RuleBase {
 	 * @param ruleBaseFile
 	 *            The file to save the rules to.
 	 */
-	public void saveRulesToFile(File ruleBaseFile) {
+	public void saveRulesToFile(File ruleBaseFile, String classPrefix) {
 		try {
 			if (!ruleBaseFile.exists())
 				ruleBaseFile.createNewFile();
 
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
+
+			// First, write the class prefix
+			bf.write(classPrefix + "\n");
 
 			// For each of the rule bases
 			for (int i = 0; i < ruleGenerators_.length; i++) {
@@ -260,8 +313,7 @@ public class RuleBase {
 			strBuffer = new StringBuffer();
 			// For each rule within the generators.
 			for (int i = 0; i < ruleGenerators_[slot].size(); i++) {
-				strBuffer.append(ruleGenerators_[slot]
-						.getProb(ruleGenerators_[slot].getElement(i))
+				strBuffer.append(ruleGenerators_[slot].getProb(i)
 						+ CrossEntropyExperiment.ELEMENT_DELIMITER);
 			}
 			strBuffer.append("\n");
@@ -302,133 +354,133 @@ public class RuleBase {
 		// Go to dot
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.TO_DOT, true)));
 		// Go to centre of dots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.TO_CENTRE_OF_DOTS, true)));
 		// From nearest ghost 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 3), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// From nearest ghost 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 4), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// From nearest ghost 3
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Stop running from nearest ghost 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Stop running from nearest ghost 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 6), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 6), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Stop running from nearest ghost 3
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 7), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 7), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Towards safe junction
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Towards maximally safe junction 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 3), new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Towards maximally safe junction 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 2), new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Maximally safe junction off 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, false)));
 		// Safe to stop running 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Maximally safe junction off 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, false)));
 		// Safe to stop running 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Keep on moving from ghosts
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Eat edible ghosts
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.TO_ED_GHOST, true)));
 		// Ghost coming, chase powerdots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 4), new PacManAction(
 				PacManActionSet.TO_POWER_DOT, true)));
 		// If edible ghosts, don't chase power dots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 99), new PacManAction(
 				PacManActionSet.TO_POWER_DOT, false)));
 		// If edible ghosts and we're close to a powerdot, move away from it
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
 				ObservationCondition.LESS_THAN, 99), new PacManObservation(
 				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_POWER_DOT, true)));
 		// If edible ghosts, move away from powerdots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 99), new PacManAction(
 				PacManActionSet.FROM_POWER_DOT, true)));
 		// If no edible ghosts, stop moving from powerdots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99),
-				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, false)));
+				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
+				PacManActionSet.FROM_POWER_DOT, false)));
 		// If no edible ghosts, chase powerdots
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99),
-				new PacManHighAction(PacManActionSet.TO_POWER_DOT, true)));
+				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
+				PacManActionSet.TO_POWER_DOT, true)));
 		// If we're close to a ghost and powerdot, chase the powerdot 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_POWER_DOT,
 				ObservationCondition.LESS_THAN, 2), new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 5), new PacManAction(
 				PacManActionSet.TO_POWER_DOT, true)));
 		// If we're close to a ghost and powerdot, chase the powerdot 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_POWER_DOT,
 				ObservationCondition.LESS_THAN, 4), new PacManObservation(
 				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 5), new PacManAction(
 				PacManActionSet.TO_POWER_DOT, true)));
 		// In the clear
 		handRules.add(new Rule(new PacManObservation(
@@ -436,84 +488,83 @@ public class RuleBase {
 				ObservationCondition.GREATER_EQ_THAN, 7),
 				new PacManObservation(PacManObservationSet.MAX_JUNCTION_SAFETY,
 						ObservationCondition.GREATER_EQ_THAN, 4),
-				new PacManHighAction(PacManActionSet.FROM_GHOST, false)));
+				new PacManAction(PacManActionSet.FROM_GHOST, false)));
 		// Ghosts are not close, eat a dot 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.GHOST_DENSITY,
 				ObservationCondition.LESS_THAN, 1.5), new PacManObservation(
 				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_POWER_DOT, true)));
 		// Far from power dot, stop running
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.GREATER_EQ_THAN, 10),
-				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, false)));
+				ObservationCondition.GREATER_EQ_THAN, 10), new PacManAction(
+				PacManActionSet.FROM_POWER_DOT, false)));
 		// Ghosts are too spread, move away from power dot
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.TOTAL_DIST_TO_GHOSTS,
-				ObservationCondition.GREATER_EQ_THAN, 30),
-				new PacManHighAction(PacManActionSet.FROM_POWER_DOT, true)));
+				ObservationCondition.GREATER_EQ_THAN, 30), new PacManAction(
+				PacManActionSet.FROM_POWER_DOT, true)));
 		// Unsafe junction, run from ghosts 1
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 3), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Unsafe junction, run from ghosts 2
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 2), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Unsafe junction, run from ghosts 3
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 1), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 1), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Move from ghost centre
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
 				PacManActionSet.FROM_GHOST_CENTRE, true)));
 		// Stop chasing edible ghosts if none
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99),
-				new PacManHighAction(PacManActionSet.TO_ED_GHOST, false)));
+				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
+				PacManActionSet.TO_ED_GHOST, false)));
 		// Chasing edible ghosts
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 99), new PacManAction(
 				PacManActionSet.TO_ED_GHOST, true)));
 		// If not running from powerdot, move towards it
-		handRules.add(new Rule(new PacManHighAction(
-				PacManActionSet.FROM_POWER_DOT, false), new PacManHighAction(
-				PacManActionSet.TO_POWER_DOT, true)));
+		handRules.add(new Rule(new PacManAction(PacManActionSet.FROM_POWER_DOT,
+				false), new PacManAction(PacManActionSet.TO_POWER_DOT, true)));
 		// If there is a fruit, chase it
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.LESS_THAN, 99), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 99), new PacManAction(
 				PacManActionSet.TO_FRUIT, true)));
 		// If there isn't a fruit, stop chasing it
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.GREATER_EQ_THAN, 99),
-				new PacManHighAction(PacManActionSet.TO_FRUIT, false)));
+				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
+				PacManActionSet.TO_FRUIT, false)));
 		// If ghosts are edible and not flashing, chase them
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.NEAREST_ED_GHOST,
 				ObservationCondition.LESS_THAN, 99), new PacManObservation(
 				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.LESS_THAN, 1), new PacManHighAction(
+				ObservationCondition.LESS_THAN, 1), new PacManAction(
 				PacManActionSet.TO_ED_GHOST, true)));
 		// If the ghosts are flashing, stop chasing them
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
 				PacManActionSet.TO_ED_GHOST, false)));
 		// If the ghosts are flashing, run from them
 		handRules.add(new Rule(new PacManObservation(
 				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManHighAction(
+				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 
 		return handRules;
@@ -531,7 +582,7 @@ public class RuleBase {
 
 		// For each of the rules in the rule base
 		for (int s = 0; s < baseSize; s++) {
-			randomRules.add(generateRule(false, 0));
+			randomRules.add(generateRule(false, 0, classPrefix_));
 		}
 		return randomRules;
 	}
@@ -540,14 +591,25 @@ public class RuleBase {
 	 * Generates a random rule using the set of observations and actions. A rule
 	 * can consist of 1 or 2 conditions.
 	 * 
+	 * @param useDistributions
+	 *            Whether to use the observed distributions of the rules.
+	 * @param ruleSlot
+	 *            The rule slot number to generate a rule from.
+	 * @param classPrefix
+	 *            The class prefix from which we generate rules.
 	 * @return The randomly generated rule.
 	 */
-	private Rule generateRule(boolean useDistributions, int ruleSlot) {
-		int observationsSize = PacManObservationSet.values().length;
-		int actionsSize = PacManActionSet.values().length - 1;
+	private Rule generateRule(boolean useDistributions, int ruleSlot,
+			String classPrefix) {
+		ConditionObject[] observationVals = ObservationCondition
+				.getObservationValues(classPrefix);
+		ConditionObject[] actionVals = ActionCondition
+				.getActionValues(classPrefix);
+		int observationsSize = observationVals.length;
+		int actionsSize = actionVals.length;
 
-		ArrayList<PacManObservation> obs = new ArrayList<PacManObservation>();
-		PacManHighAction preAction = null;
+		ArrayList<ObservationCondition> obs = new ArrayList<ObservationCondition>();
+		ActionCondition preAction = null;
 
 		int numIters = random_.nextInt(2);
 		// Number of iterations
@@ -557,9 +619,9 @@ public class RuleBase {
 				Condition cond = conditionGenerators_[getRegenIndex(ruleSlot)]
 						.sample();
 				if (cond instanceof ActionCondition)
-					preAction = (PacManHighAction) cond;
+					preAction = (ActionCondition) cond;
 				else {
-					PacManObservation observation = (PacManObservation) cond;
+					ObservationCondition observation = (ObservationCondition) cond;
 					obs.add(observation);
 				}
 			} else {
@@ -567,30 +629,31 @@ public class RuleBase {
 				int index = random_.nextInt(observationsSize + actionsSize);
 				if (index < observationsSize) {
 					// Choose an observation
-					PacManObservationSet observation = PacManObservation
-							.getConditionAt(index);
-					index = random_.nextInt(observation.getSetOfVals().length);
-					double value = observation.getSetOfVals()[index];
-					obs.add(new PacManObservation(observation, random_
-							.nextBoolean(), value));
+					ValuedConditionObject condition = (ValuedConditionObject) observationVals[index];
+					index = random_.nextInt(condition.getSetOfVals().length);
+					double value = condition.getSetOfVals()[index];
+
+					ObservationCondition observation = ObservationCondition
+							.createObservation(classPrefix, condition, random_
+									.nextBoolean(), value);
+					obs.add(observation);
 				} else {
 					// Choose an action
 					index -= observationsSize;
-					preAction = new PacManHighAction(PacManHighAction
-							.getConditionAt(index), random_.nextBoolean());
+					preAction = ActionCondition.createAction(classPrefix,
+							actionVals[index], random_.nextBoolean());
 				}
 			}
 		}
 
-		PacManHighAction action = null;
+		ActionCondition action = null;
 		// Can just sample if using a distribution
 		if (useDistributions) {
-			action = (PacManHighAction) actionsGenerators_[getRegenIndex(ruleSlot)]
+			action = actionsGenerators_[getRegenIndex(ruleSlot)]
 					.sample();
 		} else {
-			action = new PacManHighAction(PacManHighAction
-					.getConditionAt(random_.nextInt(actionsSize)), random_
-					.nextBoolean());
+			action = ActionCondition.createAction(classPrefix, actionVals[random_
+					.nextInt(actionsSize)], random_.nextBoolean());
 		}
 
 		// Creating the rule
@@ -627,15 +690,11 @@ public class RuleBase {
 	 * @param valueModifier
 	 *            The value modifier for the update.
 	 */
-	public void updateDistribution(int distIndex, double numSamples,
-			int[] counts, int offsetIndex, double stepSize, int valueModifier) {
+	public void updateDistribution(int distIndex, int[] counts,
+			int offsetIndex, double stepSize, int valueModifier) {
 		// Updates the distribution.
-		ruleGenerators_[distIndex].updateDistribution(numSamples, counts,
+		ruleGenerators_[distIndex].updateDistribution(counts[0], counts,
 				offsetIndex, stepSize, valueModifier);
-
-		// Might be best to check the probabilities
-		if (!ruleGenerators_[distIndex].sumsToOne())
-			ruleGenerators_[distIndex].normaliseProbs();
 
 		// Only note this down if we have generators
 		if (conditionGenerators_ != null && actionsGenerators_ != null) {
@@ -659,8 +718,7 @@ public class RuleBase {
 								stepSize, 1);
 			} else {
 				// Otherwise, store the counts and totals and perform the update
-				// in
-				// the post-update operations.
+				// in the post-update operations.
 				conditionCounts_[getRegenIndex(distIndex)] = sumArrays(
 						conditionCounts_[getRegenIndex(distIndex)],
 						conditionCounts);
@@ -837,8 +895,7 @@ public class RuleBase {
 		}
 
 		// Save the rules to file as they will not be standard
-		RuleBase.getInstance().saveRulesToFile(
-				new File("reintegralRuleBase.txt"));
+		saveRulesToFile(new File("reintegralRuleBase.txt"), classPrefix_);
 
 		return newDistributions;
 	}
@@ -859,15 +916,15 @@ public class RuleBase {
 					.removeNWorst(numRegened);
 			// For each newly generated rule
 			for (int i = 0; i < numRegened; i++) {
-				ruleGenerators_[slot].add(generateRule(true, slot),
+				ruleGenerators_[slot].add(
+						generateRule(true, slot, classPrefix_),
 						regenProbability);
 			}
 			ruleGenerators_[slot].normaliseProbs();
 		}
 
 		// Save the rules to file
-		RuleBase.getInstance().saveRulesToFile(
-				new File("regeneratedRuleBase.txt"));
+		saveRulesToFile(new File("regeneratedRuleBase.txt"), classPrefix_);
 	}
 
 	/**
@@ -888,6 +945,15 @@ public class RuleBase {
 			return Policy.getPriority(distIndex, ruleGenerators_.length);
 		}
 		return -1;
+	}
+
+	/**
+	 * Normalises the rule distributions.
+	 */
+	public void normaliseDistributions() {
+		for (ProbabilityDistribution<Rule> pd : ruleGenerators_) {
+			pd.normaliseProbs();
+		}
 	}
 
 	/**
@@ -948,6 +1014,23 @@ public class RuleBase {
 	}
 
 	/**
+	 * Gets the action values used in this experiment.
+	 * 
+	 * @param classPrefix
+	 *            The class prefix used in the environment.
+	 * @return The action values used.
+	 * @throws Exception
+	 *             If something goes awry...
+	 */
+	public ConditionObject[] getActionValues(String classPrefix)
+			throws InstantiationException, IllegalAccessException,
+			ClassNotFoundException {
+		return ((ActionCondition) Class.forName(
+				classPrefix + ActionCondition.CLASS_SUFFIX).newInstance())
+				.getEnumValues();
+	}
+
+	/**
 	 * Gets the rule base instance.
 	 * 
 	 * @return The rule base instance or null if not yet initialised.
@@ -957,26 +1040,20 @@ public class RuleBase {
 	}
 
 	/**
-	 * Initialises the instance as a hand coded rule base, or a set of random
-	 * rule bases.
+	 * Initialises the instance as a set of random rule bases.
 	 * 
-	 * @param handCoded
-	 *            If the rule base uses hand coded rules.
 	 * @param policySize
 	 *            The number of rule bases to generate if the rules are random.
 	 */
-	public static void initInstance(boolean handCoded, int policySize) {
-		instance_ = new RuleBase(handCoded, policySize);
-		if (!handCoded) {
-			try {
-				File ruleBaseFile = new File("ruleBase.txt");
-				instance_.saveRulesToFile(ruleBaseFile);
+	public static void initInstance(int policySize, String classPrefix) {
+		instance_ = new RuleBase(policySize, classPrefix);
+		try {
+			File ruleBaseFile = new File("ruleBase.txt");
+			instance_.saveRulesToFile(ruleBaseFile, classPrefix);
 
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-
 	}
 
 	/**
