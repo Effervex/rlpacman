@@ -2,10 +2,9 @@ package rlPacMan;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Random;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 /**
  * A class representing a probability distribution of values. These values are
@@ -14,9 +13,7 @@ import java.util.TreeSet;
  * @author Samuel J. Sarjant
  * 
  */
-@SuppressWarnings("serial")
 public class ProbabilityDistribution<T> implements Collection<T> {
-
 	/** The instances in the distribution with associated weights. */
 	private ArrayList<ItemProb> itemProbs_;
 	/** The random number generator. */
@@ -93,21 +90,6 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	public boolean add(T element, double prob) {
 		itemProbs_.add(new ItemProb(element, prob));
 		return true;
-	}
-
-	/**
-	 * Gets the probability for this element.
-	 * 
-	 * @param element
-	 *            The element.
-	 * @return The probability for the element, or -1 if it doesn't exist.
-	 */
-	public double getProb(T element) {
-		for (ItemProb ip : itemProbs_) {
-			if (ip.getItem().equals(element))
-				return ip.getProbability();
-		}
-		return -1;
 	}
 
 	/**
@@ -231,7 +213,8 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 */
 	public ArrayList<T> getNBest(int size) {
 		// Sort the values
-		SortedSet<ItemProb> ips = new TreeSet<ItemProb>(itemProbs_);
+		ArrayList<ItemProb> ips = new ArrayList<ItemProb>(itemProbs_);
+		Collections.sort(ips);
 
 		ArrayList<T> elites = new ArrayList<T>();
 		Iterator<ItemProb> iter = ips.iterator();
@@ -261,7 +244,8 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		if (itemProbs_.size() < (3 * size))
 			return -1;
 		// Sort the values
-		SortedSet<ItemProb> ips = new TreeSet<ItemProb>(itemProbs_);
+		ArrayList<ItemProb> ips = new ArrayList<ItemProb>(itemProbs_);
+		Collections.sort(ips);
 
 		ArrayList<ItemProb> removables = new ArrayList<ItemProb>();
 		Iterator<ItemProb> iter = ips.iterator();
@@ -307,11 +291,14 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
 			for (int i = 0; i < itemProbs_.size(); i++) {
-
 				// Update every element within the distribution
 				updateElement(numSamples, counts[i + offsetIndex], stepSize,
 						valueModifier, i);
 			}
+			
+			// Normalise the probabilities
+			if (!sumsToOne())
+				normaliseProbs();
 		}
 	}
 
@@ -375,6 +362,29 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			i++;
 		}
 		return -1;
+	}
+
+	/**
+	 * Resets the probabilities to an equal distribution.
+	 */
+	public void resetProbs() {
+		// Set all probabilities to one.
+		for (ItemProb ip : itemProbs_) {
+			ip.setProbability(1);
+		}
+		
+		// Normalise the probs
+		normaliseProbs();
+	}
+	
+	/**
+	 * Resets the probabilities to a given value.
+	 */
+	public void resetProbs(double prob) {
+		// Set all probabilities to a given value.
+		for (ItemProb ip : itemProbs_) {
+			ip.setProbability(prob);
+		}
 	}
 
 	// @Override

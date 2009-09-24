@@ -2,7 +2,7 @@ package rlPacMan;
 
 import org.rlcommunity.rlglue.codec.*;
 
-public class RunPacManExperiment {
+public class RunExperiment {
 	public static void main(String[] args) {
 		// Create the Agent
 		AgentInterface theAgent = new PacManAgent();

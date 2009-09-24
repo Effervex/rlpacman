@@ -19,7 +19,6 @@ public class PacManAgent implements AgentInterface {
 
 	// @Override
 	public void agent_end(double arg0) {
-		// TODO Store the results into the generator
 		actionsModule_ = null;		
 	}
 
@@ -34,6 +33,7 @@ public class PacManAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.substring(0, Policy.PREFIX.length()).equals(Policy.PREFIX)) {
 			policy_ = Policy.parsePolicy(arg0);
+			System.out.println(policy_);
 		} else if (arg0.equals("getFired")) {
 			return policy_.getFiredString();
 		}

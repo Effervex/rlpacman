@@ -36,6 +36,10 @@ public class PacManObservation extends ObservationCondition {
 			boolean compareType, double observationValue) {
 		this(getConditionAt(observationIndex), compareType, observationValue);
 	}
+	
+	public PacManObservation() {
+		
+	}
 
 	/**
 	 * Gets the condition object at the given index.
@@ -49,6 +53,10 @@ public class PacManObservation extends ObservationCondition {
 		if (index >= values.length)
 			return null;
 		return values[index];
+	}
+	
+	public ConditionObject[] getEnumValues() {
+		return PacManObservationSet.values();
 	}
 
 	/**
@@ -107,7 +115,6 @@ public class PacManObservation extends ObservationCondition {
 			setOfVals_ = vals;
 		}
 
-		@Override
 		public double[] getSetOfVals() {
 			return setOfVals_;
 		}

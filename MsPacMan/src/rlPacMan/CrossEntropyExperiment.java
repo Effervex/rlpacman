@@ -8,15 +8,22 @@ import java.io.FileWriter;
 import java.text.DecimalFormat;
 import java.util.*;
 
+import org.apache.commons.math.stat.descriptive.moment.Mean;
+import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
 public class CrossEntropyExperiment {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
 	/** The best policy found output file. */
-	private final File policyFile_;
+	private File policyFile_;
 	/** The generator states file. */
-	private final File generatorFile_;
+	private File generatorFile_;
+	/** The performance output file. */
+	private File performanceFile_;
+	/** The folder to store the temp files. */
+	private static final File TEMP_FOLDER = new File("temp/");
+
 	public static final String ELEMENT_DELIMITER = ",";
 
 	/** The population size of the experiment. */
@@ -24,15 +31,15 @@ public class CrossEntropyExperiment {
 	/** The number of episodes to run. */
 	private int episodes_;
 	/** The ratio of samples to use as 'elite' samples. */
-	private double selectionRatio_;
+	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
-	private double stepSize_;
+	private static final double STEP_SIZE = 0.6;
 	/** The rate of decay on the slots. */
-	private double slotDecayRate_;
+	private static final double SLOT_DECAY_RATE = 0.98;
 	/** The cross-entropy generator for the slots in the policy. */
 	private ProbabilityDistribution<Integer> slotGenerator_;
 	/** The maximum size of the policy. */
-	private final int policySize_;
+	private int policySize_;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The ratio of shared/regenerated rules. */
@@ -40,34 +47,72 @@ public class CrossEntropyExperiment {
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
-	 * experiment parameters.
+	 * experiment parameters from an argument file.
 	 * 
+	 * @param argumentFile
+	 *            The file containing the arguments.
+	 */
+	public CrossEntropyExperiment(File argumentFile) {
+		// Read the arguments in from file.
+		ArrayList<String> argsList = new ArrayList<String>();
+		try {
+			FileReader reader = new FileReader(argumentFile);
+			BufferedReader bf = new BufferedReader(reader);
+
+			String input = null;
+			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
+				argsList.add(input);
+			}
+
+			bf.close();
+			reader.close();
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// Choose the correct constructor to initialise the values.
+		String[] args = new String[argsList.size()];
+		argsList.toArray(args);
+		if (args.length == 8) {
+				initialise(args[0], Integer.parseInt(args[1]), Integer
+						.parseInt(args[2]), Integer.parseInt(args[3]), args[4],
+						args[5], args[6], args[7]);
+		} else if (args.length == 10) {
+			initialise(args[0], Integer.parseInt(args[1]), Integer
+					.parseInt(args[2]), Integer.parseInt(args[3]), args[5],
+					args[6], args[7], args[8], args[9]);
+		}
+	}
+
+	/**
+	 * A constructor for the typical arguments plus an initial rule base.
+	 * 
+	 * @param environmentClass
+	 *            The name of the environment class files.
 	 * @param populationSize
 	 *            The size of the population used in calculations.
 	 * @param episodeCount
 	 *            The number of episodes to perform.
-	 * @param selectionRatio
-	 *            The percentage of 'elite' samples to use from the population.
-	 * @param stepSize
-	 *            The step size for learning weights.
-	 * @param slotDecayRate
-	 *            The rate at which the slot probabilities decay per episode.
 	 * @param policySize
 	 *            The maximum number of rules in the policy.
+	 * @param ruleFile
+	 *            The file to load the rules from.
+	 * @param policyFile
+	 *            The output file for the best policy.
+	 * @param generatorFile
+	 *            The output file for the generators.
+	 * @param performanceFile
+	 *            The output file for the agent's performance.
 	 */
-	@SuppressWarnings("unchecked")
-	public CrossEntropyExperiment(int populationSize, int episodeCount,
-			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, boolean handCoded, String policyFile,
-			String generatorFile) {
+	private void initialise(String environmentClass, int populationSize,
+			int episodeCount, int policySize, String ruleFile,
+			String policyFile, String generatorFile, String performanceFile) {
 		population_ = populationSize;
 		episodes_ = episodeCount;
-		selectionRatio_ = selectionRatio;
-		stepSize_ = stepSize;
-		slotDecayRate_ = slotDecayRate;
-		slotGenerator_ = new ProbabilityDistribution<Integer>();
 		policySize_ = policySize;
-		RuleBase.initInstance(handCoded, policySize);
+		slotGenerator_ = new ProbabilityDistribution<Integer>();
+		RuleBase.initInstance(policySize, environmentClass);
 		// Filling the generators
 		for (int i = 0; i < policySize; i++) {
 			slotGenerator_.add(i, 0.5);
@@ -76,75 +121,55 @@ public class CrossEntropyExperiment {
 		// Create the output files if necessary
 		policyFile_ = new File(policyFile);
 		generatorFile_ = new File(generatorFile);
+		performanceFile_ = new File(performanceFile);
 		try {
 			if (!policyFile_.exists())
 				policyFile_.createNewFile();
 			if (!generatorFile_.exists())
 				generatorFile_.createNewFile();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * A constructor for the typical arguments plus a state of the generators
-	 * file.
-	 * 
-	 * @param populationSize
-	 *            The size of the population used in calculations.
-	 * @param episodeCount
-	 *            The number of episodes to perform.
-	 * @param selectionRatio
-	 *            The percentage of 'elite' samples to use from the population.
-	 * @param stepSize
-	 *            The step size for learning weights.
-	 * @param slotDecayRate
-	 *            The rate at which the slot probabilities decay per episode.
-	 * @param policySize
-	 *            The maximum number of rules in the policy.
-	 */
-	@SuppressWarnings("unchecked")
-	public CrossEntropyExperiment(int populationSize, int episodeCount,
-			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, boolean handCoded, String policyFile,
-			String generatorFile, String genInputFile) {
-		this(populationSize, episodeCount, selectionRatio, stepSize,
-				slotDecayRate, policySize, handCoded, policyFile, generatorFile);
-		// Load the generators from the input file
-		try {
-			loadGenerators(new File(genInputFile));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * A constructor for the typical arguments plus a state of the generators
-	 * file.
-	 * 
-	 * @param populationSize
-	 *            The size of the population used in calculations.
-	 * @param episodeCount
-	 *            The number of episodes to perform.
-	 * @param selectionRatio
-	 *            The percentage of 'elite' samples to use from the population.
-	 * @param stepSize
-	 *            The step size for learning weights.
-	 * @param slotDecayRate
-	 *            The rate at which the slot probabilities decay per episode.
-	 * @param policySize
-	 *            The maximum number of rules in the policy.
-	 */
-	@SuppressWarnings("unchecked")
-	public CrossEntropyExperiment(int populationSize, int episodeCount,
-			double selectionRatio, double stepSize, double slotDecayRate,
-			int policySize, String ruleFile, String policyFile,
-			String generatorFile, String genInputFile) {
-		this(populationSize, episodeCount, selectionRatio, stepSize,
-				slotDecayRate, policySize, false, policyFile, generatorFile);
-		// Load the generators from the input file
-		try {
+			if (!performanceFile_.exists())
+				performanceFile_.createNewFile();
+			TEMP_FOLDER.mkdir();
+			
+			// Load the generators from the input file
 			RuleBase.initInstance(new File(ruleFile));
+			RuleBase.getInstance().normaliseDistributions();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * A constructor for the typical arguments plus a state of the generators
+	 * file and rulebase.
+	 * 
+	 * @param environmentClass
+	 *            The name of the environment class files.
+	 * @param populationSize
+	 *            The size of the population used in calculations.
+	 * @param episodeCount
+	 *            The number of episodes to perform.
+	 * @param policySize
+	 *            The maximum number of rules in the policy.
+	 * @param ruleFile
+	 *            The file to load the rules from.
+	 * @param policyFile
+	 *            The output file for the best policy.
+	 * @param generatorFile
+	 *            The output file for the generators.
+	 * @param performanceFile
+	 *            The output file for the agent's performance.
+	 * @param genInputFile
+	 *            The input file for generators.
+	 */
+	private void initialise(String environmentClass, int populationSize,
+			int episodeCount, int policySize, String ruleFile,
+			String policyFile, String generatorFile, String performanceFile,
+			String genInputFile) {
+		initialise(environmentClass, populationSize, episodeCount, policySize,
+				ruleFile, policyFile, generatorFile, performanceFile);
+		// Load the generators from the input file
+		try {
 			loadGenerators(new File(genInputFile));
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -152,97 +177,149 @@ public class CrossEntropyExperiment {
 	}
 
 	/**
-	 * Runs the experiment.
+	 * Runs the experiment through a number of iterations and saves the averaged
+	 * performance.
+	 * 
+	 * @param runs
+	 *            The number of runs to average the results over.
 	 */
-	public void runExperiment() {
+	public void runExperiment(int runs) {
 		experimentStart_ = System.currentTimeMillis();
 
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 
-		// The outer loop, for refinement episode by episode
-		// Most outputs/frozen tests will be performed at the end of each of
-		// these.
 		PolicyValue bestPolicy = null;
-		float[] episodeAverage = new float[episodes_];
-		float runningAverage = 0;
-		for (int t = 0; t < episodes_; t++) {
-			// Forming a population of solutions
-			SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
-			for (int i = 0; i < population_; i++) {
-				Policy pol = generatePolicy();
-				// pol = paperPolicy();
-				// Send the agent a generated policy
-				RLGlue.RL_agent_message(pol.toParseableString());
 
-				float score = 0;
-				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-					RLGlue.RL_episode(1000000);
-					score += Float.parseFloat(RLGlue.RL_env_message("score"));
+		// Determine the iitial run (as previous runs may hve already been done
+		// in a previous experiment)
+		int run = checkFiles();
+
+		// The ultra-outer loop, for averaging experiment results
+		for (; run < runs; run++) {
+			float[] episodeAverage = new float[episodes_];
+			float runningAverage = 0;
+			// The outer loop, for refinement episode by episode
+			for (int t = 0; t < episodes_; t++) {
+				// Forming a population of solutions
+				SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
+				for (int i = 0; i < population_; i++) {
+					Policy pol = generatePolicy();
+					// pol = paperPolicy();
+					// Send the agent a generated policy
+					RLGlue.RL_agent_message(pol.toParseableString());
+
+					float score = 0;
+					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+						RLGlue.RL_episode(1000000);
+						score += Float.parseFloat(RLGlue
+								.RL_env_message("score"));
+					}
+					score /= AVERAGE_ITERATIONS;
+					// Set the fired rules back to this policy
+					pol.setFired(RLGlue.RL_agent_message("getFired"));
+
+					PolicyValue thisPolicy = new PolicyValue(pol, score);
+					pvs.add(thisPolicy);
+					// Storing the best policy
+					if ((bestPolicy == null)
+							|| (thisPolicy.getValue() > bestPolicy.getValue()))
+						bestPolicy = thisPolicy;
+
+					// Give an ETA
+					estimateETA(t * population_ + i + 1, run, episodes_
+							* population_, runs);
 				}
-				score /= AVERAGE_ITERATIONS;
-				// Set the fired rules back to this policy
-				pol.setFired(RLGlue.RL_agent_message("getFired"));
 
-				PolicyValue thisPolicy = new PolicyValue(pol, score);
-				pvs.add(thisPolicy);
-				// Storing the best policy
-				if ((bestPolicy == null)
-						|| (thisPolicy.getValue() > bestPolicy.getValue()))
-					bestPolicy = thisPolicy;
+				// Update the weights for all distributions using only the elite
+				// samples
+				float value = (t == 0) ? 0 : episodeAverage[t - 1];
+				episodeAverage[t] = updateWeights(pvs.iterator(), (int) Math
+						.ceil(population_ * SELECTION_RATIO), value,
+						runningAverage);
+				runningAverage = ((episodeAverage[t] - value) + runningAverage) / 2;
 
-				// Give an ETA
-				estimateETA(t * population_ + i + 1, episodes_ * population_);
+				// Save the results at each episode
+				try {
+					saveGenerators(t, run);
+					saveBestPolicy(bestPolicy);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 
-			// Update the weights for all distributions using only the elite
-			// samples
-			float value = (t == 0) ? 0 : episodeAverage[t - 1];
-			episodeAverage[t] = updateWeights(pvs.iterator(), population_
-					* selectionRatio_, value, runningAverage);
-			runningAverage = ((episodeAverage[t] - value) + runningAverage) / 2;
-
-			// Save the results at each episode
 			try {
-				saveGenerators(t);
-				saveBestPolicy(bestPolicy);
+				// Output the episode averages
+				savePerformance(episodeAverage, run);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		}
 
-		// Output the episode averages
-		System.out.println("Average episode elite scores:");
-		for (int e = 0; e < episodeAverage.length; e++) {
-			System.out.println(episodeAverage[e]);
+			// Resetting experiment values
+			RuleBase.getInstance().resetInstance();
+			slotGenerator_.resetProbs(0.5);
 		}
 
 		RLGlue.RL_cleanup();
+
+		try {
+			combineGenerators(runs);
+			compilePerformanceAverage(runs);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Checks the files for pre-existing versions so runs do not have to be
+	 * re-run.
+	 * 
+	 * @return The run number that the files stopped at.
+	 */
+	private int checkFiles() {
+		// Check the performance files
+		int run = -1;
+		File tempPerf = null;
+		do {
+			run++;
+			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
+					+ run);
+		} while (tempPerf.exists());
+		return run;
 	}
 
 	/**
 	 * Prints out the percentage complete, time elapsed and estimated time to
 	 * completion.
 	 * 
-	 * @param totalProg
-	 *            The total amount of progress to cover.
 	 * @param currentProg
 	 *            The current progress.
+	 * @param run
+	 *            The current run number.
+	 * @param totalProg
+	 *            The total amount of progress to cover.
+	 * @param runs
+	 *            The total number of runs.
 	 */
-	private void estimateETA(int currentProg, int totalProg) {
+	private void estimateETA(int currentProg, int run, int totalProg, int runs) {
 		long elapsedTime = System.currentTimeMillis() - experimentStart_;
 		double percent = (currentProg * 1.0) / totalProg;
+		double totalPercent = (currentProg * 1.0 + run * totalProg)
+				/ (totalProg * runs);
 
-		DecimalFormat formatter = new DecimalFormat("#0.00000");
-		String percentStr = formatter.format(100 * percent) + "% complete.";
+		DecimalFormat formatter = new DecimalFormat("#0.000");
+		String percentStr = formatter.format(100 * percent) + "% run complete.";
+		String totalPercentStr = formatter.format(100 * totalPercent)
+				+ "% experiment complete.";
 		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
 				+ (elapsedTime / (1000 * 60)) % 60 + ":" + (elapsedTime / 1000)
 				% 60;
-		long remainingTime = (long) (elapsedTime / percent - elapsedTime);
+		long remainingTime = (long) (elapsedTime / totalPercent - elapsedTime);
 		String remaining = "Remaining: " + remainingTime / (1000 * 60 * 60)
 				+ ":" + (remainingTime / (1000 * 60)) % 60 + ":"
 				+ (remainingTime / 1000) % 60;
-		System.out.println(percentStr + " " + elapsed + ", " + remaining);
+		System.out.println(percentStr);
+		System.out.println(totalPercentStr + " " + elapsed + ", " + remaining);
 		System.out.println();
 	}
 
@@ -269,8 +346,11 @@ public class CrossEntropyExperiment {
 	 * @throws Exception
 	 *             Should something go awry.
 	 */
-	private void saveGenerators(int episode) throws Exception {
-		FileWriter wr = new FileWriter(generatorFile_);
+	private void saveGenerators(int episode, int run) throws Exception {
+		File tempGen = new File(TEMP_FOLDER + "/" + generatorFile_.getName()
+				+ run);
+		tempGen.createNewFile();
+		FileWriter wr = new FileWriter(tempGen);
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		StringBuffer strBuffer = new StringBuffer();
@@ -282,10 +362,150 @@ public class CrossEntropyExperiment {
 		buf.write(strBuffer.toString());
 		// Write the rule generators
 		RuleBase.getInstance().writeGenerators(buf);
-		buf.write(episode);
+		buf.write(episode + "");
 
 		buf.close();
 		wr.close();
+	}
+
+	/**
+	 * Saves the performance to file and outputs them.
+	 * 
+	 * @param episodeAverage
+	 *            The saved episode average performances.
+	 */
+	private void savePerformance(float[] episodeAverage, int run)
+			throws Exception {
+		File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
+				+ run);
+		tempPerf.createNewFile();
+		FileWriter wr = new FileWriter(tempPerf);
+		BufferedWriter buf = new BufferedWriter(wr);
+
+		System.out.println("Average episode elite scores:");
+		for (int e = 0; e < episodeAverage.length; e++) {
+			buf.write(episodeAverage[e] + "\n");
+			System.out.println(episodeAverage[e]);
+		}
+
+		buf.close();
+		wr.close();
+	}
+
+	/**
+	 * Compiles the performance files togetrher into a single file, detailing
+	 * the average, min and max performances.
+	 * 
+	 * @param runs
+	 *            The number of runs involved in the experiment.
+	 */
+	private void compilePerformanceAverage(int runs) throws Exception {
+		double[][] performances = new double[episodes_][runs];
+		float min = Float.MAX_VALUE;
+		int minIndex = -1;
+		float max = -Float.MAX_VALUE;
+		int maxIndex = -1;
+		// For every performance file
+		for (int i = 0; i < runs; i++) {
+			File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_ + i);
+			FileReader reader = new FileReader(tempPerf);
+			BufferedReader buf = new BufferedReader(reader);
+
+			// For every value within the performance file
+			float sum = 0;
+			for (int e = 0; e < episodes_; e++) {
+				float val = Float.parseFloat(buf.readLine());
+				performances[e][i] = val;
+				sum += val;
+			}
+
+			// Find min or max runs
+			if (sum < min) {
+				min = sum;
+				minIndex = i;
+			}
+			if (sum > max) {
+				max = sum;
+				maxIndex = i;
+			}
+
+			buf.close();
+			reader.close();
+		}
+
+		// Calculate the average and print out the stats
+		FileWriter writer = new FileWriter(performanceFile_);
+		BufferedWriter buf = new BufferedWriter(writer);
+		buf.write("Average\tSD\tMin\tMax\n");
+		for (int e = 0; e < performances.length; e++) {
+			Mean mean = new Mean();
+			StandardDeviation sd = new StandardDeviation();
+			buf.write(mean.evaluate(performances[e]) + "\t"
+					+ sd.evaluate(performances[e]) + "\t"
+					+ performances[e][minIndex] + "\t"
+					+ performances[e][maxIndex] + "\n");
+		}
+
+		buf.close();
+		writer.close();
+	}
+
+	/**
+	 * Combines the generators into a single file, averaging the generator
+	 * values.
+	 * 
+	 * @param runs
+	 *            The number of runs involved in the experiment.
+	 * @throws Exception
+	 *             Should something go awry...
+	 */
+	private void combineGenerators(int runs) throws Exception {
+		Double[][] probs = new Double[policySize_ + 1][];
+		// For every generator file
+		for (int i = 0; i < runs; i++) {
+			File tempGen = new File(TEMP_FOLDER + "/" + generatorFile_ + i);
+			FileReader reader = new FileReader(tempGen);
+			BufferedReader buf = new BufferedReader(reader);
+
+			int dist = 0;
+			String input;
+			// For each value in the generator file
+			while (((input = buf.readLine()) != null) && (!input.equals(""))) {
+				ArrayList<Double> vals = new ArrayList<Double>();
+				String[] split = input.split(ELEMENT_DELIMITER);
+				if (split.length > 1) {
+					for (String str : split) {
+						vals.add(Double.parseDouble(str));
+					}
+
+					// Adding the values
+					if (probs[dist] == null)
+						probs[dist] = vals.toArray(new Double[vals.size()]);
+					else {
+						for (int j = 0; j < vals.size(); j++) {
+							probs[dist][j] += vals.get(j);
+						}
+					}
+
+					dist++;
+				}
+			}
+
+			buf.close();
+			reader.close();
+		}
+
+		// Average and write the generators out
+		FileWriter writer = new FileWriter(generatorFile_);
+		BufferedWriter buf = new BufferedWriter(writer);
+		for (Double[] values : probs) {
+			for (Double val : values) {
+				buf.write((val / runs) + ELEMENT_DELIMITER);
+			}
+			buf.write("\n");
+		}
+		buf.close();
+		writer.close();
 	}
 
 	/**
@@ -339,7 +559,7 @@ public class CrossEntropyExperiment {
 	 *            The running average score among the elites. Used for
 	 *            determining if the performance is settling.
 	 */
-	private float updateWeights(Iterator<PolicyValue> iter, double numElite,
+	private float updateWeights(Iterator<PolicyValue> iter, int numElite,
 			float lastEpisode, float runningAverage) {
 		// Keep count of the rules seen (and slots used)
 		int[][] slotCounter = new int[policySize_][1 + RuleBase.getInstance()
@@ -351,16 +571,16 @@ public class CrossEntropyExperiment {
 		for (int s = 0; s < slotGenerator_.size(); s++) {
 			// Change the slot probabilities, factoring in decay
 			slotGenerator_.updateElement(numElite, slotCounter[s][0],
-					stepSize_, slotDecayRate_, s);
+					STEP_SIZE, SLOT_DECAY_RATE, s);
 
 			// Update the internal rule distributions
-			RuleBase.getInstance().updateDistribution(s, numElite,
-					slotCounter[s], 1, stepSize_, 1);
+			RuleBase.getInstance().updateDistribution(s, slotCounter[s], 1,
+					STEP_SIZE, 1);
 		}
 
 		// Further updates on the distributions
 		ratioShared_ = RuleBase.getInstance().postUpdateOperations(thisAverage,
-				ratioShared_, stepSize_);
+				ratioShared_, STEP_SIZE);
 
 		return episodeValue;
 	}
@@ -377,7 +597,7 @@ public class CrossEntropyExperiment {
 	 *            The storage for the rule counts.
 	 * @return The average value of the elite samples.
 	 */
-	private float countRules(Iterator<PolicyValue> iter, double numElite,
+	private float countRules(Iterator<PolicyValue> iter, int numElite,
 			int[][] slotCounter) {
 		float total = 0;
 		// Only selecting the top elite samples
@@ -431,27 +651,10 @@ public class CrossEntropyExperiment {
 	 *            the arguments for the program.
 	 */
 	public static void main(String[] args) {
-		CrossEntropyExperiment theExperiment = null;
-		if (args.length == 9) {
-			theExperiment = new CrossEntropyExperiment(Integer
-					.parseInt(args[0]), Integer.parseInt(args[1]), Double
-					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean
-					.parseBoolean(args[6]), args[7], args[8]);
-		} else if (args.length == 10) {
-			theExperiment = new CrossEntropyExperiment(Integer
-					.parseInt(args[0]), Integer.parseInt(args[1]), Double
-					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), Boolean
-					.parseBoolean(args[6]), args[7], args[8], args[9]);
-		} else if (args.length == 11) {
-			theExperiment = new CrossEntropyExperiment(Integer
-					.parseInt(args[0]), Integer.parseInt(args[1]), Double
-					.parseDouble(args[2]), Double.parseDouble(args[3]), Double
-					.parseDouble(args[4]), Integer.parseInt(args[5]), args[7],
-					args[8], args[9], args[10]);
-		}
-		theExperiment.runExperiment();
+		CrossEntropyExperiment theExperiment = new CrossEntropyExperiment(
+				new File(args[0]));
+
+		theExperiment.runExperiment(10);
 		System.exit(0);
 	}
 

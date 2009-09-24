@@ -18,7 +18,6 @@ public class Policy {
 	 * @param policySize
 	 *            The maximum size of the policy.
 	 */
-	@SuppressWarnings("unchecked")
 	public Policy(int policySize) {
 		priorityRules_ = new Rule[policySize];
 		triggered_ = new boolean[policySize];
