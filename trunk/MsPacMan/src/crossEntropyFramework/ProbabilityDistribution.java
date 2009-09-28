@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;

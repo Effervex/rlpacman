@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 /**
  * An abstract class for representing an action type to be used within rules.
@@ -103,6 +103,21 @@ public abstract class ActionCondition extends Condition {
 			e.printStackTrace();
 		}
 		return action;
+	}
+	
+	/**
+	 * A streamlined method for creating an ActionCondition using an index argument.
+	 * 
+	 * @param classPrefix
+	 *            The class prefix used in the environment.
+	 * @param condIndex
+	 *            The action condition index.
+	 * @param operator
+	 *            The operator on the action.
+	 * @return The newly created ObservationCondition instantiation.
+	 */
+	public static ActionCondition createAction(String classPrefix, int condIndex, boolean operator) {
+		return createAction(classPrefix, getActionValues(classPrefix)[condIndex], operator);
 	}
 
 	/**

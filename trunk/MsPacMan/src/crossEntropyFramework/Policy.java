@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 /**
  * This class represents a policy that the agent can use.

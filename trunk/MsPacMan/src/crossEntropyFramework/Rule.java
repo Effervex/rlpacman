@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,7 +27,7 @@ public class Rule {
 	 *            The action to trigger if condition met.
 	 */
 	public Rule(Condition obs, ActionCondition action) {
-		conditions_ = new PacManObservation[1];
+		conditions_ = new ObservationCondition[1];
 		conditions_[0] = obs;
 
 		action_ = action;
@@ -76,16 +76,24 @@ public class Rule {
 	 * 
 	 * @param condAction
 	 *            The action condition.
-	 * @param acSwitch
-	 *            The switch value of the action condition.
 	 * @param action
 	 *            The action to trigger if condition met.
-	 * @param switched
-	 *            Whether to activate or deactivate the action.
 	 */
 	public Rule(ActionCondition condAction, ActionCondition action) {
 		conditions_ = new ActionCondition[1];
 		conditions_[0] = condAction;
+
+		action_ = action;
+	}
+
+	/**
+	 * A constructor for a constant rule that always fires the action.
+	 * 
+	 * @param action
+	 *            The action to always trigger.
+	 */
+	public Rule(ActionCondition action) {
+		conditions_ = null;
 
 		action_ = action;
 	}
@@ -103,6 +111,10 @@ public class Rule {
 	 */
 	public boolean evaluateConditions(double[] observations,
 			ActionSwitch actionSwitch) {
+		// If we have no conditions, the rule is met
+		if (conditions_ == null)
+			return true;
+
 		int i = 0;
 		// Check every observation
 		for (i = 0; i < conditions_.length; i++) {
@@ -151,24 +163,26 @@ public class Rule {
 	public String toParseableString() {
 		StringBuffer buffer = new StringBuffer();
 
-		// Just action case
-		if (conditions_[0] instanceof ActionCondition) {
-			buffer.append(ACTION + Condition.PRE_SEPARATOR
-					+ conditions_[0].toParseableString());
-		} else {
-			buffer.append(OBSERVATION + Condition.PRE_SEPARATOR
-					+ conditions_[0].toParseableString());
-			// Check for more observations
-			int i = 1;
-			if (conditions_.length > 1) {
-				for (; i < conditions_.length; i++) {
-					buffer.append(Condition.PRE_SEPARATOR);
-					if (conditions_[i] instanceof ActionCondition) {
-						buffer.append(ACTION + Condition.PRE_SEPARATOR
-								+ conditions_[i].toParseableString());
-					} else {
-						buffer.append(OBSERVATION + Condition.PRE_SEPARATOR
-								+ conditions_[i].toParseableString());
+		// Just action case\
+		if (conditions_ != null) {
+			if (conditions_[0] instanceof ActionCondition) {
+				buffer.append(ACTION + Condition.PRE_SEPARATOR
+						+ conditions_[0].toParseableString());
+			} else {
+				buffer.append(OBSERVATION + Condition.PRE_SEPARATOR
+						+ conditions_[0].toParseableString());
+				// Check for more observations
+				int i = 1;
+				if (conditions_.length > 1) {
+					for (; i < conditions_.length; i++) {
+						buffer.append(Condition.PRE_SEPARATOR);
+						if (conditions_[i] instanceof ActionCondition) {
+							buffer.append(ACTION + Condition.PRE_SEPARATOR
+									+ conditions_[i].toParseableString());
+						} else {
+							buffer.append(OBSERVATION + Condition.PRE_SEPARATOR
+									+ conditions_[i].toParseableString());
+						}
 					}
 				}
 			}
@@ -185,31 +199,37 @@ public class Rule {
 	 * 
 	 * @param ruleString
 	 *            The rule in String form.
+	 * @param classPrefix
+	 *            The class prefix to the actions and conditions used in the
+	 *            environment.
 	 * @return The Rule from the String or null.
 	 */
-	public static Rule parseRule(String ruleString) {
+	public static Rule parseRule(String ruleString, String classPrefix) {
 		ArrayList<Integer> observations = new ArrayList<Integer>();
 		ArrayList<Boolean> operators = new ArrayList<Boolean>();
 		ArrayList<Double> values = new ArrayList<Double>();
 		ArrayList<Integer> actions = new ArrayList<Integer>();
 
 		String[] split = ruleString.split(ACTION_SEPARATOR);
-		String[] preconditionSplit = split[0].split(Condition.PRE_SEPARATOR);
+		if (!split[0].isEmpty()) {
+			String[] preconditionSplit = split[0]
+					.split(Condition.PRE_SEPARATOR);
 
-		// Parsing the pre conditions
-		int index = 0;
-		while (index < preconditionSplit.length) {
-			if (preconditionSplit[index].equals(OBSERVATION)) {
-				// Observation splits
-				index++;
-				index = ObservationCondition.parseObservationCondition(
-						preconditionSplit, index, observations, operators,
-						values);
-			} else if (preconditionSplit[index].equals(ACTION)) {
-				// Action splits
-				index++;
-				index = ActionCondition.parseCondition(preconditionSplit,
-						index, actions, operators);
+			// Parsing the pre conditions
+			int index = 0;
+			while (index < preconditionSplit.length) {
+				if (preconditionSplit[index].equals(OBSERVATION)) {
+					// Observation splits
+					index++;
+					index = ObservationCondition.parseObservationCondition(
+							preconditionSplit, index, observations, operators,
+							values);
+				} else if (preconditionSplit[index].equals(ACTION)) {
+					// Action splits
+					index++;
+					index = ActionCondition.parseCondition(preconditionSplit,
+							index, actions, operators);
+				}
 			}
 		}
 
@@ -217,34 +237,57 @@ public class Rule {
 		String[] actionSplit = split[1].split(Condition.PRE_SEPARATOR);
 		ActionCondition.parseCondition(actionSplit, 0, actions, operators);
 
+		ObservationCondition observation = null;
+		ObservationCondition observation2 = null;
+		ActionCondition condAction = null;
+		ActionCondition action = null;
+
 		// Choosing the appropriate constructor
 		if (observations.isEmpty()) {
-			// One action
-			return new Rule(new PacManAction(actions.get(0), operators
-					.get(0)), new PacManAction(actions.get(1), operators
-					.get(1)));
+			// If we have an action rule
+			if (actions.size() == 2) {
+				condAction = ActionCondition.createAction(classPrefix, actions
+						.get(0), operators.get(0));
+				action = ActionCondition.createAction(classPrefix, actions
+						.get(1), operators.get(1));
+				return new Rule(condAction, action);
+			} else {
+				// A constant rule
+				action = ActionCondition.createAction(classPrefix, actions
+						.get(0), operators.get(0));
+				return new Rule(action);
+			}
 		} else {
 			if (actions.size() > 1) {
 				// One obs and one action
-				return new Rule(new PacManObservation(observations.get(0),
-						operators.get(0), values.get(0)), new PacManAction(
-						actions.get(0), operators.get(1)),
-						new PacManAction(actions.get(1), operators.get(2)));
+				observation = ObservationCondition.createObservation(
+						classPrefix, observations.get(0), operators.get(0),
+						values.get(0));
+				condAction = ActionCondition.createAction(classPrefix, actions
+						.get(0), operators.get(1));
+				action = ActionCondition.createAction(classPrefix, actions
+						.get(1), operators.get(2));
+				return new Rule(observation, condAction, action);
 			} else {
 				// One observation rule
 				if (observations.size() == 1) {
-					return new Rule(new PacManObservation(observations.get(0),
-							operators.get(0), values.get(0)),
-							new PacManAction(actions.get(0), operators
-									.get(1)));
+					observation = ObservationCondition.createObservation(
+							classPrefix, observations.get(0), operators.get(0),
+							values.get(0));
+					action = ActionCondition.createAction(classPrefix, actions
+							.get(0), operators.get(1));
+					return new Rule(observation, action);
 				} else {
 					// Two observation rule
-					return new Rule(new PacManObservation(observations.get(0),
-							operators.get(0), values.get(0)),
-							new PacManObservation(observations.get(1),
-									operators.get(1), values.get(1)),
-							new PacManAction(actions.get(0), operators
-									.get(2)));
+					observation = ObservationCondition.createObservation(
+							classPrefix, observations.get(0), operators.get(0),
+							values.get(0));
+					observation2 = ObservationCondition.createObservation(
+							classPrefix, observations.get(1), operators.get(1),
+							values.get(1));
+					action = ActionCondition.createAction(classPrefix, actions
+							.get(0), operators.get(2));
+					return new Rule(observation, observation2, action);
 				}
 			}
 		}
@@ -257,10 +300,16 @@ public class Rule {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("if ");
-		for (int i = 0; i < conditions_.length; i++) {
-			if (i != 0)
-				buffer.append("and ");
-			buffer.append(conditions_[i].toString() + " ");
+		// Constant rule case
+		if (conditions_ == null) {
+			buffer.append("true ");
+		} else {
+			// Note the condition/s
+			for (int i = 0; i < conditions_.length; i++) {
+				if (i != 0)
+					buffer.append("and ");
+				buffer.append(conditions_[i].toString() + " ");
+			}
 		}
 
 		// Then action

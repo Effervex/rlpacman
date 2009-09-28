@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -9,10 +9,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Random;
 
-import rlPacMan.Condition.ConditionObject;
-import rlPacMan.ObservationCondition.ValuedConditionObject;
-import rlPacMan.PacManAction.PacManActionSet;
-import rlPacMan.PacManObservation.PacManObservationSet;
+import crossEntropyFramework.Condition.ConditionObject;
+import crossEntropyFramework.ObservationCondition.ValuedConditionObject;
 
 /**
  * A singleton implementation of the current rule base.
@@ -245,7 +243,7 @@ public class RuleBase {
 				String[] split = input.split(RULE_DELIMITER);
 				// For each rule, add it to the rulebase
 				for (int i = 0; i < split.length; i++) {
-					ruleBase.add(Rule.parseRule(split[i]));
+					ruleBase.add(Rule.parseRule(split[i], classPrefix));
 				}
 				ruleBases.add(ruleBase);
 			}
@@ -339,235 +337,6 @@ public class RuleBase {
 				ruleGenerators_[s].set(i, Double.parseDouble(split[i]));
 			}
 		}
-	}
-
-	/**
-	 * Loads the hand-coded rules with default weights.
-	 * 
-	 * @param generator
-	 *            The generator to receive the rules.
-	 * @return The list of hand coded rules.
-	 */
-	private ArrayList<Rule> loadHandCodedRules() {
-		ArrayList<Rule> handRules = new ArrayList<Rule>();
-
-		// Go to dot
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.TO_DOT, true)));
-		// Go to centre of dots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.TO_CENTRE_OF_DOTS, true)));
-		// From nearest ghost 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// From nearest ghost 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// From nearest ghost 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Stop running from nearest ghost 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Stop running from nearest ghost 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 6), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Stop running from nearest ghost 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 7), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Towards safe junction
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
-		// Towards maximally safe junction 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
-		// Towards maximally safe junction 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
-		// Maximally safe junction off 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, false)));
-		// Safe to stop running 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Maximally safe junction off 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, false)));
-		// Safe to stop running 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Keep on moving from ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Eat edible ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
-		// Ghost coming, chase powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
-		// If edible ghosts, don't chase power dots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, false)));
-		// If edible ghosts and we're close to a powerdot, move away from it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// If edible ghosts, move away from powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// If no edible ghosts, stop moving from powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, false)));
-		// If no edible ghosts, chase powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
-		// If we're close to a ghost and powerdot, chase the powerdot 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 2), new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
-		// If we're close to a ghost and powerdot, chase the powerdot 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 4), new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
-		// In the clear
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 7),
-				new PacManObservation(PacManObservationSet.MAX_JUNCTION_SAFETY,
-						ObservationCondition.GREATER_EQ_THAN, 4),
-				new PacManAction(PacManActionSet.FROM_GHOST, false)));
-		// Ghosts are not close, eat a dot 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOST_DENSITY,
-				ObservationCondition.LESS_THAN, 1.5), new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// Far from power dot, stop running
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.GREATER_EQ_THAN, 10), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, false)));
-		// Ghosts are too spread, move away from power dot
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.TOTAL_DIST_TO_GHOSTS,
-				ObservationCondition.GREATER_EQ_THAN, 30), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// Unsafe junction, run from ghosts 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Unsafe junction, run from ghosts 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Unsafe junction, run from ghosts 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 1), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Move from ghost centre
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
-				PacManActionSet.FROM_GHOST_CENTRE, true)));
-		// Stop chasing edible ghosts if none
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, false)));
-		// Chasing edible ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
-		// If not running from powerdot, move towards it
-		handRules.add(new Rule(new PacManAction(PacManActionSet.FROM_POWER_DOT,
-				false), new PacManAction(PacManActionSet.TO_POWER_DOT, true)));
-		// If there is a fruit, chase it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_FRUIT, true)));
-		// If there isn't a fruit, stop chasing it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_FRUIT, false)));
-		// If ghosts are edible and not flashing, chase them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.LESS_THAN, 1), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
-		// If the ghosts are flashing, stop chasing them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, false)));
-		// If the ghosts are flashing, run from them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-
-		return handRules;
 	}
 
 	/**
@@ -985,6 +754,15 @@ public class RuleBase {
 		if (slot >= ruleGenerators_.length)
 			slot = 0;
 		return ruleGenerators_[slot];
+	}
+	
+	/**
+	 * Gets the number of slots the ruleGenerator uses.
+	 * 
+	 * @return the number of slots the rule generator keeps track of.
+	 */
+	public int getNumSlots() {
+		return ruleGenerators_.length;
 	}
 
 	/**

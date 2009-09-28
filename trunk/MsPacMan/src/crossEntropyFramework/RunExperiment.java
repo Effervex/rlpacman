@@ -1,6 +1,10 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import org.rlcommunity.rlglue.codec.*;
+
+import rlPacMan.PacManAgent;
+import rlPacMan.PacManEnvironment;
+
 
 public class RunExperiment {
 	public static void main(String[] args) {
