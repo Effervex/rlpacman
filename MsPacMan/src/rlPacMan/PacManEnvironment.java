@@ -19,6 +19,9 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import crossEntropyFramework.ObservationCondition;
+import crossEntropyFramework.Rule;
+
 import rlPacMan.PacManAction.PacManActionSet;
 import rlPacMan.PacManObservation.PacManObservationSet;
 

@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -74,14 +74,22 @@ public class CrossEntropyExperiment {
 		// Choose the correct constructor to initialise the values.
 		String[] args = new String[argsList.size()];
 		argsList.toArray(args);
-		if (args.length == 8) {
+		if (args.length == 7) {
+			try {
+				// Random rules
+				int policySize = Integer.parseInt(args[3]);
 				initialise(args[0], Integer.parseInt(args[1]), Integer
 						.parseInt(args[2]), Integer.parseInt(args[3]), args[4],
-						args[5], args[6], args[7]);
-		} else if (args.length == 10) {
+						args[5], args[6]);
+			} catch (Exception e) {
+				// Rules from file
+				initialise(args[0], Integer.parseInt(args[1]), Integer
+						.parseInt(args[2]), args[3], args[4], args[5], args[6]);
+			}
+		} else if (args.length == 9) {
 			initialise(args[0], Integer.parseInt(args[1]), Integer
-					.parseInt(args[2]), Integer.parseInt(args[3]), args[5],
-					args[6], args[7], args[8], args[9]);
+					.parseInt(args[2]), args[3], args[5], args[6], args[7],
+					args[8]);
 		}
 	}
 
@@ -95,9 +103,7 @@ public class CrossEntropyExperiment {
 	 * @param episodeCount
 	 *            The number of episodes to perform.
 	 * @param policySize
-	 *            The maximum number of rules in the policy.
-	 * @param ruleFile
-	 *            The file to load the rules from.
+	 *            The size of the policy to load.
 	 * @param policyFile
 	 *            The output file for the best policy.
 	 * @param generatorFile
@@ -106,15 +112,18 @@ public class CrossEntropyExperiment {
 	 *            The output file for the agent's performance.
 	 */
 	private void initialise(String environmentClass, int populationSize,
-			int episodeCount, int policySize, String ruleFile,
-			String policyFile, String generatorFile, String performanceFile) {
+			int episodeCount, int policySize, String policyFile,
+			String generatorFile, String performanceFile) {
 		population_ = populationSize;
 		episodes_ = episodeCount;
-		policySize_ = policySize;
-		slotGenerator_ = new ProbabilityDistribution<Integer>();
+
+		// Load the generators from the input file
 		RuleBase.initInstance(policySize, environmentClass);
+		policySize_ = policySize;
+
+		slotGenerator_ = new ProbabilityDistribution<Integer>();
 		// Filling the generators
-		for (int i = 0; i < policySize; i++) {
+		for (int i = 0; i < policySize_; i++) {
 			slotGenerator_.add(i, 0.5);
 		}
 
@@ -130,12 +139,44 @@ public class CrossEntropyExperiment {
 			if (!performanceFile_.exists())
 				performanceFile_.createNewFile();
 			TEMP_FOLDER.mkdir();
-			
-			// Load the generators from the input file
-			RuleBase.initInstance(new File(ruleFile));
-			RuleBase.getInstance().normaliseDistributions();
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * A constructor for the typical arguments plus an initial rule base.
+	 * 
+	 * @param environmentClass
+	 *            The name of the environment class files.
+	 * @param populationSize
+	 *            The size of the population used in calculations.
+	 * @param episodeCount
+	 *            The number of episodes to perform.
+	 * @param ruleFile
+	 *            The file to load the rules from.
+	 * @param policyFile
+	 *            The output file for the best policy.
+	 * @param generatorFile
+	 *            The output file for the generators.
+	 * @param performanceFile
+	 *            The output file for the agent's performance.
+	 */
+	private void initialise(String environmentClass, int populationSize,
+			int episodeCount, String ruleFile, String policyFile,
+			String generatorFile, String performanceFile) {
+		initialise(environmentClass, populationSize, episodeCount, 1,
+				policyFile, generatorFile, performanceFile);
+
+		// Load the generators from the input file
+		RuleBase.initInstance(new File(ruleFile));
+		RuleBase.getInstance().normaliseDistributions();
+		policySize_ = RuleBase.getInstance().getNumSlots();
+		
+		slotGenerator_ = new ProbabilityDistribution<Integer>();
+		// Filling the generators
+		for (int i = 0; i < policySize_; i++) {
+			slotGenerator_.add(i, 0.5);
 		}
 	}
 
@@ -163,11 +204,10 @@ public class CrossEntropyExperiment {
 	 *            The input file for generators.
 	 */
 	private void initialise(String environmentClass, int populationSize,
-			int episodeCount, int policySize, String ruleFile,
-			String policyFile, String generatorFile, String performanceFile,
-			String genInputFile) {
-		initialise(environmentClass, populationSize, episodeCount, policySize,
-				ruleFile, policyFile, generatorFile, performanceFile);
+			int episodeCount, String ruleFile, String policyFile,
+			String generatorFile, String performanceFile, String genInputFile) {
+		initialise(environmentClass, populationSize, episodeCount, ruleFile,
+				policyFile, generatorFile, performanceFile);
 		// Load the generators from the input file
 		try {
 			loadGenerators(new File(genInputFile));

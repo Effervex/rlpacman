@@ -1,5 +1,7 @@
 package rlPacMan;
 
+import crossEntropyFramework.ObservationCondition;
+
 /**
  * A class to represent a full evaluatable rule condition.
  * 

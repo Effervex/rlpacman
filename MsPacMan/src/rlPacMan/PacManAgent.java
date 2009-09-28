@@ -4,6 +4,9 @@ import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
+import crossEntropyFramework.ActionSwitch;
+import crossEntropyFramework.Policy;
+
 public class PacManAgent implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;

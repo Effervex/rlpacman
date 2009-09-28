@@ -1,5 +1,7 @@
 package rlPacMan;
 
+import crossEntropyFramework.ActionCondition;
+
 /**
  * A class containing the actions used in Ms. PacMan.
  * 

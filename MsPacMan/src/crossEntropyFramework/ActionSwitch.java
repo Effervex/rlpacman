@@ -1,6 +1,6 @@
-package rlPacMan;
+package crossEntropyFramework;
 
-import rlPacMan.Condition.ConditionObject;
+import crossEntropyFramework.Condition.ConditionObject;
 
 /**
  * This class represents an actions module. It controls which actions are switched on and off

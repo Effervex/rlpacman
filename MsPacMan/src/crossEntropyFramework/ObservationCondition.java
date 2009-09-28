@@ -1,4 +1,4 @@
-package rlPacMan;
+package crossEntropyFramework;
 
 import java.util.ArrayList;
 
@@ -189,6 +189,25 @@ public abstract class ObservationCondition extends Condition {
 			e.printStackTrace();
 		}
 		return observation;
+	}
+
+	/**
+	 * A streamlined method for creating an ObservationCondition using an index argument.
+	 * 
+	 * @param classPrefix
+	 *            The class prefix used in the environment.
+	 * @param condIndex
+	 *            The observation condition index.
+	 * @param operator
+	 *            The operator used on the condition.
+	 * @param value
+	 *            The value to compare the operator.
+	 * @return The newly created ObservationCondition instantiation.
+	 */
+	public static ObservationCondition createObservation(String classPrefix,
+			int condIndex, boolean operator, double value) {
+		return createObservation(classPrefix,
+				(ValuedConditionObject) getObservationValues(classPrefix)[condIndex], operator, value);
 	}
 
 	/**
