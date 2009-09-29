@@ -13,6 +13,9 @@ class Ghost extends Thing {
 	public static final byte INKY = 2;
 	// Clyde (Orange) behaviour (Ignorant)
 	public static final byte CLYDE = 3;
+	
+	/** The density ratio of the ghosts. */
+	public static final double DENSITY_RADIUS = 10;
 
 	int[] m_ghostMouthX; // X points of Ghost's crooked mouth when Pacman
 	// powersup

@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Random;
 
-import crossEntropyFramework.Condition.ConditionObject;
-import crossEntropyFramework.ObservationCondition.ValuedConditionObject;
+import relationalFramework.Condition.ConditionObject;
+import relationalFramework.ObservationCondition.ValuedConditionObject;
 
 /**
  * A singleton implementation of the current rule base.
@@ -45,6 +45,9 @@ public class RuleBase {
 	/** The cross-entropy generators for the actions within the rules. */
 	private ProbabilityDistribution<ActionCondition>[] actionsGenerators_;
 
+	/** Whether to update the generators. */
+	private boolean updateGenerators_;
+
 	/** The random number generator. */
 	private Random random_ = new Random();
 
@@ -73,14 +76,13 @@ public class RuleBase {
 	private RuleBase(int ruleBases, String classPrefix) {
 		classPrefix_ = classPrefix;
 		ruleGenerators_ = new ProbabilityDistribution[ruleBases];
+		initialiseConditionGenerators(ruleBases, classPrefix);
 		for (int i = 0; i < ruleBases; i++) {
 			ruleGenerators_[i] = new ProbabilityDistribution<Rule>();
 			ruleGenerators_[i].addAll(generateRandomRules(RANDOM_RULE_NUMBER));
 		}
 
 		initialFile_ = null;
-
-		initialiseConditionGenerators(ruleBases, classPrefix);
 	}
 
 	/**
@@ -178,8 +180,12 @@ public class RuleBase {
 		ConditionObject[] actionVals = ActionCondition
 				.getActionValues(classPrefix);
 
-		double baseWeight = 1.0 / (2 * (observationVals.length + actionVals.length));
+		// Each observation and action has a boolean operator, plus the empty
+		// condition (twice to keep it balanced)
+		double baseWeight = 1.0 / (2 * (observationVals.length
+				+ actionVals.length + 1));
 
+		// Adding all the conditions
 		for (ConditionObject cond : observationVals) {
 			ValuedConditionObject obs = (ValuedConditionObject) cond;
 			double thisWeight = baseWeight / obs.getSetOfVals().length;
@@ -195,6 +201,10 @@ public class RuleBase {
 				obsGenerator.add(observation, thisWeight);
 			}
 		}
+		// Adding the empty condition
+		ObservationCondition emptyCond = ObservationCondition
+				.emptyObservation(classPrefix);
+		obsGenerator.add(emptyCond, 2 * baseWeight);
 
 		double actionWeight = 1.0 / (2 * actionVals.length);
 		// Adding the actions
@@ -351,7 +361,7 @@ public class RuleBase {
 
 		// For each of the rules in the rule base
 		for (int s = 0; s < baseSize; s++) {
-			randomRules.add(generateRule(false, 0, classPrefix_));
+			randomRules.add(generateRule(0, classPrefix_));
 		}
 		return randomRules;
 	}
@@ -360,16 +370,14 @@ public class RuleBase {
 	 * Generates a random rule using the set of observations and actions. A rule
 	 * can consist of 1 or 2 conditions.
 	 * 
-	 * @param useDistributions
-	 *            Whether to use the observed distributions of the rules.
 	 * @param ruleSlot
 	 *            The rule slot number to generate a rule from.
 	 * @param classPrefix
 	 *            The class prefix from which we generate rules.
+	 * 
 	 * @return The randomly generated rule.
 	 */
-	private Rule generateRule(boolean useDistributions, int ruleSlot,
-			String classPrefix) {
+	private Rule generateRule(int ruleSlot, String classPrefix) {
 		ConditionObject[] observationVals = ObservationCondition
 				.getObservationValues(classPrefix);
 		ConditionObject[] actionVals = ActionCondition
@@ -383,47 +391,20 @@ public class RuleBase {
 		int numIters = random_.nextInt(2);
 		// Number of iterations
 		for (int i = 0; i <= numIters; i++) {
-			// If using the distributions, simply sample.
-			if (useDistributions) {
-				Condition cond = conditionGenerators_[getRegenIndex(ruleSlot)]
-						.sample();
-				if (cond instanceof ActionCondition)
-					preAction = (ActionCondition) cond;
-				else {
-					ObservationCondition observation = (ObservationCondition) cond;
-					obs.add(observation);
-				}
-			} else {
-				// Choose a random set, either observations or actions
-				int index = random_.nextInt(observationsSize + actionsSize);
-				if (index < observationsSize) {
-					// Choose an observation
-					ValuedConditionObject condition = (ValuedConditionObject) observationVals[index];
-					index = random_.nextInt(condition.getSetOfVals().length);
-					double value = condition.getSetOfVals()[index];
-
-					ObservationCondition observation = ObservationCondition
-							.createObservation(classPrefix, condition, random_
-									.nextBoolean(), value);
-					obs.add(observation);
-				} else {
-					// Choose an action
-					index -= observationsSize;
-					preAction = ActionCondition.createAction(classPrefix,
-							actionVals[index], random_.nextBoolean());
-				}
+			// Sample from the distributions
+			Condition cond = conditionGenerators_[getRegenIndex(ruleSlot)]
+					.sample();
+			if (cond instanceof ActionCondition)
+				preAction = (ActionCondition) cond;
+			else {
+				ObservationCondition observation = (ObservationCondition) cond;
+				obs.add(observation);
 			}
 		}
 
 		ActionCondition action = null;
 		// Can just sample if using a distribution
-		if (useDistributions) {
-			action = actionsGenerators_[getRegenIndex(ruleSlot)]
-					.sample();
-		} else {
-			action = ActionCondition.createAction(classPrefix, actionVals[random_
-					.nextInt(actionsSize)], random_.nextBoolean());
-		}
+		action = actionsGenerators_[getRegenIndex(ruleSlot)].sample();
 
 		// Creating the rule
 		if (preAction != null) {
@@ -685,8 +666,7 @@ public class RuleBase {
 					.removeNWorst(numRegened);
 			// For each newly generated rule
 			for (int i = 0; i < numRegened; i++) {
-				ruleGenerators_[slot].add(
-						generateRule(true, slot, classPrefix_),
+				ruleGenerators_[slot].add(generateRule(slot, classPrefix_),
 						regenProbability);
 			}
 			ruleGenerators_[slot].normaliseProbs();
@@ -755,7 +735,7 @@ public class RuleBase {
 			slot = 0;
 		return ruleGenerators_[slot];
 	}
-	
+
 	/**
 	 * Gets the number of slots the ruleGenerator uses.
 	 * 

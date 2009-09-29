@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -12,6 +12,11 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
+/**
+ * The cross entropy algorithm implementation.
+ * 
+ * @author Sam Sarjant
+ */
 public class CrossEntropyExperiment {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;

@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import java.util.ArrayList;
 
@@ -86,15 +86,44 @@ public abstract class ObservationCondition extends Condition {
 		}
 		return false;
 	}
+	
+	/**
+	 * Evaluates this condition using the given observations.
+	 * 
+	 * @param observations
+	 *            The current observation values, ordered by index.
+	 * @return True if the condition is met, false otherwise.
+	 */
+	public boolean evaluateCondition(double[] obsValues) {
+		// Empty condition
+		if (this.getCondition() == null)
+			return true;
+		// X >= Value
+		if ((getOperator() == ObservationCondition.GREATER_EQ_THAN)
+				&& (obsValues[this.getCondition().ordinal()] >= getValue())) {
+			return true;
+		} else if ((getOperator() == ObservationCondition.LESS_THAN)
+				&& (obsValues[this.getCondition().ordinal()] < getValue())) {
+			// X < Value
+			return true;
+		}
+		return false;
+	}
 
 	@Override
 	public String toParseableString() {
+		if (this.getCondition() == null)
+			return "";
 		return this.getCondition().ordinal() + PRE_SEPARATOR + getOperator()
 				+ PRE_SEPARATOR + getValue();
 	}
 
 	@Override
 	public String toString() {
+		// Empty condition
+		if (this.getCondition() == null)
+			return "true";
+		
 		StringBuffer buffer = new StringBuffer(getCondition() + " ");
 		if (getOperator() == GREATER_EQ_THAN)
 			buffer.append(">= ");
@@ -179,20 +208,14 @@ public abstract class ObservationCondition extends Condition {
 	 */
 	public static ObservationCondition createObservation(String classPrefix,
 			ValuedConditionObject condition, boolean operator, double value) {
-		ObservationCondition observation = null;
-		try {
-			observation = (ObservationCondition) Class.forName(
-					classPrefix + ObservationCondition.CLASS_SUFFIX)
-					.newInstance();
-			observation.initialise(condition, operator, value);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		ObservationCondition observation = emptyObservation(classPrefix);
+		observation.initialise(condition, operator, value);
 		return observation;
 	}
 
 	/**
-	 * A streamlined method for creating an ObservationCondition using an index argument.
+	 * A streamlined method for creating an ObservationCondition using an index
+	 * argument.
 	 * 
 	 * @param classPrefix
 	 *            The class prefix used in the environment.
@@ -206,28 +229,28 @@ public abstract class ObservationCondition extends Condition {
 	 */
 	public static ObservationCondition createObservation(String classPrefix,
 			int condIndex, boolean operator, double value) {
-		return createObservation(classPrefix,
-				(ValuedConditionObject) getObservationValues(classPrefix)[condIndex], operator, value);
+		return createObservation(
+				classPrefix,
+				(ValuedConditionObject) getObservationValues(classPrefix)[condIndex],
+				operator, value);
 	}
 
 	/**
-	 * Evaluates this condition using the given observations.
+	 * Creates an empty condition.
 	 * 
-	 * @param observations
-	 *            The current observation values, ordered by index.
-	 * @return True if the condition is met, false otherwise.
+	 * @param classPrefix
+	 *            The class prefix used in the environment.
+	 * @return The newly created empty ObservationCondition.
 	 */
-	public boolean evaluateCondition(double[] obsValues) {
-		// X >= Value
-		if ((getOperator() == ObservationCondition.GREATER_EQ_THAN)
-				&& (obsValues[this.getCondition().ordinal()] >= getValue())) {
-			return true;
-		} else if ((getOperator() == ObservationCondition.LESS_THAN)
-				&& (obsValues[this.getCondition().ordinal()] < getValue())) {
-			// X < Value
-			return true;
+	public static ObservationCondition emptyObservation(String classPrefix) {
+		try {
+			return (ObservationCondition) Class.forName(
+					classPrefix + ObservationCondition.CLASS_SUFFIX)
+					.newInstance();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		return false;
+		return null;
 	}
 
 	/**

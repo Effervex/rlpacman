@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Arrays;

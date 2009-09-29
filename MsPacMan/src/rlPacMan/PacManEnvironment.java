@@ -19,14 +19,13 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import crossEntropyFramework.ObservationCondition;
-import crossEntropyFramework.Rule;
 
+import relationalFramework.ObservationCondition;
+import relationalFramework.Rule;
 import rlPacMan.PacManAction.PacManActionSet;
 import rlPacMan.PacManObservation.PacManObservationSet;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	private static final double DENSITY_RADIUS = 10;
 	public static final int PLAYER_SPEED = 20;
 	private PacMan environment_;
 	private int prevScore_;
@@ -170,14 +169,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		ArrayList<Rule> handRules = new ArrayList<Rule>();
 
 		// Go to dot
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.TO_DOT, true)));
 		// Go to centre of dots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.TO_CENTRE_OF_DOTS, true)));
 		// From nearest ghost 1
 		handRules.add(new Rule(new PacManObservation(
@@ -210,9 +205,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				ObservationCondition.GREATER_EQ_THAN, 7), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Towards safe junction
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.TO_SAFE_JUNCTION, true)));
 		// Towards maximally safe junction 1
 		handRules.add(new Rule(new PacManObservation(
@@ -245,14 +238,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
 				PacManActionSet.FROM_GHOST, false)));
 		// Keep on moving from ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Eat edible ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.TO_ED_GHOST, true)));
 		// Ghost coming, chase powerdots
 		handRules.add(new Rule(new PacManObservation(
@@ -340,9 +329,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				ObservationCondition.LESS_THAN, 1), new PacManAction(
 				PacManActionSet.FROM_GHOST, true)));
 		// Move from ghost centre
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.CONSTANT,
-				ObservationCondition.GREATER_EQ_THAN, 0), new PacManAction(
+		handRules.add(new Rule(new PacManAction(
 				PacManActionSet.FROM_GHOST_CENTRE, true)));
 		// Stop chasing edible ghosts if none
 		handRules.add(new Rule(new PacManObservation(
@@ -682,7 +669,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			Point thisGhost = coordArray[i];
 			for (int j = i + 1; j < coordArray.length; j++) {
 				Point thatGhost = coordArray[j];
-				double distance = DENSITY_RADIUS
+				double distance = Ghost.DENSITY_RADIUS
 						- thisGhost.distance(thatGhost);
 				if (distance > 0)
 					density += distance;
@@ -977,7 +964,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		for (int i = 0; i < obs_.doubleArray.length; i++) {
 			obs_.doubleArray[i] = Integer.MAX_VALUE;
 		}
-		obs_.doubleArray[PacManObservationSet.CONSTANT.ordinal()] = 1;
 		obs_.doubleArray[PacManObservationSet.GHOSTS_FLASHING.ordinal()] = 0;
 
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];

@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import org.rlcommunity.rlglue.codec.*;
 

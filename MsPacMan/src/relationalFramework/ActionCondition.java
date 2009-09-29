@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 /**
  * An abstract class for representing an action type to be used within rules.

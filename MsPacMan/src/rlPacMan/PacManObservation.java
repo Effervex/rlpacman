@@ -1,6 +1,6 @@
 package rlPacMan;
 
-import crossEntropyFramework.ObservationCondition;
+import relationalFramework.ObservationCondition;
 
 /**
  * A class to represent a full evaluatable rule condition.
@@ -70,8 +70,6 @@ public class PacManObservation extends ObservationCondition {
 	 * @author Samuel J. Sarjant
 	 */
 	public static enum PacManObservationSet implements ValuedConditionObject {
-		// A constant value of 1
-		CONSTANT(new double[] { 1 }),
 		// The distance to the nearest dot (if any)
 		NEAREST_DOT(new double[] { 1.0, 1.0, 3.0, 6.0, 12.0 }),
 		// The distance to the nearest power dot (if any)
