@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 import java.util.ArrayList;
 
@@ -30,13 +30,13 @@ public abstract class Condition {
 		condition_ = condition;
 		operator_ = operator;
 	}
-	
+
 	/**
 	 * A nullary constructor.
 	 */
 	public Condition() {
 	}
-	
+
 	/**
 	 * Initialises the arguments for this object.
 	 * 
@@ -88,11 +88,18 @@ public abstract class Condition {
 
 	@Override
 	public abstract String toString();
-	
+
 	@Override
 	public boolean equals(Object obj) {
 		if ((obj != null) && (obj instanceof Condition)) {
 			Condition cond = (Condition) obj;
+			if (condition_ == null) {
+				if (cond.condition_ == null)
+					return true;
+				else
+					return false;
+			}
+
 			if (condition_.equals(cond.condition_)) {
 				if (operator_ == cond.operator_) {
 					return true;
@@ -124,7 +131,7 @@ public abstract class Condition {
 		index++;
 		return index;
 	}
-	
+
 	/**
 	 * Gets the values of this enum.
 	 * 

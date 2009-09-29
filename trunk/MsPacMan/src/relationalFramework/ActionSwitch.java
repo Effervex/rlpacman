@@ -1,6 +1,6 @@
-package crossEntropyFramework;
+package relationalFramework;
 
-import crossEntropyFramework.Condition.ConditionObject;
+import relationalFramework.Condition.ConditionObject;
 
 /**
  * This class represents an actions module. It controls which actions are switched on and off

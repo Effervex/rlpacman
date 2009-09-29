@@ -1,7 +1,7 @@
 rlPacMan.PacMan
 1000
 50
-handCodedRules.txt
+10
 bestPolicy.txt
 generatorOutput.txt
 performance.txt

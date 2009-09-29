@@ -1,4 +1,4 @@
-package crossEntropyFramework;
+package relationalFramework;
 
 /**
  * This class represents a policy that the agent can use.
@@ -92,7 +92,8 @@ public class Policy {
 		StringBuffer buffer = new StringBuffer();
 		for (int i = 0; i < priorityRules_.length; i++) {
 			if (priorityRules_[i] != null) {
-				buffer.append("[" + (getPriority(i, priorityRules_.length) + 1) + "]: ");
+				buffer.append("[" + (getPriority(i, priorityRules_.length) + 1)
+						+ "]: ");
 				buffer.append(priorityRules_[i] + "\n");
 			}
 		}
@@ -102,13 +103,14 @@ public class Policy {
 	/**
 	 * Gets the priority of a slot within the policy.
 	 * 
-	 * @param slot The slot within the policy.
-	 * @param policySize The size of the policy.
+	 * @param slot
+	 *            The slot within the policy.
+	 * @param policySize
+	 *            The size of the policy.
 	 * @return A value between 1-NUM_PRIORITIES.
 	 */
 	public static int getPriority(int slot, int policySize) {
-		int priorityNumber = policySize
-				/ ActionSwitch.NUM_PRIORITIES + 1;
+		int priorityNumber = policySize / ActionSwitch.NUM_PRIORITIES + 1;
 		return slot / priorityNumber;
 	}
 
@@ -153,19 +155,10 @@ public class Policy {
 			if ((priorityRules_[i] != null)
 					&& (priorityRules_[i].evaluateConditions(observations,
 							actionSwitch))) {
-				// Check if this rule is at the same priority as other firing
-				// rules
-				// int thisPriority = i / priorityNumber;
-				int thisPriority = firingPriority;
-				if ((firingPriority == -1) || (thisPriority == firingPriority)) {
-					// Apply the rule and set the firing priority
-					priorityRules_[i].applyAction(actionSwitch,
-							getPriority(i, priorityRules_.length));
-					triggered_[i] = true;
-					firingPriority = thisPriority;
-				} else {
-					return;
-				}
+				// Apply the rule
+				priorityRules_[i].applyAction(actionSwitch, getPriority(i,
+						priorityRules_.length));
+				triggered_[i] = true;
 			}
 		}
 	}
