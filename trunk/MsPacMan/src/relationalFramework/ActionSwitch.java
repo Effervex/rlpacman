@@ -35,6 +35,12 @@ public class ActionSwitch {
 			}
 		}
 	}
+
+	public void switchOffAll() {
+		for (int i = 0; i < NUM_PRIORITIES; i++) {
+			activeActions_[i] = null;
+		}
+	}
 	
 	/**
 	 * Gets the int version of the action list.

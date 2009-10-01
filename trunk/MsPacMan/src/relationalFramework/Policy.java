@@ -149,7 +149,6 @@ public class Policy {
 	 */
 	public void evaluatePolicy(double[] observations, ActionSwitch actionSwitch) {
 		// Check every slot, from top-to-bottom until one activates
-		int firingPriority = -1;
 		for (int i = 0; i < priorityRules_.length; i++) {
 			// Check if the rule exists and if it does, if it applies.
 			if ((priorityRules_[i] != null)

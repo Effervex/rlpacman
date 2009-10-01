@@ -1,5 +1,7 @@
 package rlPacMan;
 
+import org.mandarax.kernel.Constructor;
+
 import relationalFramework.ActionCondition;
 
 /**
@@ -12,20 +14,18 @@ public class PacManAction extends ActionCondition {
 	 * A constructor for a Ms. PacMan action with operator.
 	 * 
 	 * @param action The action.
-	 * @param actionOperator The operator on the action.
 	 */
-	public PacManAction(PacManActionSet action, boolean actionOperator) {
-		super(action, actionOperator);
+	public PacManAction(PacManActionSet action) {
+		super(action);
 	}
 	
 	/**
 	 * A constructor that uses the raw index of the action.
 	 * 
 	 * @param actionIndex The index of the action.
-	 * @param actionOperator The operator of the action.
 	 */
-	public PacManAction(int actionIndex, boolean actionOperator) {
-		this(getConditionAt(actionIndex), actionOperator);
+	public PacManAction(int actionIndex) {
+		this(getConditionAt(actionIndex));
 	}
 	
 	public PacManAction() {
@@ -77,5 +77,13 @@ public class PacManAction extends ActionCondition {
 		TO_CENTRE_OF_DOTS; // An unlisted action that moves in a direction that
 		// minimises the Euclidean distance from the centre of
 		// the dots.
+		
+		/** The format of the action predicate */
+		private Constructor actionPredicate_;
+		
+		@Override
+		public Constructor getConstructor() {
+			return actionPredicate_;
+		}
 	}
 }

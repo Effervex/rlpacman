@@ -1,7 +1,7 @@
 rlPacMan.PacMan
-1000
+100
 50
-10
+100
 bestPolicy.txt
 generatorOutput.txt
 performance.txt

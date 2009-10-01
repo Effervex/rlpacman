@@ -14,11 +14,9 @@ public abstract class ActionCondition extends Condition {
 	 * 
 	 * @param action
 	 *            The action, as an enum that implements ConditionObject.
-	 * @param actionOperator
-	 *            The boolean operator acting on the condition.
 	 */
-	public ActionCondition(ConditionObject action, boolean actionOperator) {
-		super(action, actionOperator);
+	public ActionCondition(ConditionObject action) {
+		super(action);
 	}
 
 	/**
@@ -41,25 +39,20 @@ public abstract class ActionCondition extends Condition {
 	 * Evaluates this condition using the currently switched on actions.
 	 * 
 	 * @param ac
-	 *            The ActionSwicth object.
+	 *            The ActionSwitch object.
 	 * @return True if the condition is met, false otherwise.
 	 */
 	public boolean evaluateCondition(ActionSwitch ac) {
 		// Action check
 		if (ac.isActionActive(getCondition())) {
-			return getOperator();
+			return true;
 		}
-		return !getOperator();
+		return false;
 	}
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer(getCondition().toString());
-		if (getOperator())
-			buffer.append("+");
-		else
-			buffer.append("-");
-		return buffer.toString();
+		return getCondition().toString();
 	}
 
 	/**
@@ -88,17 +81,15 @@ public abstract class ActionCondition extends Condition {
 	 *            The class prefix used in the environment.
 	 * @param condition
 	 *            The action condition object.
-	 * @param operator
-	 *            The operator on the action.
 	 * @return The newly created ObservationCondition instantiation.
 	 */
 	public static ActionCondition createAction(String classPrefix,
-			ConditionObject condition, boolean operator) {
+			ConditionObject condition) {
 		ActionCondition action = null;
 		try {
 			action = (ActionCondition) Class.forName(
 					classPrefix + ActionCondition.CLASS_SUFFIX).newInstance();
-			action.initialise(condition, operator);
+			action.initialise(condition);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -112,12 +103,10 @@ public abstract class ActionCondition extends Condition {
 	 *            The class prefix used in the environment.
 	 * @param condIndex
 	 *            The action condition index.
-	 * @param operator
-	 *            The operator on the action.
 	 * @return The newly created ObservationCondition instantiation.
 	 */
-	public static ActionCondition createAction(String classPrefix, int condIndex, boolean operator) {
-		return createAction(classPrefix, getActionValues(classPrefix)[condIndex], operator);
+	public static ActionCondition createAction(String classPrefix, int condIndex) {
+		return createAction(classPrefix, getActionValues(classPrefix)[condIndex]);
 	}
 
 	/**

@@ -18,7 +18,7 @@ class Fruit extends Thing {
 
 	Fruit(GameModel gameModel, byte type, int startX, int startY,
 			boolean bMiddleX) {
-		super(gameModel, type, startX, startY, bMiddleX);
+		super(gameModel, startX, startY, bMiddleX);
 		m_deltaMax = 5;
 	}
 

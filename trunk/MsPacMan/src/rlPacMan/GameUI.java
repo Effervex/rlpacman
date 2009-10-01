@@ -86,12 +86,9 @@ public class GameUI extends Canvas {
 		// Powerups always need to be redrawn because they may get clipped by
 		// the
 		// redraw last location of the player or the ghosts
-		for (int x = 0; x < m_gameModel.m_gameSizeX; x++) {
-			for (int y = 0; y < m_gameModel.m_gameSizeY; y++) {
-				if ((m_gameModel.m_gameState[x][y] & GameModel.GS_POWERUP) != 0)
-					m_redrawHash.put(Integer.toString(x) + " "
-							+ Integer.toString(y), new Point(x, y));
-			}
+		for (PowerDot pd : m_gameModel.m_powerdots.values()) {
+			m_redrawHash.put(pd.m_locX + " "
+							+ pd.m_locY, new Point(pd.m_locX, pd.m_locY));
 		}
 	}
 
@@ -759,12 +756,13 @@ public class GameUI extends Canvas {
 						WALL1 * 2, 180, 90);
 			}
 		}
-		if ((gameCell & GameModel.GS_FOOD) != 0) {
+		Point location = new Point(x,y);
+		if (m_gameModel.m_dots.get(location) != null) {
 			g.setColor(Color.pink);
 			g.fillOval(x1 + WALL2, y1 + WALL2, WALL1, WALL1);
 			g.setColor(wallColor);
 		}
-		if ((gameCell & GameModel.GS_POWERUP) != 0) {
+		if (m_gameModel.m_powerdots.get(location) != null) {
 			if ((m_gameModel.m_pacMan.m_globalTickCount % (1000 / m_pacMan.m_delay)) > (200 / m_pacMan.m_delay))
 				g.setColor(Color.pink);
 			else

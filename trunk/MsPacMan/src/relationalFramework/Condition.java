@@ -2,10 +2,11 @@ package relationalFramework;
 
 import java.util.ArrayList;
 
+import org.mandarax.kernel.Constructor;
+
 /**
  * A high level abstract class for the basics of a rule condition. A rule
- * condition will have at least a condition value and an associated binary
- * check.
+ * condition will have at least a condition value.
  * 
  * @author Samuel J. Sarjant
  */
@@ -15,20 +16,15 @@ public abstract class Condition {
 
 	/** This class's condition. */
 	private ConditionObject condition_;
-	/** This class's operator. */
-	private boolean operator_;
 
 	/**
 	 * A constructor for a Condition.
 	 * 
 	 * @param condition
 	 *            The condition, as an enum that implements ConditionObject.
-	 * @param operator
-	 *            The boolean operator acting on the condition.
 	 */
-	public Condition(ConditionObject condition, boolean operator) {
+	public Condition(ConditionObject condition) {
 		condition_ = condition;
-		operator_ = operator;
 	}
 
 	/**
@@ -42,12 +38,9 @@ public abstract class Condition {
 	 * 
 	 * @param condition
 	 *            The condition, as an enum that implements ConditionObject.
-	 * @param operator
-	 *            The boolean operator acting on the condition.
 	 */
-	public void initialise(ConditionObject condition, boolean operator) {
+	public void initialise(ConditionObject condition) {
 		condition_ = condition;
-		operator_ = operator;
 	}
 
 	/**
@@ -57,15 +50,6 @@ public abstract class Condition {
 	 */
 	public ConditionObject getCondition() {
 		return condition_;
-	}
-
-	/**
-	 * Gets the operator on this condition.
-	 * 
-	 * @return The condition operator.
-	 */
-	public boolean getOperator() {
-		return operator_;
 	}
 
 	/**
@@ -83,7 +67,7 @@ public abstract class Condition {
 	 * @return A parseable format of this Condition.
 	 */
 	public String toParseableString() {
-		return condition_.ordinal() + PRE_SEPARATOR + operator_;
+		return condition_.ordinal() + "";
 	}
 
 	@Override
@@ -101,9 +85,7 @@ public abstract class Condition {
 			}
 
 			if (condition_.equals(cond.condition_)) {
-				if (operator_ == cond.operator_) {
-					return true;
-				}
+				return true;
 			}
 		}
 		return false;
@@ -119,15 +101,11 @@ public abstract class Condition {
 	 *            The index to start at.
 	 * @param actions
 	 *            The actions ArrayList to add to.
-	 * @param operators
-	 *            The operators ArrayList to add to.
 	 * @return The end index after parsing.
 	 */
 	public static int parseCondition(String[] conditionSplit, int index,
-			ArrayList<Integer> conditions, ArrayList<Boolean> operators) {
+			ArrayList<Integer> conditions) {
 		conditions.add(Integer.parseInt(conditionSplit[index]));
-		index++;
-		operators.add(Boolean.parseBoolean(conditionSplit[index]));
 		index++;
 		return index;
 	}
@@ -151,5 +129,12 @@ public abstract class Condition {
 		 * @return The integer value of the ConditionSet.
 		 */
 		public int ordinal();
+		
+		/**
+		 * Gets the predicate or function of the ConditionObject.
+		 * 
+		 * @return The predicate or function.
+		 */
+		public Constructor getConstructor();
 	}
 }

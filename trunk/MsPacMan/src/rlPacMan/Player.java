@@ -22,7 +22,7 @@ class Player extends Thing {
 	// This constructor is used to place Pacman's X-location between two cells.
 	Player(GameModel gameModel, byte type, int startX, int startY,
 			boolean bMiddleX) {
-		super(gameModel, type, startX, startY, bMiddleX);
+		super(gameModel, startX, startY, bMiddleX);
 		m_boundingBoxFull = new Rectangle();
 	}
 
@@ -30,63 +30,77 @@ class Player extends Thing {
 	// lookAhead check is also used because the Player's bounding box is larger
 	// than
 	// CELL_LENGTH and extends into other gamestate cells
-	public void eatItem(int itemType) {
-		GameUI gameUI = m_gameModel.m_pacMan.m_gameUI;
-		Rectangle itemBoundingBox;
-		Rectangle intersectRect;
-		double itemPixelX;
-		double itemPixelY;
-		int lookAheadX = m_locX;
-		int lookAheadY = m_locY;
-		int itemX = -1;
-		int itemY = -1;
-
-		if (m_direction == LEFT && m_locX != 0)
-			lookAheadX--;
-		else if (m_direction == UP && m_locY != 0)
-			lookAheadY--;
-		else if (m_direction == RIGHT && m_locX != m_gameModel.m_gameSizeX - 1)
-			lookAheadX++;
-		else if (m_direction == DOWN && m_locY != m_gameModel.m_gameSizeY - 1)
-			lookAheadY++;
-
-		if ((m_gameModel.m_gameState[m_locX][m_locY] & itemType) != 0) {
-			itemX = m_locX;
-			itemY = m_locY;
-		} else if ((m_gameModel.m_gameState[lookAheadX][lookAheadY] & itemType) != 0) {
-			itemX = lookAheadX;
-			itemY = lookAheadY;
+	public void eatItem() {
+		Point pacLoc = new Point(m_locX, m_locY);
+		// Eating a dot
+		if (m_gameModel.m_dots.get(pacLoc) != null) {
+			m_gameModel.m_currentFoodCount++;
+			m_score += m_gameModel.m_dots.get(pacLoc).getValue();
+			m_gameModel.m_dots.remove(pacLoc);
 		}
-
-		if (itemX != -1 && itemY != -1) {
-			itemPixelX = gameUI.m_gridInset + itemX * gameUI.CELL_LENGTH;
-			itemPixelY = gameUI.m_gridInset + itemY * gameUI.CELL_LENGTH;
-			if (itemType != GameModel.GS_POWERUP)
-				itemBoundingBox = new Rectangle(
-						(int) itemPixelX + gameUI.WALL2, (int) itemPixelY
-								+ gameUI.WALL2, gameUI.WALL1, gameUI.WALL1);
-			else
-				itemBoundingBox = new Rectangle((int) itemPixelX,
-						(int) itemPixelY, gameUI.CELL_LENGTH,
-						gameUI.CELL_LENGTH);
-			intersectRect = m_boundingBoxFull.intersection(itemBoundingBox);
-			if (!intersectRect.isEmpty()) {
-				m_gameModel.m_currentFoodCount++;
-				if (itemType != GameModel.GS_POWERUP) {
-					m_score += 10;
-					// m_gameModel.m_pacMan.m_soundMgr.playSound
-					// (SoundManager.SOUND_CHOMP);
-				} else {
-					m_score += 40;
-					m_gameModel.eatPowerup();
-					// m_gameModel.m_pacMan.m_soundMgr.stopSound
-					// (SoundManager.SOUND_SIREN);
-					// m_gameModel.m_pacMan.m_soundMgr.playSound
-					// (SoundManager.SOUND_GHOSTBLUE);
-				}
-				m_gameModel.m_gameState[itemX][itemY] &= ~itemType;
-			}
+		// Eating a powerup
+		if (m_gameModel.m_powerdots.get(pacLoc) != null) {
+			m_gameModel.m_currentFoodCount++;
+			m_score += m_gameModel.m_powerdots.get(pacLoc).getValue();
+			m_gameModel.eatPowerup();
+			m_gameModel.m_powerdots.remove(pacLoc);
 		}
+//		GameUI gameUI = m_gameModel.m_pacMan.m_gameUI;
+//		Rectangle itemBoundingBox;
+//		Rectangle intersectRect;
+//		double itemPixelX;
+//		double itemPixelY;
+//		int lookAheadX = m_locX;
+//		int lookAheadY = m_locY;
+//		int itemX = -1;
+//		int itemY = -1;
+//
+//		if (m_direction == LEFT && m_locX != 0)
+//			lookAheadX--;
+//		else if (m_direction == UP && m_locY != 0)
+//			lookAheadY--;
+//		else if (m_direction == RIGHT && m_locX != m_gameModel.m_gameSizeX - 1)
+//			lookAheadX++;
+//		else if (m_direction == DOWN && m_locY != m_gameModel.m_gameSizeY - 1)
+//			lookAheadY++;
+//
+//		if ((m_gameModel.m_gameState[m_locX][m_locY] & itemType) != 0) {
+//			itemX = m_locX;
+//			itemY = m_locY;
+//		} else if ((m_gameModel.m_gameState[lookAheadX][lookAheadY] & itemType) != 0) {
+//			itemX = lookAheadX;
+//			itemY = lookAheadY;
+//		}
+//
+//		if (itemX != -1 && itemY != -1) {
+//			itemPixelX = gameUI.m_gridInset + itemX * gameUI.CELL_LENGTH;
+//			itemPixelY = gameUI.m_gridInset + itemY * gameUI.CELL_LENGTH;
+//			if (itemType != GameModel.GS_POWERUP)
+//				itemBoundingBox = new Rectangle(
+//						(int) itemPixelX + gameUI.WALL2, (int) itemPixelY
+//								+ gameUI.WALL2, gameUI.WALL1, gameUI.WALL1);
+//			else
+//				itemBoundingBox = new Rectangle((int) itemPixelX,
+//						(int) itemPixelY, gameUI.CELL_LENGTH,
+//						gameUI.CELL_LENGTH);
+//			intersectRect = m_boundingBoxFull.intersection(itemBoundingBox);
+//			if (!intersectRect.isEmpty()) {
+//				m_gameModel.m_currentFoodCount++;
+//				if (itemType != GameModel.GS_POWERUP) {
+//					m_score += 10;
+//					// m_gameModel.m_pacMan.m_soundMgr.playSound
+//					// (SoundManager.SOUND_CHOMP);
+//				} else {
+//					m_score += 40;
+//					m_gameModel.eatPowerup();
+//					// m_gameModel.m_pacMan.m_soundMgr.stopSound
+//					// (SoundManager.SOUND_SIREN);
+//					// m_gameModel.m_pacMan.m_soundMgr.playSound
+//					// (SoundManager.SOUND_GHOSTBLUE);
+//				}
+//				m_gameModel.m_gameState[itemX][itemY] &= ~itemType;
+//			}
+//		}
 	}
 
 	// Overriden to draw Pacman

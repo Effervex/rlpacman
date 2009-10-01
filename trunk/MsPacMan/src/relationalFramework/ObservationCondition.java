@@ -4,19 +4,14 @@ import java.util.ArrayList;
 
 /**
  * An abstract class for representing an observation type to be used within
- * rules. This condition incorporates checking against a double value.
+ * rules. This condition incorporates checking less than or equal against a
+ * double value.
  * 
  * @author Samuel J. Sarjant
  */
 public abstract class ObservationCondition extends Condition {
 	/** The suffix to this class for use with dynamically loaded classes. */
 	public static final String CLASS_SUFFIX = "Observation";
-
-	/** If the observation is greater than or equal to the value. */
-	public static final boolean GREATER_EQ_THAN = true;
-
-	/** If the observation is less than the value. */
-	public static final boolean LESS_THAN = false;
 
 	/** This class's comparable value. */
 	private double conditionValue_;
@@ -26,37 +21,31 @@ public abstract class ObservationCondition extends Condition {
 	 * 
 	 * @param valueCondition
 	 *            The condition that has a value.
-	 * @param valueOperator
-	 *            The operator for comparing the value.
 	 * @param value
 	 *            The value to be compared against.
 	 */
 	public ObservationCondition(ValuedConditionObject valueCondition,
-			boolean valueOperator, double value) {
-		super(valueCondition, valueOperator);
+			double value) {
+		super(valueCondition);
 		conditionValue_ = value;
 	}
 
 	/**
 	 * A nullary constructor.
 	 */
-	public ObservationCondition() {
-
-	}
+	public ObservationCondition() {	}
 
 	/**
 	 * Initialises the arguments of this object.
 	 * 
 	 * @param valueCondition
 	 *            The condition that has a value.
-	 * @param valueOperator
-	 *            The operator for comparing the value.
 	 * @param value
 	 *            The value to be compared against.
 	 */
 	public void initialise(ValuedConditionObject valueCondition,
-			boolean valueOperator, double value) {
-		initialise(valueCondition, valueOperator);
+			double value) {
+		initialise(valueCondition);
 		conditionValue_ = value;
 	}
 
@@ -86,7 +75,7 @@ public abstract class ObservationCondition extends Condition {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Evaluates this condition using the given observations.
 	 * 
@@ -98,13 +87,8 @@ public abstract class ObservationCondition extends Condition {
 		// Empty condition
 		if (this.getCondition() == null)
 			return true;
-		// X >= Value
-		if ((getOperator() == ObservationCondition.GREATER_EQ_THAN)
-				&& (obsValues[this.getCondition().ordinal()] >= getValue())) {
-			return true;
-		} else if ((getOperator() == ObservationCondition.LESS_THAN)
-				&& (obsValues[this.getCondition().ordinal()] < getValue())) {
-			// X < Value
+		if (obsValues[this.getCondition().ordinal()] <= getValue()) {
+			// X <= Value
 			return true;
 		}
 		return false;
@@ -114,7 +98,7 @@ public abstract class ObservationCondition extends Condition {
 	public String toParseableString() {
 		if (this.getCondition() == null)
 			return "";
-		return this.getCondition().ordinal() + PRE_SEPARATOR + getOperator()
+		return this.getCondition().ordinal()
 				+ PRE_SEPARATOR + getValue();
 	}
 
@@ -123,12 +107,9 @@ public abstract class ObservationCondition extends Condition {
 		// Empty condition
 		if (this.getCondition() == null)
 			return "true";
-		
+
 		StringBuffer buffer = new StringBuffer(getCondition() + " ");
-		if (getOperator() == GREATER_EQ_THAN)
-			buffer.append(">= ");
-		else
-			buffer.append("< ");
+		buffer.append("<= ");
 		buffer.append(conditionValue_);
 		return buffer.toString();
 	}
@@ -156,18 +137,13 @@ public abstract class ObservationCondition extends Condition {
 	 *            The index to start at.
 	 * @param observations
 	 *            The observations ArrayList to add to.
-	 * @param operators
-	 *            The operators ArrayList to add to.
 	 * @param values
 	 *            The values ArrayList to add to.
 	 * @return The end index after parsing.
 	 */
 	public static int parseObservationCondition(String[] conditionSplit,
-			int index, ArrayList<Integer> observations,
-			ArrayList<Boolean> operators, ArrayList<Double> values) {
+			int index, ArrayList<Integer> observations, ArrayList<Double> values) {
 		observations.add(Integer.parseInt(conditionSplit[index]));
-		index++;
-		operators.add(Boolean.parseBoolean(conditionSplit[index]));
 		index++;
 		values.add(Double.parseDouble(conditionSplit[index]));
 		index++;
@@ -200,16 +176,14 @@ public abstract class ObservationCondition extends Condition {
 	 *            The class prefix used in the environment.
 	 * @param condition
 	 *            The observation condition.
-	 * @param operator
-	 *            The operator used on the condition.
 	 * @param value
 	 *            The value to compare the operator.
 	 * @return The newly created ObservationCondition instantiation.
 	 */
 	public static ObservationCondition createObservation(String classPrefix,
-			ValuedConditionObject condition, boolean operator, double value) {
+			ValuedConditionObject condition, double value) {
 		ObservationCondition observation = emptyObservation(classPrefix);
-		observation.initialise(condition, operator, value);
+		observation.initialise(condition, value);
 		return observation;
 	}
 
@@ -221,18 +195,16 @@ public abstract class ObservationCondition extends Condition {
 	 *            The class prefix used in the environment.
 	 * @param condIndex
 	 *            The observation condition index.
-	 * @param operator
-	 *            The operator used on the condition.
 	 * @param value
 	 *            The value to compare the operator.
 	 * @return The newly created ObservationCondition instantiation.
 	 */
 	public static ObservationCondition createObservation(String classPrefix,
-			int condIndex, boolean operator, double value) {
+			int condIndex, double value) {
 		return createObservation(
 				classPrefix,
 				(ValuedConditionObject) getObservationValues(classPrefix)[condIndex],
-				operator, value);
+				value);
 	}
 
 	/**
@@ -261,13 +233,6 @@ public abstract class ObservationCondition extends Condition {
 	public interface ValuedConditionObject extends ConditionObject {
 		/** The suffix to this class for use with dynamically loaded classes. */
 		public static final String CLASS_SUFFIX = "ObservationSet";
-
-		/**
-		 * The ordinal of the condition. Required by enumerations.
-		 * 
-		 * @return The integer value of the ConditionSet.
-		 */
-		public int ordinal();
 
 		/**
 		 * Gets the set of values that this condition object can be compared

@@ -43,8 +43,7 @@ public abstract class Thing {
 	int pixelSize_;
 	int pixelShrink_;
 
-	public Thing(GameModel gameModel, byte type, int startX, int startY,
-			boolean bMiddleX) {
+	public Thing(GameModel gameModel, int startX, int startY, boolean bMiddleX) {
 		m_startX = startX;
 		m_startY = startY;
 		m_deltaStartX = 0;
@@ -64,7 +63,7 @@ public abstract class Thing {
 		}
 	}
 
-	public void eatItem(int itemType) {
+	public void eatItem() {
 	}
 
 	public void draw(GameUI gameUI, Graphics g2) {
