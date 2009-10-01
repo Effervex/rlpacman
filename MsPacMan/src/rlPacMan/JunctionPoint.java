@@ -6,6 +6,7 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 	private Point location_;
 	private byte direction_;
 	private int distance_;
+	private int safety_ = Integer.MAX_VALUE;
 
 	public JunctionPoint(Point loc, byte dir, int dist) {
 		location_ = loc;
@@ -15,7 +16,7 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 
 	//@Override
 	public int compareTo(JunctionPoint otherPoint) {
-		// Mainly comaparable by distance
+		// Mainly comparable by distance
 		if (otherPoint.distance_ < distance_)
 			return 1;
 		if (otherPoint.distance_ > distance_)
@@ -62,5 +63,13 @@ public class JunctionPoint implements Comparable<JunctionPoint> {
 
 	public byte getDirection() {
 		return direction_;
+	}
+	
+	public void setSafety(int safety) {
+		safety_ = safety;
+	}
+	
+	public int getSafety() {
+		return safety_;
 	}
 }

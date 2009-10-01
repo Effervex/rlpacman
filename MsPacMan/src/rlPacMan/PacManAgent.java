@@ -71,6 +71,7 @@ public class PacManAgent implements AgentInterface {
 	 *         switches.
 	 */
 	private int[] chooseAction(double[] observations) {
+		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(observations, actionsModule_);
 

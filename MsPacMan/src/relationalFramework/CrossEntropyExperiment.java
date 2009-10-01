@@ -82,7 +82,7 @@ public class CrossEntropyExperiment {
 		if (args.length == 7) {
 			try {
 				// Random rules
-				int policySize = Integer.parseInt(args[3]);
+				Integer.parseInt(args[3]);
 				initialise(args[0], Integer.parseInt(args[1]), Integer
 						.parseInt(args[2]), Integer.parseInt(args[3]), args[4],
 						args[5], args[6]);

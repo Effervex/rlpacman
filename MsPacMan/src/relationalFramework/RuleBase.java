@@ -45,9 +45,6 @@ public class RuleBase {
 	/** The cross-entropy generators for the actions within the rules. */
 	private ProbabilityDistribution<ActionCondition>[] actionsGenerators_;
 
-	/** Whether to update the generators. */
-	private boolean updateGenerators_;
-
 	/** The random number generator. */
 	private Random random_ = new Random();
 
@@ -182,8 +179,8 @@ public class RuleBase {
 
 		// Each observation and action has a boolean operator, plus the empty
 		// condition (twice to keep it balanced)
-		double baseWeight = 1.0 / (2 * (observationVals.length
-				+ actionVals.length + 1));
+		double baseWeight = 1.0 / (observationVals.length
+				+ 1);
 
 		// Adding all the conditions
 		for (ConditionObject cond : observationVals) {
@@ -193,29 +190,20 @@ public class RuleBase {
 			// decreased weight
 			for (double obsVal : obs.getSetOfVals()) {
 				ObservationCondition observation = ObservationCondition
-						.createObservation(classPrefix, obs, false, obsVal);
-				obsGenerator.add(observation, thisWeight);
-
-				observation = ObservationCondition.createObservation(
-						classPrefix, obs, true, obsVal);
+						.createObservation(classPrefix, obs, obsVal);
 				obsGenerator.add(observation, thisWeight);
 			}
 		}
 		// Adding the empty condition
 		ObservationCondition emptyCond = ObservationCondition
 				.emptyObservation(classPrefix);
-		obsGenerator.add(emptyCond, 2 * baseWeight);
+		obsGenerator.add(emptyCond, baseWeight);
 
-		double actionWeight = 1.0 / (2 * actionVals.length);
+		double actionWeight = 1.0 / actionVals.length;
 		// Adding the actions
 		for (ConditionObject act : actionVals) {
 			ActionCondition action = ActionCondition.createAction(classPrefix,
-					act, false);
-			obsGenerator.add(action, baseWeight);
-			actGenerator.add(action, actionWeight);
-
-			action = ActionCondition.createAction(classPrefix, act, true);
-			obsGenerator.add(action, baseWeight);
+					act);
 			actGenerator.add(action, actionWeight);
 		}
 
@@ -378,13 +366,6 @@ public class RuleBase {
 	 * @return The randomly generated rule.
 	 */
 	private Rule generateRule(int ruleSlot, String classPrefix) {
-		ConditionObject[] observationVals = ObservationCondition
-				.getObservationValues(classPrefix);
-		ConditionObject[] actionVals = ActionCondition
-				.getActionValues(classPrefix);
-		int observationsSize = observationVals.length;
-		int actionsSize = actionVals.length;
-
 		ArrayList<ObservationCondition> obs = new ArrayList<ObservationCondition>();
 		ActionCondition preAction = null;
 

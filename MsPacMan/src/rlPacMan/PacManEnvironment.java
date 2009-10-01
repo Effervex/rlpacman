@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,7 +20,6 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-
 import relationalFramework.ObservationCondition;
 import relationalFramework.Rule;
 import rlPacMan.PacManAction.PacManActionSet;
@@ -32,8 +32,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private Observation obs_;
 	private GameModel model_;
 	private int[][] distanceGrid_;
-	private Set<Point> pacJunctions_;
-	private Map<Point, Integer> junctionSafety_;
+	private SortedSet<JunctionPoint> pacJunctions_;
 	private Point gridStart_;
 	private ArrayList<Double>[] observationFreqs_;
 	private boolean noteFreqs_ = false;
@@ -159,7 +158,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				calculateReward(), calculateObservations(), isTerminal());
 		return rot;
 	}
-	
+
 	/**
 	 * Loads the hand-coded rules with default weights.
 	 * 
@@ -169,208 +168,107 @@ public class PacManEnvironment implements EnvironmentInterface {
 		ArrayList<Rule> handRules = new ArrayList<Rule>();
 
 		// Go to dot
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_DOT, true)));
+		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_DOT)));
 		// Go to centre of dots
 		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_CENTRE_OF_DOTS, true)));
+				PacManActionSet.TO_CENTRE_OF_DOTS)));
 		// From nearest ghost 1
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.NEAREST_GHOST, 3), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// From nearest ghost 2
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.NEAREST_GHOST, 4), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// From nearest ghost 3
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
-		// Stop running from nearest ghost 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Stop running from nearest ghost 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 6), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Stop running from nearest ghost 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 7), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
+				PacManObservationSet.NEAREST_GHOST, 5), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// Towards safe junction
 		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
+				PacManActionSet.TO_SAFE_JUNCTION)));
 		// Towards maximally safe junction 1
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
+				PacManObservationSet.MAX_JUNCTION_SAFETY, 3), new PacManAction(
+				PacManActionSet.TO_SAFE_JUNCTION)));
 		// Towards maximally safe junction 2
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, true)));
-		// Maximally safe junction off 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, false)));
-		// Safe to stop running 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
-		// Maximally safe junction off 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION, false)));
-		// Safe to stop running 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.GREATER_EQ_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST, false)));
+				PacManObservationSet.MAX_JUNCTION_SAFETY, 2), new PacManAction(
+				PacManActionSet.TO_SAFE_JUNCTION)));
 		// Keep on moving from ghosts
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+		handRules.add(new Rule(new PacManAction(PacManActionSet.FROM_GHOST)));
 		// Eat edible ghosts
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
+		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_ED_GHOST)));
 		// Ghost coming, chase powerdots
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 4), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
+				PacManObservationSet.NEAREST_GHOST, 4), new PacManAction(
+				PacManActionSet.TO_POWER_DOT)));
 		// If edible ghosts, don't chase power dots
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, false)));
+				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
+				PacManActionSet.TO_POWER_DOT)));
 		// If edible ghosts and we're close to a powerdot, move away from it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
+		handRules
+				.add(new Rule(new PacManObservation(
+						PacManObservationSet.NEAREST_ED_GHOST, 99),
+						new PacManObservation(
+								PacManObservationSet.NEAREST_POWER_DOT, 5),
+						new PacManAction(PacManActionSet.FROM_POWER_DOT)));
 		// If edible ghosts, move away from powerdots
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// If no edible ghosts, stop moving from powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, false)));
-		// If no edible ghosts, chase powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
+				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
+				PacManActionSet.FROM_POWER_DOT)));
 		// If we're close to a ghost and powerdot, chase the powerdot 1
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 2), new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
+				PacManObservationSet.NEAREST_POWER_DOT, 2),
+				new PacManObservation(PacManObservationSet.NEAREST_GHOST, 5),
+				new PacManAction(PacManActionSet.TO_POWER_DOT)));
 		// If we're close to a ghost and powerdot, chase the powerdot 2
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 4), new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.TO_POWER_DOT, true)));
-		// In the clear
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 7),
-				new PacManObservation(PacManObservationSet.MAX_JUNCTION_SAFETY,
-						ObservationCondition.GREATER_EQ_THAN, 4),
-				new PacManAction(PacManActionSet.FROM_GHOST, false)));
-		// Ghosts are not close, eat a dot 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOST_DENSITY,
-				ObservationCondition.LESS_THAN, 1.5), new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.LESS_THAN, 5), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
-		// Far from power dot, stop running
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT,
-				ObservationCondition.GREATER_EQ_THAN, 10), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, false)));
+				PacManObservationSet.NEAREST_POWER_DOT, 4),
+				new PacManObservation(PacManObservationSet.NEAREST_GHOST, 5),
+				new PacManAction(PacManActionSet.TO_POWER_DOT)));
+		// Ghosts are not close, don't eat a dot 1
+		handRules
+				.add(new Rule(new PacManObservation(
+						PacManObservationSet.GHOST_DENSITY, 1.5),
+						new PacManObservation(
+								PacManObservationSet.NEAREST_POWER_DOT, 5),
+						new PacManAction(PacManActionSet.FROM_POWER_DOT)));
 		// Ghosts are too spread, move away from power dot
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.TOTAL_DIST_TO_GHOSTS,
-				ObservationCondition.GREATER_EQ_THAN, 30), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT, true)));
+				PacManObservationSet.TOTAL_DIST_TO_GHOSTS, 20),
+				new PacManAction(PacManActionSet.TO_POWER_DOT)));
 		// Unsafe junction, run from ghosts 1
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.MAX_JUNCTION_SAFETY, 3), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// Unsafe junction, run from ghosts 2
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 2), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.MAX_JUNCTION_SAFETY, 2), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// Unsafe junction, run from ghosts 3
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY,
-				ObservationCondition.LESS_THAN, 1), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.MAX_JUNCTION_SAFETY, 1), new PacManAction(
+				PacManActionSet.FROM_GHOST)));
 		// Move from ghost centre
 		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.FROM_GHOST_CENTRE, true)));
-		// Stop chasing edible ghosts if none
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, false)));
+				PacManActionSet.FROM_GHOST_CENTRE)));
 		// Chasing edible ghosts
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
+				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
+				PacManActionSet.TO_ED_GHOST)));
 		// If not running from powerdot, move towards it
-		handRules.add(new Rule(new PacManAction(PacManActionSet.FROM_POWER_DOT,
-				false), new PacManAction(PacManActionSet.TO_POWER_DOT, true)));
+		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_POWER_DOT)));
 		// If there is a fruit, chase it
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.LESS_THAN, 99), new PacManAction(
-				PacManActionSet.TO_FRUIT, true)));
-		// If there isn't a fruit, stop chasing it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_FRUIT,
-				ObservationCondition.GREATER_EQ_THAN, 99), new PacManAction(
-				PacManActionSet.TO_FRUIT, false)));
+				PacManObservationSet.NEAREST_FRUIT, 99), new PacManAction(
+				PacManActionSet.TO_FRUIT)));
 		// If ghosts are edible and not flashing, chase them
 		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST,
-				ObservationCondition.LESS_THAN, 99), new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.LESS_THAN, 1), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, true)));
-		// If the ghosts are flashing, stop chasing them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
-				PacManActionSet.TO_ED_GHOST, false)));
-		// If the ghosts are flashing, run from them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.GHOSTS_FLASHING,
-				ObservationCondition.GREATER_EQ_THAN, 1), new PacManAction(
-				PacManActionSet.FROM_GHOST, true)));
+				PacManObservationSet.NEAREST_ED_GHOST, 99),
+				new PacManObservation(PacManObservationSet.GHOSTS_FLASHING, 0),
+				new PacManAction(PacManActionSet.TO_ED_GHOST)));
 
 		return handRules;
 	}
@@ -466,9 +364,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				case TO_SAFE_JUNCTION:
 					levelDirections = ActionConverter
 							.toSafeJunction(
-									junctionSafety_,
-									(int) obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
-											.ordinal()], distanceGrid_);
+									pacJunctions_, distanceGrid_);
 					break;
 				case FROM_GHOST_CENTRE:
 					levelDirections = ActionConverter.fromGhostCentre(
@@ -526,6 +422,147 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return false;
 	}
 
+	// // // The predicate methods
+
+	/**
+	 * Calculates whether a particular thing is within a distance from PacMan.
+	 * 
+	 * @param dot
+	 *            The thing to be checked.
+	 * @param distance
+	 *            The distance range the thing needs to be in.
+	 * @return True if the thing is within the distance from PacMan.
+	 */
+	public boolean proximalThing(Thing thing, Integer distance) {
+		if (distanceGrid_[thing.m_locX][thing.m_locY] <= distance)
+			return true;
+		return false;
+	}
+
+	/*
+	 * An assortment of wrapper methods checking distance between Pacman and a
+	 * Thing.
+	 */
+	public boolean proximalDot(Dot dot, Integer distance) {
+		return proximalThing(dot, distance);
+	}
+
+	public boolean proximalPowerDot(PowerDot powerDot, Integer distance) {
+		return proximalThing(powerDot, distance);
+	}
+
+	public boolean proximalGhost(Ghost ghost, Integer distance) {
+		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
+			if (ghost.m_nTicks2Flee <= 0)
+				return proximalThing(ghost, distance);
+		}
+		return false;
+	}
+
+	public boolean proximalEdibleGhost(Ghost ghost, Integer distance) {
+		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
+			if (ghost.m_nTicks2Flee > 0)
+				return proximalThing(ghost, distance);
+		}
+		return false;
+	}
+
+	public boolean proximalFruit(Fruit fruit, Integer distance) {
+		if ((model_.m_fruit.m_nTicks2Show == 0)
+				&& (model_.m_fruit.m_bAvailable)) {
+			return proximalThing(fruit, distance);
+		}
+		return false;
+	}
+
+	public boolean safeJunction(JunctionPoint junction, Integer safety) {
+		// Make the check
+		if (junction.getSafety() <= safety) {
+			return true;
+		}
+		return false;
+	}
+
+	public boolean ghostCentre(Double distance) {
+		double sumX = 0;
+		double sumY = 0;
+		for (Ghost ghost : model_.m_ghosts) {
+			sumX += ghost.m_locX;
+			sumY += ghost.m_locY;
+		}
+		double centreX = sumX / model_.m_ghosts.length;
+		double centreY = sumY / model_.m_ghosts.length;
+		if (Point.distance(centreX, centreY, model_.m_player.m_locX,
+				model_.m_player.m_locY) <= distance)
+			return true;
+
+		return false;
+	}
+
+	public boolean dotCentre(Double distance) {
+		double sumX = 0;
+		double sumY = 0;
+		for (Dot dot : model_.m_dots.values()) {
+			sumX += dot.m_locX;
+			sumY += dot.m_locY;
+		}
+		double centreX = sumX / model_.m_dots.size();
+		double centreY = sumY / model_.m_dots.size();
+		if (Point.distance(centreX, centreY, model_.m_player.m_locX,
+				model_.m_player.m_locY) <= distance)
+			return true;
+
+		return false;
+	}
+
+	public boolean ghostDensity(Double density) {
+		if (calculateDensity() <= density)
+			return true;
+		return false;
+	}
+
+	public boolean ghostDistanceSum(Double distance) {
+		Thing currentThing = model_.m_player;
+		Set<Thing> thingsToVisit = new HashSet<Thing>();
+		for (Ghost ghost : model_.m_ghosts)
+			thingsToVisit.add(ghost);
+		double totalDistance = 0;
+		// While there are things to go to.
+		while (!thingsToVisit.isEmpty()) {
+			// Find the closest thing to the current thing
+			double closest = Integer.MAX_VALUE;
+			Thing closestThing = null;
+			for (Thing thing : thingsToVisit) {
+				double distanceBetween = Point.distance(currentThing.m_locX,
+						currentThing.m_locY, thing.m_locX, thing.m_locY);
+				if (distanceBetween < closest) {
+					closest = distanceBetween;
+					closestThing = thing;
+				}
+			}
+
+			// Add to the total distance, and repeat the loop, minus the closest
+			// thing
+			totalDistance += closest;
+			currentThing = closestThing;
+			thingsToVisit.remove(currentThing);
+		}
+
+		// The comparison
+		if (totalDistance <= distance)
+			return true;
+
+		return false;
+	}
+
+	public boolean ghostsFlashing() {
+		for (Ghost ghost : model_.m_ghosts) {
+			if (ghost.isFlashing())
+				return true;
+		}
+		return false;
+	}
+
 	/**
 	 * A method for calculating observations about the current PacMan state.
 	 * 
@@ -536,21 +573,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private Observation calculateObservations() {
 		// Find the player related observations
 		pacJunctions_ = searchMaze(model_.m_player, obs_.doubleArray);
-		junctionSafety_ = new HashMap<Point, Integer>();
-		for (Point junc : pacJunctions_)
-			junctionSafety_.put(junc, Integer.MAX_VALUE);
-		/*
-		 * for (int y = 0; y < model_.m_gameSizeY; y++) { for (int x = 0; x <
-		 * model_.m_gameSizeX; x++) { DecimalFormat df = new
-		 * DecimalFormat("00"); System.out.print(df.format(distanceGrid_[x][y])
-		 * + " "); } System.out.println(); }
-		 */
 
 		// Find the ghost related observations
 		double ghostX = 0;
 		double ghostY = 0;
 		int numGhosts = 0;
-		Set<Point> ghostCoords = new HashSet<Point>();
 		obs_.doubleArray[PacManObservationSet.NEAREST_GHOST.ordinal()] = Integer.MAX_VALUE;
 		obs_.doubleArray[PacManObservationSet.NEAREST_ED_GHOST.ordinal()] = Integer.MAX_VALUE;
 		for (int i = 0; i < model_.m_ghosts.length; i++) {
@@ -573,18 +600,17 @@ public class PacManEnvironment implements EnvironmentInterface {
 				ghostX += ghost.m_locX;
 				ghostY += ghost.m_locY;
 				numGhosts++;
-				ghostCoords.add(new Point(ghost.m_locX, ghost.m_locY));
 
 				// Calculate the ghost's distance from each of the player's
 				// junctions
 				if (ghost.m_nTicks2Flee <= 0) {
-					for (Point p : pacJunctions_) {
-						int ghostDist = calculateDistance(ghost, p);
-						int result = ghostDist - distanceGrid_[p.x][p.y];
+					for (JunctionPoint jp : pacJunctions_) {
+						int ghostDist = calculateDistance(ghost, jp.getLocation());
+						int result = ghostDist - distanceGrid_[jp.getLocation().x][jp.getLocation().y];
 						// Looking for the minimally safe junction
 						if ((result > Integer.MIN_VALUE)
-								&& (result < junctionSafety_.get(p)))
-							junctionSafety_.put(p, result);
+								&& (result < jp.getSafety()))
+							jp.setSafety(result);
 					}
 				}
 			}
@@ -596,16 +622,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 							model_.m_player.m_locX, model_.m_player.m_locY);
 
 			// Calculate the density
-			obs_.doubleArray[PacManObservationSet.GHOST_DENSITY.ordinal()] = calculateDensity(ghostCoords);
+			obs_.doubleArray[PacManObservationSet.GHOST_DENSITY.ordinal()] = calculateDensity();
 		}
 
 		// Choose the maximally safe junction
 		obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY.ordinal()] = Integer.MIN_VALUE;
-		for (Point p : pacJunctions_) {
-			if (junctionSafety_.get(p) > obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
+		for (JunctionPoint jp : pacJunctions_) {
+			if (jp.getSafety() > obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
 					.ordinal()])
 				obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
-						.ordinal()] = junctionSafety_.get(p);
+						.ordinal()] = jp.getSafety();
 		}
 
 		// Calculate the travelling salesman distance
@@ -628,7 +654,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				}
 			}
 
-			// Add tot he total distance, and repeat the loop, minus the closest
+			// Add to the total distance, and repeat the loop, minus the closest
 			// thing
 			totalDistance += closest;
 			currentThing = closestThing;
@@ -657,20 +683,18 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Calculates the density of the ghosts.
 	 * 
-	 * @param ghostCoords
-	 *            The coordinates of every ghost.
 	 * @return The density of the ghosts, or 0 if only one ghost.
 	 */
-	private double calculateDensity(Set<Point> ghostCoords) {
+	private double calculateDensity() {
 		// If we can compare densities between ghosts
 		double density = 0;
-		Point[] coordArray = ghostCoords.toArray(new Point[ghostCoords.size()]);
-		for (int i = 0; i < coordArray.length - 1; i++) {
-			Point thisGhost = coordArray[i];
-			for (int j = i + 1; j < coordArray.length; j++) {
-				Point thatGhost = coordArray[j];
+		for (int i = 0; i < model_.m_ghosts.length - 1; i++) {
+			Ghost thisGhost = model_.m_ghosts[i];
+			for (int j = i + 1; j < model_.m_ghosts.length; j++) {
+				Ghost thatGhost = model_.m_ghosts[j];
 				double distance = Ghost.DENSITY_RADIUS
-						- thisGhost.distance(thatGhost);
+						- Point.distance(thisGhost.m_locX, thisGhost.m_locY,
+								thatGhost.m_locX, thatGhost.m_locY);
 				if (distance > 0)
 					density += distance;
 			}
@@ -746,9 +770,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The observations being made during the search.
 	 * @return A mapping of minimal distances to junctions, given by points.
 	 */
-	private Set<Point> searchMaze(Thing thing, double[] observations) {
-		Set<Point> closeJunctions = new HashSet<Point>();
-		Set<Point> dots = new HashSet<Point>();
+	private SortedSet<JunctionPoint> searchMaze(Thing thing, double[] observations) {
+		SortedSet<JunctionPoint> closeJunctions = new TreeSet<JunctionPoint>();
+		Collection<Dot> dots = model_.m_dots.values();
 
 		Point playerLoc = new Point(thing.m_locX, thing.m_locY);
 
@@ -781,14 +805,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 				junctionStack.remove(point);
 
 				Set<JunctionPoint> nextJunction = searchToJunction(point,
-						knownJunctions, observations, dots);
+						knownJunctions, observations);
 				junctionStack.addAll(nextJunction);
 
 				// Checking for the immediate junctions
 				if ((!nextJunction.isEmpty())
 						&& (point.getLocation().equals(playerLoc))) {
-					closeJunctions.add(nextJunction.iterator().next()
-							.getLocation());
+					closeJunctions.add(nextJunction.iterator().next());
 				}
 			}
 
@@ -796,10 +819,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 			int dotX = 0;
 			int dotY = 0;
 			int i = 0;
-			for (Point dot : dots) {
+			for (Dot dot : dots) {
 				i++;
-				dotX += dot.x;
-				dotY += dot.y;
+				dotX += dot.m_locX;
+				dotY += dot.m_locY;
 			}
 			// Special case if player eats all dots
 			if (i == 0) {
@@ -825,13 +848,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The known junctions.
 	 * @param observations
 	 *            The observations to be made.
-	 * @param dots
-	 *            The dots present in the maze. Used for calculating the centre.
 	 * @return The set of starting points for the next found junction or an
 	 *         empty set.
 	 */
 	private Set<JunctionPoint> searchToJunction(JunctionPoint startingPoint,
-			Set<Point> knownJunctions, double[] observations, Set<Point> dots) {
+			Set<Point> knownJunctions, double[] observations) {
 		byte direction = startingPoint.getDirection();
 		int x = startingPoint.getLocation().x;
 		int y = startingPoint.getLocation().y;
@@ -879,13 +900,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 			// Update any observations
 
-			if ((model_.m_gameState[x][y] & GameModel.GS_FOOD) != 0) {
+			Point pacLoc = new Point(x, y);
+			if (model_.m_dots.get(pacLoc) != null) {
 				if (distance < observations[PacManObservationSet.NEAREST_DOT
 						.ordinal()])
 					observations[PacManObservationSet.NEAREST_DOT.ordinal()] = distance;
-				dots.add(new Point(x, y));
 			}
-			if (((model_.m_gameState[x][y] & GameModel.GS_POWERUP) != 0)
+			if ((model_.m_powerdots.get(pacLoc) != null)
 					&& (distance < observations[PacManObservationSet.NEAREST_POWER_DOT
 							.ordinal()]))
 				observations[PacManObservationSet.NEAREST_POWER_DOT.ordinal()] = distance;
@@ -1125,7 +1146,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		public static ArrayList<PacManLowAction> toDot(GameModel model,
 				int[][] distanceGrid, int nearestDotDist) {
 			return scanDistanceGrid(model, distanceGrid, nearestDotDist,
-					GameModel.GS_FOOD);
+					model.m_dots.values());
 		}
 
 		/**
@@ -1147,7 +1168,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				Player thePlayer, int[][] distanceGrid, int nearestDotDist,
 				boolean isTowards) {
 			ArrayList<PacManLowAction> endDirections = scanDistanceGrid(model,
-					distanceGrid, nearestDotDist, GameModel.GS_POWERUP);
+					distanceGrid, nearestDotDist, model.m_powerdots.values());
 			if (isTowards)
 				return endDirections;
 			else {
@@ -1258,14 +1279,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 		 *         safe junction.
 		 */
 		public static ArrayList<PacManLowAction> toSafeJunction(
-				Map<Point, Integer> junctionSafety, int safestJunction,
+				SortedSet<JunctionPoint> junctions,
 				int[][] distanceGrid) {
 			// For every junction
 			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			for (Point p : junctionSafety.keySet()) {
+			int safety = Integer.MAX_VALUE;
+			for (JunctionPoint jp : junctions) {
 				// If this is the safest junction
-				if (junctionSafety.get(p) == safestJunction) {
-					endDirections.add(followPath(p.x, p.y, distanceGrid));
+				if ((safety == Integer.MAX_VALUE) || (jp.getSafety() == safety)) {
+					endDirections.add(followPath(jp.getLocation().x, jp.getLocation().y, distanceGrid));
+					safety = jp.getSafety();
 				}
 			}
 			return endDirections;
@@ -1325,14 +1348,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 			double dotX = 0;
 			double dotY = 0;
 			int numDots = 0;
-			for (int x = 0; x < model.m_gameState.length; x++) {
-				for (int y = 0; y < model.m_gameState[x].length; y++) {
-					if ((model.m_gameState[x][y] & GameModel.GS_FOOD) != 0) {
-						dotX += x;
-						dotY += y;
-						numDots++;
-					}
-				}
+			for (Dot dot : model.m_dots.values()) {
+				dotX += dot.m_locX;
+				dotY += dot.m_locY;
+				numDots++;
 			}
 
 			if (numDots != 0) {
@@ -1435,16 +1454,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 		 */
 		private static ArrayList<PacManLowAction> scanDistanceGrid(
 				GameModel model, int[][] distanceGrid, int nearestDotDist,
-				int dotType) {
+				Collection<? extends Dot> dots) {
 			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
 			// First, find the nearest dot location/s
-			for (int x = 0; x < distanceGrid.length; x++) {
-				for (int y = 0; y < distanceGrid[x].length; y++) {
-					// If a possible location contains a dot, follow it back
-					if (distanceGrid[x][y] == nearestDotDist) {
-						if ((model.m_gameState[x][y] & dotType) != 0)
-							endDirections.add(followPath(x, y, distanceGrid));
-					}
+			for (Dot dot : dots) {
+				// If a possible location contains a dot, follow it back
+				if (distanceGrid[dot.m_locX][dot.m_locY] == nearestDotDist) {
+					endDirections.add(followPath(dot.m_locX, dot.m_locY,
+							distanceGrid));
 				}
 			}
 			return endDirections;

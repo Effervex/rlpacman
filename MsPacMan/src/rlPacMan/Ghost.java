@@ -62,7 +62,7 @@ class Ghost extends Thing {
 
 	Ghost(GameModel gameModel, byte type, int startX, int startY,
 			boolean bMiddle, int nExitMilliSec) {
-		super(gameModel, type, startX, startY, bMiddle);
+		super(gameModel, startX, startY, bMiddle);
 		m_deltaMax = m_ghostDeltaMax;
 		m_destinationX = -1;
 		m_destinationY = -1;
@@ -242,7 +242,7 @@ class Ghost extends Thing {
 		// Alter the Ghost's color if Pacman ate a Powerup
 		if (m_nTicks2Flee == 0) {
 			g2.setColor(m_color);
-
+			flashing_ = false;
 		} else {
 			// Check if the Powerup is almost out for this ghost,
 			// if so, flash white.

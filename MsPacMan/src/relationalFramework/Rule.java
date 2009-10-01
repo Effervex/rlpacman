@@ -140,19 +140,7 @@ public class Rule {
 	 *            action.
 	 */
 	public void applyAction(ActionSwitch actionSwitch, int priority) {
-		if (action_.getOperator())
-			actionSwitch.switchOn(action_.getCondition(), priority);
-		else
-			actionSwitch.switchOff(action_.getCondition());
-	}
-
-	/**
-	 * Checks if this rule is an activation rule.
-	 * 
-	 * @return True if it is, false otherwise.
-	 */
-	public boolean isActivator() {
-		return action_.getOperator();
+		actionSwitch.switchOn(action_.getCondition(), priority);
 	}
 
 	/**
@@ -206,7 +194,6 @@ public class Rule {
 	 */
 	public static Rule parseRule(String ruleString, String classPrefix) {
 		ArrayList<Integer> observations = new ArrayList<Integer>();
-		ArrayList<Boolean> operators = new ArrayList<Boolean>();
 		ArrayList<Double> values = new ArrayList<Double>();
 		ArrayList<Integer> actions = new ArrayList<Integer>();
 
@@ -222,20 +209,20 @@ public class Rule {
 					// Observation splits
 					index++;
 					index = ObservationCondition.parseObservationCondition(
-							preconditionSplit, index, observations, operators,
+							preconditionSplit, index, observations,
 							values);
 				} else if (preconditionSplit[index].equals(ACTION)) {
 					// Action splits
 					index++;
 					index = ActionCondition.parseCondition(preconditionSplit,
-							index, actions, operators);
+							index, actions);
 				}
 			}
 		}
 
 		// Parsing the action
 		String[] actionSplit = split[1].split(Condition.PRE_SEPARATOR);
-		ActionCondition.parseCondition(actionSplit, 0, actions, operators);
+		ActionCondition.parseCondition(actionSplit, 0, actions);
 
 		ObservationCondition observation = null;
 		ObservationCondition observation2 = null;
@@ -247,46 +234,46 @@ public class Rule {
 			// If we have an action rule
 			if (actions.size() == 2) {
 				condAction = ActionCondition.createAction(classPrefix, actions
-						.get(0), operators.get(0));
+						.get(0));
 				action = ActionCondition.createAction(classPrefix, actions
-						.get(1), operators.get(1));
+						.get(1));
 				return new Rule(condAction, action);
 			} else {
 				// A constant rule
 				action = ActionCondition.createAction(classPrefix, actions
-						.get(0), operators.get(0));
+						.get(0));
 				return new Rule(action);
 			}
 		} else {
 			if (actions.size() > 1) {
 				// One obs and one action
 				observation = ObservationCondition.createObservation(
-						classPrefix, observations.get(0), operators.get(0),
+						classPrefix, observations.get(0),
 						values.get(0));
 				condAction = ActionCondition.createAction(classPrefix, actions
-						.get(0), operators.get(1));
+						.get(0));
 				action = ActionCondition.createAction(classPrefix, actions
-						.get(1), operators.get(2));
+						.get(1));
 				return new Rule(observation, condAction, action);
 			} else {
 				// One observation rule
 				if (observations.size() == 1) {
 					observation = ObservationCondition.createObservation(
-							classPrefix, observations.get(0), operators.get(0),
+							classPrefix, observations.get(0),
 							values.get(0));
 					action = ActionCondition.createAction(classPrefix, actions
-							.get(0), operators.get(1));
+							.get(0));
 					return new Rule(observation, action);
 				} else {
 					// Two observation rule
 					observation = ObservationCondition.createObservation(
-							classPrefix, observations.get(0), operators.get(0),
+							classPrefix, observations.get(0),
 							values.get(0));
 					observation2 = ObservationCondition.createObservation(
-							classPrefix, observations.get(1), operators.get(1),
+							classPrefix, observations.get(1),
 							values.get(1));
 					action = ActionCondition.createAction(classPrefix, actions
-							.get(0), operators.get(2));
+							.get(0));
 					return new Rule(observation, observation2, action);
 				}
 			}

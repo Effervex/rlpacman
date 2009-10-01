@@ -443,8 +443,7 @@ public class PacMan {
 		thing.m_lastDeltaLocY = thing.m_deltaLocY;
 
 		// See if thing can eat any nearby items
-		thing.eatItem(GameModel.GS_FOOD);
-		thing.eatItem(GameModel.GS_POWERUP);
+		thing.eatItem();
 
 		// Based on the current direction, update thing's location in that
 		// direction.
