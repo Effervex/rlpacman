@@ -903,8 +903,6 @@ class Ghost extends Thing {
 				// then Pacman caught the Ghost.
 				player.m_score += m_gameModel.m_eatGhostPoints;
 				m_eatenPoints = m_gameModel.m_eatGhostPoints;
-				// TODO: Remove
-				// System.out.println (m_gameModel.m_eatGhostPoints);
 				m_gameModel.m_eatGhostPoints *= 2;
 				m_bEaten = true;
 				m_destinationX = -1;
@@ -964,5 +962,19 @@ class Ghost extends Thing {
 						+ gameUI.CELL_LENGTH / 2.0 + m_deltaLocY
 						* (gameUI.CELL_LENGTH / (m_deltaMax * 2.0 - 1)));
 		pixelShrink_ = -pixelSize_ / 4;
+	}
+	
+	public String toString() {
+		switch(m_type) {
+		case BLINKY:
+			return "Blinky";
+		case PINKY:
+			return "Pinky";
+		case INKY:
+			return "Inky";
+		case CLYDE:
+			return "Clyde";
+		}
+		return "Ghost";
 	}
 }

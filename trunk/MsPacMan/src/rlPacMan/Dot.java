@@ -1,7 +1,5 @@
 package rlPacMan;
 
-import java.awt.Point;
-
 /**
  * A dot in the PacMan world. Worth 10 points.
  * 
@@ -39,5 +37,9 @@ public class Dot extends Thing {
 	protected void updatePixelVals(GameUI gameUI) {
 		// TODO Auto-generated method stub
 		
+	}
+	
+	public String toString() {
+		return "Dot: " + m_locX + "," + m_locY;
 	}
 }

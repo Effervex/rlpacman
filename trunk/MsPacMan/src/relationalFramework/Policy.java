@@ -1,5 +1,24 @@
 package relationalFramework;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+import org.mandarax.kernel.Fact;
+import org.mandarax.kernel.InferenceEngine;
+import org.mandarax.kernel.KnowledgeBase;
+import org.mandarax.kernel.Prerequisite;
+import org.mandarax.kernel.Query;
+import org.mandarax.kernel.Replacement;
+import org.mandarax.kernel.ResultSet;
+import org.mandarax.kernel.Rule;
+import org.mandarax.kernel.Term;
+import org.mandarax.kernel.VariableTerm;
+import org.mandarax.kernel.meta.JConstructor;
+import org.mandarax.util.LogicFactorySupport;
+
 /**
  * This class represents a policy that the agent can use.
  * 
@@ -94,9 +113,47 @@ public class Policy {
 			if (priorityRules_[i] != null) {
 				buffer.append("[" + (getPriority(i, priorityRules_.length) + 1)
 						+ "]: ");
-				buffer.append(priorityRules_[i] + "\n");
+				buffer.append(lightenRule(priorityRules_[i]) + "\n");
 			}
 		}
+		return buffer.toString();
+	}
+
+	/**
+	 * Creates a string representation of a rule, in a light, easy-to-read
+	 * format.
+	 * 
+	 * @param rule
+	 *            The rule begin output.
+	 * @return A light representation of the rule.
+	 */
+	private String lightenRule(Rule rule) {
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("IF ");
+		// Only output the prereqs that aren't type preds
+		List<Prerequisite> body = rule.getBody();
+
+		boolean noRules = true;
+		boolean plural = false;
+		// Check all prereqs, only outputting the Java preds
+		for (Prerequisite prereq : body) {
+			// If the predicate is a Java method
+			if (prereq.getPredicate() instanceof JConstructor) {
+				// If we have more than one condition
+				if (plural)
+					buffer.append("AND ");
+
+				buffer.append(StateSpec.lightenFact(prereq));
+				plural = true;
+				noRules = false;
+			}
+		}
+		if (noRules)
+			buffer.append("TRUE ");
+
+		buffer.append("THEN ");
+		buffer.append(StateSpec.lightenFact(rule.getHead()));
+
 		return buffer.toString();
 	}
 
@@ -142,24 +199,106 @@ public class Policy {
 	 * Evaluates the policy for applicable rules within each priority. If
 	 * multiple rules are applicable, only apply the highest priority ones.
 	 * 
-	 * @param observations
-	 *            The current observations.
+	 * @param state
+	 *            The current state in predicates.
 	 * @param actionSwitch
 	 *            The current actions.
 	 */
-	public void evaluatePolicy(double[] observations, ActionSwitch actionSwitch) {
-		// Check every slot, from top-to-bottom until one activates
-		for (int i = 0; i < priorityRules_.length; i++) {
-			// Check if the rule exists and if it does, if it applies.
-			if ((priorityRules_[i] != null)
-					&& (priorityRules_[i].evaluateConditions(observations,
-							actionSwitch))) {
-				// Apply the rule
-				priorityRules_[i].applyAction(actionSwitch, getPriority(i,
-						priorityRules_.length));
-				triggered_[i] = true;
+	public void evaluatePolicy(KnowledgeBase state, ActionSwitch actionSwitch) {
+		// Get the applicable actions from the priority levels.
+		List<Fact>[] results = evaluateRules(state);
+
+		// Choose which actions to apply in the action switch
+		Random random = new Random();
+		for (int i = 0; i < results.length; i++) {
+			if (results[i] != null) {
+				// TODO The question of how to deal with multiple actions
+				// perhaps should be left to the environment. Maybe this should
+				// return a list of facts to the actionSwitch.
+				Fact appliedAction = results[i].get(random.nextInt(results[i]
+						.size()));
+				actionSwitch.switchOn(appliedAction, i);
 			}
 		}
+	}
+
+	/**
+	 * Evaluates the rules within the policy, returning the sets of rules
+	 * applicable at each policy level. The policy is ordered as a decision
+	 * list, so the first rule to activate is the rule to use at that priority
+	 * level and further evaluation ceases at the activated level.
+	 * 
+	 * @param state
+	 *            The state of the system, in predicate form.
+	 * @return A set of grounded facts for each priority level.
+	 */
+	private List<Fact>[] evaluateRules(KnowledgeBase state) {
+		List<Fact>[] activatedActions = new List[ActionSwitch.NUM_PRIORITIES];
+
+		// Logic constructs
+		LogicFactorySupport factorySupport = new LogicFactorySupport(RuleBase
+				.getInstance().getLogicFactory());
+		InferenceEngine ie = RuleBase.getInstance().getInferenceEngine();
+
+		// Check every slot, from top-to-bottom until one activates
+		for (int i = 0; i < priorityRules_.length; i++) {
+			List<Fact> priorityActions = activatedActions[getPriority(i,
+					priorityRules_.length)];
+			// Check if the rule exists and the current priority level hasn't
+			// fired.
+			if ((priorityRules_[i] != null) && (priorityActions == null)) {
+				Rule rule = priorityRules_[i];
+
+				// Setting up the necessary variables
+				ResultSet results = null;
+				Fact[] ruleConditions = (Fact[]) rule.getBody().toArray(
+						new Fact[rule.getBody().size()]);
+
+				// Forming the query
+				Query query = factorySupport.query(ruleConditions, rule
+						.toString());
+
+				// Find the result set
+				try {
+					results = ie.query(query, state, InferenceEngine.ONE,
+							InferenceEngine.BUBBLE_EXCEPTIONS);
+					// If there is at least one result
+					if (results.next()) {
+						priorityActions = new ArrayList<Fact>();
+						// For each possible replacement
+						do {
+							Map<Term, Term> replacementMap = results
+									.getResults();
+							Collection<Replacement> replacements = new ArrayList<Replacement>();
+							// Find the replacements for the variable terms in
+							// the action
+							for (Term var : rule.getHead().getTerms()) {
+								if (var instanceof VariableTerm) {
+									replacements.add(new Replacement(var,
+											replacementMap.get(var)));
+								} else {
+									replacements.add(new Replacement(var, var));
+								}
+							}
+
+							// Apply the replacements and add the fact to the
+							// set
+							Fact groundAction = rule.getHead().applyToFact(
+									replacements);
+							// If the action is ground
+							if (!priorityActions.contains(groundAction))
+								priorityActions.add(groundAction);
+						} while (results.next());
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				if ((priorityActions != null) && (!priorityActions.isEmpty()))
+					activatedActions[getPriority(i, priorityRules_.length)] = priorityActions;
+			}
+		}
+
+		return activatedActions;
 	}
 
 	/**

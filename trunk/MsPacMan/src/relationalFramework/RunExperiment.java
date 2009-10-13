@@ -2,14 +2,13 @@ package relationalFramework;
 
 import org.rlcommunity.rlglue.codec.*;
 
-import rlPacMan.PacManAgent;
 import rlPacMan.PacManEnvironment;
 
 
 public class RunExperiment {
 	public static void main(String[] args) {
 		// Create the Agent
-		AgentInterface theAgent = new PacManAgent();
+		AgentInterface theAgent = new PolicyAgent();
 
 		// Create the Environment
 		EnvironmentInterface theEnvironment = new PacManEnvironment();
