@@ -7,9 +7,14 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.DecimalFormat;
 import java.util.*;
+import java.util.logging.Logger;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Category;
+import org.apache.log4j.Level;
+import org.mandarax.kernel.Rule;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
 /**
@@ -57,7 +62,10 @@ public class CrossEntropyExperiment {
 	 * @param argumentFile
 	 *            The file containing the arguments.
 	 */
-	public CrossEntropyExperiment(File argumentFile) {
+	public CrossEntropyExperiment(File argumentFile) {	
+		BasicConfigurator.configure();
+		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
+		
 		// Read the arguments in from file.
 		ArrayList<String> argsList = new ArrayList<String>();
 		try {
@@ -177,7 +185,7 @@ public class CrossEntropyExperiment {
 		RuleBase.initInstance(new File(ruleFile));
 		RuleBase.getInstance().normaliseDistributions();
 		policySize_ = RuleBase.getInstance().getNumSlots();
-		
+
 		slotGenerator_ = new ProbabilityDistribution<Integer>();
 		// Filling the generators
 		for (int i = 0; i < policySize_; i++) {
@@ -257,8 +265,11 @@ public class CrossEntropyExperiment {
 					float score = 0;
 					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 						RLGlue.RL_episode(1000000);
-						score += Float.parseFloat(RLGlue
+						// score += Float.parseFloat(RLGlue
+						// .RL_env_message("score"));
+						double envScore = Float.parseFloat(RLGlue
 								.RL_env_message("score"));
+						score += RLGlue.RL_return();
 					}
 					score /= AVERAGE_ITERATIONS;
 					// Set the fired rules back to this policy

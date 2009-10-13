@@ -7,35 +7,36 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Arrays;
 
+import org.mandarax.kernel.ClauseSet;
+import org.mandarax.kernel.Fact;
+import org.mandarax.kernel.KnowledgeBase;
+import org.mandarax.kernel.LogicFactory;
+import org.mandarax.kernel.Term;
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.ObservationCondition;
-import relationalFramework.Rule;
-import rlPacMan.PacManAction.PacManActionSet;
-import rlPacMan.PacManObservation.PacManObservationSet;
+import relationalFramework.ObjectObservations;
+import relationalFramework.RuleBase;
+import relationalFramework.State;
+import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static final int PLAYER_SPEED = 20;
 	private PacMan environment_;
 	private int prevScore_;
-	private Observation obs_;
 	private GameModel model_;
 	private int[][] distanceGrid_;
 	private SortedSet<JunctionPoint> pacJunctions_;
 	private Point gridStart_;
 	private ArrayList<Double>[] observationFreqs_;
-	private boolean noteFreqs_ = false;
 
 	// @Override
 	public void env_cleanup() {
@@ -65,13 +66,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Return the score
 		if (arg0.equals("score"))
 			return model_.m_player.m_score + "";
-		if (arg0.equals("noteObs")) {
-			noteFreqs_ = true;
-			observationFreqs_ = new ArrayList[PacManObservationSet.values().length];
-			for (int i = 0; i < observationFreqs_.length; i++) {
-				observationFreqs_[i] = new ArrayList<Double>();
-			}
-		}
 		if (arg0.equals("writeFreqs")) {
 			writeFreqs();
 		}
@@ -128,7 +122,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Applying the action (up down left right or nothing)
-		environment_.simulateKeyPress(chooseLowAction(arg0.intArray).getKey());
+		Fact[] actionPriority = (Fact[]) ObjectObservations.getInstance().objectArray;
+		environment_.simulateKeyPress(chooseLowAction(actionPriority).getKey());
 
 		synchronized (environment_) {
 			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
@@ -143,7 +138,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// If we're not in full experiment mode, redraw the scene.
 		if (!environment_.experimentMode_) {
-			drawActions(arg0.intArray);
+			drawActions(actionPriority);
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
 			environment_.m_topCanvas.repaint();
@@ -160,135 +155,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Loads the hand-coded rules with default weights.
-	 * 
-	 * @return The list of hand coded rules.
-	 */
-	public ArrayList<Rule> loadHandCodedRules() {
-		ArrayList<Rule> handRules = new ArrayList<Rule>();
-
-		// Go to dot
-		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_DOT)));
-		// Go to centre of dots
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_CENTRE_OF_DOTS)));
-		// From nearest ghost 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// From nearest ghost 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST, 4), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// From nearest ghost 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST, 5), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// Towards safe junction
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION)));
-		// Towards maximally safe junction 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY, 3), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION)));
-		// Towards maximally safe junction 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY, 2), new PacManAction(
-				PacManActionSet.TO_SAFE_JUNCTION)));
-		// Keep on moving from ghosts
-		handRules.add(new Rule(new PacManAction(PacManActionSet.FROM_GHOST)));
-		// Eat edible ghosts
-		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_ED_GHOST)));
-		// Ghost coming, chase powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_GHOST, 4), new PacManAction(
-				PacManActionSet.TO_POWER_DOT)));
-		// If edible ghosts, don't chase power dots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
-				PacManActionSet.TO_POWER_DOT)));
-		// If edible ghosts and we're close to a powerdot, move away from it
-		handRules
-				.add(new Rule(new PacManObservation(
-						PacManObservationSet.NEAREST_ED_GHOST, 99),
-						new PacManObservation(
-								PacManObservationSet.NEAREST_POWER_DOT, 5),
-						new PacManAction(PacManActionSet.FROM_POWER_DOT)));
-		// If edible ghosts, move away from powerdots
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
-				PacManActionSet.FROM_POWER_DOT)));
-		// If we're close to a ghost and powerdot, chase the powerdot 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT, 2),
-				new PacManObservation(PacManObservationSet.NEAREST_GHOST, 5),
-				new PacManAction(PacManActionSet.TO_POWER_DOT)));
-		// If we're close to a ghost and powerdot, chase the powerdot 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_POWER_DOT, 4),
-				new PacManObservation(PacManObservationSet.NEAREST_GHOST, 5),
-				new PacManAction(PacManActionSet.TO_POWER_DOT)));
-		// Ghosts are not close, don't eat a dot 1
-		handRules
-				.add(new Rule(new PacManObservation(
-						PacManObservationSet.GHOST_DENSITY, 1.5),
-						new PacManObservation(
-								PacManObservationSet.NEAREST_POWER_DOT, 5),
-						new PacManAction(PacManActionSet.FROM_POWER_DOT)));
-		// Ghosts are too spread, move away from power dot
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.TOTAL_DIST_TO_GHOSTS, 20),
-				new PacManAction(PacManActionSet.TO_POWER_DOT)));
-		// Unsafe junction, run from ghosts 1
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY, 3), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// Unsafe junction, run from ghosts 2
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY, 2), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// Unsafe junction, run from ghosts 3
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.MAX_JUNCTION_SAFETY, 1), new PacManAction(
-				PacManActionSet.FROM_GHOST)));
-		// Move from ghost centre
-		handRules.add(new Rule(new PacManAction(
-				PacManActionSet.FROM_GHOST_CENTRE)));
-		// Chasing edible ghosts
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST, 99), new PacManAction(
-				PacManActionSet.TO_ED_GHOST)));
-		// If not running from powerdot, move towards it
-		handRules.add(new Rule(new PacManAction(PacManActionSet.TO_POWER_DOT)));
-		// If there is a fruit, chase it
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_FRUIT, 99), new PacManAction(
-				PacManActionSet.TO_FRUIT)));
-		// If ghosts are edible and not flashing, chase them
-		handRules.add(new Rule(new PacManObservation(
-				PacManObservationSet.NEAREST_ED_GHOST, 99),
-				new PacManObservation(PacManObservationSet.GHOSTS_FLASHING, 0),
-				new PacManAction(PacManActionSet.TO_ED_GHOST)));
-
-		return handRules;
-	}
-
-	/**
 	 * Draws the agent's action switch.
 	 * 
-	 * @param actions
+	 * @param actionPriority
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(int[] actions) {
-		String[] actionList = new String[actions.length];
-		for (int i = 0; i < actions.length; i++) {
+	private void drawActions(Fact[] actionPriority) {
+		String[] actionList = new String[actionPriority.length];
+		for (int i = 0; i < actionPriority.length; i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
 			// If the action is null
-			if (actions[i] == -1) {
+			if (actionPriority[i] == null) {
 				buffer.append("null");
 			} else {
-				buffer.append(PacManAction.getConditionAt(actions[i]));
+				buffer.append(StateSpec.lightenFact(actionPriority[i]));
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -298,104 +179,46 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Chooses a low action when given a high action.
 	 * 
-	 * @param highActions
+	 * @param actionArray
 	 *            The high action to take, sorted in order from most to least
 	 *            priority, being processed into a single low action.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(int[] highActions) {
-		Player thePlayer = model_.m_player;
-		ArrayList<PacManLowAction> actionDirection = ActionConverter
-				.validDirections(thePlayer.m_locX, thePlayer.m_locY, model_);
+	private PacManLowAction chooseLowAction(Fact[] actionArray) {
+		// Find the valid directions
+		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
+		Point blag = new Point();
+		int x = model_.m_player.m_locX;
+		int y = model_.m_player.m_locY;
+		if (Thing.getDestination(Thing.UP, x, y, blag, model_))
+			directions.add(PacManLowAction.UP);
+		if (Thing.getDestination(Thing.DOWN, x, y, blag, model_))
+			directions.add(PacManLowAction.DOWN);
+		if (Thing.getDestination(Thing.LEFT, x, y, blag, model_))
+			directions.add(PacManLowAction.LEFT);
+		if (Thing.getDestination(Thing.RIGHT, x, y, blag, model_))
+			directions.add(PacManLowAction.RIGHT);
+
 		int i = 0;
 		do {
-			ArrayList<PacManLowAction> levelDirections = null;
-
-			if (highActions[i] >= 0) {
-				// The actions returned are guaranteed not to move into a wall.
-				switch (PacManAction.getConditionAt(highActions[i])) {
-				case TO_DOT:
-					levelDirections = ActionConverter
-							.toDot(
-									model_,
-									distanceGrid_,
-									(int) obs_.doubleArray[PacManObservationSet.NEAREST_DOT
-											.ordinal()]);
-					break;
-				case TO_POWER_DOT:
-					levelDirections = ActionConverter
-							.toPowerDot(
-									model_,
-									thePlayer,
-									distanceGrid_,
-									(int) obs_.doubleArray[PacManObservationSet.NEAREST_POWER_DOT
-											.ordinal()], true);
-					break;
-				case FROM_POWER_DOT:
-					levelDirections = ActionConverter
-							.toPowerDot(
-									model_,
-									thePlayer,
-									distanceGrid_,
-									(int) obs_.doubleArray[PacManObservationSet.NEAREST_POWER_DOT
-											.ordinal()], false);
-					break;
-				case TO_ED_GHOST:
-					levelDirections = ActionConverter
-							.toEdGhost(
-									model_,
-									distanceGrid_,
-									(int) obs_.doubleArray[PacManObservationSet.NEAREST_ED_GHOST
-											.ordinal()]);
-					break;
-				case TO_FRUIT:
-					levelDirections = ActionConverter.toFruit(model_,
-							thePlayer, distanceGrid_);
-					break;
-				case FROM_GHOST:
-					levelDirections = ActionConverter
-							.fromGhost(
-									model_,
-									thePlayer,
-									distanceGrid_,
-									(int) obs_.doubleArray[PacManObservationSet.NEAREST_GHOST
-											.ordinal()]);
-					break;
-				case TO_SAFE_JUNCTION:
-					levelDirections = ActionConverter
-							.toSafeJunction(
-									pacJunctions_, distanceGrid_);
-					break;
-				case FROM_GHOST_CENTRE:
-					levelDirections = ActionConverter.fromGhostCentre(
-							thePlayer, model_);
-					break;
-				case KEEP_DIRECTION:
-					levelDirections = ActionConverter.keepDirection(thePlayer,
-							model_);
-					break;
-				// case TO_LOWER_GHOST_DENSITY:
-				// case TO_GHOST_FREE_AREA:
-				case TO_CENTRE_OF_DOTS:
-					levelDirections = ActionConverter.toCentreOfDots(thePlayer,
-							model_);
-					break;
-				default:
-					levelDirections = actionDirection;
+			if (actionArray[i] != null) {
+				Byte direction = (Byte) actionArray[i].getPredicate().perform(
+						actionArray[i].getTerms(), null);
+				// Checking for negative direction
+				if (direction < 0) {
+					PacManLowAction removable = PacManLowAction.values()[direction * -1];
+					directions.remove(removable);
+				} else {
+					PacManLowAction chosen = PacManLowAction.values()[direction];
+					if (directions.contains(chosen))
+						return chosen;
 				}
-
-				// Remove any directions not in the higher priority direction
-				// list
-				levelDirections.retainAll(actionDirection);
-				if (levelDirections.size() > 0)
-					actionDirection = levelDirections;
 			}
 			i++;
-		} while ((i < highActions.length) && (actionDirection.size() > 1));
+		} while ((i < actionArray.length) && (directions.size() > 1));
 
 		// Choose a random action from the directions (may only be one)
-		return actionDirection.get((int) (Math.random() * actionDirection
-				.size()));
+		return directions.get((int) (Math.random() * directions.size()));
 	}
 
 	/**
@@ -422,147 +245,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return false;
 	}
 
-	// // // The predicate methods
-
-	/**
-	 * Calculates whether a particular thing is within a distance from PacMan.
-	 * 
-	 * @param dot
-	 *            The thing to be checked.
-	 * @param distance
-	 *            The distance range the thing needs to be in.
-	 * @return True if the thing is within the distance from PacMan.
-	 */
-	public boolean proximalThing(Thing thing, Integer distance) {
-		if (distanceGrid_[thing.m_locX][thing.m_locY] <= distance)
-			return true;
-		return false;
-	}
-
-	/*
-	 * An assortment of wrapper methods checking distance between Pacman and a
-	 * Thing.
-	 */
-	public boolean proximalDot(Dot dot, Integer distance) {
-		return proximalThing(dot, distance);
-	}
-
-	public boolean proximalPowerDot(PowerDot powerDot, Integer distance) {
-		return proximalThing(powerDot, distance);
-	}
-
-	public boolean proximalGhost(Ghost ghost, Integer distance) {
-		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-			if (ghost.m_nTicks2Flee <= 0)
-				return proximalThing(ghost, distance);
-		}
-		return false;
-	}
-
-	public boolean proximalEdibleGhost(Ghost ghost, Integer distance) {
-		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-			if (ghost.m_nTicks2Flee > 0)
-				return proximalThing(ghost, distance);
-		}
-		return false;
-	}
-
-	public boolean proximalFruit(Fruit fruit, Integer distance) {
-		if ((model_.m_fruit.m_nTicks2Show == 0)
-				&& (model_.m_fruit.m_bAvailable)) {
-			return proximalThing(fruit, distance);
-		}
-		return false;
-	}
-
-	public boolean safeJunction(JunctionPoint junction, Integer safety) {
-		// Make the check
-		if (junction.getSafety() <= safety) {
-			return true;
-		}
-		return false;
-	}
-
-	public boolean ghostCentre(Double distance) {
-		double sumX = 0;
-		double sumY = 0;
-		for (Ghost ghost : model_.m_ghosts) {
-			sumX += ghost.m_locX;
-			sumY += ghost.m_locY;
-		}
-		double centreX = sumX / model_.m_ghosts.length;
-		double centreY = sumY / model_.m_ghosts.length;
-		if (Point.distance(centreX, centreY, model_.m_player.m_locX,
-				model_.m_player.m_locY) <= distance)
-			return true;
-
-		return false;
-	}
-
-	public boolean dotCentre(Double distance) {
-		double sumX = 0;
-		double sumY = 0;
-		for (Dot dot : model_.m_dots.values()) {
-			sumX += dot.m_locX;
-			sumY += dot.m_locY;
-		}
-		double centreX = sumX / model_.m_dots.size();
-		double centreY = sumY / model_.m_dots.size();
-		if (Point.distance(centreX, centreY, model_.m_player.m_locX,
-				model_.m_player.m_locY) <= distance)
-			return true;
-
-		return false;
-	}
-
-	public boolean ghostDensity(Double density) {
-		if (calculateDensity() <= density)
-			return true;
-		return false;
-	}
-
-	public boolean ghostDistanceSum(Double distance) {
-		Thing currentThing = model_.m_player;
-		Set<Thing> thingsToVisit = new HashSet<Thing>();
-		for (Ghost ghost : model_.m_ghosts)
-			thingsToVisit.add(ghost);
-		double totalDistance = 0;
-		// While there are things to go to.
-		while (!thingsToVisit.isEmpty()) {
-			// Find the closest thing to the current thing
-			double closest = Integer.MAX_VALUE;
-			Thing closestThing = null;
-			for (Thing thing : thingsToVisit) {
-				double distanceBetween = Point.distance(currentThing.m_locX,
-						currentThing.m_locY, thing.m_locX, thing.m_locY);
-				if (distanceBetween < closest) {
-					closest = distanceBetween;
-					closestThing = thing;
-				}
-			}
-
-			// Add to the total distance, and repeat the loop, minus the closest
-			// thing
-			totalDistance += closest;
-			currentThing = closestThing;
-			thingsToVisit.remove(currentThing);
-		}
-
-		// The comparison
-		if (totalDistance <= distance)
-			return true;
-
-		return false;
-	}
-
-	public boolean ghostsFlashing() {
-		for (Ghost ghost : model_.m_ghosts) {
-			if (ghost.isFlashing())
-				return true;
-		}
-		return false;
-	}
-
 	/**
 	 * A method for calculating observations about the current PacMan state.
 	 * 
@@ -572,41 +254,22 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private Observation calculateObservations() {
 		// Find the player related observations
-		pacJunctions_ = searchMaze(model_.m_player, obs_.doubleArray);
+		pacJunctions_ = searchMaze(model_.m_player);
 
-		// Find the ghost related observations
-		double ghostX = 0;
-		double ghostY = 0;
-		int numGhosts = 0;
-		obs_.doubleArray[PacManObservationSet.NEAREST_GHOST.ordinal()] = Integer.MAX_VALUE;
-		obs_.doubleArray[PacManObservationSet.NEAREST_ED_GHOST.ordinal()] = Integer.MAX_VALUE;
+		// Find the maximally safe junctions
 		for (int i = 0; i < model_.m_ghosts.length; i++) {
 			// If the ghost is active and hostile
 			Ghost ghost = model_.m_ghosts[i];
 			if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-				int isEd = 0;
-				if (ghost.m_nTicks2Flee <= 0) {
-					isEd = PacManObservationSet.NEAREST_GHOST.ordinal();
-				} else {
-					isEd = PacManObservationSet.NEAREST_ED_GHOST.ordinal();
-					// Check flashing
-					if (ghost.isFlashing())
-						obs_.doubleArray[PacManObservationSet.GHOSTS_FLASHING
-								.ordinal()] = 1;
-				}
-				obs_.doubleArray[isEd] = Math.min(obs_.doubleArray[isEd],
-						distanceGrid_[ghost.m_locX][ghost.m_locY]);
-
-				ghostX += ghost.m_locX;
-				ghostY += ghost.m_locY;
-				numGhosts++;
-
 				// Calculate the ghost's distance from each of the player's
 				// junctions
 				if (ghost.m_nTicks2Flee <= 0) {
 					for (JunctionPoint jp : pacJunctions_) {
-						int ghostDist = calculateDistance(ghost, jp.getLocation());
-						int result = ghostDist - distanceGrid_[jp.getLocation().x][jp.getLocation().y];
+						int ghostDist = calculateDistance(ghost, jp
+								.getLocation());
+						int result = ghostDist
+								- distanceGrid_[jp.getLocation().x][jp
+										.getLocation().y];
 						// Looking for the minimally safe junction
 						if ((result > Integer.MIN_VALUE)
 								&& (result < jp.getSafety()))
@@ -615,91 +278,131 @@ public class PacManEnvironment implements EnvironmentInterface {
 				}
 			}
 		}
-		// Work out the ghost centre dist
-		if (numGhosts != 0) {
-			obs_.doubleArray[PacManObservationSet.GHOST_CENTRE_DIST.ordinal()] = Point
-					.distance(ghostX / numGhosts, ghostY / numGhosts,
-							model_.m_player.m_locX, model_.m_player.m_locY);
 
-			// Calculate the density
-			obs_.doubleArray[PacManObservationSet.GHOST_DENSITY.ordinal()] = calculateDensity();
+		// Send the state of the system
+		Observation obs = new Observation();
+		KnowledgeBase newKB = new org.mandarax.reference.KnowledgeBase();
+		addBackgroundKnowledge(newKB);
+		ObjectObservations.getInstance().objectArray = updateState(newKB);
+		ObjectObservations.getInstance().predicateKB = newKB;
+		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+
+		return obs;
+	}
+
+	private void addBackgroundKnowledge(KnowledgeBase newKB) {
+		KnowledgeBase bk = StateSpec.getInstance().getBackgroundKnowledge();
+		for (Object obj : bk.getClauseSets()) {
+			ClauseSet backgroundClauseSet = (ClauseSet) obj;
+			newKB.add(backgroundClauseSet);
 		}
-
-		// Choose the maximally safe junction
-		obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY.ordinal()] = Integer.MIN_VALUE;
-		for (JunctionPoint jp : pacJunctions_) {
-			if (jp.getSafety() > obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
-					.ordinal()])
-				obs_.doubleArray[PacManObservationSet.MAX_JUNCTION_SAFETY
-						.ordinal()] = jp.getSafety();
-		}
-
-		// Calculate the travelling salesman distance
-		Thing currentThing = model_.m_player;
-		Set<Thing> thingsToVisit = new HashSet<Thing>();
-		for (Ghost ghost : model_.m_ghosts)
-			thingsToVisit.add(ghost);
-		double totalDistance = 0;
-		// While there are things to go to.
-		while (!thingsToVisit.isEmpty()) {
-			// Find the closest thing to the current thing
-			double closest = Integer.MAX_VALUE;
-			Thing closestThing = null;
-			for (Thing thing : thingsToVisit) {
-				double distanceBetween = Point.distance(currentThing.m_locX,
-						currentThing.m_locY, thing.m_locX, thing.m_locY);
-				if (distanceBetween < closest) {
-					closest = distanceBetween;
-					closestThing = thing;
-				}
-			}
-
-			// Add to the total distance, and repeat the loop, minus the closest
-			// thing
-			totalDistance += closest;
-			currentThing = closestThing;
-			thingsToVisit.remove(currentThing);
-		}
-		obs_.doubleArray[PacManObservationSet.TOTAL_DIST_TO_GHOSTS.ordinal()] = totalDistance;
-
-		// Calculate the fruit distance
-		if ((model_.m_fruit.m_nTicks2Show == 0)
-				&& (model_.m_fruit.m_bAvailable)) {
-			obs_.doubleArray[PacManObservationSet.NEAREST_FRUIT.ordinal()] = distanceGrid_[model_.m_fruit.m_locX][model_.m_fruit.m_locY];
-		}
-
-		if (noteFreqs_) {
-			// Update the observation values
-			for (int i = 1; i < obs_.doubleArray.length; i++) {
-				double val = obs_.doubleArray[i];
-				if (val < Integer.MAX_VALUE)
-					observationFreqs_[i].add(val);
-			}
-		}
-
-		return obs_;
 	}
 
 	/**
-	 * Calculates the density of the ghosts.
+	 * Updates the state observation by loading an array with the necessary
+	 * state objects.
 	 * 
-	 * @return The density of the ghosts, or 0 if only one ghost.
+	 * @param returnedKB
+	 *            The KnowledgeBase to be filled with state predicates.
+	 * @return An ordered array according to the state enum of observations.
 	 */
-	private double calculateDensity() {
-		// If we can compare densities between ghosts
-		double density = 0;
-		for (int i = 0; i < model_.m_ghosts.length - 1; i++) {
-			Ghost thisGhost = model_.m_ghosts[i];
-			for (int j = i + 1; j < model_.m_ghosts.length; j++) {
-				Ghost thatGhost = model_.m_ghosts[j];
-				double distance = Ghost.DENSITY_RADIUS
-						- Point.distance(thisGhost.m_locX, thisGhost.m_locY,
-								thatGhost.m_locX, thatGhost.m_locY);
-				if (distance > 0)
-					density += distance;
+	private Object[] updateState(KnowledgeBase returnedKB) {
+		Object[] observations = new Object[PacManState.values().length];
+		for (int i = 0; i < observations.length; i++) {
+			switch (PacManState.values()[i]) {
+			case PACMAN:
+				observations[i] = model_.m_player;
+				break;
+			case DOT_COLLECTION:
+				observations[i] = model_.m_dots.values();
+				break;
+			case POWERDOT_COLLECTION:
+				observations[i] = model_.m_powerdots.values();
+				break;
+			case GHOST_ARRAY:
+				observations[i] = model_.m_ghosts;
+				break;
+			case FRUIT:
+				observations[i] = model_.m_fruit;
+				break;
+			case DISTANCE_GRID:
+				observations[i] = distanceGrid_;
+				break;
 			}
 		}
-		return density;
+
+		compilePredicates(returnedKB, observations);
+		return observations;
+	}
+
+	/**
+	 * Compiles the predicates into the knowledge base.
+	 * 
+	 * @param returnedKB
+	 *            The knowledge base to be filled.
+	 * @param state
+	 *            The state variables used to make a decision.
+	 */
+	private void compilePredicates(KnowledgeBase returnedKB, Object[] state) {
+		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
+		String classPrefix = RuleBase.getInstance().getClassPrefix();
+
+		// Pacman
+		addKBFact(model_.m_player, Player.class, returnedKB, factory,
+				classPrefix);
+
+		// Dots
+		for (Dot dot : model_.m_dots.values()) {
+			addKBFact(dot, Dot.class, returnedKB, factory, classPrefix);
+		}
+
+		// Powerdots
+		for (PowerDot powerdot : model_.m_powerdots.values()) {
+			addKBFact(powerdot, PowerDot.class, returnedKB, factory,
+					classPrefix);
+		}
+
+		// Ghosts
+		for (Ghost ghost : model_.m_ghosts) {
+			addKBFact(ghost, Ghost.class, returnedKB, factory, classPrefix);
+		}
+
+		// Fruit
+		if ((model_.m_fruit.m_nTicks2Show == 0)
+				&& (model_.m_fruit.m_bAvailable)) {
+			addKBFact(model_.m_fruit, Fruit.class, returnedKB, factory,
+					classPrefix);
+		}
+
+		// Junctions
+		for (JunctionPoint jp : pacJunctions_) {
+			addKBFact(jp, JunctionPoint.class, returnedKB, factory, classPrefix);
+		}
+
+		// State
+		addKBFact(state, Object[].class, returnedKB, factory, classPrefix);
+	}
+
+	/**
+	 * Adds a fact to the KB, using the given object as a constant and a class
+	 * for the object.
+	 * 
+	 * @param obj
+	 *            The object to add as a constant.
+	 * @param clazz
+	 *            The class of the object.
+	 * @param returnedKB
+	 *            The kb to add to.
+	 * @param factory
+	 *            The logic factory.
+	 * @param classPrefix
+	 *            The class prefix of the environment.
+	 */
+	private void addKBFact(Object obj, Class clazz, KnowledgeBase returnedKB,
+			LogicFactory factory, String classPrefix) {
+		Term[] terms = { factory.createConstantTerm(obj, clazz) };
+		returnedKB.add(factory.createFact(StateSpec.getInstance()
+				.getTypePredicate(clazz), terms));
 	}
 
 	/**
@@ -766,11 +469,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * 
 	 * @param thing
 	 *            The searching from.
-	 * @param observations
-	 *            The observations being made during the search.
 	 * @return A mapping of minimal distances to junctions, given by points.
 	 */
-	private SortedSet<JunctionPoint> searchMaze(Thing thing, double[] observations) {
+	private SortedSet<JunctionPoint> searchMaze(Thing thing) {
 		SortedSet<JunctionPoint> closeJunctions = new TreeSet<JunctionPoint>();
 		Collection<Dot> dots = model_.m_dots.values();
 
@@ -805,7 +506,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				junctionStack.remove(point);
 
 				Set<JunctionPoint> nextJunction = searchToJunction(point,
-						knownJunctions, observations);
+						knownJunctions);
 				junctionStack.addAll(nextJunction);
 
 				// Checking for the immediate junctions
@@ -830,9 +531,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				dotX = model_.m_player.m_locX;
 				dotY = model_.m_player.m_locY;
 			}
-			observations[PacManObservationSet.DOT_CENTRE_DIST.ordinal()] = Point
-					.distance(dotX / i, dotY / i, model_.m_player.m_locX,
-							model_.m_player.m_locY);
 			return closeJunctions;
 		}
 		return pacJunctions_;
@@ -840,19 +538,17 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 	/**
 	 * A method for searching for the shortest distance from junction to
-	 * junction. Also makes observations about dots and ghosts along the way.
+	 * junction.
 	 * 
 	 * @param startingPoint
 	 *            The starting point for the junction search.
 	 * @param knownJunctions
 	 *            The known junctions.
-	 * @param observations
-	 *            The observations to be made.
 	 * @return The set of starting points for the next found junction or an
 	 *         empty set.
 	 */
 	private Set<JunctionPoint> searchToJunction(JunctionPoint startingPoint,
-			Set<Point> knownJunctions, double[] observations) {
+			Set<Point> knownJunctions) {
 		byte direction = startingPoint.getDirection();
 		int x = startingPoint.getLocation().x;
 		int y = startingPoint.getLocation().y;
@@ -897,19 +593,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				changed = true;
 				distanceGrid_[x][y] = distance;
 			}
-
-			// Update any observations
-
-			Point pacLoc = new Point(x, y);
-			if (model_.m_dots.get(pacLoc) != null) {
-				if (distance < observations[PacManObservationSet.NEAREST_DOT
-						.ordinal()])
-					observations[PacManObservationSet.NEAREST_DOT.ordinal()] = distance;
-			}
-			if ((model_.m_powerdots.get(pacLoc) != null)
-					&& (distance < observations[PacManObservationSet.NEAREST_POWER_DOT
-							.ordinal()]))
-				observations[PacManObservationSet.NEAREST_POWER_DOT.ordinal()] = distance;
 
 			// Check if the new position is a junction
 			isJunct = isJunction(new Point(x, y), distance);
@@ -980,13 +663,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * Resets the observation and distance grid array.
 	 */
 	private void resetObservations() {
-		if (obs_ == null)
-			obs_ = new Observation(0, PacManObservationSet.values().length);
-		for (int i = 0; i < obs_.doubleArray.length; i++) {
-			obs_.doubleArray[i] = Integer.MAX_VALUE;
-		}
-		obs_.doubleArray[PacManObservationSet.GHOSTS_FLASHING.ordinal()] = 0;
-
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
 		for (int x = 0; x < distanceGrid_.length; x++)
 			Arrays.fill(distanceGrid_[x], Integer.MAX_VALUE);
@@ -1019,495 +695,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-		}
-	}
-
-	/**
-	 * A static enclosing class for handling action conversions from high to
-	 * low.
-	 * 
-	 * @author Samuel J. Sarjant
-	 */
-	public static class ActionConverter {
-
-		/**
-		 * Creates a list of valid directions to move in (not blocked by a
-		 * wall).
-		 * 
-		 * @param x
-		 *            The x location.
-		 * @param y
-		 *            The y location.
-		 * @param model
-		 *            The current game model.
-		 * @return A list of valid directions (should always be at least 2
-		 *         elements)
-		 */
-		public static ArrayList<PacManLowAction> validDirections(int x, int y,
-				GameModel model) {
-			ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
-			Point blag = new Point();
-			if (Thing.getDestination(Thing.UP, x, y, blag, model))
-				directions.add(PacManLowAction.UP);
-			if (Thing.getDestination(Thing.DOWN, x, y, blag, model))
-				directions.add(PacManLowAction.DOWN);
-			if (Thing.getDestination(Thing.LEFT, x, y, blag, model))
-				directions.add(PacManLowAction.LEFT);
-			if (Thing.getDestination(Thing.RIGHT, x, y, blag, model))
-				directions.add(PacManLowAction.RIGHT);
-			return directions;
-		}
-
-		/**
-		 * The keep direction high action simply keeps Pacman going in the same
-		 * direction, or chooses a random valid direction (except going
-		 * backwards) when Pacman can no longer proceed in the given direction.
-		 * 
-		 * @param thePlayer
-		 *            The player.
-		 * @param model
-		 *            The current game model.
-		 * @return The direction/s to go.
-		 */
-		public static ArrayList<PacManLowAction> keepDirection(
-				Player thePlayer, GameModel model) {
-			// Call the move around wall procedure.
-			return moveAroundWall(
-					PacManLowAction.values()[thePlayer.m_direction],
-					thePlayer.m_locX, thePlayer.m_locY, model);
-		}
-
-		/**
-		 * If the direction in the specified position is moving into a wall,
-		 * choose a random valid direction to 90 degrees of the original
-		 * direction.
-		 * 
-		 * @param direction
-		 *            The direction to move.
-		 * @param x
-		 *            The x location.
-		 * @param y
-		 *            The y location.
-		 * @param model
-		 *            The current game model.
-		 * @return The possible direction/s to go after adjusting for possible
-		 *         walls.
-		 */
-		private static ArrayList<PacManLowAction> moveAroundWall(
-				PacManLowAction direction, int x, int y, GameModel model) {
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			if (!Thing.getDestination(direction.ordinal(), x, y, new Point(),
-					model)) {
-				// The player cannot go in the same or opposite direction
-				byte[] directions = new byte[2];
-				if (direction.ordinal() == 0)
-					return endDirections;
-
-				// If the player is going up or down
-				if (direction.ordinal() <= Thing.DOWN) {
-					directions[0] = Thing.LEFT;
-					directions[1] = Thing.RIGHT;
-				} else {
-					// The player is going left or right
-					directions[0] = Thing.UP;
-					directions[1] = Thing.DOWN;
-				}
-
-				// Check if both directions are valid. Else choose the only
-				// valid one.
-				if (Thing.getDestination(directions[0], x, y, new Point(),
-						model))
-					endDirections.add(PacManLowAction.values()[directions[0]]);
-				// If the other direction is valid
-				if (Thing.getDestination(directions[1], x, y, new Point(),
-						model)) {
-					endDirections.add(PacManLowAction.values()[directions[1]]);
-				}
-
-				return endDirections;
-			}
-			endDirections.add(direction);
-			return endDirections;
-		}
-
-		/**
-		 * The to dot high action moves the player towards the nearest dot
-		 * following the shortest possible path.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestDotDist
-		 *            The nearest dot to the player in terms of distance.
-		 * @return The direction/s following the shortest path to the nearest
-		 *         dot.
-		 */
-		public static ArrayList<PacManLowAction> toDot(GameModel model,
-				int[][] distanceGrid, int nearestDotDist) {
-			return scanDistanceGrid(model, distanceGrid, nearestDotDist,
-					model.m_dots.values());
-		}
-
-		/**
-		 * The to power dot high action moves the player towards the nearest
-		 * power dot following the shortest possible path.
-		 * 
-		 * @param thePlayer
-		 *            The player.
-		 * @param model
-		 *            The current game model.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestDotDist
-		 *            The nearest dot to the player in terms of distance.
-		 * @param isTowards
-		 * @return The direction following the shortest path to the nearest dot.
-		 */
-		public static ArrayList<PacManLowAction> toPowerDot(GameModel model,
-				Player thePlayer, int[][] distanceGrid, int nearestDotDist,
-				boolean isTowards) {
-			ArrayList<PacManLowAction> endDirections = scanDistanceGrid(model,
-					distanceGrid, nearestDotDist, model.m_powerdots.values());
-			if (isTowards)
-				return endDirections;
-			else {
-				return oppositeDirection(model, thePlayer, endDirections);
-			}
-		}
-
-		/**
-		 * Moves the player in the opposite direction to the directions in the
-		 * directions list (the player will not move towards any of the
-		 * directions).
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param thePlayer
-		 *            The player.
-		 * @param directions
-		 *            The possible directions to go opposite to.
-		 * @return A direction away from one of the given directions.
-		 */
-		private static ArrayList<PacManLowAction> oppositeDirection(
-				GameModel model, Player thePlayer,
-				ArrayList<PacManLowAction> directions) {
-			if (directions.isEmpty())
-				return directions;
-			// Return the inverse of the directions present
-			ArrayList<PacManLowAction> validDirs = validDirections(
-					thePlayer.m_locX, thePlayer.m_locY, model);
-			validDirs.removeAll(directions);
-			return validDirs;
-		}
-
-		/**
-		 * The to edible ghost high action moves Pacman towards the nearest
-		 * edible ghost following the shortest path.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestGhostDist
-		 *            The nearest edible ghost distance to the player.
-		 * @return The direction following the shortest path to the nearest
-		 *         edible ghost.
-		 */
-		public static ArrayList<PacManLowAction> toEdGhost(GameModel model,
-				int[][] distanceGrid, int nearestGhostDist) {
-			return chaseGhost(model, distanceGrid, nearestGhostDist, true);
-		}
-
-		/**
-		 * The from ghost high action moves Pacman away from the nearest
-		 * non-edible ghost in the opposite to the shortest path towards.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param thePlayer
-		 *            The player.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestGhostDist
-		 *            The nearest ghost distance to the player.
-		 * @return The opposite direction following the shortest path to the
-		 *         nearest ghost.
-		 */
-		public static ArrayList<PacManLowAction> fromGhost(GameModel model,
-				Player thePlayer, int[][] distanceGrid, int nearestGhostDist) {
-			return oppositeDirection(model, thePlayer, chaseGhost(model,
-					distanceGrid, nearestGhostDist, false));
-		}
-
-		/**
-		 * The to fruit action moves the player towards the fruit, taking the
-		 * shortest possible route.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param thePlayer
-		 *            The player.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @return The possible direction/s to take for chasing the fruit (if
-		 *         existant).
-		 */
-		public static ArrayList<PacManLowAction> toFruit(GameModel model,
-				Player thePlayer, int[][] distanceGrid) {
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			// If there is a fruit, chase it
-			if (model.m_fruit.m_nTicks2Show == 0) {
-				endDirections.add(followPath(model.m_fruit.m_locX,
-						model.m_fruit.m_locY, distanceGrid));
-			}
-			return endDirections;
-		}
-
-		/**
-		 * The to safe junction high action moves Pacman towards the maximally
-		 * safe junction from the possible junctions Pacman can go towards.
-		 * 
-		 * @param junctionSafety
-		 *            The possible junctions Pacman can go to, with safety
-		 *            values.
-		 * @param safestJunction
-		 *            The safest junction value.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @return The direction following the shortest path to the maximally
-		 *         safe junction.
-		 */
-		public static ArrayList<PacManLowAction> toSafeJunction(
-				SortedSet<JunctionPoint> junctions,
-				int[][] distanceGrid) {
-			// For every junction
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			int safety = Integer.MAX_VALUE;
-			for (JunctionPoint jp : junctions) {
-				// If this is the safest junction
-				if ((safety == Integer.MAX_VALUE) || (jp.getSafety() == safety)) {
-					endDirections.add(followPath(jp.getLocation().x, jp.getLocation().y, distanceGrid));
-					safety = jp.getSafety();
-				}
-			}
-			return endDirections;
-		}
-
-		/**
-		 * The from ghost centre high action moves Pacman away from the ghost
-		 * centre by maximising the Euclidean distance between Pacman and the
-		 * centre.
-		 * 
-		 * @param thePlayer
-		 *            The player.
-		 * @param model
-		 *            The current game model.
-		 * @return The direction that maximises the distance from the ghost
-		 *         centre.
-		 */
-		public static ArrayList<PacManLowAction> fromGhostCentre(
-				Player thePlayer, GameModel model) {
-			double ghostX = 0;
-			double ghostY = 0;
-			int numGhosts = 0;
-			// Check each ghost
-			for (Ghost ghost : model.m_ghosts) {
-				// If the ghost is out there
-				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-					ghostX += ghost.m_locX;
-					ghostY += ghost.m_locY;
-					numGhosts++;
-				}
-			}
-
-			// If there is at least one ghost out there
-			if (numGhosts != 0) {
-				ghostX /= numGhosts;
-				ghostY /= numGhosts;
-				return maximiseEuclideanDistance(thePlayer, ghostX, ghostY,
-						model);
-			}
-			return new ArrayList<PacManLowAction>();
-		}
-
-		/**
-		 * The to centre of dots high action chooses a direction that minimises
-		 * the Euclidean distance between the player and the centre of the dots.
-		 * 
-		 * @param thePlayer
-		 *            The player.
-		 * @param model
-		 *            The current game model.
-		 * @return The direction that minimises the Euclidean distance between
-		 *         the player and the centre point.
-		 */
-		public static ArrayList<PacManLowAction> toCentreOfDots(
-				Player thePlayer, GameModel model) {
-			// Scan the state for dots
-			double dotX = 0;
-			double dotY = 0;
-			int numDots = 0;
-			for (Dot dot : model.m_dots.values()) {
-				dotX += dot.m_locX;
-				dotY += dot.m_locY;
-				numDots++;
-			}
-
-			if (numDots != 0) {
-				dotX /= numDots;
-				dotY /= numDots;
-				return oppositeDirection(model, thePlayer,
-						maximiseEuclideanDistance(thePlayer, dotX, dotY, model));
-			}
-			return new ArrayList<PacManLowAction>();
-		}
-
-		/**
-		 * Chases a ghost (edible or not) by taking the shortest possible path
-		 * towards it.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestGhostDist
-		 *            The nearest ghost distance (edible or not as by next
-		 *            param) to the player.
-		 * @param edibleGhost
-		 *            If the player is chasing edible ghosts or not.
-		 * @return The direction following the shortest path to the nearest
-		 *         edible/non-edible ghost.
-		 */
-		private static ArrayList<PacManLowAction> chaseGhost(GameModel model,
-				int[][] distanceGrid, int nearestGhostDist, boolean edibleGhost) {
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			// Check each ghost
-			for (Ghost ghost : model.m_ghosts) {
-				// If the ghost is out there
-				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-					// If the edibility equals the parameter
-					if ((edibleGhost && (ghost.m_nTicks2Flee > 0))
-							|| (!edibleGhost && (ghost.m_nTicks2Flee <= 0))) {
-						// If this ghost is the closest one, go for it
-						if (distanceGrid[ghost.m_locX][ghost.m_locY] == nearestGhostDist)
-							endDirections.add(followPath(ghost.m_locX,
-									ghost.m_locY, distanceGrid));
-					}
-				}
-			}
-			return endDirections;
-		}
-
-		/**
-		 * Maximises the Euclidean distance between the player and a point in 2D
-		 * space.
-		 * 
-		 * @param thePlayer
-		 *            The player.
-		 * @param x
-		 *            The x location of the point.
-		 * @param y
-		 *            the y location of the point.
-		 * @return The movement action that maximises the Euclidean distance
-		 *         between the player and the point.
-		 */
-		private static ArrayList<PacManLowAction> maximiseEuclideanDistance(
-				Player thePlayer, double x, double y, GameModel model) {
-			// Find the distances between Pacman and the point centre
-			double distX = thePlayer.m_locX - x;
-			double distY = thePlayer.m_locY - y;
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			// Move left/right
-			if (Math.abs(distX) > Math.abs(distY)) {
-				if (distX > 0)
-					endDirections.add(PacManLowAction.RIGHT);
-				else
-					endDirections.add(PacManLowAction.LEFT);
-			} else {
-				// Move up/down
-				if (distY > 0)
-					endDirections.add(PacManLowAction.DOWN);
-				else
-					endDirections.add(PacManLowAction.UP);
-			}
-			// Be sure the player is travelling in a valid direction.
-			endDirections.retainAll(validDirections(thePlayer.m_locX,
-					thePlayer.m_locY, model));
-			return endDirections;
-		}
-
-		/**
-		 * A general method for scanning the distance grid for a type of dot at
-		 * a specified distance.
-		 * 
-		 * @param model
-		 *            The current game model.
-		 * @param distanceGrid
-		 *            The distance grid for the player.
-		 * @param nearestDotDist
-		 *            The distance for the nearest dot.
-		 * @param dotType
-		 *            The particular type of dot (regular or power).
-		 * @return The direction following the shortest path to the nearest dot
-		 *         type.
-		 */
-		private static ArrayList<PacManLowAction> scanDistanceGrid(
-				GameModel model, int[][] distanceGrid, int nearestDotDist,
-				Collection<? extends Dot> dots) {
-			ArrayList<PacManLowAction> endDirections = new ArrayList<PacManLowAction>();
-			// First, find the nearest dot location/s
-			for (Dot dot : dots) {
-				// If a possible location contains a dot, follow it back
-				if (distanceGrid[dot.m_locX][dot.m_locY] == nearestDotDist) {
-					endDirections.add(followPath(dot.m_locX, dot.m_locY,
-							distanceGrid));
-				}
-			}
-			return endDirections;
-		}
-
-		/**
-		 * Follows a path from a particular location back to point 0: where
-		 * Pacman currently is. This procedure thereby finds the quickest path
-		 * to a point by giving the initial direction that Pacman needs to take
-		 * to get to the goal.
-		 * 
-		 * @param x
-		 *            The x location of the point.
-		 * @param y
-		 *            The y location of the point.
-		 * @param distanceGrid
-		 *            The distance grid for the player, where a value of 0 is
-		 *            the player position.
-		 * @return The initial direction to take to follow the path.
-		 */
-		private static PacManLowAction followPath(int x, int y,
-				int[][] distanceGrid) {
-			PacManLowAction prevLocation = PacManLowAction.NOTHING;
-			// Repeat until the distance grid coords are equal to 0
-			int width = distanceGrid.length;
-			int height = distanceGrid[x].length;
-			while (distanceGrid[x][y] != 0) {
-				int currentVal = distanceGrid[x][y];
-				// Check all directions
-				if (distanceGrid[(x + 1) % width][y] == currentVal - 1) {
-					x = (x + 1) % width;
-					prevLocation = PacManLowAction.LEFT;
-				} else if (distanceGrid[(x - 1 + width) % width][y] == currentVal - 1) {
-					x = (x - 1 + width) % width;
-					prevLocation = PacManLowAction.RIGHT;
-				} else if (distanceGrid[x][(y + 1) % height] == currentVal - 1) {
-					y = (y + 1) % height;
-					prevLocation = PacManLowAction.UP;
-				} else if (distanceGrid[x][(y - 1 + height) % height] == currentVal - 1) {
-					y = (y - 1 + height) % height;
-					prevLocation = PacManLowAction.DOWN;
-				} else {
-					return prevLocation;
-				}
-			}
-			return prevLocation;
 		}
 	}
 }

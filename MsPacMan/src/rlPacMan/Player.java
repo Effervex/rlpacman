@@ -256,4 +256,8 @@ class Player extends Thing {
 		pixelY_ = (int) (pacManY + deltaPixelY);
 		pixelShrink_ = -pixelSize_ / 5;
 	}
+	
+	public String toString() {
+		return "Player";
+	}
 }

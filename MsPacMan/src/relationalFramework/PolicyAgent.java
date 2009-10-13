@@ -1,14 +1,16 @@
-package rlPacMan;
+package relationalFramework;
 
+import org.mandarax.kernel.KnowledgeBase;
 import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
-import relationalFramework.ActionSwitch;
-import relationalFramework.Policy;
-
-
-public class PacManAgent implements AgentInterface {
+/**
+ * An agent that chooses its decisions based on a fixed policy, fed in via agent message.
+ * 
+ * @author Sam Sarjant
+ */
+public class PolicyAgent implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
 	/** The currently switched actions. */
@@ -50,14 +52,17 @@ public class PacManAgent implements AgentInterface {
 		actionsModule_ = new ActionSwitch();
 
 		Action action = new Action(0, 0);
-		action.intArray = chooseAction(arg0.doubleArray);
+		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations.getInstance().predicateKB);
+		
 		return action;
 	}
 
 	// @Override
 	public Action agent_step(double arg0, Observation arg1) {
 		Action action = new Action(0, 0);
-		action.intArray = chooseAction(arg1.doubleArray);
+		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations.getInstance().predicateKB);
 
 		return action;
 	}
@@ -65,15 +70,14 @@ public class PacManAgent implements AgentInterface {
 	/**
 	 * Chooses the action based on what higher actions are switched on.
 	 * 
-	 * @param observations
-	 *            The observations made, sorted by PacManObservations.
-	 * @return A high-level action based on the current observations and
-	 *         switches.
+	 * @param state
+	 *            The state of the system as given by predicates.
+	 * @return A relational action.
 	 */
-	private int[] chooseAction(double[] observations) {
+	private Object[] chooseAction(KnowledgeBase state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
-		policy_.evaluatePolicy(observations, actionsModule_);
+		policy_.evaluatePolicy(state, actionsModule_);
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();

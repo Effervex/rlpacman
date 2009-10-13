@@ -7,10 +7,19 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
-import relationalFramework.Condition.ConditionObject;
-import relationalFramework.ObservationCondition.ValuedConditionObject;
+import org.mandarax.kernel.Fact;
+import org.mandarax.kernel.InferenceEngine;
+import org.mandarax.kernel.KnowledgeBase;
+import org.mandarax.kernel.LogicFactory;
+import org.mandarax.kernel.Prerequisite;
+import org.mandarax.kernel.Rule;
+import org.mandarax.kernel.Term;
+import org.mandarax.reference.DefaultInferenceEngine;
 
 /**
  * A singleton implementation of the current rule base.
@@ -36,14 +45,20 @@ public class RuleBase {
 	/** The instance. */
 	private static RuleBase instance_;
 
+	private LogicFactory factory_;
+
+	private InferenceEngine inferenceEngine_;
+
+	private StateSpec stateSpec_;
+
 	/** The cross-entropy generators for the rules within the policy. */
 	private ProbabilityDistribution<Rule>[] ruleGenerators_;
 
 	/** The cross-entropy generators for the conditions within the rules. */
-	private ProbabilityDistribution<Condition>[] conditionGenerators_;
+	private ProbabilityDistribution<GuidedPredicate>[] conditionGenerators_;
 
 	/** The cross-entropy generators for the actions within the rules. */
-	private ProbabilityDistribution<ActionCondition>[] actionsGenerators_;
+	private ProbabilityDistribution<GuidedPredicate>[] actionsGenerators_;
 
 	/** The random number generator. */
 	private Random random_ = new Random();
@@ -71,6 +86,9 @@ public class RuleBase {
 	 *            The class prefix to the environment classes.
 	 */
 	private RuleBase(int ruleBases, String classPrefix) {
+		factory_ = LogicFactory.getDefaultFactory();
+		inferenceEngine_ = new DefaultInferenceEngine();
+		StateSpec.initInstance(classPrefix, factory_);
 		classPrefix_ = classPrefix;
 		ruleGenerators_ = new ProbabilityDistribution[ruleBases];
 		initialiseConditionGenerators(ruleBases, classPrefix);
@@ -107,12 +125,12 @@ public class RuleBase {
 		}
 		// Resetting the condition and action values
 		if (conditionGenerators_ != null) {
-			for (ProbabilityDistribution<Condition> pd : conditionGenerators_) {
+			for (ProbabilityDistribution<GuidedPredicate> pd : conditionGenerators_) {
 				pd.resetProbs();
 			}
 		}
 		if (actionsGenerators_ != null) {
-			for (ProbabilityDistribution<ActionCondition> pd : actionsGenerators_) {
+			for (ProbabilityDistribution<GuidedPredicate> pd : actionsGenerators_) {
 				pd.resetProbs();
 			}
 		}
@@ -131,8 +149,8 @@ public class RuleBase {
 		actionsGenerators_ = new ProbabilityDistribution[ruleBases];
 
 		// Adding the conditions to the first generator.
-		conditionGenerators_[0] = new ProbabilityDistribution<Condition>();
-		actionsGenerators_[0] = new ProbabilityDistribution<ActionCondition>();
+		conditionGenerators_[0] = new ProbabilityDistribution<GuidedPredicate>();
+		actionsGenerators_[0] = new ProbabilityDistribution<GuidedPredicate>();
 		try {
 			addConditions(conditionGenerators_[0], actionsGenerators_[0],
 					classPrefix);
@@ -166,45 +184,45 @@ public class RuleBase {
 	 * @param actGenerator
 	 *            the action generator to add to.
 	 */
-	private void addConditions(ProbabilityDistribution<Condition> obsGenerator,
-			ProbabilityDistribution<ActionCondition> actGenerator,
+	private void addConditions(
+			ProbabilityDistribution<GuidedPredicate> obsGenerator,
+			ProbabilityDistribution<GuidedPredicate> actGenerator,
 			String classPrefix) {
-		// Work out the base weight for each item
-		// Note the 2 is because each
+		// Extracting the information from the StateSpec
+		StateSpec ss = StateSpec.getInstance();
+		List<GuidedPredicate> observationPreds = ss.getPredicates();
+		List<GuidedPredicate> actionPreds = ss.getActions();
+		KnowledgeBase bk = ss.getBackgroundKnowledge();
 
-		ConditionObject[] observationVals = ObservationCondition
-				.getObservationValues(classPrefix);
-		ConditionObject[] actionVals = ActionCondition
-				.getActionValues(classPrefix);
+		// The number of base observation predicates + the empty predicate
+		double baseWeight = 1.0 / (observationPreds.size() + 1);
 
-		// Each observation and action has a boolean operator, plus the empty
-		// condition (twice to keep it balanced)
-		double baseWeight = 1.0 / (observationVals.length
-				+ 1);
-
-		// Adding all the conditions
-		for (ConditionObject cond : observationVals) {
-			ValuedConditionObject obs = (ValuedConditionObject) cond;
-			double thisWeight = baseWeight / obs.getSetOfVals().length;
-			// For each of the double values, add the observation with a
-			// decreased weight
-			for (double obsVal : obs.getSetOfVals()) {
-				ObservationCondition observation = ObservationCondition
-						.createObservation(classPrefix, obs, obsVal);
-				obsGenerator.add(observation, thisWeight);
+		// Adding all the possible conditions
+		for (GuidedPredicate pred : observationPreds) {
+			Collection<GuidedPredicate> loosePredicates = pred
+					.createAllLooseInstantiations(bk, factory_,
+							inferenceEngine_);
+			double thisWeight = baseWeight
+					/ (Math.max(1, loosePredicates.size()));
+			for (GuidedPredicate loosePred : loosePredicates) {
+				obsGenerator.add(loosePred, thisWeight);
 			}
 		}
 		// Adding the empty condition
-		ObservationCondition emptyCond = ObservationCondition
-				.emptyObservation(classPrefix);
+		GuidedPredicate emptyCond = GuidedPredicate.emptyObservation();
 		obsGenerator.add(emptyCond, baseWeight);
 
-		double actionWeight = 1.0 / actionVals.length;
+		double actionWeight = 1.0 / actionPreds.size();
 		// Adding the actions
-		for (ConditionObject act : actionVals) {
-			ActionCondition action = ActionCondition.createAction(classPrefix,
-					act);
-			actGenerator.add(action, actionWeight);
+		for (GuidedPredicate act : actionPreds) {
+			Collection<GuidedPredicate> looseActions = act
+					.createAllLooseInstantiations(bk, factory_,
+							inferenceEngine_);
+			double thisWeight = actionWeight
+					/ (Math.max(1, looseActions.size()));
+			for (GuidedPredicate looseAct : looseActions) {
+				actGenerator.add(looseAct, thisWeight);
+			}
 		}
 
 		// Check the values sum to one
@@ -241,7 +259,8 @@ public class RuleBase {
 				String[] split = input.split(RULE_DELIMITER);
 				// For each rule, add it to the rulebase
 				for (int i = 0; i < split.length; i++) {
-					ruleBase.add(Rule.parseRule(split[i], classPrefix));
+					// TODO Handle loading of rules.
+					// ruleBase.add(Rule.parseRule(split[i], classPrefix));
 				}
 				ruleBases.add(ruleBase);
 			}
@@ -279,7 +298,8 @@ public class RuleBase {
 			for (int i = 0; i < ruleGenerators_.length; i++) {
 				// For each of the rules
 				for (Rule r : ruleGenerators_[i]) {
-					bf.write(r.toParseableString() + RULE_DELIMITER);
+					// TODO Handle saving of rules
+					// bf.write(r.toParseableString() + RULE_DELIMITER);
 				}
 				bf.write("\n");
 			}
@@ -366,43 +386,107 @@ public class RuleBase {
 	 * @return The randomly generated rule.
 	 */
 	private Rule generateRule(int ruleSlot, String classPrefix) {
-		ArrayList<ObservationCondition> obs = new ArrayList<ObservationCondition>();
-		ActionCondition preAction = null;
-
-		int numIters = random_.nextInt(2);
-		// Number of iterations
-		for (int i = 0; i <= numIters; i++) {
-			// Sample from the distributions
-			Condition cond = conditionGenerators_[getRegenIndex(ruleSlot)]
-					.sample();
-			if (cond instanceof ActionCondition)
-				preAction = (ActionCondition) cond;
-			else {
-				ObservationCondition observation = (ObservationCondition) cond;
-				obs.add(observation);
-			}
+		// Determining how many (non-type) predicates are in the rule
+		int numPrereqs = 0;
+		double chance = 1;
+		while (random_.nextDouble() < chance) {
+			numPrereqs++;
+			chance = 1.0 / ((numPrereqs + 1) * (numPrereqs + 1));
 		}
 
-		ActionCondition action = null;
-		// Can just sample if using a distribution
-		action = actionsGenerators_[getRegenIndex(ruleSlot)].sample();
+		// Number of iterations
+		List<Prerequisite> rulePrereqs = new ArrayList<Prerequisite>();
+		Set<Term> tiableTerms = new HashSet<Term>();
+		for (int i = 0; i < numPrereqs; i++) {
+			// Sample from the distributions
+			GuidedPredicate cond = conditionGenerators_[getRegenIndex(ruleSlot)]
+					.sample();
+			Term[] existingTerms = compileTied(tiableTerms, cond
+					.getLooseInstantiation());
+			// Adding the prereqs, assuming they aren't already
+			List<Prerequisite> condPreqs = cond
+					.factify(factory_, existingTerms, false);
+			for (Prerequisite prereq : condPreqs) {
+				if (!rulePrereqs.contains(prereq))
+					rulePrereqs.add(prereq);
+			}
+			for (Term usedTerm : existingTerms)
+				tiableTerms.add(usedTerm);
+		}
+
+		// Sampling the action, which probably needs to be tied.
+		GuidedPredicate action = actionsGenerators_[getRegenIndex(ruleSlot)]
+				.sample();
+		Term[] existingTerms = compileTied(tiableTerms, action
+				.getLooseInstantiation());
+		List<Prerequisite> actPreqs = action.factify(factory_, existingTerms, true);
+		// Check the action is not null
+		if (actPreqs == null)
+			return generateRule(ruleSlot, classPrefix);
+		
+		// Add the type predicates to the condition, and the action prereq as
+		// the head
+		Fact actionFact = null;
+		for (Prerequisite prereq : actPreqs) {
+			if (prereq.getPredicate().equals(action.getPredicate())) {
+				actionFact = prereq;
+			} else if (!rulePrereqs.contains(prereq)) {
+				//rulePrereqs.add(prereq);
+			}
+		}
 
 		// Creating the rule
-		if (preAction != null) {
-			// Rule has an action
-			if (obs.size() == 0) {
-				// Just an action
-				return new Rule(preAction, action);
-			} else {
-				return new Rule(obs.get(0), preAction, action);
-			}
-		} else {
-			if (obs.size() == 1) {
-				return new Rule(obs.get(0), action);
-			} else {
-				return new Rule(obs.get(0), obs.get(1), action);
+		if (rulePrereqs.isEmpty())
+			return factory_.createRule(actionFact);
+		else
+			return factory_.createRule(rulePrereqs, actionFact);
+	}
+
+	/**
+	 * Compiles an array of tied terms.
+	 * 
+	 * @param tiableTerms
+	 *            The set of tiable terms.
+	 * @param structure
+	 *            The structure of the predicate.
+	 * @return The terms to use.
+	 */
+	private Term[] compileTied(Set<Term> tiableTerms, PredTerm[] looseTerms) {
+		if (looseTerms == null)
+			return new Term[0];
+
+		Term[] existingTerms = new Term[looseTerms.length];
+		Set<Term> stopDuplicates = new HashSet<Term>();
+
+		// Run through the predicate terms
+		for (int i = 0; i < looseTerms.length; i++) {
+			PredTerm term = looseTerms[i];
+			// If we have a tied term, look for tiable terms.
+			if (term.getTermType() == PredTerm.TIED) {
+				List<Term> possibleTies = new ArrayList<Term>();
+				for (Term tiableTerm : tiableTerms) {
+					// If the tiable term is of the right type
+					if (term.getValueType().isAssignableFrom(
+							tiableTerm.getType())) {
+						// If the term has not already been used
+						if (!stopDuplicates.contains(tiableTerm)) {
+							possibleTies.add(tiableTerm);
+							stopDuplicates.add(tiableTerm);
+						}
+					}
+				}
+
+				// Choose a random swap for the tied term, if we have at least
+				// one
+				if (possibleTies.isEmpty())
+					existingTerms[i] = null;
+				else {
+					existingTerms[i] = possibleTies.get(random_
+							.nextInt(possibleTies.size()));
+				}
 			}
 		}
+		return existingTerms;
 	}
 
 	/**
@@ -536,26 +620,26 @@ public class RuleBase {
 			int distIndex) {
 		int[] total = new int[2];
 		// For each of the rules, use their counts to go towards the conditions
-		// and actions within.
-		for (int i = 0; i < ruleGenerators_[distIndex].size(); i++) {
-			int ruleCount = ruleCounts[i + offsetIndex];
-			// If this rule is used at least once, note its conditions and
-			// actions down.
-			if (ruleCount > 0) {
-				Rule thisRule = ruleGenerators_[distIndex].getElement(i);
-				Condition[] conditions = thisRule.getConditions();
-				// Note the condition(s) and store their counts
-				for (Condition cond : conditions) {
-					conditionCounts[conditionGenerators_[getRegenIndex(distIndex)]
-							.indexOf(cond)] += ruleCount;
-					total[0] += ruleCount;
-				}
-				// Note the action
-				actionCounts[actionsGenerators_[getRegenIndex(distIndex)]
-						.indexOf(thisRule.getAction())] += ruleCount;
-				total[1] += ruleCount;
-			}
-		}
+		// and actions within. TODO
+		// for (int i = 0; i < ruleGenerators_[distIndex].size(); i++) {
+		// int ruleCount = ruleCounts[i + offsetIndex];
+		// // If this rule is used at least once, note its conditions and
+		// // actions down.
+		// if (ruleCount > 0) {
+		// Rule thisRule = ruleGenerators_[distIndex].getElement(i);
+		// Condition[] conditions = thisRule.getConditions();
+		// // Note the condition(s) and store their counts
+		// for (Condition cond : conditions) {
+		// conditionCounts[conditionGenerators_[getRegenIndex(distIndex)]
+		// .indexOf(cond)] += ruleCount;
+		// total[0] += ruleCount;
+		// }
+		// // Note the action
+		// actionCounts[actionsGenerators_[getRegenIndex(distIndex)]
+		// .indexOf(thisRule.getAction())] += ruleCount;
+		// total[1] += ruleCount;
+		// }
+		// }
 
 		return total;
 	}
@@ -753,23 +837,6 @@ public class RuleBase {
 	}
 
 	/**
-	 * Gets the action values used in this experiment.
-	 * 
-	 * @param classPrefix
-	 *            The class prefix used in the environment.
-	 * @return The action values used.
-	 * @throws Exception
-	 *             If something goes awry...
-	 */
-	public ConditionObject[] getActionValues(String classPrefix)
-			throws InstantiationException, IllegalAccessException,
-			ClassNotFoundException {
-		return ((ActionCondition) Class.forName(
-				classPrefix + ActionCondition.CLASS_SUFFIX).newInstance())
-				.getEnumValues();
-	}
-
-	/**
 	 * Gets the rule base instance.
 	 * 
 	 * @return The rule base instance or null if not yet initialised.
@@ -826,5 +893,41 @@ public class RuleBase {
 	 */
 	public int size() {
 		return ruleGenerators_[0].size();
+	}
+
+	/**
+	 * Gets the logic factory.
+	 * 
+	 * @return The logic factory.
+	 */
+	public LogicFactory getLogicFactory() {
+		return factory_;
+	}
+
+	/**
+	 * Gets the inference engine.
+	 * 
+	 * @return The inference engine.
+	 */
+	public InferenceEngine getInferenceEngine() {
+		return inferenceEngine_;
+	}
+
+	/**
+	 * Gets the class prefix.
+	 * 
+	 * @return The class prefix.
+	 */
+	public String getClassPrefix() {
+		return classPrefix_;
+	}
+
+	/**
+	 * Gets the state specifications.
+	 * 
+	 * @return The state spec.
+	 */
+	public StateSpec getStateSpec() {
+		return stateSpec_;
 	}
 }

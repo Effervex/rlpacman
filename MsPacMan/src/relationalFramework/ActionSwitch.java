@@ -1,6 +1,6 @@
 package relationalFramework;
 
-import relationalFramework.Condition.ConditionObject;
+import org.mandarax.kernel.Fact;
 
 /**
  * This class represents an actions module. It controls which actions are switched on and off
@@ -11,29 +11,16 @@ public class ActionSwitch {
 	/** The number of priorities. */
 	public static final int NUM_PRIORITIES = 3;
 	/** The prioritised list of switched actions. Max 3. */ 
-	private ConditionObject[] activeActions_ = new ConditionObject[NUM_PRIORITIES];
+	private Fact[] activeActions_ = new Fact[NUM_PRIORITIES];
 	
 	/**
 	 * Switches on a high action at the given priority.
 	 * 
-	 * @param action The action being switched on.
+	 * @param clause The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(ConditionObject action, int priority) {
-		activeActions_[priority] = action;
-	}
-	
-	/**
-	 * Switches off an action (or actions) regardless of the action priority.
-	 * 
-	 * @param action The action to be switched off.
-	 */
-	public void switchOff(ConditionObject action) {
-		for (int i = 0; i < NUM_PRIORITIES; i++) {
-			if ((activeActions_[i] != null) && (activeActions_[i].equals(action))) {
-				activeActions_[i] = null;
-			}
-		}
+	public void switchOn(Fact clause, int priority) {
+		activeActions_[priority] = clause;
 	}
 
 	public void switchOffAll() {
@@ -47,13 +34,13 @@ public class ActionSwitch {
 	 * 
 	 * @return The int version of the action list.
 	 */
-	public int[] getPrioritisedActions() {
-		int[] prioritisedActions = new int[NUM_PRIORITIES];
+	public Fact[] getPrioritisedActions() {
+		Fact[] prioritisedActions = new Fact[NUM_PRIORITIES];
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if (activeActions_[i] != null)
-				prioritisedActions[i] = activeActions_[i].ordinal();
+				prioritisedActions[i] = activeActions_[i];
 			else
-				prioritisedActions[i] = -1;
+				prioritisedActions[i] = null;
 		}
 		
 		return prioritisedActions;
@@ -65,7 +52,7 @@ public class ActionSwitch {
 	 * @param action The action to check.
 	 * @return True if it is on, false otherwise
 	 */
-	public boolean isActionActive(ConditionObject action) {
+	public boolean isActionActive(Fact action) {
 		for (int i = 0; i < NUM_PRIORITIES; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
 				return true;

@@ -3,7 +3,7 @@ package rlPacMan;
 import java.awt.*;
 
 // Pacman and Ghosts
-public abstract class Thing {
+public abstract class Thing extends PacPoint {
 	// Thing's next step is one of these constants
 	public static final byte STILL = 0;
 	public static final byte UP = 1;
@@ -20,8 +20,6 @@ public abstract class Thing {
 
 	boolean m_bInsideRoom;
 
-	int m_locX;
-	int m_locY;
 	int m_deltaLocX = 0; // Delta between cells, i.e. x -> x+1
 	int m_deltaLocY = 0; // Delta between cells, i.e. x -> x+1
 	int m_lastLocX;

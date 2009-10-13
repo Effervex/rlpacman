@@ -244,4 +244,8 @@ class Fruit extends Thing {
 		pixelSize_ = gameUI.CELL_LENGTH;
 		pixelShrink_ = 0;
 	}
+	
+	public String toString() {
+		return "Fruit";
+	}
 }
