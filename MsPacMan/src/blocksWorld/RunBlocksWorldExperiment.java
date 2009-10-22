@@ -1,17 +1,18 @@
-package relationalFramework;
+package blocksWorld;
 
 import org.rlcommunity.rlglue.codec.*;
 
-import rlPacMan.PacManEnvironment;
+import relationalFramework.CrossEntropyExperiment;
+import relationalFramework.PolicyAgent;
 
 
-public class RunExperiment {
+public class RunBlocksWorldExperiment {
 	public static void main(String[] args) {
 		// Create the Agent
 		AgentInterface theAgent = new PolicyAgent();
 
 		// Create the Environment
-		EnvironmentInterface theEnvironment = new PacManEnvironment();
+		EnvironmentInterface theEnvironment = new BlocksWorldEnvironment();
 
 		LocalGlue localGlueImplementation = new LocalGlue(theEnvironment,
 				theAgent);

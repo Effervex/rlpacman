@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -10,6 +11,8 @@ import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Query;
+import org.mandarax.kernel.ResultSet;
+import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JConstructor;
 
@@ -147,7 +150,10 @@ public class GuidedPredicate {
 			GuidedPredicate loosePred = new GuidedPredicate(predicate_, clone);
 			// Check that the predicate doesn't clash with the background
 			// knowledge
-			if (isPredicateValid(loosePred, backgroundKnowledge, factory, ie)) {
+			if (StateSpec.getInstance()
+					.isConditionValid(
+							loosePred.factify(factory, null, false, false),
+							factory, ie)) {
 				looseInstantiations.add(loosePred);
 			}
 			predTerms[argument] = null;
@@ -165,37 +171,6 @@ public class GuidedPredicate {
 	}
 
 	/**
-	 * Checks if a formed predicate is valid against the background knowledge.
-	 * 
-	 * @param loosePred
-	 *            The yet-to-be formed predicate.
-	 * @param backgroundKnowledge
-	 *            The background knowledge for the environment.
-	 * @param factory
-	 *            The LogicFactory in use
-	 * @param ie
-	 *            The inference engine in use.
-	 * @return True if the predicate is valid, false if it is illegal or
-	 *         redundant.
-	 */
-	private boolean isPredicateValid(GuidedPredicate loosePred,
-			KnowledgeBase backgroundKnowledge, LogicFactory factory,
-			InferenceEngine ie) {
-		// Create the fact
-		List<Prerequisite> instant = loosePred.factify(factory, null, false);
-		Query query = factory.createQuery(instant
-				.toArray(new Prerequisite[instant.size()]), "test");
-		// This may not work... I may need Resolution
-		try {
-			ie.query(query, backgroundKnowledge, InferenceEngine.ONE,
-					InferenceEngine.BUBBLE_EXCEPTIONS);
-			return true;
-		} catch (Exception e) {
-		}
-		return false;
-	}
-
-	/**
 	 * Instantiates this guided predicate into a proper fact/prerequisite. For
 	 * now, there is no negation. Tied terms can be given as a parameter and the
 	 * same parameter is used for output of terms used in the predicate.
@@ -205,81 +180,100 @@ public class GuidedPredicate {
 	 * @param existingTerms
 	 *            The variable terms to fill in the tied terms and the output
 	 *            parameter.
+	 * @param negated
+	 *            If the prerequisite is negated.
 	 * @return A instantiated version of this guided predicate with type
 	 *         predicates, if it can be. Also fills the existing terms array
 	 *         with the terms used.
 	 */
 	public List<Prerequisite> factify(LogicFactory factory,
-			Term[] existingTerms, boolean mustTie) {
+			Term[] existingTerms, boolean negated, boolean mustTie) {
 		List<Prerequisite> result = new LinkedList<Prerequisite>();
-		if (looseInstantiation_ != null) {
-			int offset = 0;
-			if (predicate_ instanceof JConstructor)
-				offset = 1;
 
-			// Create a term array
-			Class[] predStructure = predicate_.getStructure();
-			Term[] terms = new Term[predStructure.length];
-			for (int i = 0; i < terms.length; i++) {
-				// Check for the instantiated class in the predicate
-				if (i < offset) {
-					terms[i] = factory.createConstantTerm(StateSpec
-							.getInstance());
-				} else {
-					// Instantiate/find the regular terms
-					PredTerm argTerm = looseInstantiation_[i - offset];
-					// If we have a tied term
-					if (argTerm.getTermType() == PredTerm.TIED) {
-						// If we have a replacement, use that
-						if ((existingTerms != null)
-								&& (existingTerms[i - offset] != null)
-								&& (predStructure[i]
-										.isAssignableFrom(existingTerms[i
-												- offset].getType()))) {
-							terms[i] = existingTerms[i - offset];
+		int offset = 0;
+		if (predicate_ instanceof JConstructor)
+			offset = 1;
+
+		// Create a term array
+		Class[] predStructure = predicate_.getStructure();
+		Term[] terms = new Term[predStructure.length];
+
+		// If we have existing terms and they are 1 too short, add the state
+		// term to the start.
+		if ((existingTerms != null)
+				&& (existingTerms.length == (terms.length - offset - 1))) {
+			Term[] newExistingTerms = new Term[existingTerms.length + 1];
+			newExistingTerms[0] = StateSpec.getStateTerm(factory);
+			for (int i = 0; i < existingTerms.length; i++)
+				newExistingTerms[i + 1] = existingTerms[i];
+			existingTerms = newExistingTerms;
+		}
+
+		// For each term
+		for (int i = 0; i < terms.length; i++) {
+			// Check for the instantiated class in the predicate
+			if (i < offset) {
+				terms[i] = StateSpec.getSpecTerm(factory);
+			} else {
+				PredTerm argTerm = null;
+				if (looseInstantiation_ != null)
+					argTerm = looseInstantiation_[i - offset];
+				else
+					argTerm = new PredTerm(predValues_[i][0].getValue(),
+							predStructure[i], PredTerm.TIED);
+				// Instantiate/find the regular terms
+				// If we have a tied term
+				if (argTerm.getTermType() == PredTerm.TIED) {
+					// If we have a replacement, use that
+					if ((existingTerms != null)
+							&& (existingTerms[i - offset] != null)
+							&& (predStructure[i]
+									.isAssignableFrom(existingTerms[i - offset]
+											.getType()))) {
+						terms[i] = existingTerms[i - offset];
+					} else {
+						// If we must tie
+						if (mustTie) {
+							// Left untied, so results in an invalid fact
+							return null;
 						} else {
-							// If we must tie
-							if (mustTie) {
-								// Left untied, so results in an invalid fact
-								return null;
-							} else {
-								// Treat this as a free variable
-								terms[i] = factory.createVariableTerm(
-										(String) (argTerm.getValue()),
-										predStructure[i]);
-							}
+							// Treat this as a free variable
+							terms[i] = factory.createVariableTerm(
+									(String) (argTerm.getValue()),
+									predStructure[i]);
 						}
-					} else if (argTerm.getTermType() == PredTerm.FREE) {
-						// Create a free variable
-						terms[i] = factory.createVariableTerm((String) (argTerm
-								.getValue()), predStructure[i]);
-					} else if (argTerm.getTermType() == PredTerm.VALUE) {
-						// Create a constant variable
-						terms[i] = factory.createConstantTerm(argTerm
-								.getValue(), predStructure[i]);
 					}
+				} else if (argTerm.getTermType() == PredTerm.FREE) {
+					// Create a free variable
+					terms[i] = factory.createVariableTerm((String) (argTerm
+							.getValue()), predStructure[i]);
+				} else if (argTerm.getTermType() == PredTerm.VALUE) {
+					// Create a constant variable
+					terms[i] = factory.createConstantTerm(argTerm.getValue(),
+							predStructure[i]);
+				}
 
-					// Adding the type predicates, if necessary
-					Predicate typePred = StateSpec.getInstance()
-							.getTypePredicate(predStructure[i]);
-					if (typePred != null) {
-						Term[] typeTerm = { terms[i] };
-						Prerequisite typePrereq = factory.createPrerequisite(
-								typePred, typeTerm, false);
-						if (!result.contains(typePrereq))
-							result.add(typePrereq);
-					}
+				// Adding the type predicates, if necessary
+				Predicate typePred = StateSpec.getInstance().getTypePredicate(
+						predStructure[i]);
+				if (typePred != null) {
+					Term[] typeTerm = { terms[i] };
+					Prerequisite typePrereq = factory.createPrerequisite(
+							typePred, typeTerm, false);
+					if (!result.contains(typePrereq))
+						result.add(typePrereq);
+				}
 
-					// Adding to the return array
-					if (existingTerms != null) {
-						existingTerms[i - offset] = terms[i];
-					}
+				// Adding to the return array
+				if (existingTerms != null) {
+					existingTerms[i - offset] = terms[i];
 				}
 			}
-
-			// Create the prereq
-			result.add(factory.createPrerequisite(predicate_, terms, false));
 		}
+
+		// Create the prereq
+		result.add(factory.createPrerequisite(predicate_, terms, negated));
+		// }
 		return result;
 	}
 
@@ -301,12 +295,36 @@ public class GuidedPredicate {
 		return predicate_.toString();
 	}
 
-	/**
-	 * Creates the empty observation.
-	 * 
-	 * @return The empty guided predicate.
-	 */
-	public static GuidedPredicate emptyObservation() {
-		return new GuidedPredicate();
+	public boolean equals(Object obj) {
+		if ((obj != null) && (obj instanceof GuidedPredicate)) {
+			GuidedPredicate gp = (GuidedPredicate) obj;
+			// Predicate nullability
+			if (predicate_ == null) {
+				if (gp.predicate_ == null)
+					return true;
+				else
+					return false;
+			}
+
+			if (predicate_.equals(gp.predicate_)) {
+				boolean predValEquals = predValues_ == null ? gp.predValues_ == null
+						: Arrays.deepEquals(predValues_, gp.predValues_);
+				boolean looseInstantEquals = looseInstantiation_ == null ? gp.looseInstantiation_ == null
+						: Arrays.equals(looseInstantiation_,
+								gp.looseInstantiation_);
+				return predValEquals && looseInstantEquals;
+			}
+		}
+		return false;
+	}
+	
+	public int hashCode() {
+		if (predicate_ == null)
+			return 7919;
+		
+		int predVal = 7919 * predicate_.hashCode();
+		int predValsVal = predValues_ == null ? 2099 : 2099 * predValues_.hashCode();
+		int looseVals = looseInstantiation_ == null ? 5059 : 5059 * looseInstantiation_.hashCode();
+		return predVal * predValsVal * looseVals;
 	}
 }

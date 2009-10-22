@@ -4,6 +4,14 @@ import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.mandarax.kernel.ClauseSet;
+import org.mandarax.kernel.KnowledgeBase;
+import org.mandarax.kernel.LogicFactory;
+import org.mandarax.kernel.Fact;
+
+import relationalFramework.RuleBase;
+import relationalFramework.StateSpec;
+
 // GameState is primarly maintained by the int[][] m_gameState
 // 2D array where each integer is a location in the maze.  Integers
 // consists of GameState Values ORd together.  By using bitwise
@@ -51,6 +59,9 @@ public class GameModel {
 	static final int STATE_ABOUT = 10; // About page
 
 	int[][] m_gameState; // Represents maze as integers
+	private KnowledgeBase stateKB_;
+	private LogicFactory factory_;
+	private String classPrefix_;
 	Map<Point, Dot> m_dots;
 	Map<Point, PowerDot> m_powerdots;
 	int m_gameSizeX;
@@ -103,10 +114,16 @@ public class GameModel {
 	private int[][] scatterChaseTable_;
 	private int scatterChaseDifficulty_;
 	private int scatterChaseIndex_ = 0;
+	private Map<Object, Fact> clauseMap_;
 
 	GameModel(PacMan pacMan) {
 		m_pacMan = pacMan;
 		m_stage = 1;
+		stateKB_ = new org.mandarax.reference.KnowledgeBase();
+		addBackgroundKnowledge(stateKB_);
+		clauseMap_ = new HashMap<Object, Fact>();
+		factory_ = RuleBase.getInstance().getLogicFactory();
+		classPrefix_ = RuleBase.getInstance().getClassPrefix();
 
 		// GameState
 		m_gameSizeX = 28;
@@ -129,6 +146,19 @@ public class GameModel {
 
 		fillThingArray();
 		createScatterChaseTable();
+	}
+
+	/**
+	 * Adds the background knowledge to the knowledge base.
+	 * 
+	 * @param kb The kb to add to.
+	 */
+	private void addBackgroundKnowledge(KnowledgeBase kb) {
+		KnowledgeBase bk = StateSpec.getInstance().getBackgroundKnowledge();
+		for (Object obj : bk.getClauseSets()) {
+			ClauseSet backgroundClauseSet = (ClauseSet) obj;
+			kb.add(backgroundClauseSet);
+		}
 	}
 
 	/**
@@ -203,6 +233,11 @@ public class GameModel {
 		m_things[3] = m_ghosts[Ghost.PINKY];
 		m_things[4] = m_ghosts[Ghost.INKY];
 		m_things[5] = m_ghosts[Ghost.CLYDE];
+
+		// Load up the constants in the KB
+		for (Thing thing : m_things) {
+			addKBFact(thing);
+		}
 	}
 
 	// Pause Pacman and Ghosts
@@ -240,6 +275,61 @@ public class GameModel {
 			m_ghosts[i].m_destinationY = -1;
 		}
 		m_eatGhostPoints = 200; // Reset the next eaten ghost's worth
+	}
+
+	/**
+	 * Eats a dot.
+	 * 
+	 * @param pacLoc
+	 *            The location of Pacman when the dot was eaten.
+	 * @return The value of the dot.
+	 */
+	public int eatDot(Point pacLoc) {
+		Dot dot = m_dots.remove(pacLoc);
+		removeKBFact(dot);
+		return dot.getValue();
+	}
+
+	/**
+	 * Eats a powerdot.
+	 * 
+	 * @param pacLoc
+	 *            The location of Pacman when the powerdot was eaten.
+	 * @return The value of the powerdot.
+	 */
+	public int eatPowerDot(Point pacLoc) {
+		PowerDot pdot = m_powerdots.remove(pacLoc);
+		eatPowerup();
+		removeKBFact(pdot);
+		return pdot.getValue();
+	}
+
+	/**
+	 * Adds a fact to the Knowledge Base.
+	 * 
+	 * @param obj
+	 *            The fact being added.
+	 */
+	public void addKBFact(Object obj) {
+		Fact fact = StateSpec.addKBFact(obj, obj.getClass(), stateKB_,
+				factory_, classPrefix_);
+		clauseMap_.put(obj, fact);
+	}
+
+	/**
+	 * Removes a fact from the Knowledge Base, using the fact object.
+	 * 
+	 * @param obj
+	 *            The fact containing the object to be removed.
+	 */
+	public void removeKBFact(Object obj) {
+		Fact fact = clauseMap_.remove(obj);
+		if (fact != null)
+			stateKB_.remove(fact);
+	}
+
+	public KnowledgeBase getKB() {
+		return stateKB_;
 	}
 
 	// Returns the total count of Food and Powerups
@@ -290,6 +380,16 @@ public class GameModel {
 			m_pacMan.m_gameUI.m_wallColor = Color.magenta;
 			m_pacMan.m_gameUI.m_wallAltColor = Color.white;
 			break;
+		}
+
+		// Add the dots and powerdots to the KB
+		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
+		String classPrefix = RuleBase.getInstance().getClassPrefix();
+		for (Dot dot : m_dots.values()) {
+			addKBFact(dot);
+		}
+		for (PowerDot powerdot : m_powerdots.values()) {
+			addKBFact(powerdot);
 		}
 
 		// Patch the maze for the ghost hideout

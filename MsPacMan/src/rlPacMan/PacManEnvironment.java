@@ -13,28 +13,23 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Arrays;
 
-import org.mandarax.kernel.ClauseSet;
 import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Term;
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
-import relationalFramework.RuleBase;
-import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static final int PLAYER_SPEED = 20;
+	public static final int PLAYER_SPEED = 5;
 	private PacMan environment_;
 	private int prevScore_;
 	private GameModel model_;
 	private int[][] distanceGrid_;
 	private SortedSet<JunctionPoint> pacJunctions_;
+	private Object[] state_;
 	private Point gridStart_;
 	private ArrayList<Double>[] observationFreqs_;
 
@@ -63,11 +58,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public String env_message(String arg0) {
-		// Return the score
-		if (arg0.equals("score"))
-			return model_.m_player.m_score + "";
 		if (arg0.equals("writeFreqs")) {
 			writeFreqs();
+		}
+		if (arg0.equals("maxSteps")) {
+			return 1000000 + "";
 		}
 		return null;
 	}
@@ -206,7 +201,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 						actionArray[i].getTerms(), null);
 				// Checking for negative direction
 				if (direction < 0) {
-					PacManLowAction removable = PacManLowAction.values()[direction * -1];
+					PacManLowAction removable = PacManLowAction.values()[direction
+							* -1];
 					directions.remove(removable);
 				} else {
 					PacManLowAction chosen = PacManLowAction.values()[direction];
@@ -254,7 +250,17 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private Observation calculateObservations() {
 		// Find the player related observations
-		pacJunctions_ = searchMaze(model_.m_player);
+		SortedSet<JunctionPoint> newJunctions = searchMaze(model_.m_player);
+		// If our junctions have changed, remove the old set and add the new
+		if (!newJunctions.equals(pacJunctions_)) {
+			if (pacJunctions_ != null) {
+				for (JunctionPoint oldJP : pacJunctions_)
+					model_.removeKBFact(oldJP);
+			}
+			for (JunctionPoint newJP : newJunctions)
+				model_.addKBFact(newJP);
+			pacJunctions_ = newJunctions;
+		}
 
 		// Find the maximally safe junctions
 		for (int i = 0; i < model_.m_ghosts.length; i++) {
@@ -280,33 +286,25 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Send the state of the system
+		state_ = updateState();
+		ObjectObservations.getInstance().objectArray = state_;
+		ObjectObservations.getInstance().predicateKB = model_.getKB();
 		Observation obs = new Observation();
-		KnowledgeBase newKB = new org.mandarax.reference.KnowledgeBase();
-		addBackgroundKnowledge(newKB);
-		ObjectObservations.getInstance().objectArray = updateState(newKB);
-		ObjectObservations.getInstance().predicateKB = newKB;
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 
 		return obs;
-	}
-
-	private void addBackgroundKnowledge(KnowledgeBase newKB) {
-		KnowledgeBase bk = StateSpec.getInstance().getBackgroundKnowledge();
-		for (Object obj : bk.getClauseSets()) {
-			ClauseSet backgroundClauseSet = (ClauseSet) obj;
-			newKB.add(backgroundClauseSet);
-		}
 	}
 
 	/**
 	 * Updates the state observation by loading an array with the necessary
 	 * state objects.
 	 * 
-	 * @param returnedKB
-	 *            The KnowledgeBase to be filled with state predicates.
 	 * @return An ordered array according to the state enum of observations.
 	 */
-	private Object[] updateState(KnowledgeBase returnedKB) {
+	private Object[] updateState() {
+		// Remove the old state
+		model_.removeKBFact(state_);
+
 		Object[] observations = new Object[PacManState.values().length];
 		for (int i = 0; i < observations.length; i++) {
 			switch (PacManState.values()[i]) {
@@ -331,78 +329,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 			}
 		}
 
-		compilePredicates(returnedKB, observations);
-		return observations;
-	}
-
-	/**
-	 * Compiles the predicates into the knowledge base.
-	 * 
-	 * @param returnedKB
-	 *            The knowledge base to be filled.
-	 * @param state
-	 *            The state variables used to make a decision.
-	 */
-	private void compilePredicates(KnowledgeBase returnedKB, Object[] state) {
-		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
-		String classPrefix = RuleBase.getInstance().getClassPrefix();
-
-		// Pacman
-		addKBFact(model_.m_player, Player.class, returnedKB, factory,
-				classPrefix);
-
-		// Dots
-		for (Dot dot : model_.m_dots.values()) {
-			addKBFact(dot, Dot.class, returnedKB, factory, classPrefix);
-		}
-
-		// Powerdots
-		for (PowerDot powerdot : model_.m_powerdots.values()) {
-			addKBFact(powerdot, PowerDot.class, returnedKB, factory,
-					classPrefix);
-		}
-
-		// Ghosts
-		for (Ghost ghost : model_.m_ghosts) {
-			addKBFact(ghost, Ghost.class, returnedKB, factory, classPrefix);
-		}
-
-		// Fruit
-		if ((model_.m_fruit.m_nTicks2Show == 0)
-				&& (model_.m_fruit.m_bAvailable)) {
-			addKBFact(model_.m_fruit, Fruit.class, returnedKB, factory,
-					classPrefix);
-		}
-
-		// Junctions
-		for (JunctionPoint jp : pacJunctions_) {
-			addKBFact(jp, JunctionPoint.class, returnedKB, factory, classPrefix);
-		}
-
 		// State
-		addKBFact(state, Object[].class, returnedKB, factory, classPrefix);
-	}
-
-	/**
-	 * Adds a fact to the KB, using the given object as a constant and a class
-	 * for the object.
-	 * 
-	 * @param obj
-	 *            The object to add as a constant.
-	 * @param clazz
-	 *            The class of the object.
-	 * @param returnedKB
-	 *            The kb to add to.
-	 * @param factory
-	 *            The logic factory.
-	 * @param classPrefix
-	 *            The class prefix of the environment.
-	 */
-	private void addKBFact(Object obj, Class clazz, KnowledgeBase returnedKB,
-			LogicFactory factory, String classPrefix) {
-		Term[] terms = { factory.createConstantTerm(obj, clazz) };
-		returnedKB.add(factory.createFact(StateSpec.getInstance()
-				.getTypePredicate(clazz), terms));
+		model_.addKBFact(observations);
+		return observations;
 	}
 
 	/**

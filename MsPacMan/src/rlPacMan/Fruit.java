@@ -71,7 +71,6 @@ class Fruit extends Thing {
 		m_boundingBox.setBounds((int) (fruitX), (int) (fruitY),
 				gameUI.CELL_LENGTH, gameUI.CELL_LENGTH);
 
-		// TODO: Draw bounding box for testing
 		// g2.setColor (Color.white);
 		// g2.drawRect (m_boundingBox.x, m_boundingBox.y, m_boundingBox.width,
 		// m_boundingBox.height);

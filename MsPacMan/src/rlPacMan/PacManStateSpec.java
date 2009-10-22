@@ -98,9 +98,15 @@ public class PacManStateSpec extends StateSpec {
 
 			// GHOSTS FLASHING
 			predicates.add(createDefinedPredicate(
+					PacManStateSpec.class,
 					new Class[] { Object[].class },
-					new PredTerm[][] { createTied("State", Object[].class) },
-					"ghostsFlashing"));
+					new PredTerm[][] { createTied("State", Object[].class) }, "ghostsFlashing"));
+
+			// EMPTY PREDICATE
+			Predicate empty = new SimplePredicate("true",
+					new Class[] { Object[].class });
+			predicates.add(new GuidedPredicate(empty,
+					new PredTerm[][] { createTied("State", Object[].class) }));
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -118,20 +124,20 @@ public class PacManStateSpec extends StateSpec {
 			PredTerm[][] predVals = new PredTerm[2][];
 			predVals[0] = createTied("State", Object[].class);
 			predVals[1] = createTied("Location", PacPoint.class);
-			actions.add(createDefinedPredicate(moveStructure, predVals,
-					"moveTowards"));
+			actions.add(createDefinedPredicate(PacManStateSpec.class, moveStructure,
+					predVals, "moveTowards"));
 
 			// MOVE FROM
-			actions.add(createDefinedPredicate(moveStructure, predVals,
-					"moveFrom"));
+			actions.add(createDefinedPredicate(PacManStateSpec.class, moveStructure,
+					predVals, "moveFrom"));
 
 			// KEEP DIRECTION
-			moveStructure = new Class[1];
-			moveStructure[0] = Object[].class;
-			predVals = new PredTerm[1][];
-			predVals[0] = createTied("State", Object[].class);
-			actions.add(createDefinedPredicate(moveStructure, predVals,
-					"keepDirection"));
+//			moveStructure = new Class[1];
+//			moveStructure[0] = Object[].class;
+//			predVals = new PredTerm[1][];
+//			predVals[0] = createTied("State", Object[].class);
+//			actions.add(createDefinedPredicate(moveStructure, predVals,
+//					"keepDirection"));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -155,10 +161,10 @@ public class PacManStateSpec extends StateSpec {
 
 		// There is a little type hierarchy to infer that some things are
 		// Locations
-		List<Prerequisite> subPacPreqs = new LinkedList<Prerequisite>();
 		Class[] subPacClasses = { Player.class, Ghost.class, Dot.class,
 				PowerDot.class, JunctionPoint.class, Fruit.class };
 		for (int i = 0; i < subPacClasses.length; i++) {
+			List<Prerequisite> subPacPreqs = new LinkedList<Prerequisite>();
 			Term[] variable = { factory.createVariableTerm("X",
 					subPacClasses[i]) };
 			subPacPreqs.add(factory.createPrerequisite(
@@ -166,97 +172,12 @@ public class PacManStateSpec extends StateSpec {
 			Rule subPacRule = factory.createRule(subPacPreqs, factory
 					.createFact(getTypePredicate(PacPoint.class), variable));
 			kb.add(subPacRule);
-			subPacPreqs.clear();
 		}
 
 		return kb;
 	}
 
-	@Override
-	protected ConstantTerm[] addGoalConstants(List<GuidedPredicate> predicates,
-			org.mandarax.kernel.Rule goalState) {
-		List<Fact> body = goalState.getBody();
-		Map<Class, Set<ConstantTerm>> constantMap = new HashMap<Class, Set<ConstantTerm>>();
-		// For every fact in the body of the rule, extract the constants
-		for (Fact fact : body) {
-			Term[] factTerms = fact.getTerms();
-			for (Term term : factTerms) {
-				// Add any constant terms found.
-				if (term.isConstant()) {
-					Set<ConstantTerm> constants = constantMap.get(term
-							.getType());
-					if (constants == null) {
-						constants = new HashSet<ConstantTerm>();
-						constantMap.put(term.getType(), constants);
-					}
-					constants.add((ConstantTerm) term);
-				}
-			}
-		}
-
-		// If there are no constants, exit
-		if (constantMap.isEmpty())
-			return new ConstantTerm[0];
-
-		// Now with the constants, add those to the predicates that can accept
-		// them
-		// TODO Check the predicate JStructure isn't messing things up
-		for (GuidedPredicate pred : predicates) {
-			Class[] predStructure = pred.getPredicate().getStructure();
-			// For each of the classes in the predicate
-			for (int i = 0; i < predStructure.length; i++) {
-				for (Class constClass : constantMap.keySet()) {
-					// If the predicate is the same or superclass of the
-					// constant
-					if (predStructure[i].isAssignableFrom(constClass)) {
-						// Check that this pred slot can take consts
-						boolean addConsts = false;
-						for (int j = 0; j < pred.getPredValues()[i].length; j++) {
-							if (pred.getPredValues()[i][j].getTermType() != PredTerm.VALUE) {
-								addConsts = true;
-								break;
-							}
-						}
-
-						// If there is a free or tied value, we can add
-						// constants
-						if (addConsts)
-							pred.getPredValues()[i] = addConstants(pred
-									.getPredValues()[i], constantMap
-									.get(constClass));
-					}
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Adds the constants to the array of pred terms, if they're not already
-	 * there.
-	 * 
-	 * @param predTerms
-	 *            The predicate term array to add to.
-	 * @param constants
-	 *            The constants to be added.
-	 * @return The expanded term array.
-	 */
-	private PredTerm[] addConstants(PredTerm[] predTerms,
-			Set<ConstantTerm> constants) {
-		// Move the existing terms into a set
-		Set<PredTerm> newTerms = new HashSet<PredTerm>();
-		for (PredTerm predTerm : predTerms) {
-			newTerms.add(predTerm);
-		}
-
-		// Add the constants to the set
-		for (ConstantTerm ct : constants) {
-			newTerms.add(new PredTerm(ct.getObject()));
-		}
-
-		return newTerms.toArray(new PredTerm[newTerms.size()]);
-	}
+	
 
 	/**
 	 * Method for creating predicates relating to direct value comparisons.
@@ -280,8 +201,8 @@ public class PacManStateSpec extends StateSpec {
 		Class[] predicateStructure = new Class[2];
 		predicateStructure[0] = Object[].class;
 		predicateStructure[1] = Double.class;
-		return createDefinedPredicate(predicateStructure, predValues,
-				methodName);
+		return createDefinedPredicate(PacManStateSpec.class, predicateStructure,
+				predValues, methodName);
 	}
 
 	/**
@@ -314,55 +235,8 @@ public class PacManStateSpec extends StateSpec {
 		predicateStructure[0] = Object[].class;
 		predicateStructure[1] = secondClass;
 		predicateStructure[2] = Integer.class;
-		return createDefinedPredicate(predicateStructure, predValues,
-				methodName);
-	}
-
-	/**
-	 * Convenience method for creating a defined predicate.
-	 * 
-	 * @param predicateStructure
-	 *            The structure of the method/predicate.
-	 * @param predValues
-	 *            The possible values to be used within the predicate.
-	 * @param methodName
-	 *            The name of the method/predicate.
-	 * @return A new defined predicate from the above parameters.
-	 * @throws NoSuchMethodException
-	 *             If the method doesn't exist.
-	 */
-	private GuidedPredicate createDefinedPredicate(Class[] predicateStructure,
-			PredTerm[][] predValues, String methodName)
-			throws NoSuchMethodException {
-		Method method = PacManStateSpec.class.getMethod(methodName,
-				predicateStructure);
-		Predicate predicate = new JPredicate(method);
-		return new GuidedPredicate(predicate, predValues);
-	}
-
-	/**
-	 * Convenience method for creating a tied PredTerm.
-	 * 
-	 * @param termName
-	 *            The term name.
-	 * @return The array containing the tied term.
-	 */
-	private PredTerm[] createTied(String termName, Class termClass) {
-		PredTerm[] terms = { new PredTerm(termName, termClass, PredTerm.TIED) };
-		return terms;
-	}
-
-	/**
-	 * Convenience method for creating a tied and free PredTerm.
-	 * 
-	 * @param termName
-	 *            The term name.
-	 * @return The array containing the tied and free terms.
-	 */
-	private PredTerm[] createTiedAndFree(String termName, Class termClass) {
-		PredTerm[] terms = { new PredTerm(termName, termClass, PredTerm.TIED),
-				new PredTerm(termName, termClass, PredTerm.FREE) };
-		return terms;
+		return createDefinedPredicate(PacManStateSpec.class, predicateStructure,
+				predValues, methodName);
 	}
 
 	// // // // // THE PREDICATE METHODS // // // // //
@@ -419,8 +293,11 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	public boolean proximalFruit(Object[] state, Fruit fruit, Integer distance) {
-		return proximalThing(PacManState.getDistanceGrid(state), fruit,
-				distance);
+		if ((fruit.m_nTicks2Show == 0) && (fruit.m_bAvailable)) {
+			return proximalThing(PacManState.getDistanceGrid(state), fruit,
+					distance);
+		}
+		return false;
 	}
 
 	public boolean safeJunction(Object[] state, JunctionPoint junction,
@@ -645,7 +522,9 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		// Test if the specified location is free
-		if (distanceGrid[player.m_locX + xOffset][player.m_locY + yOffset] < Integer.MAX_VALUE) {
+		int x = (player.m_locX + xOffset + distanceGrid.length) % distanceGrid.length;
+		int y = (player.m_locY + yOffset + distanceGrid[0].length) % distanceGrid[0].length;
+		if (distanceGrid[x][y] < Integer.MAX_VALUE) {
 			return player.m_direction;
 		} else {
 			return (byte) (-notDirection);

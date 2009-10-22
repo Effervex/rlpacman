@@ -20,6 +20,9 @@ import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.Term;
 import org.mandarax.reference.DefaultInferenceEngine;
+import org.mandarax.reference.ResolutionInferenceEngine;
+
+import blocksWorld.Block;
 
 /**
  * A singleton implementation of the current rule base.
@@ -28,9 +31,6 @@ import org.mandarax.reference.DefaultInferenceEngine;
  * 
  */
 public class RuleBase {
-	/** The number of random rules to use. */
-	private static final int RANDOM_RULE_NUMBER = 100;
-
 	/** The delimiter character between rules within the same rule base. */
 	public static final String RULE_DELIMITER = ",";
 
@@ -45,20 +45,23 @@ public class RuleBase {
 	/** The instance. */
 	private static RuleBase instance_;
 
+	/** The single logic factory. */
 	private LogicFactory factory_;
 
+	/** The single inference engine. */
 	private InferenceEngine inferenceEngine_;
 
+	/** The state specification for the experiment. */
 	private StateSpec stateSpec_;
 
 	/** The cross-entropy generators for the rules within the policy. */
-	private ProbabilityDistribution<Rule>[] ruleGenerators_;
+	private ProbabilityDistribution<GuidedRule>[] ruleGenerators_;
 
 	/** The cross-entropy generators for the conditions within the rules. */
 	private ProbabilityDistribution<GuidedPredicate>[] conditionGenerators_;
 
 	/** The cross-entropy generators for the actions within the rules. */
-	private ProbabilityDistribution<GuidedPredicate>[] actionsGenerators_;
+	private ProbabilityDistribution<GuidedPredicate>[] actionGenerators_;
 
 	/** The random number generator. */
 	private Random random_ = new Random();
@@ -90,11 +93,11 @@ public class RuleBase {
 		inferenceEngine_ = new DefaultInferenceEngine();
 		StateSpec.initInstance(classPrefix, factory_);
 		classPrefix_ = classPrefix;
+		ruleBases = initialiseConditionGenerators(0, classPrefix);
 		ruleGenerators_ = new ProbabilityDistribution[ruleBases];
-		initialiseConditionGenerators(ruleBases, classPrefix);
 		for (int i = 0; i < ruleBases; i++) {
-			ruleGenerators_[i] = new ProbabilityDistribution<Rule>();
-			ruleGenerators_[i].addAll(generateRandomRules(RANDOM_RULE_NUMBER));
+			ruleGenerators_[i] = new ProbabilityDistribution<GuidedRule>();
+			ruleGenerators_[i].addAll(generateRandomRules(ruleBases));
 		}
 
 		initialFile_ = null;
@@ -120,7 +123,7 @@ public class RuleBase {
 		if (initialFile_ != null) {
 			loadRulesFromFile(initialFile_);
 		}
-		for (ProbabilityDistribution<Rule> pd : ruleGenerators_) {
+		for (ProbabilityDistribution<GuidedRule> pd : ruleGenerators_) {
 			pd.resetProbs();
 		}
 		// Resetting the condition and action values
@@ -129,8 +132,8 @@ public class RuleBase {
 				pd.resetProbs();
 			}
 		}
-		if (actionsGenerators_ != null) {
-			for (ProbabilityDistribution<GuidedPredicate> pd : actionsGenerators_) {
+		if (actionGenerators_ != null) {
+			for (ProbabilityDistribution<GuidedPredicate> pd : actionGenerators_) {
 				pd.resetProbs();
 			}
 		}
@@ -139,29 +142,35 @@ public class RuleBase {
 	/**
 	 * Initialises the condition generators.
 	 */
-	private void initialiseConditionGenerators(int ruleBases, String classPrefix) {
+	private int initialiseConditionGenerators(int ruleBases, String classPrefix) {
 		if (regenerationStrategy_ == SINGLE) {
 			ruleBases = 1;
 		} else if (regenerationStrategy_ == PRIORITY) {
 			ruleBases = ActionSwitch.NUM_PRIORITIES;
 		}
-		conditionGenerators_ = new ProbabilityDistribution[ruleBases];
-		actionsGenerators_ = new ProbabilityDistribution[ruleBases];
 
 		// Adding the conditions to the first generator.
-		conditionGenerators_[0] = new ProbabilityDistribution<GuidedPredicate>();
-		actionsGenerators_[0] = new ProbabilityDistribution<GuidedPredicate>();
+		ProbabilityDistribution<GuidedPredicate> condGen = new ProbabilityDistribution<GuidedPredicate>();
+		ProbabilityDistribution<GuidedPredicate> actGen = new ProbabilityDistribution<GuidedPredicate>();
 		try {
-			addConditions(conditionGenerators_[0], actionsGenerators_[0],
-					classPrefix);
+			addConditions(condGen, actGen, classPrefix);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
+		// Using the max number of conditions/actions for the policy and
+		// ruleBase size
+		if (ruleBases == 0)
+			ruleBases = Math.max(condGen.size(), actGen.size());
+		conditionGenerators_ = new ProbabilityDistribution[ruleBases];
+		actionGenerators_ = new ProbabilityDistribution[ruleBases];
+		conditionGenerators_[0] = condGen;
+		actionGenerators_[0] = actGen;
+
 		// Cloning the initialised generator.
 		for (int i = 1; i < ruleBases; i++) {
 			conditionGenerators_[i] = conditionGenerators_[0].clone();
-			actionsGenerators_[i] = actionsGenerators_[0].clone();
+			actionGenerators_[i] = actionGenerators_[0].clone();
 		}
 
 		// May need holding variables during the update process.
@@ -174,6 +183,8 @@ public class RuleBase {
 			actionCounts_ = new int[1][];
 			totalCount_ = new int[1][2];
 		}
+
+		return ruleBases;
 	}
 
 	/**
@@ -208,9 +219,6 @@ public class RuleBase {
 				obsGenerator.add(loosePred, thisWeight);
 			}
 		}
-		// Adding the empty condition
-		GuidedPredicate emptyCond = GuidedPredicate.emptyObservation();
-		obsGenerator.add(emptyCond, baseWeight);
 
 		double actionWeight = 1.0 / actionPreds.size();
 		// Adding the actions
@@ -297,7 +305,7 @@ public class RuleBase {
 			// For each of the rule bases
 			for (int i = 0; i < ruleGenerators_.length; i++) {
 				// For each of the rules
-				for (Rule r : ruleGenerators_[i]) {
+				for (GuidedRule r : ruleGenerators_[i]) {
 					// TODO Handle saving of rules
 					// bf.write(r.toParseableString() + RULE_DELIMITER);
 				}
@@ -364,8 +372,8 @@ public class RuleBase {
 	 *            The number of random rules to generate.
 	 * @return A list of random rules.
 	 */
-	private ArrayList<Rule> generateRandomRules(int baseSize) {
-		ArrayList<Rule> randomRules = new ArrayList<Rule>();
+	private ArrayList<GuidedRule> generateRandomRules(int baseSize) {
+		ArrayList<GuidedRule> randomRules = new ArrayList<GuidedRule>();
 
 		// For each of the rules in the rule base
 		for (int s = 0; s < baseSize; s++) {
@@ -383,9 +391,10 @@ public class RuleBase {
 	 * @param classPrefix
 	 *            The class prefix from which we generate rules.
 	 * 
-	 * @return The randomly generated rule.
+	 * @return The randomly generated rule with the guided predicates that made
+	 *         it.
 	 */
-	private Rule generateRule(int ruleSlot, String classPrefix) {
+	private GuidedRule generateRule(int ruleSlot, String classPrefix) {
 		// Determining how many (non-type) predicates are in the rule
 		int numPrereqs = 0;
 		double chance = 1;
@@ -394,36 +403,42 @@ public class RuleBase {
 			chance = 1.0 / ((numPrereqs + 1) * (numPrereqs + 1));
 		}
 
+		// Sampling the action first, to ensure there are enough conditions to
+		// tie to it
+		GuidedPredicate action = actionGenerators_[getRegenIndex(ruleSlot)]
+				.sample();
+		Set<GuidedPredicate> guidedConds = new HashSet<GuidedPredicate>();
+
 		// Number of iterations
 		List<Prerequisite> rulePrereqs = new ArrayList<Prerequisite>();
 		Set<Term> tiableTerms = new HashSet<Term>();
-		for (int i = 0; i < numPrereqs; i++) {
+		int i = 0;
+		List<Prerequisite> actPreqs = null;
+		do {
+			// TODO Insert implicit inequalities
 			// Sample from the distributions
 			GuidedPredicate cond = conditionGenerators_[getRegenIndex(ruleSlot)]
 					.sample();
+			guidedConds.add(cond);
 			Term[] existingTerms = compileTied(tiableTerms, cond
 					.getLooseInstantiation());
 			// Adding the prereqs, assuming they aren't already
-			List<Prerequisite> condPreqs = cond
-					.factify(factory_, existingTerms, false);
+			List<Prerequisite> condPreqs = cond.factify(factory_,
+					existingTerms, false, false);
 			for (Prerequisite prereq : condPreqs) {
 				if (!rulePrereqs.contains(prereq))
 					rulePrereqs.add(prereq);
 			}
 			for (Term usedTerm : existingTerms)
 				tiableTerms.add(usedTerm);
-		}
 
-		// Sampling the action, which probably needs to be tied.
-		GuidedPredicate action = actionsGenerators_[getRegenIndex(ruleSlot)]
-				.sample();
-		Term[] existingTerms = compileTied(tiableTerms, action
-				.getLooseInstantiation());
-		List<Prerequisite> actPreqs = action.factify(factory_, existingTerms, true);
-		// Check the action is not null
-		if (actPreqs == null)
-			return generateRule(ruleSlot, classPrefix);
-		
+			// Attempting to factify the action
+			existingTerms = compileTied(tiableTerms, action
+					.getLooseInstantiation());
+			actPreqs = action.factify(factory_, existingTerms, false, true);
+			i++;
+		} while ((i < numPrereqs) || (actPreqs == null));
+
 		// Add the type predicates to the condition, and the action prereq as
 		// the head
 		Fact actionFact = null;
@@ -431,15 +446,17 @@ public class RuleBase {
 			if (prereq.getPredicate().equals(action.getPredicate())) {
 				actionFact = prereq;
 			} else if (!rulePrereqs.contains(prereq)) {
-				//rulePrereqs.add(prereq);
+				// rulePrereqs.add(prereq);
 			}
 		}
 
 		// Creating the rule
 		if (rulePrereqs.isEmpty())
-			return factory_.createRule(actionFact);
+			return new GuidedRule(factory_.createRule(actionFact), guidedConds,
+					action);
 		else
-			return factory_.createRule(rulePrereqs, actionFact);
+			return new GuidedRule(factory_.createRule(rulePrereqs, actionFact),
+					guidedConds, action);
 	}
 
 	/**
@@ -471,7 +488,7 @@ public class RuleBase {
 						// If the term has not already been used
 						if (!stopDuplicates.contains(tiableTerm)) {
 							possibleTies.add(tiableTerm);
-							stopDuplicates.add(tiableTerm);
+
 						}
 					}
 				}
@@ -481,8 +498,10 @@ public class RuleBase {
 				if (possibleTies.isEmpty())
 					existingTerms[i] = null;
 				else {
-					existingTerms[i] = possibleTies.get(random_
+					Term existingTerm = possibleTies.get(random_
 							.nextInt(possibleTies.size()));
+					stopDuplicates.add(existingTerm);
+					existingTerms[i] = existingTerm;
 				}
 			}
 		}
@@ -512,13 +531,13 @@ public class RuleBase {
 				offsetIndex, stepSize, valueModifier);
 
 		// Only note this down if we have generators
-		if (conditionGenerators_ != null && actionsGenerators_ != null) {
+		if (conditionGenerators_ != null && actionGenerators_ != null) {
 			// We also want to note down the conditions and actions within the
 			// elite
 			// rules.
 			int[] conditionCounts = new int[conditionGenerators_[getRegenIndex(distIndex)]
 					.size()];
-			int[] actionCounts = new int[actionsGenerators_[getRegenIndex(distIndex)]
+			int[] actionCounts = new int[actionGenerators_[getRegenIndex(distIndex)]
 					.size()];
 			int[] totalCounts = calculateConditionActionCounts(counts,
 					offsetIndex, conditionCounts, actionCounts, distIndex);
@@ -528,9 +547,8 @@ public class RuleBase {
 				conditionGenerators_[getRegenIndex(distIndex)]
 						.updateDistribution(totalCounts[0], conditionCounts, 0,
 								stepSize, 1);
-				actionsGenerators_[getRegenIndex(distIndex)]
-						.updateDistribution(totalCounts[1], actionCounts, 0,
-								stepSize, 1);
+				actionGenerators_[getRegenIndex(distIndex)].updateDistribution(
+						totalCounts[1], actionCounts, 0, stepSize, 1);
 			} else {
 				// Otherwise, store the counts and totals and perform the update
 				// in the post-update operations.
@@ -557,24 +575,26 @@ public class RuleBase {
 	public float postUpdateOperations(float thisAverage, float ratioChanged,
 			double stepSize) {
 		// Only update the condition generators if they exist
-		if (conditionGenerators_ != null && actionsGenerators_ != null) {
+		if (conditionGenerators_ != null && actionGenerators_ != null) {
 			// Update the condition and action counts if needed
 			if (regenerationStrategy_ != INDIVIDUAL) {
 				for (int i = 0; i < totalCount_.length; i++) {
 					conditionGenerators_[i].updateDistribution(
 							totalCount_[i][0], conditionCounts_[i], 0,
 							stepSize, 1);
-					actionsGenerators_[i].updateDistribution(totalCount_[i][1],
+					actionGenerators_[i].updateDistribution(totalCount_[i][1],
 							actionCounts_[i], 0, stepSize, 1);
 				}
 			}
 		}
+		
+		// TODO Mutation operators
 
 		// if (thisAverage < 0) {
 		// Modify the distributions by reintegration rules from neighbouring
 		// distributions.
 		// ruleGenerators_ = reintegrateRules(ratioChanged, DIST_CONSTANT);
-		if (conditionGenerators_ != null && actionsGenerators_ != null)
+		if (conditionGenerators_ != null && actionGenerators_ != null)
 			regenerateRules(ratioChanged);
 
 		// ratioShared_ *= slotDecayRate_;
@@ -620,26 +640,27 @@ public class RuleBase {
 			int distIndex) {
 		int[] total = new int[2];
 		// For each of the rules, use their counts to go towards the conditions
-		// and actions within. TODO
-		// for (int i = 0; i < ruleGenerators_[distIndex].size(); i++) {
-		// int ruleCount = ruleCounts[i + offsetIndex];
-		// // If this rule is used at least once, note its conditions and
-		// // actions down.
-		// if (ruleCount > 0) {
-		// Rule thisRule = ruleGenerators_[distIndex].getElement(i);
-		// Condition[] conditions = thisRule.getConditions();
-		// // Note the condition(s) and store their counts
-		// for (Condition cond : conditions) {
-		// conditionCounts[conditionGenerators_[getRegenIndex(distIndex)]
-		// .indexOf(cond)] += ruleCount;
-		// total[0] += ruleCount;
-		// }
-		// // Note the action
-		// actionCounts[actionsGenerators_[getRegenIndex(distIndex)]
-		// .indexOf(thisRule.getAction())] += ruleCount;
-		// total[1] += ruleCount;
-		// }
-		// }
+		// and actions within.
+		for (int i = 0; i < ruleGenerators_[distIndex].size(); i++) {
+			int ruleCount = ruleCounts[i + offsetIndex];
+			// If this rule is used at least once, note its conditions and
+			// actions down.
+			if (ruleCount > 0) {
+				GuidedRule thisRule = ruleGenerators_[distIndex].getElement(i);
+				Collection<GuidedPredicate> conditions = thisRule
+						.getConditions();
+				// Note the condition(s) and store their counts
+				for (GuidedPredicate cond : conditions) {
+					conditionCounts[conditionGenerators_[getRegenIndex(distIndex)]
+							.indexOf(cond)] += ruleCount;
+					total[0] += ruleCount;
+				}
+				// Note the action
+				actionCounts[actionGenerators_[getRegenIndex(distIndex)]
+						.indexOf(thisRule.getAction())] += ruleCount;
+				total[1] += ruleCount;
+			}
+		}
 
 		return total;
 	}
@@ -656,21 +677,18 @@ public class RuleBase {
 	 * @return The new rule distribution.
 	 */
 	@SuppressWarnings("unchecked")
-	private ProbabilityDistribution<Rule>[] reintegrateRules(float sharedRatio,
-			float distConstant) {
+	private ProbabilityDistribution<GuidedRule>[] reintegrateRules(
+			float sharedRatio, float distConstant) {
 		// Has to use forward step distribution so full sweeps can be performed.
-		ProbabilityDistribution<Rule>[] newDistributions = new ProbabilityDistribution[ruleGenerators_.length];
+		ProbabilityDistribution<GuidedRule>[] newDistributions = new ProbabilityDistribution[ruleGenerators_.length];
 
 		// Run through each distribution
 		for (int slot = 0; slot < newDistributions.length; slot++) {
 			// Clone the old distribution
 			newDistributions[slot] = ruleGenerators_[slot].clone();
 
-			int thisPriority = Policy
-					.getPriority(slot, newDistributions.length);
-
 			// Get rules from either side of this slot.
-			ArrayList<Rule> sharedRules = new ArrayList<Rule>();
+			ArrayList<GuidedRule> sharedRules = new ArrayList<GuidedRule>();
 			int sideModifier = -1;
 			// Cover both sides of this slot
 			do {
@@ -684,7 +702,6 @@ public class RuleBase {
 				while ((neighbourSlot >= 0) // Above 0
 						&& (neighbourSlot < newDistributions.length) // Below
 						// max
-						&& (neighbourPriority == thisPriority) // Same priority
 						&& (numRules > 0)) // Getting at least one rule
 				{
 					// Get the n best rules
@@ -765,7 +782,7 @@ public class RuleBase {
 	 * Normalises the rule distributions.
 	 */
 	public void normaliseDistributions() {
-		for (ProbabilityDistribution<Rule> pd : ruleGenerators_) {
+		for (ProbabilityDistribution<GuidedRule> pd : ruleGenerators_) {
 			pd.normaliseProbs();
 		}
 	}
@@ -779,7 +796,7 @@ public class RuleBase {
 	 *            The slot to get the rule from.
 	 * @return The Rule or null.
 	 */
-	public Rule getRule(int index, int slot) {
+	public GuidedRule getRule(int index, int slot) {
 		if (slot >= ruleGenerators_.length)
 			slot = 0;
 		if (index >= ruleGenerators_[slot].size())
@@ -795,7 +812,7 @@ public class RuleBase {
 	 * 
 	 * @return The rules.
 	 */
-	public Collection<Rule> getRules(int slot) {
+	public Collection<GuidedRule> getRules(int slot) {
 		if (slot >= ruleGenerators_.length)
 			slot = 0;
 		return ruleGenerators_[slot];
@@ -817,7 +834,7 @@ public class RuleBase {
 	 *            The slot to get the generator from.
 	 * @return The rule generator.
 	 */
-	public ProbabilityDistribution<Rule> getRuleGenerator(int i) {
+	public ProbabilityDistribution<GuidedRule> getRuleGenerator(int i) {
 		return ruleGenerators_[i];
 	}
 
@@ -830,7 +847,7 @@ public class RuleBase {
 	 *            The slot to get the rule from.
 	 * @return The index or -1 if not present.
 	 */
-	public int indexOf(Rule rule, int slot) {
+	public int indexOf(GuidedRule rule, int slot) {
 		if (slot >= ruleGenerators_.length)
 			slot = 0;
 		return ruleGenerators_[slot].indexOf(rule);
@@ -879,8 +896,8 @@ public class RuleBase {
 		StringBuffer buffer = new StringBuffer();
 		for (int i = 0; i < ruleGenerators_.length; i++) {
 			buffer.append("Slot " + i + ":\n");
-			for (Rule r : ruleGenerators_[i]) {
-				buffer.append(" " + r + "\n");
+			for (GuidedRule r : ruleGenerators_[i]) {
+				buffer.append(" " + r.getRule() + "\n");
 			}
 		}
 		return buffer.toString();
