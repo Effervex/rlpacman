@@ -35,15 +35,12 @@ class Player extends Thing {
 		// Eating a dot
 		if (m_gameModel.m_dots.get(pacLoc) != null) {
 			m_gameModel.m_currentFoodCount++;
-			m_score += m_gameModel.m_dots.get(pacLoc).getValue();
-			m_gameModel.m_dots.remove(pacLoc);
+			m_score += m_gameModel.eatDot(pacLoc);	
 		}
 		// Eating a powerup
 		if (m_gameModel.m_powerdots.get(pacLoc) != null) {
 			m_gameModel.m_currentFoodCount++;
-			m_score += m_gameModel.m_powerdots.get(pacLoc).getValue();
-			m_gameModel.eatPowerup();
-			m_gameModel.m_powerdots.remove(pacLoc);
+			m_score += m_gameModel.eatPowerDot(pacLoc);
 		}
 //		GameUI gameUI = m_gameModel.m_pacMan.m_gameUI;
 //		Rectangle itemBoundingBox;

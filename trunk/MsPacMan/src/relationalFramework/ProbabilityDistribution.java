@@ -203,6 +203,40 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	/**
+	 * Creates a clone distribution and restricts the values of the distribution
+	 * to 0 or 1, in the case of binary. When binary, this is determined by
+	 * whether the value is above or below 0.5. When not binary, all values
+	 * below the mean value are set to 0 and those remaining are normalised.
+	 * 
+	 * @param binary
+	 *            If the values are to be set to 0 and 1, split by 0.5.
+	 * @return The cloned and bound distribution.
+	 */
+	public ProbabilityDistribution<T> bindProbs(boolean binary) {
+		ProbabilityDistribution<T> clone = clone();
+		
+		// Calculate the average
+		double average = 0.5;
+		if (!binary) {
+			average = 1.0 / size();
+		}
+		
+		// Set those below the average to 0 and (if binary) above to 1
+		for (int i = 0; i < size(); i++) {
+			if (getProb(i) < average) {
+				clone.set(i, 0);
+			} else if (binary) {
+				clone.set(i, 1);
+			}
+		}
+		
+		// Normalise if not binary
+		if (!binary)
+			clone.normaliseProbs();
+		return clone;
+	}
+
+	/**
 	 * Gets the N best items from this distribution, as determined by their
 	 * weight. The distribution must be no smaller than N (preferable 3N, in
 	 * conjunction with the other method).
@@ -295,7 +329,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 				updateElement(numSamples, counts[i + offsetIndex], stepSize,
 						valueModifier, i);
 			}
-			
+
 			// Normalise the probabilities
 			if (!sumsToOne())
 				normaliseProbs();
@@ -372,11 +406,11 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		for (ItemProb ip : itemProbs_) {
 			ip.setProbability(1);
 		}
-		
+
 		// Normalise the probs
 		normaliseProbs();
 	}
-	
+
 	/**
 	 * Resets the probabilities to a given value.
 	 */
@@ -389,25 +423,23 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	// @Override
 	public void clear() {
-		// TODO Auto-generated method stub
-
+		itemProbs_.clear();
 	}
 
 	// @Override
 	public boolean contains(Object arg0) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	// @Override
 	public boolean containsAll(Collection<?> arg0) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	// @Override
 	public boolean isEmpty() {
-		// TODO Auto-generated method stub
+		if (itemProbs_.isEmpty())
+			return true;
 		return false;
 	}
 

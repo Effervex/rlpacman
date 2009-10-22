@@ -278,7 +278,7 @@ class Ghost extends Thing {
 		}
 
 		// Draw Eyes
-		double crossEyeDelta = 1; // TODO: Make this relative.
+		double crossEyeDelta = 1;
 		double ghostEyeWidth = ghostHeadDiameter / 2.7;
 		double ghostEyeHeight = ghostHeadDiameter / 2.0;
 
@@ -823,8 +823,7 @@ class Ghost extends Thing {
 				targetY = m_targetY;
 			}
 		}
-		// TODO Remove these and uncomment the previous code. Also remove draw
-		// code
+		
 		// Modulo the x coordinate for wrapping
 		if ((targetX >= m_gameModel.m_gameSizeX) || (targetX < 0))
 			targetX = (targetX + m_gameModel.m_gameSizeX)
@@ -965,16 +964,23 @@ class Ghost extends Thing {
 	}
 	
 	public String toString() {
+		String ghostString = null;
 		switch(m_type) {
 		case BLINKY:
-			return "Blinky";
+			ghostString = "Blinky";
+			break;
 		case PINKY:
-			return "Pinky";
+			ghostString = "Pinky";
+			break;
 		case INKY:
-			return "Inky";
+			ghostString = "Inky";
+			break;
 		case CLYDE:
-			return "Clyde";
+			ghostString = "Clyde";
+			break;
 		}
-		return "Ghost";
+		if (m_nTicks2Flee > 0)
+			ghostString += " (Edb)";
+		return ghostString;
 	}
 }
