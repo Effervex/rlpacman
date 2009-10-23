@@ -56,6 +56,9 @@ public class RuleBase {
 
 	/** The cross-entropy generators for the rules within the policy. */
 	private ProbabilityDistribution<GuidedRule>[] ruleGenerators_;
+	
+	/** The backup generators to use when unfreezing. */
+	private ProbabilityDistribution<GuidedRule>[] backupRuleGenerators_;
 
 	/** The cross-entropy generators for the conditions within the rules. */
 	private ProbabilityDistribution<GuidedPredicate>[] conditionGenerators_;
@@ -424,18 +427,16 @@ public class RuleBase {
 					.getLooseInstantiation());
 			// Adding the prereqs, assuming they aren't already
 			List<Prerequisite> condPreqs = cond.factify(factory_,
-					existingTerms, false, false);
+					existingTerms, false, false, tiableTerms);
 			for (Prerequisite prereq : condPreqs) {
 				if (!rulePrereqs.contains(prereq))
 					rulePrereqs.add(prereq);
 			}
-			for (Term usedTerm : existingTerms)
-				tiableTerms.add(usedTerm);
 
 			// Attempting to factify the action
 			existingTerms = compileTied(tiableTerms, action
 					.getLooseInstantiation());
-			actPreqs = action.factify(factory_, existingTerms, false, true);
+			actPreqs = action.factify(factory_, existingTerms, false, true, null);
 			i++;
 		} while ((i < numPrereqs) || (actPreqs == null));
 
@@ -587,7 +588,7 @@ public class RuleBase {
 				}
 			}
 		}
-		
+
 		// TODO Mutation operators
 
 		// if (thisAverage < 0) {
@@ -784,6 +785,25 @@ public class RuleBase {
 	public void normaliseDistributions() {
 		for (ProbabilityDistribution<GuidedRule> pd : ruleGenerators_) {
 			pd.normaliseProbs();
+		}
+	}
+
+	/**
+	 * Freezes or unfreezes the rule generators contained within. This means
+	 * that the generators are bound and the probabilities within are flattened.
+	 * 
+	 * @param freeze If the state is to freeze.
+	 */
+	public void freezeState(boolean freeze) {
+		if (freeze) {
+			backupRuleGenerators_ = ruleGenerators_;
+			// Clone and bind the generators
+			ruleGenerators_ = new ProbabilityDistribution[ruleGenerators_.length];
+			for (int i = 0; i < ruleGenerators_.length; i++) {
+				ruleGenerators_[i] = backupRuleGenerators_[i].bindProbs(false);
+			}
+		} else {
+			ruleGenerators_ = backupRuleGenerators_;
 		}
 	}
 

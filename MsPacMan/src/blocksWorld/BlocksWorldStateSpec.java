@@ -3,8 +3,10 @@ package blocksWorld;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.mandarax.kernel.ClauseSet;
 import org.mandarax.kernel.ConstantTerm;
@@ -20,6 +22,8 @@ import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JPredicate;
 
 import relationalFramework.GuidedPredicate;
+import relationalFramework.GuidedRule;
+import relationalFramework.Policy;
 import relationalFramework.PredTerm;
 import relationalFramework.StateSpec;
 
@@ -52,7 +56,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Term[] terms = new Term[2];
 		terms[0] = factory.createVariableTerm("X", Block.class);
 		terms[1] = factory.createVariableTerm("Y", Block.class);
-		List<Prerequisite> prereqs = getGuidedPredicate("on").factify(factory, terms, false, false);
+		List<Prerequisite> prereqs = getGuidedPredicate("on").factify(factory, terms, false, false, null);
 		Term[] terms2 = new Term[3];
 		terms2[0] = StateSpec.getStateTerm(factory);
 		terms2[1] = terms[0];
@@ -65,12 +69,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 		terms = new Term[2];
 		terms[0] = factory.createVariableTerm("X", Block.class);
 		terms[1] = factory.createVariableTerm("Y", Block.class);
-		prereqs = getGuidedPredicate("on").factify(factory, terms, false, false);
+		Set<Term> allTerms = new HashSet<Term>();
+		allTerms.add(terms[0]);
+		prereqs = getGuidedPredicate("on").factify(factory, terms, false, false, null);
 		terms2 = new Term[2];
 		terms2[0] = terms[1];
 		terms2[1] = factory.createVariableTerm("Z", Block.class);
 		addContains(prereqs, getGuidedPredicate("above").factify(factory,
-				terms2, false, false));
+				terms2, false, false, null));
 		Term[] terms3 = new Term[3];
 		terms3[0] = StateSpec.getStateTerm(factory);
 		terms3[1] = terms[0];
@@ -85,11 +91,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 	@Override
 	protected Rule initialiseGoalState(LogicFactory factory) {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
-		String goal = "unstack";
+		goal_ = "onab";
 
 		try {
 		// On(a,b) goal
-		if (goal.equals("onab")) {
+		if (goal_.equals("onab")) {
 			Predicate goalPred = getGuidedPredicate("on").getPredicate();
 			Term[] terms = new Term[3];
 			terms[0] = StateSpec.getStateTerm(factory);
@@ -99,7 +105,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		}
 
 		// Unstack goal
-		if (goal.equals("unstack")) {
+		if (goal_.equals("unstack")) {
 			Class[] types = new Class[1];
 			types[0] = Object[].class;
 			Method method = BlocksWorldStateSpec.class.getMethod("unstacked", types);
@@ -114,7 +120,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		}
 		
 		// Stack goal
-		if (goal.equals("stack")) {
+		if (goal_.equals("stack")) {
 			Class[] types = new Class[1];
 			types[0] = Object[].class;
 			Method method = BlocksWorldStateSpec.class.getMethod("stacked", types);
@@ -197,6 +203,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 				new Class[] { Object[].class }));
 
 		return typePreds;
+	}
+	@Override
+	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
+		// TODO create rule Regexp and create rule.
+		return null;
 	}
 
 	/**
@@ -282,5 +293,34 @@ public class BlocksWorldStateSpec extends StateSpec {
 			}
 		}
 		return oneFound;
+	}
+	
+	@Override
+	public Policy getOptimalPolicy() {
+		Policy optimal = null;
+		
+		// Defining the optimal policy based on the goal
+		String[] rules = null;
+		Map<String, Object> constantMap = new HashMap<String, Object>();
+		if (goal_.equals("onab")) {
+			rules = new String[3];
+			rules[0] = "clear(a) & clear(b) -> move(a,b)";
+			rules[1] = "clear(X) & above(X,a) -> moveFloor(X)";
+			rules[2] = "clear(X) & above(X,b) -> moveFloor(X)";
+			constantMap.put("a", new Block("a"));
+			constantMap.put("b", new Block("b"));
+		} else if (goal_.equals("stack")) {
+			rules = new String[1];
+			rules[0] = "clear(X) & highest(Y) -> move(X,Y)";
+		} else if (goal_.equals("unstack")) {
+			rules = new String[1];
+			rules[0] = "highest(X) -> moveFloor(X)";
+		}
+		
+		optimal = new Policy(rules.length);
+		for (int i = 0; i < rules.length; i++)
+			optimal.addRule(i, new GuidedRule(parseRule(rules[i], constantMap), null, null));
+		
+		return optimal;
 	}
 }

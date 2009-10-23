@@ -22,6 +22,7 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
+import relationalFramework.Policy;
 import relationalFramework.RuleBase;
 import relationalFramework.StateSpec;
 
@@ -31,15 +32,23 @@ import relationalFramework.StateSpec;
  * @author Sam Sarjant
  */
 public class BlocksWorldEnvironment implements EnvironmentInterface {
+	/** The constant for extending the episode. */
+	public static final int STEP_CONSTANT = 2;
+
 	/** The number of blocks. Default 5. */
 	private int numBlocks_ = 5;
 
 	/** The state of the blocks world. */
 	private Integer[] state_;
 
+	/** The state of the blocks world in base predicates. */
 	private KnowledgeBase stateKB_;
 
+	/** The blocks contained within the environment. */
 	private ConstantTerm[] blocks_;
+
+	/** The number of steps from the optimal path. */
+	private int steps_;
 
 	@Override
 	public void env_cleanup() {
@@ -59,11 +68,20 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	@Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
-			return (numBlocks_ * 2) + "";
+			return (numBlocks_ * STEP_CONSTANT) + "";
+		if (arg0.equals("freeze")) {
+			RuleBase.getInstance().freezeState(true);
+			return null;
+		}
+		if (arg0.equals("freeze")) {
+			RuleBase.getInstance().freezeState(false);
+			return null;
+		}
 		try {
 			numBlocks_ = Integer.parseInt(arg0);
 			// Assign the blocks
 			blocks_ = createBlocks(numBlocks_);
+			return null;
 		} catch (Exception e) {
 
 		}
@@ -75,6 +93,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
+		steps_ = optimalSteps();
 
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -85,8 +104,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		Fact action = null;
+		Random random = new Random();
 		for (int i = 0; i < ObjectObservations.getInstance().objectArray.length; i++) {
-			action = (Fact) ObjectObservations.getInstance().objectArray[i];
+			List<Fact> actions = (List<Fact>) ObjectObservations.getInstance().objectArray[i];
+			if ((actions != null) && (!actions.isEmpty()))
+				action = actions.get(random.nextInt(actions.size()));
 			if (action != null)
 				break;
 		}
@@ -99,10 +121,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			state_ = newState;
 			stateKB_ = formState(state_);
 		} else {
-			// TODO This results in lower rewards for agents that take some
-			// steps but fail the rest, rather than imminent failure.
-			return new Reward_observation_terminal(numBlocks_ * -10, obs, true);
+			return new Reward_observation_terminal(-numBlocks_ * STEP_CONSTANT
+					+ steps_, obs, true);
 		}
+		steps_++;
 
 		ObjectObservations.getInstance().predicateKB = stateKB_;
 		Reward_observation_terminal rot = new Reward_observation_terminal(-1,
@@ -289,7 +311,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				terms[1] = blocks_[i];
 				StateSpec.addContains(preds, StateSpec.getInstance()
 						.getGuidedPredicate("onFloor").factify(factory, terms,
-								false, false));
+								false, false, null));
 			} else {
 				// On another block
 				Term[] terms = new Term[3];
@@ -298,7 +320,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				terms[2] = blocks_[worldState[i] - 1];
 				StateSpec.addContains(preds, StateSpec.getInstance()
 						.getGuidedPredicate("on").factify(factory, terms,
-								false, false));
+								false, false, null));
 
 				// The other block is not clear
 				clearBlocks.remove((Object) (new Integer(worldState[i] - 1)));
@@ -318,7 +340,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			terms[1] = blocks_[blockInd];
 			StateSpec.addContains(preds, StateSpec.getInstance()
 					.getGuidedPredicate("clear").factify(factory, terms, false,
-							false));
+							false, null));
 		}
 
 		// Adding the prereqs
@@ -351,5 +373,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		recurseHeight(below, heightMap, worldState);
 		heightMap[start] = heightMap[below] + 1;
 		return heightMap[start];
+	}
+
+	/**
+	 * Calculates the optimal number of steps to solve the problem.
+	 * 
+	 * @return The minimal number of steps to take for solving.
+	 */
+	private int optimalSteps() {
+		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
+		return 0;
 	}
 }
