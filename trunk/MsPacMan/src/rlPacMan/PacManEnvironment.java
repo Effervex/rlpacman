@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -117,7 +118,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Applying the action (up down left right or nothing)
-		Fact[] actionPriority = (Fact[]) ObjectObservations.getInstance().objectArray;
+		List<Fact>[] actionPriority = (List<Fact>[]) ObjectObservations
+				.getInstance().objectArray;
 		environment_.simulateKeyPress(chooseLowAction(actionPriority).getKey());
 
 		synchronized (environment_) {
@@ -156,15 +158,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(Fact[] actionPriority) {
+	private void drawActions(List<Fact>[] actionPriority) {
 		String[] actionList = new String[actionPriority.length];
 		for (int i = 0; i < actionPriority.length; i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
 			// If the action is null
-			if (actionPriority[i] == null) {
+			if ((actionPriority[i] == null) || (actionPriority[i].isEmpty())) {
 				buffer.append("null");
 			} else {
-				buffer.append(StateSpec.lightenFact(actionPriority[i]));
+				buffer.append(StateSpec.lightenFact(actionPriority[i].get(0)));
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -179,7 +181,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            priority, being processed into a single low action.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(Fact[] actionArray) {
+	private PacManLowAction chooseLowAction(List<Fact>[] actionArray) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -197,18 +199,36 @@ public class PacManEnvironment implements EnvironmentInterface {
 		int i = 0;
 		do {
 			if (actionArray[i] != null) {
-				Byte direction = (Byte) actionArray[i].getPredicate().perform(
-						actionArray[i].getTerms(), null);
-				// Checking for negative direction
-				if (direction < 0) {
-					PacManLowAction removable = PacManLowAction.values()[direction
-							* -1];
-					directions.remove(removable);
-				} else {
-					PacManLowAction chosen = PacManLowAction.values()[direction];
-					if (directions.contains(chosen))
-						return chosen;
+				int[] directionVote = new int[PacManLowAction.values().length];
+				for (Fact fact : actionArray[i]) {
+					Byte direction = (Byte) fact.getPredicate().perform(
+							fact.getTerms(), null);
+					// TODO Deal with negative directions
+					if (direction > 0)
+						directionVote[direction]++;
+					else if (direction < 0)
+						directionVote[-direction]--;
 				}
+
+				// Find the best direction/s
+				ArrayList<PacManLowAction> chosen = new ArrayList<PacManLowAction>();
+				chosen.add(PacManLowAction.values()[1]);
+				int best = directionVote[1];
+				for (int j = 2; j < directionVote.length; j++) {
+					// Same value, add
+					if (directionVote[j] == best) {
+						chosen.add(PacManLowAction.values()[j]);
+					} else if (directionVote[j] > best) {
+						// Better value, clear
+						chosen.clear();
+						chosen.add(PacManLowAction.values()[j]);
+					}
+				}
+
+				// Checking for negative direction
+				chosen.retainAll(directions);
+				if (!chosen.isEmpty())
+					directions = chosen;
 			}
 			i++;
 		} while ((i < actionArray.length) && (directions.size() > 1));

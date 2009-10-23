@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import java.util.List;
+
 import org.mandarax.kernel.Fact;
 
 /**
@@ -11,7 +13,7 @@ public class ActionSwitch {
 	/** The number of priorities. */
 	public static final int NUM_PRIORITIES = 3;
 	/** The prioritised list of switched actions. Max 3. */ 
-	private Fact[] activeActions_ = new Fact[NUM_PRIORITIES];
+	private List<Fact>[] activeActions_ = new List[NUM_PRIORITIES];
 	
 	/**
 	 * Switches on a high action at the given priority.
@@ -19,7 +21,7 @@ public class ActionSwitch {
 	 * @param clause The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(Fact clause, int priority) {
+	public void switchOn(List<Fact> clause, int priority) {
 		activeActions_[priority] = clause;
 	}
 
@@ -34,16 +36,8 @@ public class ActionSwitch {
 	 * 
 	 * @return The int version of the action list.
 	 */
-	public Fact[] getPrioritisedActions() {
-		Fact[] prioritisedActions = new Fact[NUM_PRIORITIES];
-		for (int i = 0; i < NUM_PRIORITIES; i++) {
-			if (activeActions_[i] != null)
-				prioritisedActions[i] = activeActions_[i];
-			else
-				prioritisedActions[i] = null;
-		}
-		
-		return prioritisedActions;
+	public List<Fact>[] getPrioritisedActions() {
+		return activeActions_;
 	}
 	
 	/**

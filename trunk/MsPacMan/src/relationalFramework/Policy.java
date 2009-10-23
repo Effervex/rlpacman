@@ -137,8 +137,11 @@ public class Policy {
 		boolean plural = false;
 		// Check all prereqs, only outputting the Java preds
 		for (Prerequisite prereq : body) {
-			// If the predicate is a Java method
-			if (!StateSpec.getInstance().isTypePredicate(prereq.getPredicate())) {
+			// Don't show type and inequal predicates.
+			if ((!StateSpec.getInstance()
+					.isTypePredicate(prereq.getPredicate()))
+					&& (!prereq.getPredicate().getName()
+							.equals(StateSpec.INEQUAL))) {
 				// If we have more than one condition
 				if (plural)
 					buffer.append("AND ");
@@ -222,16 +225,10 @@ public class Policy {
 		// Get the applicable actions from the priority levels.
 		List<Fact>[] results = evaluateRules(state);
 
-		// Choose which actions to apply in the action switch
-		Random random = new Random();
+		// Apply the actions in the action switch.
 		for (int i = 0; i < results.length; i++) {
 			if (results[i] != null) {
-				// TODO The question of how to deal with multiple actions
-				// perhaps should be left to the environment. Maybe this should
-				// return a list of facts to the actionSwitch.
-				Fact appliedAction = results[i].get(random.nextInt(results[i]
-						.size()));
-				actionSwitch.switchOn(appliedAction, i);
+				actionSwitch.switchOn(results[i], i);
 			}
 		}
 	}
@@ -265,7 +262,6 @@ public class Policy {
 				Rule rule = priorityRules_[i].getRule();
 
 				// Setting up the necessary variables
-
 				RuleCondition ruleConds = new RuleCondition(rule.getBody());
 				ResultSet results = resultTable.get(ruleConds);
 
@@ -361,7 +357,7 @@ public class Policy {
 		public Fact[] getFactArray() {
 			return (Fact[]) conditions_.toArray(new Fact[conditions_.size()]);
 		}
-		
+
 		public String toString() {
 			return conditions_.toString();
 		}

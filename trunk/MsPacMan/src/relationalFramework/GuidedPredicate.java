@@ -2,6 +2,7 @@ package relationalFramework;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -148,14 +149,7 @@ public class GuidedPredicate {
 			}
 			// If so, add to the collection and undo the addition
 			GuidedPredicate loosePred = new GuidedPredicate(predicate_, clone);
-			// Check that the predicate doesn't clash with the background
-			// knowledge
-			if (StateSpec.getInstance()
-					.isConditionValid(
-							loosePred.factify(factory, null, false, false),
-							factory, ie)) {
-				looseInstantiations.add(loosePred);
-			}
+			looseInstantiations.add(loosePred);
 			predTerms[argument] = null;
 		} else {
 			// If not full, recurse deeper
@@ -177,17 +171,24 @@ public class GuidedPredicate {
 	 * 
 	 * @param factory
 	 *            The logic factory in use.
-	 * @param existingTerms
+	 * @param replacementTerms
 	 *            The variable terms to fill in the tied terms and the output
 	 *            parameter.
 	 * @param negated
 	 *            If the prerequisite is negated.
+	 * @param allTerms
+	 *            TODO
 	 * @return A instantiated version of this guided predicate with type
 	 *         predicates, if it can be. Also fills the existing terms array
 	 *         with the terms used.
 	 */
 	public List<Prerequisite> factify(LogicFactory factory,
-			Term[] existingTerms, boolean negated, boolean mustTie) {
+			Term[] replacementTerms, boolean negated, boolean mustTie,
+			Collection<Term> allTerms) {
+		// If we don't have all terms, create one
+		if (allTerms == null)
+			allTerms = new HashSet<Term>();
+		
 		List<Prerequisite> result = new LinkedList<Prerequisite>();
 
 		int offset = 0;
@@ -200,13 +201,13 @@ public class GuidedPredicate {
 
 		// If we have existing terms and they are 1 too short, add the state
 		// term to the start.
-		if ((existingTerms != null)
-				&& (existingTerms.length == (terms.length - offset - 1))) {
-			Term[] newExistingTerms = new Term[existingTerms.length + 1];
+		if ((replacementTerms != null)
+				&& (replacementTerms.length == (terms.length - offset - 1))) {
+			Term[] newExistingTerms = new Term[replacementTerms.length + 1];
 			newExistingTerms[0] = StateSpec.getStateTerm(factory);
-			for (int i = 0; i < existingTerms.length; i++)
-				newExistingTerms[i + 1] = existingTerms[i];
-			existingTerms = newExistingTerms;
+			for (int i = 0; i < replacementTerms.length; i++)
+				newExistingTerms[i + 1] = replacementTerms[i];
+			replacementTerms = newExistingTerms;
 		}
 
 		// For each term
@@ -215,58 +216,19 @@ public class GuidedPredicate {
 			if (i < offset) {
 				terms[i] = StateSpec.getSpecTerm(factory);
 			} else {
-				PredTerm argTerm = null;
-				if (looseInstantiation_ != null)
-					argTerm = looseInstantiation_[i - offset];
-				else
-					argTerm = new PredTerm(predValues_[i][0].getValue(),
-							predStructure[i], PredTerm.TIED);
 				// Instantiate/find the regular terms
-				// If we have a tied term
-				if (argTerm.getTermType() == PredTerm.TIED) {
-					// If we have a replacement, use that
-					if ((existingTerms != null)
-							&& (existingTerms[i - offset] != null)
-							&& (predStructure[i]
-									.isAssignableFrom(existingTerms[i - offset]
-											.getType()))) {
-						terms[i] = existingTerms[i - offset];
-					} else {
-						// If we must tie
-						if (mustTie) {
-							// Left untied, so results in an invalid fact
-							return null;
-						} else {
-							// Treat this as a free variable
-							terms[i] = factory.createVariableTerm(
-									(String) (argTerm.getValue()),
-									predStructure[i]);
-						}
-					}
-				} else if (argTerm.getTermType() == PredTerm.FREE) {
-					// Create a free variable
-					terms[i] = factory.createVariableTerm((String) (argTerm
-							.getValue()), predStructure[i]);
-				} else if (argTerm.getTermType() == PredTerm.VALUE) {
-					// Create a constant variable
-					terms[i] = factory.createConstantTerm(argTerm.getValue(),
-							predStructure[i]);
-				}
+				terms[i] = instantiateTerm(factory, replacementTerms, mustTie,
+						offset, predStructure[i], i);
+				if (terms[i] == null)
+					return null;
 
-				// Adding the type predicates, if necessary
-				Predicate typePred = StateSpec.getInstance().getTypePredicate(
-						predStructure[i]);
-				if (typePred != null) {
-					Term[] typeTerm = { terms[i] };
-					Prerequisite typePrereq = factory.createPrerequisite(
-							typePred, typeTerm, false);
-					if (!result.contains(typePrereq))
-						result.add(typePrereq);
-				}
+				// Add the type predicates and the inequality predicates.
+				addTypesAndInequals(factory, allTerms, result,
+						predStructure[i], terms[i]);
 
 				// Adding to the return array
-				if (existingTerms != null) {
-					existingTerms[i - offset] = terms[i];
+				if (replacementTerms != null) {
+					replacementTerms[i - offset] = terms[i];
 				}
 			}
 		}
@@ -275,6 +237,117 @@ public class GuidedPredicate {
 		result.add(factory.createPrerequisite(predicate_, terms, negated));
 		// }
 		return result;
+	}
+
+	/**
+	 * Adds the type predicates and the inequal predicates.
+	 * 
+	 * @param factory
+	 *            The logic factory.
+	 * @param allTerms
+	 *            The existing terms to swap.
+	 * @param result
+	 *            The list of prereqs to add to.
+	 * @param predStructure
+	 *            The predicate structure.
+	 * @param term
+	 *            The current term of the predicate.
+	 */
+	private void addTypesAndInequals(LogicFactory factory,
+			Collection<Term> allTerms, List<Prerequisite> result,
+			Class termClass, Term term) {
+		// If the term is already in the used terms, it has already been
+		// defined.
+		if (!allTerms.contains(term)) {
+			// Adding the type predicates, if necessary
+			Predicate typePred = StateSpec.getInstance().getTypePredicate(
+					termClass);
+			if (typePred != null) {
+				Term[] typeTerm = { term };
+				Prerequisite typePrereq = factory.createPrerequisite(typePred,
+						typeTerm, false);
+				if (!result.contains(typePrereq))
+					result.add(typePrereq);
+			}
+
+			// Adding the inequality predicate/s
+			Predicate inequal = StateSpec.getInequalityPredicate(factory);
+			// We need to define an inequality relation for each of these
+			for (Term usedTerm : allTerms) {
+				if (term.getType().equals(usedTerm.getType())) {
+					// If at least one is a variable
+					if ((term.isVariable()) || (usedTerm.isVariable())) {
+						Term[] terms = new Term[4];
+						terms[0] = StateSpec.getSpecTerm(factory);
+						terms[1] = StateSpec.getStateTerm(factory);
+						terms[2] = term;
+						terms[3] = usedTerm;
+						Prerequisite ineqPreq = factory.createPrerequisite(
+								inequal, terms, false);
+						result.add(ineqPreq);
+					}
+				}
+			}
+
+			allTerms.add(term);
+		}
+	}
+
+	/**
+	 * Instantiates a pred term into a proper term.
+	 * 
+	 * @param factory
+	 *            The logic factory.
+	 * @param existingTerms
+	 *            The existing terms to swap.
+	 * @param mustTie
+	 *            If the existing terms must tie.
+	 * @param offset
+	 *            The offset for the existing terms.
+	 * @param termClass
+	 *            The class of the current term.
+	 * @param index
+	 *            The predicate term index.
+	 * @return The created or existing term.
+	 */
+	private Term instantiateTerm(LogicFactory factory, Term[] existingTerms,
+			boolean mustTie, int offset, Class termClass, int index) {
+		PredTerm argTerm = null;
+		if (looseInstantiation_ != null)
+			argTerm = looseInstantiation_[index - offset];
+		else
+			argTerm = new PredTerm(predValues_[index][0].getValue(), termClass,
+					PredTerm.TIED);
+
+		// If we have a tied term
+		if (argTerm.getTermType() == PredTerm.TIED) {
+			// If we have a replacement, use that
+			if ((existingTerms != null)
+					&& (existingTerms[index - offset] != null)
+					&& (termClass
+							.isAssignableFrom(existingTerms[index - offset]
+									.getType()))) {
+				return existingTerms[index - offset];
+			} else {
+				// If we must tie
+				if (mustTie) {
+					// Left untied, so results in an invalid fact
+					return null;
+				} else {
+					// Treat this as a free variable
+					return factory.createVariableTerm((String) (argTerm
+							.getValue()), termClass);
+				}
+			}
+		} else if (argTerm.getTermType() == PredTerm.FREE) {
+			// Create a free variable
+			return factory.createVariableTerm((String) (argTerm.getValue()),
+					termClass);
+		} else if (argTerm.getTermType() == PredTerm.VALUE) {
+			// Create a constant variable
+			return factory.createConstantTerm(argTerm.getValue(), termClass);
+		}
+		return null;
 	}
 
 	public Predicate getPredicate() {
@@ -317,14 +390,16 @@ public class GuidedPredicate {
 		}
 		return false;
 	}
-	
+
 	public int hashCode() {
 		if (predicate_ == null)
 			return 7919;
-		
+
 		int predVal = 7919 * predicate_.hashCode();
-		int predValsVal = predValues_ == null ? 2099 : 2099 * predValues_.hashCode();
-		int looseVals = looseInstantiation_ == null ? 5059 : 5059 * looseInstantiation_.hashCode();
+		int predValsVal = predValues_ == null ? 2099 : 2099 * predValues_
+				.hashCode();
+		int looseVals = looseInstantiation_ == null ? 5059
+				: 5059 * looseInstantiation_.hashCode();
 		return predVal * predValsVal * looseVals;
 	}
 }

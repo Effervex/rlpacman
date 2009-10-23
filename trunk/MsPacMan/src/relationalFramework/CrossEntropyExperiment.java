@@ -245,26 +245,31 @@ public class CrossEntropyExperiment {
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("5");
+		RLGlue.RL_env_message("25");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
 
 		// Determine the iitial run (as previous runs may hve already been done
 		// in a previous experiment)
-		//TODO int run = checkFiles();
+		// TODO int run = checkFiles();
 		int run = 0;
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
-			float[] episodePerformances = new float[episodes_];
+			float[] episodePerformances = new float[episodes_ + 1];
+			episodePerformances[0] = testAgent(-1, maxSteps);
 			float runningAverage = 0;
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
 				// Forming a population of solutions
 				SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
+				// TODO Even this population value can change. Blocks World is
+				// showing good results even with populations of 10. Perhaps
+				// this could be equal to the policy size * 10?
 				for (int i = 0; i < population_; i++) {
 					Policy pol = generatePolicy(policySize_, slotGenerator_);
+					System.out.println(pol);
 					// Send the agent a generated policy
 					RLGlue.RL_agent_message(pol.toParseableString());
 
@@ -274,6 +279,7 @@ public class CrossEntropyExperiment {
 						score += RLGlue.RL_return();
 					}
 					score /= AVERAGE_ITERATIONS;
+					System.out.println(score);
 					// Set the fired rules back to this policy
 					pol.setFired(RLGlue.RL_agent_message("getFired"));
 
@@ -291,15 +297,18 @@ public class CrossEntropyExperiment {
 
 				// Update the weights for all distributions using only the elite
 				// samples
-				// TODO Incorporate testing here
-				// Perhaps freeze the generators and round them out such that
-				// slot probs > 0.5 are 1 and the slot rules are altered such
-				// that those under the slot average have 0 prob.
-				float value = (t == 0) ? 0 : episodePerformances[t - 1];
 				updateWeights(pvs.iterator(), (int) Math.ceil(population_
-						* SELECTION_RATIO), value, runningAverage);
-				episodePerformances[t] = testAgent(maxSteps);
-				runningAverage = ((episodePerformances[t] - value) + runningAverage) / 2;
+						* SELECTION_RATIO));
+
+				// Test the agent and record the performances
+				episodePerformances[t + 1] = testAgent(t, maxSteps);
+				runningAverage = ((episodePerformances[t + 1] - episodePerformances[t]) + runningAverage) / 2;
+
+				// Run post-update operations on the distributions
+				double sineRatio = (-Math.cos((t * 2 * Math.PI)
+						/ (episodes_ - 1)) + 1) / 2 * 0.08;
+				ratioShared_ = RuleBase.getInstance().postUpdateOperations(
+						runningAverage, ratioShared_, STEP_SIZE);
 
 				// Save the results at each episode
 				try {
@@ -332,18 +341,24 @@ public class CrossEntropyExperiment {
 	 * generators and trialling the agent several times over the environment to
 	 * get an idea of the average performance at this point.
 	 * 
-	 * @param maxSteps The maximum number of allowed.
+	 * @param maxSteps
+	 *            The maximum number of allowed.
 	 * @return The average performance of the agent.
 	 */
-	private float testAgent(int maxSteps) {
+	private float testAgent(int episode, int maxSteps) {
+		System.out.println();
+		System.out.println("Beginning testing for episode " + episode + ".");
+		System.out.println();
 		float averageScore = 0;
 		RLGlue.RL_env_message("freeze");
 
-		ProbabilityDistribution<Integer> frozenSlotGen = slotGenerator_.bindProbs(true);
+		ProbabilityDistribution<Integer> frozenSlotGen = slotGenerator_
+				.bindProbs(true);
 		// Run the agent through several test iterations, resampling the agent
 		// at each step
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
 			Policy pol = generatePolicy(policySize_, frozenSlotGen);
+			System.out.println(pol);
 			// Send the agent a generated policy
 			RLGlue.RL_agent_message(pol.toParseableString());
 
@@ -629,20 +644,12 @@ public class CrossEntropyExperiment {
 	 *            The iterator over the samples.
 	 * @param numElite
 	 *            The number of samples to form the 'elite' samples.
-	 * @param lastEpisode
-	 *            The average elites value for the last episode. Used for
-	 *            determining if the performance is settling.
-	 * @param runningAverage
-	 *            The running average score among the elites. Used for
-	 *            determining if the performance is settling.
 	 */
-	private float updateWeights(Iterator<PolicyValue> iter, int numElite,
-			float lastEpisode, float runningAverage) {
+	private void updateWeights(Iterator<PolicyValue> iter, int numElite) {
 		// Keep count of the rules seen (and slots used)
 		int[][] slotCounter = new int[policySize_][1 + RuleBase.getInstance()
 				.size()];
-		float episodeValue = countRules(iter, numElite, slotCounter);
-		float thisAverage = ((episodeValue - lastEpisode) + runningAverage) / 2;
+		countRules(iter, numElite, slotCounter);
 
 		// Apply the weights to the distributions
 		for (int s = 0; s < slotGenerator_.size(); s++) {
@@ -654,12 +661,6 @@ public class CrossEntropyExperiment {
 			RuleBase.getInstance().updateDistribution(s, slotCounter[s], 1,
 					STEP_SIZE, 1);
 		}
-
-		// Further updates on the distributions
-		ratioShared_ = RuleBase.getInstance().postUpdateOperations(thisAverage,
-				ratioShared_, STEP_SIZE);
-
-		return episodeValue;
 	}
 
 	/**
@@ -674,13 +675,11 @@ public class CrossEntropyExperiment {
 	 *            The storage for the rule counts.
 	 * @return The average value of the elite samples.
 	 */
-	private float countRules(Iterator<PolicyValue> iter, int numElite,
+	private void countRules(Iterator<PolicyValue> iter, int numElite,
 			int[][] slotCounter) {
-		float total = 0;
 		// Only selecting the top elite samples
 		for (int k = 0; k < numElite; k++) {
 			PolicyValue pv = iter.next();
-			total += pv.value_;
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
@@ -694,10 +693,6 @@ public class CrossEntropyExperiment {
 				}
 			}
 		}
-
-		// Maintaining values
-		float episodeValue = (float) (total / numElite);
-		return episodeValue;
 	}
 
 	/**

@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import java.util.List;
+
 import org.mandarax.kernel.KnowledgeBase;
 import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
@@ -39,7 +41,6 @@ public class PolicyAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.substring(0, Policy.PREFIX.length()).equals(Policy.PREFIX)) {
 			policy_ = Policy.parsePolicy(arg0);
-			System.out.println(policy_);
 		} else if (arg0.equals("getFired")) {
 			return policy_.getFiredString();
 		}
@@ -74,7 +75,7 @@ public class PolicyAgent implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private Object[] chooseAction(KnowledgeBase state) {
+	private List[] chooseAction(KnowledgeBase state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_);

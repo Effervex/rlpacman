@@ -23,6 +23,7 @@ import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JPredicate;
 
 import relationalFramework.GuidedPredicate;
+import relationalFramework.Policy;
 import relationalFramework.PredTerm;
 import relationalFramework.StateSpec;
 
@@ -237,6 +238,23 @@ public class PacManStateSpec extends StateSpec {
 		predicateStructure[2] = Integer.class;
 		return createDefinedPredicate(PacManStateSpec.class, predicateStructure,
 				predValues, methodName);
+	}
+
+	@Override
+	public Policy getOptimalPolicy() {
+		// TODO Optimal policy for Pacman? I could define a good one, I suppose.
+		// If the junction is risky, run for it.
+		// If there are edible (non-flashing) ghosts, chow down
+		// If there is a dot nearby, chow down
+		// If there is a dot somewhere, chow down
+		// Priority level 2: Always go towards the maximally safe junction
+		return null;
+	}
+
+	@Override
+	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
+		// This will be done when I make the above policy.
+		return null;
 	}
 
 	// // // // // THE PREDICATE METHODS // // // // //

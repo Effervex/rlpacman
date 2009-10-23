@@ -19,6 +19,7 @@ import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Query;
 import org.mandarax.kernel.ResultSet;
+import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JConstructor;
@@ -48,7 +49,7 @@ public abstract class StateSpec {
 	private static Term specTerm_;
 
 	/** The predicate for handling inequality. */
-	private static Prerequisite inequalityPred_;
+	private static Predicate inequalityPred_;
 
 	/** The prerequisites of the rules. */
 	private List<GuidedPredicate> predicates_;
@@ -68,11 +69,17 @@ public abstract class StateSpec {
 	/** The constants found within the goal. */
 	private ConstantTerm[] goalConstants_;
 
+	/** The name of the goal. */
+	protected String goal_;
+
 	/** The background knowledge regarding the predicates and actions. */
 	private KnowledgeBase backgroundKnowledge_;
 
 	/** The suffix to this class for use with dynamically loaded classes. */
 	public static final String CLASS_SUFFIX = "StateSpec";
+
+	/** The name of the inequal predicate. */
+	public static final String INEQUAL = "inequal";
 
 	/**
 	 * The constructor for a state specification.
@@ -145,6 +152,21 @@ public abstract class StateSpec {
 	 */
 	protected abstract KnowledgeBase initialiseBackgroundKnowledge(
 			LogicFactory factory);
+
+	/**
+	 * Parses a rule from a human readable string. the string is in the format
+	 * 'predicate(arg) [& predicate(arg)] -> predicate(arg)'. If an arg is
+	 * uppercase, it is considered a variable. If lowercase, a constant which
+	 * must be referenced in the constant terms map.
+	 * 
+	 * @param rule
+	 *            The string representation of the rule.
+	 * @param constantTerms
+	 *            The objects to replace the constants with.
+	 * @return An instantiated rule.
+	 */
+	public abstract Rule parseRule(String rule,
+			Map<String, Object> constantTerms);
 
 	protected ConstantTerm[] addGoalConstants(List<GuidedPredicate> predicates,
 			org.mandarax.kernel.Rule goalState) {
@@ -246,6 +268,13 @@ public abstract class StateSpec {
 		return goalState_;
 	}
 
+	/**
+	 * Gets the optimal policy for the problem. Or at least gets a good policy.
+	 * 
+	 * @return The policy that is optimal.
+	 */
+	public abstract Policy getOptimalPolicy();
+
 	public KnowledgeBase getBackgroundKnowledge() {
 		return backgroundKnowledge_;
 	}
@@ -281,36 +310,6 @@ public abstract class StateSpec {
 		buffer.append(typePredicates_.size() + " type preds, ");
 		buffer.append(actions_.size() + " actions");
 		return buffer.toString();
-	}
-
-	/**
-	 * Checks if a formed predicate is valid against the background knowledge.
-	 * 
-	 * @param loosePred
-	 *            The yet-to-be formed predicate.
-	 * @param backgroundKnowledge
-	 *            The background knowledge for the environment.
-	 * @param factory
-	 *            The LogicFactory in use
-	 * @param ie
-	 *            The inference engine in use.
-	 * @return True if the predicate is valid, false if it is illegal or
-	 *         redundant.
-	 */
-	public boolean isConditionValid(List condition, LogicFactory factory,
-			InferenceEngine ie) {
-		Query query = factory.createQuery((Fact[]) condition
-				.toArray(new Fact[condition.size()]), "test");
-		try {
-			ResultSet rs = ie.query(query, backgroundKnowledge_,
-					InferenceEngine.ONE, InferenceEngine.BUBBLE_EXCEPTIONS);
-			while (rs.next()) {
-				// I'm not sure...
-				return false;
-			}
-		} catch (Exception e) {
-		}
-		return true;
 	}
 
 	/**
@@ -418,13 +417,16 @@ public abstract class StateSpec {
 		}
 		return specTerm_;
 	}
-	
-	protected static Prerequisite getInequalityPredicate(LogicFactory factory) {
+
+	protected static Predicate getInequalityPredicate(LogicFactory factory) {
 		if (inequalityPred_ == null) {
-//			Class[] types = {
-//			Method method = StateSpec.class.getMethod("inequal", types);
-//			Predicate inequalPred = new JPredicate(method);
-//			inequalityPred_ = factory.createPrerequisite(aPredicate, terms, false);
+			try {
+				Class[] types = { Object[].class, Object.class, Object.class };
+				Method method = StateSpec.class.getMethod(INEQUAL, types);
+				inequalityPred_ = new JPredicate(method);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 		return inequalityPred_;
 	}
@@ -516,10 +518,19 @@ public abstract class StateSpec {
 		returnedKB.add(fact);
 		return fact;
 	}
-	
+
+	/**
+	 * A JPredicate for the inequality clause. It is implicit that all differing
+	 * terms are inequal and this predicate implements the test.
+	 * 
+	 * @param state The current state.
+	 * @param objA The first object.
+	 * @param objB The second object.
+	 * @return True if the objects are inequal.
+	 */
 	public boolean inequal(Object[] state, Object objA, Object objB) {
 		if (objA.equals(objB))
-			return true;
-		return false;
+			return false;
+		return true;
 	}
 }
