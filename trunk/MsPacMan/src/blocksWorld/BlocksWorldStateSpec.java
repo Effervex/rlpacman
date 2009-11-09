@@ -91,7 +91,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	@Override
 	protected Rule initialiseGoalState(LogicFactory factory) {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
-		goal_ = "onab";
+		goal_ = "unstack";
 
 		try {
 		// On(a,b) goal

@@ -291,8 +291,8 @@ public class CrossEntropyExperiment {
 						bestPolicy = thisPolicy;
 
 					// Give an ETA
-					estimateETA(t * population_ + i + 1, run, episodes_
-							* population_, runs);
+					estimateETA(experimentStart_, t * population_ + i + 1, run,
+							episodes_ * population_, runs, "experiment");
 				}
 
 				// Update the weights for all distributions using only the elite
@@ -346,6 +346,7 @@ public class CrossEntropyExperiment {
 	 * @return The average performance of the agent.
 	 */
 	private float testAgent(int episode, int maxSteps) {
+		long testStart = System.currentTimeMillis();
 		System.out.println();
 		System.out.println("Beginning testing for episode " + episode + ".");
 		System.out.println();
@@ -366,6 +367,9 @@ public class CrossEntropyExperiment {
 				RLGlue.RL_episode(maxSteps);
 				averageScore += RLGlue.RL_return();
 			}
+			System.out.println("For episode test: " + episode);
+			estimateETA(testStart, i + 1, 0, TEST_ITERATIONS, 1, "test");
+			System.out.println();
 		}
 		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 
@@ -395,6 +399,8 @@ public class CrossEntropyExperiment {
 	 * Prints out the percentage complete, time elapsed and estimated time to
 	 * completion.
 	 * 
+	 * @param timeStart
+	 *            The start time.
 	 * @param currentProg
 	 *            The current progress.
 	 * @param run
@@ -404,8 +410,9 @@ public class CrossEntropyExperiment {
 	 * @param runs
 	 *            The total number of runs.
 	 */
-	private void estimateETA(int currentProg, int run, int totalProg, int runs) {
-		long elapsedTime = System.currentTimeMillis() - experimentStart_;
+	private void estimateETA(long timeStart, int currentProg, int run,
+			int totalProg, int runs, String stringType) {
+		long elapsedTime = System.currentTimeMillis() - timeStart;
 		double percent = (currentProg * 1.0) / totalProg;
 		double totalPercent = (currentProg * 1.0 + run * totalProg)
 				/ (totalProg * runs);
@@ -413,7 +420,7 @@ public class CrossEntropyExperiment {
 		DecimalFormat formatter = new DecimalFormat("#0.000");
 		String percentStr = formatter.format(100 * percent) + "% run complete.";
 		String totalPercentStr = formatter.format(100 * totalPercent)
-				+ "% experiment complete.";
+				+ "% " + stringType + " complete.";
 		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
 				+ (elapsedTime / (1000 * 60)) % 60 + ":" + (elapsedTime / 1000)
 				% 60;
