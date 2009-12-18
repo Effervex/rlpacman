@@ -7,11 +7,14 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
+import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
@@ -19,20 +22,18 @@ import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.Term;
+import org.mandarax.kernel.VariableTerm;
+import org.mandarax.kernel.meta.JConstructor;
 import org.mandarax.reference.DefaultInferenceEngine;
-import org.mandarax.reference.ResolutionInferenceEngine;
-
-import blocksWorld.Block;
 
 /**
  * A singleton implementation of the current rule base.
  * 
  * @author Samuel J. Sarjant
- * 
  */
 public class RuleBase {
 	/** The delimiter character between rules within the same rule base. */
-	public static final String RULE_DELIMITER = ",";
+	public static final String RULE_DELIMITER = "@";
 
 	/** The distance constant used during the reintegration process. */
 	private static final float DIST_CONSTANT = 0.4f;
@@ -51,12 +52,9 @@ public class RuleBase {
 	/** The single inference engine. */
 	private InferenceEngine inferenceEngine_;
 
-	/** The state specification for the experiment. */
-	private StateSpec stateSpec_;
-
 	/** The cross-entropy generators for the rules within the policy. */
 	private ProbabilityDistribution<GuidedRule>[] ruleGenerators_;
-	
+
 	/** The backup generators to use when unfreezing. */
 	private ProbabilityDistribution<GuidedRule>[] backupRuleGenerators_;
 
@@ -78,7 +76,7 @@ public class RuleBase {
 	private int[][] totalCount_;
 
 	/** The file the initial rulebase is read from. */
-	private final File initialFile_;
+	private File initialFile_;
 
 	/** The class prefix for the experiment. */
 	private String classPrefix_;
@@ -86,17 +84,16 @@ public class RuleBase {
 	/**
 	 * A private constructor for generating a rule base from random.
 	 * 
-	 * @param ruleBases
-	 *            The number of rule bases to generate if random.
 	 * @param classPrefix
 	 *            The class prefix to the environment classes.
 	 */
-	private RuleBase(int ruleBases, String classPrefix) {
+	private RuleBase(String classPrefix, int ruleBases) {
 		factory_ = LogicFactory.getDefaultFactory();
 		inferenceEngine_ = new DefaultInferenceEngine();
 		StateSpec.initInstance(classPrefix, factory_);
 		classPrefix_ = classPrefix;
-		ruleBases = initialiseConditionGenerators(0, classPrefix);
+		ruleBases = initialiseConditionGenerators(ruleBases, formConditions(),
+				formActions());
 		ruleGenerators_ = new ProbabilityDistribution[ruleBases];
 		for (int i = 0; i < ruleBases; i++) {
 			ruleGenerators_[i] = new ProbabilityDistribution<GuidedRule>();
@@ -109,23 +106,23 @@ public class RuleBase {
 	/**
 	 * A private constructor for creating a rule base from file.
 	 * 
+	 * @param classPrefix
+	 *            The class prefix for the environment.
 	 * @param ruleBaseFile
 	 *            The file from which to load the rules.
 	 */
-	private RuleBase(File ruleBaseFile) {
+	private void loadRuleBase(String classPrefix, File ruleBaseFile) {
 		initialFile_ = ruleBaseFile;
-		String prefix = loadRulesFromFile(initialFile_);
-		initialiseConditionGenerators(ruleGenerators_.length, prefix);
+		ruleGenerators_ = loadRulesFromFile(initialFile_,
+				conditionGenerators_[0], actionGenerators_[0]);
+		initialiseConditionGenerators(ruleGenerators_.length,
+				conditionGenerators_[0], actionGenerators_[0]);
 	}
 
 	/**
 	 * Resets the instance to it's default values.
 	 */
 	public void resetInstance() {
-		// Resetting the rule values
-		if (initialFile_ != null) {
-			loadRulesFromFile(initialFile_);
-		}
 		for (ProbabilityDistribution<GuidedRule> pd : ruleGenerators_) {
 			pd.resetProbs();
 		}
@@ -140,35 +137,42 @@ public class RuleBase {
 				pd.resetProbs();
 			}
 		}
+		// Resetting the rule values
+		if (initialFile_ != null) {
+			loadRulesFromFile(initialFile_, conditionGenerators_[0],
+					actionGenerators_[0]);
+		}
 	}
 
 	/**
 	 * Initialises the condition generators.
+	 * 
+	 * @param ruleBases
+	 *            The number of rule bases to maintain. Can be determined by
+	 *            regeneration strategy or number of conditions.
+	 * @param condGenerator
+	 *            The distribution containing all possible conditions.
+	 * @param actGenerator
+	 *            The distribution containing all possible actions.
+	 * @return The number of rule bases used.
 	 */
-	private int initialiseConditionGenerators(int ruleBases, String classPrefix) {
+	private int initialiseConditionGenerators(int ruleBases,
+			ProbabilityDistribution<GuidedPredicate> condGenerator,
+			ProbabilityDistribution<GuidedPredicate> actGenerator) {
 		if (regenerationStrategy_ == SINGLE) {
 			ruleBases = 1;
 		} else if (regenerationStrategy_ == PRIORITY) {
 			ruleBases = ActionSwitch.NUM_PRIORITIES;
 		}
 
-		// Adding the conditions to the first generator.
-		ProbabilityDistribution<GuidedPredicate> condGen = new ProbabilityDistribution<GuidedPredicate>();
-		ProbabilityDistribution<GuidedPredicate> actGen = new ProbabilityDistribution<GuidedPredicate>();
-		try {
-			addConditions(condGen, actGen, classPrefix);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
 		// Using the max number of conditions/actions for the policy and
 		// ruleBase size
 		if (ruleBases == 0)
-			ruleBases = Math.max(condGen.size(), actGen.size());
+			ruleBases = Math.max(condGenerator.size(), actGenerator.size());
 		conditionGenerators_ = new ProbabilityDistribution[ruleBases];
 		actionGenerators_ = new ProbabilityDistribution[ruleBases];
-		conditionGenerators_[0] = condGen;
-		actionGenerators_[0] = actGen;
+		conditionGenerators_[0] = condGenerator;
+		actionGenerators_[0] = actGenerator;
 
 		// Cloning the initialised generator.
 		for (int i = 1; i < ruleBases; i++) {
@@ -191,27 +195,20 @@ public class RuleBase {
 	}
 
 	/**
-	 * Adds all possible conditions to the generator sets.
+	 * Creates all possible conditions from within the StateSpec.
 	 * 
-	 * @param obsGenerator
-	 *            The observation generator to add to.
-	 * @param actGenerator
-	 *            the action generator to add to.
+	 * @return The conditions generator.
 	 */
-	private void addConditions(
-			ProbabilityDistribution<GuidedPredicate> obsGenerator,
-			ProbabilityDistribution<GuidedPredicate> actGenerator,
-			String classPrefix) {
+	private ProbabilityDistribution<GuidedPredicate> formConditions() {
 		// Extracting the information from the StateSpec
 		StateSpec ss = StateSpec.getInstance();
-		List<GuidedPredicate> observationPreds = ss.getPredicates();
-		List<GuidedPredicate> actionPreds = ss.getActions();
 		KnowledgeBase bk = ss.getBackgroundKnowledge();
-
-		// The number of base observation predicates + the empty predicate
-		double baseWeight = 1.0 / (observationPreds.size() + 1);
+		ProbabilityDistribution<GuidedPredicate> obsGenerator = new ProbabilityDistribution<GuidedPredicate>();
 
 		// Adding all the possible conditions
+		List<GuidedPredicate> observationPreds = ss.getPredicates();
+		// The number of base observation predicates + the empty predicate
+		double baseWeight = 1.0 / (observationPreds.size());
 		for (GuidedPredicate pred : observationPreds) {
 			Collection<GuidedPredicate> loosePredicates = pred
 					.createAllLooseInstantiations(bk, factory_,
@@ -222,7 +219,23 @@ public class RuleBase {
 				obsGenerator.add(loosePred, thisWeight);
 			}
 		}
+		if (!obsGenerator.sumsToOne())
+			obsGenerator.normaliseProbs();
+		return obsGenerator;
+	}
 
+	/**
+	 * Creates all possible actions from within the StateSpec.
+	 * 
+	 * @return The actions generator.
+	 */
+	private ProbabilityDistribution<GuidedPredicate> formActions() {
+		// Extracting the information from the StateSpec
+		StateSpec ss = StateSpec.getInstance();
+		KnowledgeBase bk = ss.getBackgroundKnowledge();
+		ProbabilityDistribution<GuidedPredicate> actGenerator = new ProbabilityDistribution<GuidedPredicate>();
+
+		List<GuidedPredicate> actionPreds = ss.getActions();
 		double actionWeight = 1.0 / actionPreds.size();
 		// Adding the actions
 		for (GuidedPredicate act : actionPreds) {
@@ -235,12 +248,9 @@ public class RuleBase {
 				actGenerator.add(looseAct, thisWeight);
 			}
 		}
-
-		// Check the values sum to one
-		if (!obsGenerator.sumsToOne())
-			obsGenerator.normaliseProbs();
 		if (!actGenerator.sumsToOne())
 			actGenerator.normaliseProbs();
+		return actGenerator;
 	}
 
 	/**
@@ -248,30 +258,38 @@ public class RuleBase {
 	 * 
 	 * @param ruleBaseFile
 	 *            The file to load the rules from.
-	 * @return The prefix of the experiment classes used to generate the rules.
+	 * @param actGenerator
+	 * @param condGenerator
+	 * @return The rules loaded in.
 	 */
-	private String loadRulesFromFile(File ruleBaseFile) {
-		ArrayList<ProbabilityDistribution<Rule>> ruleBases = new ArrayList<ProbabilityDistribution<Rule>>();
-		String classPrefix = null;
+	private ProbabilityDistribution<GuidedRule>[] loadRulesFromFile(
+			File ruleBaseFile,
+			ProbabilityDistribution<GuidedPredicate> condGenerator,
+			ProbabilityDistribution<GuidedPredicate> actGenerator) {
+		ArrayList<ProbabilityDistribution<GuidedRule>> ruleBases = new ArrayList<ProbabilityDistribution<GuidedRule>>();
 		try {
 			FileReader reader = new FileReader(ruleBaseFile);
 			BufferedReader bf = new BufferedReader(reader);
 
-			String input = bf.readLine();
-			// First, read the environment class prefix
-			classPrefix = input;
-			if (classPrefix == null)
-				throw new Exception("No class prefix found!");
+			String input = null;
 
-			// Then read the rules in.
+			// Read the rules in.
+			Map<String, Object> constants = StateSpec.getInstance()
+					.getConstants();
 			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
-				ProbabilityDistribution<Rule> ruleBase = new ProbabilityDistribution<Rule>();
+				ProbabilityDistribution<GuidedRule> ruleBase = new ProbabilityDistribution<GuidedRule>();
 				// Split the base into rules
 				String[] split = input.split(RULE_DELIMITER);
 				// For each rule, add it to the rulebase
 				for (int i = 0; i < split.length; i++) {
-					// TODO Handle loading of rules.
-					// ruleBase.add(Rule.parseRule(split[i], classPrefix));
+					Rule rule = StateSpec.getInstance().parseRule(split[i],
+							constants);
+					ArrayList<GuidedPredicate> condsAct = inferGuidedPreds(
+							rule, condGenerator, actGenerator);
+					GuidedPredicate action = condsAct
+							.remove(condsAct.size() - 1);
+					GuidedRule gr = new GuidedRule(rule, condsAct, action);
+					ruleBase.add(gr);
 				}
 				ruleBases.add(ruleBase);
 			}
@@ -279,22 +297,86 @@ public class RuleBase {
 			bf.close();
 			reader.close();
 
-			ruleGenerators_ = ruleBases
-					.toArray(new ProbabilityDistribution[ruleBases.size()]);
+			return ruleBases.toArray(new ProbabilityDistribution[ruleBases
+					.size()]);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
-		return classPrefix;
+		return null;
 	}
 
 	/**
-	 * Save rules to a file.
+	 * Infers GuidedPredicates from a rule - how it was composed.
+	 * 
+	 * @param rule
+	 *            The rule being inferred.
+	 * @param condGenerator
+	 *            The conditions distribution.
+	 * @param actGenerator
+	 *            The actions distribution.
+	 * @return The guided predicates used to make up the rule, with the action
+	 *         predicate at the end.
+	 */
+	private ArrayList<GuidedPredicate> inferGuidedPreds(Rule rule,
+			ProbabilityDistribution<GuidedPredicate> condGenerator,
+			ProbabilityDistribution<GuidedPredicate> actGenerator) {
+		ArrayList<GuidedPredicate> guidedPreds = new ArrayList<GuidedPredicate>();
+		List<Fact> prereqs = rule.getBody();
+		
+		boolean firstPred = true;
+		Collection<Term> usedVariables = new HashSet<Term>();
+		for (int f = 0; f <= prereqs.size(); f++) {
+			Fact fact = (f < prereqs.size()) ? prereqs.get(f) : rule.getHead();
+
+			int offset = (fact instanceof JConstructor) ? 1 : 0;
+			GuidedPredicate structure = StateSpec.getInstance()
+					.getGuidedPredicate(fact.getPredicate().getName());
+
+			if (structure != null) {
+				// Creating the pred terms to define the predicate
+				PredTerm[] predTerms = new PredTerm[structure.getPredValues().length];
+
+				for (int i = 0; i < predTerms.length; i++) {
+					Term matcher = fact.getTerms()[i - offset];
+
+					// If we're dealing with a variable term, it can be TIED
+					// or FREE
+					if (matcher.isVariable()) {
+						VariableTerm varMatcher = (VariableTerm) matcher;
+						// If we're at the first predicate, or we've seen
+						// the term before, it is tied.
+						if ((firstPred) || (usedVariables.contains(matcher))) {
+							predTerms[i] = new PredTerm(varMatcher.getName(),
+									varMatcher.getType(), PredTerm.TIED);
+						} else {
+							// It is a newly occurring free variable
+							predTerms[i] = new PredTerm(varMatcher.getName(),
+									varMatcher.getType(), PredTerm.FREE);
+						}
+
+						usedVariables.add(matcher);
+					} else {
+						// Otherwise, we're dealing with a constant
+						predTerms[i] = new PredTerm(((ConstantTerm) matcher)
+								.getObject());
+					}
+				}
+				guidedPreds.add(new GuidedPredicate(fact.getPredicate(),
+						predTerms));
+				firstPred = false;
+			}
+		}
+
+		return guidedPreds;
+	}
+
+	/**
+	 * Save rules to a file in the format
 	 * 
 	 * @param ruleBaseFile
 	 *            The file to save the rules to.
 	 */
-	public void saveRulesToFile(File ruleBaseFile, String classPrefix) {
+	public void saveRulesToFile(File ruleBaseFile) {
 		try {
 			if (!ruleBaseFile.exists())
 				ruleBaseFile.createNewFile();
@@ -302,15 +384,13 @@ public class RuleBase {
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
 
-			// First, write the class prefix
-			bf.write(classPrefix + "\n");
-
 			// For each of the rule bases
 			for (int i = 0; i < ruleGenerators_.length; i++) {
 				// For each of the rules
 				for (GuidedRule r : ruleGenerators_[i]) {
-					// TODO Handle saving of rules
-					// bf.write(r.toParseableString() + RULE_DELIMITER);
+					bf
+							.write(StateSpec.encodeRule(r.getRule())
+									+ RULE_DELIMITER);
 				}
 				bf.write("\n");
 			}
@@ -418,7 +498,6 @@ public class RuleBase {
 		int i = 0;
 		List<Prerequisite> actPreqs = null;
 		do {
-			// TODO Insert implicit inequalities
 			// Sample from the distributions
 			GuidedPredicate cond = conditionGenerators_[getRegenIndex(ruleSlot)]
 					.sample();
@@ -436,7 +515,8 @@ public class RuleBase {
 			// Attempting to factify the action
 			existingTerms = compileTied(tiableTerms, action
 					.getLooseInstantiation());
-			actPreqs = action.factify(factory_, existingTerms, false, true, null);
+			actPreqs = action.factify(factory_, existingTerms, false, true,
+					null);
 			i++;
 		} while ((i < numPrereqs) || (actPreqs == null));
 
@@ -695,8 +775,6 @@ public class RuleBase {
 			do {
 				// Loop variables
 				int neighbourSlot = sideModifier + slot;
-				int neighbourPriority = Policy.getPriority(neighbourSlot,
-						newDistributions.length);
 				int numRules = Math.round(sharedRatio * size());
 
 				// Only use valid slots (same priority)
@@ -711,8 +789,6 @@ public class RuleBase {
 
 					// Update the variables
 					neighbourSlot += sideModifier;
-					neighbourPriority = Policy.getPriority(neighbourSlot,
-							newDistributions.length);
 					numRules *= distConstant;
 				}
 
@@ -728,7 +804,7 @@ public class RuleBase {
 		}
 
 		// Save the rules to file as they will not be standard
-		saveRulesToFile(new File("reintegralRuleBase.txt"), classPrefix_);
+		saveRulesToFile(new File("reintegralRuleBase.txt"));
 
 		return newDistributions;
 	}
@@ -756,7 +832,7 @@ public class RuleBase {
 		}
 
 		// Save the rules to file
-		saveRulesToFile(new File("regeneratedRuleBase.txt"), classPrefix_);
+		saveRulesToFile(new File("regeneratedRuleBase.txt"));
 	}
 
 	/**
@@ -792,7 +868,8 @@ public class RuleBase {
 	 * Freezes or unfreezes the rule generators contained within. This means
 	 * that the generators are bound and the probabilities within are flattened.
 	 * 
-	 * @param freeze If the state is to freeze.
+	 * @param freeze
+	 *            If the state is to freeze.
 	 */
 	public void freezeState(boolean freeze) {
 		if (freeze) {
@@ -884,15 +961,12 @@ public class RuleBase {
 
 	/**
 	 * Initialises the instance as a set of random rule bases.
-	 * 
-	 * @param policySize
-	 *            The number of rule bases to generate if the rules are random.
 	 */
-	public static void initInstance(int policySize, String classPrefix) {
-		instance_ = new RuleBase(policySize, classPrefix);
+	public static void initInstance(String classPrefix) {
+		instance_ = new RuleBase(classPrefix, 0);
 		try {
 			File ruleBaseFile = new File("ruleBase.txt");
-			instance_.saveRulesToFile(ruleBaseFile, classPrefix);
+			instance_.saveRulesToFile(ruleBaseFile);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -902,11 +976,14 @@ public class RuleBase {
 	/**
 	 * Initialises the rule base to use a set rule base.
 	 * 
+	 * @param classPrefix
+	 *            The class prefix for the environment.
 	 * @param ruleBaseFile
 	 *            The file containing the rules used in the rule base.
 	 */
-	public static void initInstance(File ruleBaseFile) {
-		instance_ = new RuleBase(ruleBaseFile);
+	public static void initInstance(String classPrefix, File ruleBaseFile) {
+		instance_ = new RuleBase(classPrefix, 1);
+		instance_.loadRuleBase(classPrefix, ruleBaseFile);
 	}
 
 	/**
@@ -957,14 +1034,5 @@ public class RuleBase {
 	 */
 	public String getClassPrefix() {
 		return classPrefix_;
-	}
-
-	/**
-	 * Gets the state specifications.
-	 * 
-	 * @return The state spec.
-	 */
-	public StateSpec getStateSpec() {
-		return stateSpec_;
 	}
 }

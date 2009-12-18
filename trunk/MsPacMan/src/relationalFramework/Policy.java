@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
@@ -17,7 +16,6 @@ import org.mandarax.kernel.ResultSet;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.VariableTerm;
-import org.mandarax.kernel.meta.JConstructor;
 import org.mandarax.util.LogicFactorySupport;
 
 /**
@@ -113,50 +111,9 @@ public class Policy {
 			if (priorityRules_[i] != null) {
 				buffer.append("[" + (getPriority(i, priorityRules_.length) + 1)
 						+ "]: ");
-				buffer.append(lightenRule(priorityRules_[i].getRule()) + "\n");
+				buffer.append(StateSpec.encodeRule(priorityRules_[i].getRule()) + "\n");
 			}
 		}
-		return buffer.toString();
-	}
-
-	/**
-	 * Creates a string representation of a rule, in a light, easy-to-read
-	 * format.
-	 * 
-	 * @param rule
-	 *            The rule begin output.
-	 * @return A light representation of the rule.
-	 */
-	private String lightenRule(Rule rule) {
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("IF ");
-		// Only output the prereqs that aren't type preds
-		List<Prerequisite> body = rule.getBody();
-
-		boolean noRules = true;
-		boolean plural = false;
-		// Check all prereqs, only outputting the Java preds
-		for (Prerequisite prereq : body) {
-			// Don't show type and inequal predicates.
-			if ((!StateSpec.getInstance()
-					.isTypePredicate(prereq.getPredicate()))
-					&& (!prereq.getPredicate().getName()
-							.equals(StateSpec.INEQUAL))) {
-				// If we have more than one condition
-				if (plural)
-					buffer.append("AND ");
-
-				buffer.append(StateSpec.lightenFact(prereq));
-				plural = true;
-				noRules = false;
-			}
-		}
-		if (noRules)
-			buffer.append("TRUE ");
-
-		buffer.append("THEN ");
-		buffer.append(StateSpec.lightenFact(rule.getHead()));
-
 		return buffer.toString();
 	}
 

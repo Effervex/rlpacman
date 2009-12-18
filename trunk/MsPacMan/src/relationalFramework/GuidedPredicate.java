@@ -11,9 +11,6 @@ import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Query;
-import org.mandarax.kernel.ResultSet;
-import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JConstructor;
 
@@ -177,7 +174,7 @@ public class GuidedPredicate {
 	 * @param negated
 	 *            If the prerequisite is negated.
 	 * @param allTerms
-	 *            TODO
+	 *            The list of all terms used so far.
 	 * @return A instantiated version of this guided predicate with type
 	 *         predicates, if it can be. Also fills the existing terms array
 	 *         with the terms used.
@@ -188,7 +185,7 @@ public class GuidedPredicate {
 		// If we don't have all terms, create one
 		if (allTerms == null)
 			allTerms = new HashSet<Term>();
-		
+
 		List<Prerequisite> result = new LinkedList<Prerequisite>();
 
 		int offset = 0;
@@ -316,8 +313,8 @@ public class GuidedPredicate {
 		if (looseInstantiation_ != null)
 			argTerm = looseInstantiation_[index - offset];
 		else
-			argTerm = new PredTerm(predValues_[index][0].getValue(), termClass,
-					PredTerm.TIED);
+			argTerm = new PredTerm(predValues_[index - offset][0].getValue(),
+					termClass, PredTerm.TIED);
 
 		// If we have a tied term
 		if (argTerm.getTermType() == PredTerm.TIED) {
@@ -379,7 +376,7 @@ public class GuidedPredicate {
 					return false;
 			}
 
-			if (predicate_.equals(gp.predicate_)) {
+			if (predicate_.getName().equals(gp.predicate_.getName())) {
 				boolean predValEquals = predValues_ == null ? gp.predValues_ == null
 						: Arrays.deepEquals(predValues_, gp.predValues_);
 				boolean looseInstantEquals = looseInstantiation_ == null ? gp.looseInstantiation_ == null

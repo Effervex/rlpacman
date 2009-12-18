@@ -383,8 +383,6 @@ public class GameModel {
 		}
 
 		// Add the dots and powerdots to the KB
-		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
-		String classPrefix = RuleBase.getInstance().getClassPrefix();
 		for (Dot dot : m_dots.values()) {
 			addKBFact(dot);
 		}

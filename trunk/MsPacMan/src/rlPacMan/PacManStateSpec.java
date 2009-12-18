@@ -1,7 +1,6 @@
 package rlPacMan;
 
 import java.awt.Point;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -11,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.mandarax.kernel.ConstantTerm;
-import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
@@ -20,7 +17,6 @@ import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
-import org.mandarax.kernel.meta.JPredicate;
 
 import relationalFramework.GuidedPredicate;
 import relationalFramework.Policy;
@@ -70,8 +66,9 @@ public class PacManStateSpec extends StateSpec {
 					15, 21, 99 }, Ghost.class, "proximalGhost"));
 
 			// NEAREST EDIBLE GHOST
-			predicates.add(pacPointPredicate("Ghost", new Integer[] { 3, 6, 10,
-					13, 19, 99 }, Ghost.class, "proximalEdibleGhost"));
+			predicates
+					.add(pacPointPredicate("Ghost", new Integer[] { 3, 6, 10,
+							13, 19, 99 }, Ghost.class, "proximalEdibleGhost"));
 
 			// NEAREST FRUIT
 			predicates.add(pacPointPredicate("Fruit", new Integer[] { 2, 8, 13,
@@ -98,10 +95,10 @@ public class PacManStateSpec extends StateSpec {
 					33.08, 39.77, 99.0 }, "ghostDistanceSum"));
 
 			// GHOSTS FLASHING
-			predicates.add(createDefinedPredicate(
-					PacManStateSpec.class,
+			predicates.add(createDefinedPredicate(PacManStateSpec.class,
 					new Class[] { Object[].class },
-					new PredTerm[][] { createTied("State", Object[].class) }, "ghostsFlashing"));
+					new PredTerm[][] { createTied("State", Object[].class) },
+					"ghostsFlashing"));
 
 			// EMPTY PREDICATE
 			Predicate empty = new SimplePredicate("true",
@@ -125,20 +122,20 @@ public class PacManStateSpec extends StateSpec {
 			PredTerm[][] predVals = new PredTerm[2][];
 			predVals[0] = createTied("State", Object[].class);
 			predVals[1] = createTied("Location", PacPoint.class);
-			actions.add(createDefinedPredicate(PacManStateSpec.class, moveStructure,
-					predVals, "moveTowards"));
+			actions.add(createDefinedPredicate(PacManStateSpec.class,
+					moveStructure, predVals, "moveTowards"));
 
 			// MOVE FROM
-			actions.add(createDefinedPredicate(PacManStateSpec.class, moveStructure,
-					predVals, "moveFrom"));
+			actions.add(createDefinedPredicate(PacManStateSpec.class,
+					moveStructure, predVals, "moveFrom"));
 
 			// KEEP DIRECTION
-//			moveStructure = new Class[1];
-//			moveStructure[0] = Object[].class;
-//			predVals = new PredTerm[1][];
-//			predVals[0] = createTied("State", Object[].class);
-//			actions.add(createDefinedPredicate(moveStructure, predVals,
-//					"keepDirection"));
+			// moveStructure = new Class[1];
+			// moveStructure[0] = Object[].class;
+			// predVals = new PredTerm[1][];
+			// predVals[0] = createTied("State", Object[].class);
+			// actions.add(createDefinedPredicate(moveStructure, predVals,
+			// "keepDirection"));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -153,6 +150,12 @@ public class PacManStateSpec extends StateSpec {
 		// TODO Fill in the goal.
 
 		return factory.createRule(prereqs, StateSpec.getTerminalFact(factory));
+	}
+
+	@Override
+	protected Policy initialiseOptimalPolicy() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	@Override
@@ -178,8 +181,6 @@ public class PacManStateSpec extends StateSpec {
 		return kb;
 	}
 
-	
-
 	/**
 	 * Method for creating predicates relating to direct value comparisons.
 	 * 
@@ -191,8 +192,7 @@ public class PacManStateSpec extends StateSpec {
 	 * @throws NoSuchMethodException
 	 *             If the method doesn't exist.
 	 */
-	private GuidedPredicate valuePredicate(Double[] vals, String methodName)
-			throws NoSuchMethodException {
+	private GuidedPredicate valuePredicate(Double[] vals, String methodName) throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[2][];
 		predValues[0] = createTied("State", Object[].class);
@@ -202,8 +202,8 @@ public class PacManStateSpec extends StateSpec {
 		Class[] predicateStructure = new Class[2];
 		predicateStructure[0] = Object[].class;
 		predicateStructure[1] = Double.class;
-		return createDefinedPredicate(PacManStateSpec.class, predicateStructure,
-				predValues, methodName);
+		return createDefinedPredicate(PacManStateSpec.class,
+				predicateStructure, predValues, methodName);
 	}
 
 	/**
@@ -223,8 +223,7 @@ public class PacManStateSpec extends StateSpec {
 	 *             If the method does not exist.
 	 */
 	private GuidedPredicate pacPointPredicate(String secondParamName,
-			Integer[] distanceVals, Class secondClass, String methodName)
-			throws NoSuchMethodException {
+			Integer[] distanceVals, Class secondClass, String methodName) throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[3][];
 		predValues[0] = createTied("State", Object[].class);
@@ -236,25 +235,8 @@ public class PacManStateSpec extends StateSpec {
 		predicateStructure[0] = Object[].class;
 		predicateStructure[1] = secondClass;
 		predicateStructure[2] = Integer.class;
-		return createDefinedPredicate(PacManStateSpec.class, predicateStructure,
-				predValues, methodName);
-	}
-
-	@Override
-	public Policy getOptimalPolicy() {
-		// TODO Optimal policy for Pacman? I could define a good one, I suppose.
-		// If the junction is risky, run for it.
-		// If there are edible (non-flashing) ghosts, chow down
-		// If there is a dot nearby, chow down
-		// If there is a dot somewhere, chow down
-		// Priority level 2: Always go towards the maximally safe junction
-		return null;
-	}
-
-	@Override
-	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
-		// This will be done when I make the above policy.
-		return null;
+		return createDefinedPredicate(PacManStateSpec.class,
+				predicateStructure, predValues, methodName);
 	}
 
 	// // // // // THE PREDICATE METHODS // // // // //
@@ -540,8 +522,10 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		// Test if the specified location is free
-		int x = (player.m_locX + xOffset + distanceGrid.length) % distanceGrid.length;
-		int y = (player.m_locY + yOffset + distanceGrid[0].length) % distanceGrid[0].length;
+		int x = (player.m_locX + xOffset + distanceGrid.length)
+				% distanceGrid.length;
+		int y = (player.m_locY + yOffset + distanceGrid[0].length)
+				% distanceGrid[0].length;
 		if (distanceGrid[x][y] < Integer.MAX_VALUE) {
 			return player.m_direction;
 		} else {
