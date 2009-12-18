@@ -1,7 +1,7 @@
 blocksWorld.BlocksWorld
 100
 25
-100
+ruleBase.txt
 bestBlocksPolicy.txt
 generatorBlocksOutput.txt
 blocksPerformance.txt

@@ -203,7 +203,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				for (Fact fact : actionArray[i]) {
 					Byte direction = (Byte) fact.getPredicate().perform(
 							fact.getTerms(), null);
-					// TODO Deal with negative directions
 					if (direction > 0)
 						directionVote[direction]++;
 					else if (direction < 0)

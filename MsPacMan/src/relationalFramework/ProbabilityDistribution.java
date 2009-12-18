@@ -454,32 +454,27 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	// @Override
 	public boolean remove(Object arg0) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	// @Override
 	public boolean removeAll(Collection<?> arg0) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	// @Override
 	public boolean retainAll(Collection<?> arg0) {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	// @Override
 	public Object[] toArray() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
 	// @Override
 	@SuppressWarnings("hiding")
 	public <T> T[] toArray(T[] arg0) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 

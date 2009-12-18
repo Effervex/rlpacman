@@ -35,8 +35,6 @@ public class Dot extends Thing {
 
 	@Override
 	protected void updatePixelVals(GameUI gameUI) {
-		// TODO Auto-generated method stub
-		
 	}
 	
 	public String toString() {

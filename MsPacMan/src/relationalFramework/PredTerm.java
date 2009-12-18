@@ -1,5 +1,6 @@
 package relationalFramework;
 
+
 /**
  * A small class for defining the type of values that can be in a defined
  * predicate. Values can be either constants, free variables, or tied variables.
@@ -103,6 +104,7 @@ public class PredTerm {
 		PredTerm[] terms = new PredTerm[objs.length];
 		for (int i = 0; i < objs.length; i++) {
 			terms[i] = new PredTerm(objs[i]);
+			StateSpec.getInstance().addConstant(objs[i].toString(), objs[i]);
 		}
 		return terms;
 	}

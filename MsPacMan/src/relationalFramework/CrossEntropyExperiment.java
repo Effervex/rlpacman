@@ -7,16 +7,12 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.text.DecimalFormat;
 import java.util.*;
-import java.util.logging.Logger;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Category;
 import org.apache.log4j.Level;
-import org.mandarax.kernel.Rule;
 import org.rlcommunity.rlglue.codec.RLGlue;
-import org.rlcommunity.rlglue.codec.types.RL_abstract_type;
 
 /**
  * The cross entropy algorithm implementation.
@@ -110,7 +106,45 @@ public class CrossEntropyExperiment {
 	}
 
 	/**
-	 * A constructor for the typical arguments plus an initial rule base.
+	 * A bare minimal initialiser, should only be called by other initialise
+	 * methods as their first execution.
+	 * 
+	 * @param populationSize
+	 *            The size of the population used in calculations.
+	 * @param episodeCount
+	 *            The number of episodes to perform.
+	 * @param policyFile
+	 *            The output file for the best policy.
+	 * @param generatorFile
+	 *            The output file for the generators.
+	 * @param performanceFile
+	 *            The output file for the agent's performance.
+	 */
+	private void initialise(int populationSize, int episodeCount,
+			String policyFile, String generatorFile, String performanceFile) {
+		population_ = populationSize;
+		episodes_ = episodeCount;
+
+		// Create the output files if necessary
+		policyFile_ = new File(policyFile);
+		generatorFile_ = new File(generatorFile);
+		performanceFile_ = new File(performanceFile);
+		try {
+			if (!policyFile_.exists())
+				policyFile_.createNewFile();
+			if (!generatorFile_.exists())
+				generatorFile_.createNewFile();
+			if (!performanceFile_.exists())
+				performanceFile_.createNewFile();
+			TEMP_FOLDER.mkdir();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * A constructor for the typical arguments and a randomly generated rule
+	 * base.
 	 * 
 	 * @param environmentClass
 	 *            The name of the environment class files.
@@ -130,33 +164,17 @@ public class CrossEntropyExperiment {
 	private void initialise(String environmentClass, int populationSize,
 			int episodeCount, int policySize, String policyFile,
 			String generatorFile, String performanceFile) {
-		population_ = populationSize;
-		episodes_ = episodeCount;
+		initialise(populationSize, episodeCount, policyFile, generatorFile,
+				performanceFile);
 
 		// Load the generators from the input file
-		RuleBase.initInstance(0, environmentClass);
+		RuleBase.initInstance(environmentClass);
 		policySize_ = RuleBase.getInstance().getNumSlots();
 
 		slotGenerator_ = new ProbabilityDistribution<Integer>();
 		// Filling the generators
 		for (int i = 0; i < policySize_; i++) {
 			slotGenerator_.add(i, 0.5);
-		}
-
-		// Create the output files if necessary
-		policyFile_ = new File(policyFile);
-		generatorFile_ = new File(generatorFile);
-		performanceFile_ = new File(performanceFile);
-		try {
-			if (!policyFile_.exists())
-				policyFile_.createNewFile();
-			if (!generatorFile_.exists())
-				generatorFile_.createNewFile();
-			if (!performanceFile_.exists())
-				performanceFile_.createNewFile();
-			TEMP_FOLDER.mkdir();
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -181,11 +199,11 @@ public class CrossEntropyExperiment {
 	private void initialise(String environmentClass, int populationSize,
 			int episodeCount, String ruleFile, String policyFile,
 			String generatorFile, String performanceFile) {
-		initialise(environmentClass, populationSize, episodeCount, 1,
-				policyFile, generatorFile, performanceFile);
+		initialise(populationSize, episodeCount, policyFile, generatorFile,
+				performanceFile);
 
 		// Load the generators from the input file
-		RuleBase.initInstance(new File(ruleFile));
+		RuleBase.initInstance(environmentClass, new File(ruleFile));
 		RuleBase.getInstance().normaliseDistributions();
 		policySize_ = RuleBase.getInstance().getNumSlots();
 
@@ -224,6 +242,7 @@ public class CrossEntropyExperiment {
 			String generatorFile, String performanceFile, String genInputFile) {
 		initialise(environmentClass, populationSize, episodeCount, ruleFile,
 				policyFile, generatorFile, performanceFile);
+
 		// Load the generators from the input file
 		try {
 			loadGenerators(new File(genInputFile));
@@ -245,20 +264,20 @@ public class CrossEntropyExperiment {
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("25");
+		RLGlue.RL_env_message("5");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
 
-		// Determine the iitial run (as previous runs may hve already been done
+		// Determine the initial run (as previous runs may have already been
+		// done
 		// in a previous experiment)
-		// TODO int run = checkFiles();
-		int run = 0;
+		int run = checkFiles();
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
-			episodePerformances[0] = testAgent(-1, maxSteps);
+			episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
 			float runningAverage = 0;
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
@@ -271,7 +290,8 @@ public class CrossEntropyExperiment {
 					Policy pol = generatePolicy(policySize_, slotGenerator_);
 					System.out.println(pol);
 					// Send the agent a generated policy
-					RLGlue.RL_agent_message(pol.toParseableString());
+					ObjectObservations.getInstance().objectArray = new Policy[] { pol };
+					RLGlue.RL_agent_message("Policy");
 
 					float score = 0;
 					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
@@ -301,14 +321,14 @@ public class CrossEntropyExperiment {
 						* SELECTION_RATIO));
 
 				// Test the agent and record the performances
-				episodePerformances[t + 1] = testAgent(t, maxSteps);
+				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs);
 				runningAverage = ((episodePerformances[t + 1] - episodePerformances[t]) + runningAverage) / 2;
 
 				// Run post-update operations on the distributions
 				double sineRatio = (-Math.cos((t * 2 * Math.PI)
 						/ (episodes_ - 1)) + 1) / 2 * 0.08;
 				ratioShared_ = RuleBase.getInstance().postUpdateOperations(
-						runningAverage, ratioShared_, STEP_SIZE);
+						runningAverage, (float) sineRatio, STEP_SIZE);
 
 				// Save the results at each episode
 				try {
@@ -343,9 +363,15 @@ public class CrossEntropyExperiment {
 	 * 
 	 * @param maxSteps
 	 *            The maximum number of allowed.
+	 * @param episode
+	 *            The current episode
+	 * @param run
+	 *            The current run number.
+	 * @param runs
+	 *            The total number of runs to complete.
 	 * @return The average performance of the agent.
 	 */
-	private float testAgent(int episode, int maxSteps) {
+	private float testAgent(int episode, int maxSteps, int run, int runs) {
 		long testStart = System.currentTimeMillis();
 		System.out.println();
 		System.out.println("Beginning testing for episode " + episode + ".");
@@ -361,14 +387,19 @@ public class CrossEntropyExperiment {
 			Policy pol = generatePolicy(policySize_, frozenSlotGen);
 			System.out.println(pol);
 			// Send the agent a generated policy
-			RLGlue.RL_agent_message(pol.toParseableString());
+			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
+			RLGlue.RL_agent_message("Policy");
 
+			double score = 0;
 			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 				RLGlue.RL_episode(maxSteps);
-				averageScore += RLGlue.RL_return();
+				score += RLGlue.RL_return();
 			}
+			averageScore += score;
+			System.out.println(score / AVERAGE_ITERATIONS + "\n");
+
 			System.out.println("For episode test: " + episode);
-			estimateETA(testStart, i + 1, 0, TEST_ITERATIONS, 1, "test");
+			estimateETA(testStart, i + 1, run, TEST_ITERATIONS, runs, "test");
 			System.out.println();
 		}
 		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
@@ -419,8 +450,8 @@ public class CrossEntropyExperiment {
 
 		DecimalFormat formatter = new DecimalFormat("#0.000");
 		String percentStr = formatter.format(100 * percent) + "% run complete.";
-		String totalPercentStr = formatter.format(100 * totalPercent)
-				+ "% " + stringType + " complete.";
+		String totalPercentStr = formatter.format(100 * totalPercent) + "% "
+				+ stringType + " complete.";
 		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
 				+ (elapsedTime / (1000 * 60)) % 60 + ":" + (elapsedTime / 1000)
 				% 60;
@@ -690,6 +721,7 @@ public class CrossEntropyExperiment {
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
+			// TODO Use firing rules only. Note that this stuffs up testAgent...
 			GuidedRule[] polRules = eliteSolution.getRules();
 			for (int i = 0; i < polRules.length; i++) {
 				// If there is a rule
@@ -738,7 +770,7 @@ public class CrossEntropyExperiment {
 		CrossEntropyExperiment theExperiment = new CrossEntropyExperiment(
 				new File(args[0]));
 
-		theExperiment.runExperiment(1);
+		theExperiment.runExperiment(10);
 		System.exit(0);
 	}
 

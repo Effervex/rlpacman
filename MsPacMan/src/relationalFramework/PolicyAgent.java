@@ -39,8 +39,8 @@ public class PolicyAgent implements AgentInterface {
 	// @Override
 	public String agent_message(String arg0) {
 		// Receive a policy
-		if (arg0.substring(0, Policy.PREFIX.length()).equals(Policy.PREFIX)) {
-			policy_ = Policy.parsePolicy(arg0);
+		if (arg0.equals("Policy")) {
+			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 		} else if (arg0.equals("getFired")) {
 			return policy_.getFiredString();
 		}

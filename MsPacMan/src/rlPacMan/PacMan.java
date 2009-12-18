@@ -26,7 +26,7 @@ public class PacMan {
 	protected AgentInterface agent_;
 	protected PacManKeyAdapter keyAdapter_;
 
-	public boolean experimentMode_ = false;
+	public boolean experimentMode_ = true;
 
 	public void init() {
 		setTicksPerSec(35);

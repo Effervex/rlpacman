@@ -1,31 +1,29 @@
 package relationalFramework;
 
 import java.lang.reflect.Method;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import org.mandarax.kernel.ClauseSet;
 import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Query;
-import org.mandarax.kernel.ResultSet;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JConstructor;
 import org.mandarax.kernel.meta.JPredicate;
 
-import rlPacMan.PacManStateSpec;
+import blocksWorld.Block;
 
 /**
  * A class to outline the specifications of the environment.
@@ -38,9 +36,6 @@ public abstract class StateSpec {
 
 	/** The terminal fact. */
 	private static Fact terminal_;
-
-	/** The illegal fact. */
-	private static Fact illegal_;
 
 	/** The variable state term. */
 	private static Term stateTerm_;
@@ -67,10 +62,13 @@ public abstract class StateSpec {
 	private org.mandarax.kernel.Rule goalState_;
 
 	/** The constants found within the goal. */
-	private ConstantTerm[] goalConstants_;
+	private Map<String, Object> constants_;
 
 	/** The name of the goal. */
 	protected String goal_;
+
+	/** The optimal policy for the goal. */
+	private Policy optimalPolicy_;
 
 	/** The background knowledge regarding the predicates and actions. */
 	private KnowledgeBase backgroundKnowledge_;
@@ -85,13 +83,14 @@ public abstract class StateSpec {
 	 * The constructor for a state specification.
 	 */
 	protected void initialise(LogicFactory factory) {
+		constants_ = new HashMap<String, Object>();
 		typePredicates_ = initialiseTypePredicates();
 		predicates_ = initialisePredicates();
 		actions_ = initialiseActions();
 		predByNames_ = createPredNameMap();
 		goalState_ = initialiseGoalState(factory);
 		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory);
-		goalConstants_ = addGoalConstants(predicates_, goalState_);
+		addGoalConstants(predicates_, goalState_);
 	}
 
 	/**
@@ -146,6 +145,16 @@ public abstract class StateSpec {
 			LogicFactory factory);
 
 	/**
+	 * Initialises the optimal policy for the goal.
+	 * 
+	 * @param factory
+	 *            The factory for creating rules.
+	 * 
+	 * @return The policy that solves the goal in optimal time.
+	 */
+	protected abstract Policy initialiseOptimalPolicy();
+
+	/**
 	 * Initialises the background knowledge.
 	 * 
 	 * @return The background knowledge base.
@@ -154,22 +163,158 @@ public abstract class StateSpec {
 			LogicFactory factory);
 
 	/**
+	 * Adds a string id to a constant used.
+	 * 
+	 * @param id The string id, sans the "[X]" brackets
+	 * @param obj The object linked to.
+	 */
+	public void addConstant(String id, Object obj) {
+		constants_.put(id, obj);
+	}
+
+	/**
 	 * Parses a rule from a human readable string. the string is in the format
-	 * 'predicate(arg) [& predicate(arg)] -> predicate(arg)'. If an arg is
-	 * uppercase, it is considered a variable. If lowercase, a constant which
-	 * must be referenced in the constant terms map.
+	 * 'predicate(arg[,arg]) [& predicate(arg[,arg])] -> predicate(arg[,arg])'.
+	 * If an arg is uppercase, it is considered a variable. If lowercase, a
+	 * constant which must be referenced in the constant terms map.
 	 * 
 	 * @param rule
 	 *            The string representation of the rule.
 	 * @param constantTerms
 	 *            The objects to replace the constants with.
+	 * 
 	 * @return An instantiated rule.
 	 */
-	public abstract Rule parseRule(String rule,
-			Map<String, Object> constantTerms);
+	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
+		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
+		String[][] info = extractInfo(rule);
+		// Compiling the initial term map of constants
+		Map<String, Term> termMap = new HashMap<String, Term>();
+		for (String constant : constantTerms.keySet()) {
+			termMap.put(constant, factory.createConstantTerm(constantTerms
+					.get(constant)));
+		}
 
-	protected ConstantTerm[] addGoalConstants(List<GuidedPredicate> predicates,
+		// Form the rule
+		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
+		Fact actionFact = null;
+		Set<Term> allTerms = new HashSet<Term>();
+		for (int i = 0; i < info.length; i++) {
+			// Get the guided predicate
+			GuidedPredicate cond = getGuidedPredicate(info[i][0]);
+			// Check if it's a JConstructor
+			int offset = (cond.getPredicate() instanceof JConstructor) ? 1 : 0;
+			// Find the terms used in the predicate arguments
+			Term[] terms = findTerms(factory, termMap, info[i], cond
+					.getPredicate().getStructure(), offset);
+			// Instantiate the guided predicate with the args.
+			List<Prerequisite> rulePreqs = cond.factify(factory, terms, false,
+					false, allTerms);
+			// Add the resulting prerequisites
+			for (Prerequisite prereq : rulePreqs) {
+				// Separate the action
+				if (i < info.length - 1) {
+					// Add as condition
+					if (!prereqs.contains(prereq))
+						prereqs.add(prereq);
+				} else {
+					// Add as action
+					if (prereq.getPredicate().getName().equals(info[i][0])) {
+						actionFact = prereq;
+					}
+				}
+			}
+		}
+
+		return factory.createRule(prereqs, actionFact);
+	}
+
+	/**
+	 * Finds or creates the terms present in the predicate
+	 * 
+	 * @param factory
+	 *            The factory to create terms.
+	 * @param termMap
+	 *            The map of existing terms.
+	 * @param predArgs
+	 *            The predicate and its arguments.
+	 * 
+	 * @return An array of terms used in the predicate.
+	 */
+	private Term[] findTerms(LogicFactory factory, Map<String, Term> termMap,
+			String[] predArgs, Class[] predStructure, int offset) {
+		Term[] terms = new Term[predArgs.length - 1];
+
+		for (int i = 0; i < terms.length; i++) {
+			// If the term is a constant or has occurred already, get it from
+			// the
+			// map
+			if (termMap.containsKey(predArgs[i + 1])) {
+				terms[i] = termMap.get(predArgs[i + 1]);
+			} else {
+				// The term is a new variable
+				terms[i] = factory.createVariableTerm(predArgs[i + 1],
+						predStructure[i + 1 + offset]);
+				termMap.put(predArgs[i + 1], terms[i]);
+			}
+		}
+		return terms;
+	}
+
+	/**
+	 * Extracts the predicates and predicate arguments from a string rule.
+	 * 
+	 * @param rule
+	 *            The rule being extracted
+	 * @return A 2D array of predicates, with an array per predicate, and each
+	 *         array containing the pred name and the arguments. The last
+	 *         predicate is the action.
+	 */
+	private String[][] extractInfo(String rule) {
+		// Split the rule into conditions and actions
+		String[] split = rule.split("->");
+		if (split.length < 2)
+			return null;
+
+		String[] conditions = split[0].split("&");
+		String[][] info = new String[conditions.length + 1][];
+		for (int i = 0; i < info.length; i++) {
+			String predicate = (i < info.length - 1) ? conditions[i] : split[1];
+
+			// A Regexp looking for a predicate with args 'clear([a])'
+			// 'move([b],<X>)' 'cool()'
+			Pattern p = Pattern
+					.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>))"
+							+ "(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)))*)*)\\)");
+			Matcher m = p.matcher(predicate);
+			if (m.find()) {
+				// Group 1 is the predicate name, Group 2 is the arg(s)
+				String arguments = m.group(2).replaceAll("(\\[|\\]|<|>)", "");
+				String[] args = arguments.split(",");
+				info[i] = new String[args.length + 1];
+				info[i][0] = m.group(1);
+				for (int j = 0; j < args.length; j++) {
+					info[i][j + 1] = args[j];
+				}
+			} else {
+				return null;
+			}
+		}
+
+		return info;
+	}
+
+	/**
+	 * Adds the constants used in the goal to all predicates in the system.
+	 * 
+	 * @param predicates
+	 *            The predicates in the system.
+	 * @param goalState
+	 *            The goal state.
+	 */
+	private ConstantTerm[] addGoalConstants(List<GuidedPredicate> predicates,
 			org.mandarax.kernel.Rule goalState) {
+		List<ConstantTerm> constantTerms = new ArrayList<ConstantTerm>();
 		List<Fact> body = goalState.getBody();
 		Map<Class, Set<ConstantTerm>> constantMap = new HashMap<Class, Set<ConstantTerm>>();
 		// For every fact in the body of the rule, extract the constants
@@ -185,6 +330,7 @@ public abstract class StateSpec {
 						constantMap.put(term.getType(), constants);
 					}
 					constants.add((ConstantTerm) term);
+					constantTerms.add((ConstantTerm) term);
 				}
 			}
 		}
@@ -227,7 +373,7 @@ public abstract class StateSpec {
 			}
 		}
 
-		return null;
+		return constantTerms.toArray(new ConstantTerm[constantTerms.size()]);
 	}
 
 	/**
@@ -273,14 +419,18 @@ public abstract class StateSpec {
 	 * 
 	 * @return The policy that is optimal.
 	 */
-	public abstract Policy getOptimalPolicy();
+	public Policy getOptimalPolicy() {
+		if (optimalPolicy_ == null)
+			optimalPolicy_ = initialiseOptimalPolicy();
+		return optimalPolicy_;
+	}
 
 	public KnowledgeBase getBackgroundKnowledge() {
 		return backgroundKnowledge_;
 	}
 
-	public ConstantTerm[] getGoalConstants() {
-		return goalConstants_;
+	public Map<String, Object> getConstants() {
+		return constants_;
 	}
 
 	/**
@@ -470,6 +620,51 @@ public abstract class StateSpec {
 		return instance_;
 	}
 
+	/**
+	 * Creates a string representation of a rule, in a light, easy-to-read, and
+	 * parsable format.
+	 * 
+	 * @param rule
+	 *            The rule begin output.
+	 * @return A light, parsable representation of the rule.
+	 */
+	public static String encodeRule(Rule rule) {
+		StringBuffer buffer = new StringBuffer();
+		// Only output the prereqs that aren't type preds
+		List<Prerequisite> body = rule.getBody();
+
+		boolean noRules = true;
+		boolean plural = false;
+		// Check all prereqs, only outputting the Java preds
+		for (Prerequisite prereq : body) {
+			// Don't show type and inequal predicates.
+			if ((!StateSpec.getInstance()
+					.isTypePredicate(prereq.getPredicate()))
+					&& (!prereq.getPredicate().getName().equals(
+							StateSpec.INEQUAL))) {
+				// If we have more than one condition
+				if (plural)
+					buffer.append("& ");
+
+				buffer.append(StateSpec.lightenFact(prereq));
+				plural = true;
+				noRules = false;
+			}
+		}
+
+		buffer.append("-> ");
+		buffer.append(StateSpec.lightenFact(rule.getHead()));
+
+		return buffer.toString();
+	}
+
+	/**
+	 * Encodes a fact by removing unnecessary terms from the description.
+	 * 
+	 * @param fact
+	 *            The fact being simplified.
+	 * @return A string output of the simplified fact.
+	 */
 	public static String lightenFact(Fact fact) {
 		StringBuffer buffer = new StringBuffer();
 
@@ -523,9 +718,12 @@ public abstract class StateSpec {
 	 * A JPredicate for the inequality clause. It is implicit that all differing
 	 * terms are inequal and this predicate implements the test.
 	 * 
-	 * @param state The current state.
-	 * @param objA The first object.
-	 * @param objB The second object.
+	 * @param state
+	 *            The current state.
+	 * @param objA
+	 *            The first object.
+	 * @param objB
+	 *            The second object.
 	 * @return True if the objects are inequal.
 	 */
 	public boolean inequal(Object[] state, Object objA, Object objB) {

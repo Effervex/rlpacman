@@ -2,7 +2,9 @@ package blocksWorld;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.mandarax.kernel.ClauseSet;
@@ -23,6 +25,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
+import relationalFramework.PolicyAgent;
 import relationalFramework.RuleBase;
 import relationalFramework.StateSpec;
 
@@ -39,7 +42,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private int numBlocks_ = 5;
 
 	/** The state of the blocks world. */
-	private Integer[] state_;
+	private State state_;
 
 	/** The state of the blocks world in base predicates. */
 	private KnowledgeBase stateKB_;
@@ -47,25 +50,32 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	/** The blocks contained within the environment. */
 	private ConstantTerm[] blocks_;
 
-	/** The number of steps from the optimal path. */
+	/** The number of steps taken. */
 	private int steps_;
 
-	@Override
+	/** The optimal number of steps for a state to be solved. */
+	private Map<State, Integer> optimalMap_;
+
+	/** The optimal number of steps. */
+	private int optimalSteps_;
+
+	// @Override
 	public void env_cleanup() {
 		stateKB_ = null;
 		state_ = null;
 		blocks_ = null;
 	}
 
-	@Override
+	// @Override
 	public String env_init() {
 		stateKB_ = new org.mandarax.reference.KnowledgeBase();
 		// Assign the blocks
 		blocks_ = createBlocks(numBlocks_);
+		optimalMap_ = new HashMap<State, Integer>();
 		return null;
 	}
 
-	@Override
+	// @Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
 			return (numBlocks_ * STEP_CONSTANT) + "";
@@ -88,20 +98,31 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		return null;
 	}
 
-	@Override
+	// @Override
 	public Observation env_start() {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-		steps_ = optimalSteps();
+		optimalSteps_ = optimalSteps();
+		steps_ = 0;
 
+		return formObs_Start();
+	}
+
+	/**
+	 * Forms the observation for the first step of the experiment.
+	 * 
+	 * @return The (useless) observation. The real return is the singleton
+	 *         ObjectObservation.
+	 */
+	private Observation formObs_Start() {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		ObjectObservations.getInstance().predicateKB = stateKB_;
 		return obs;
 	}
 
-	@Override
+	// @Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		Fact action = null;
 		Random random = new Random();
@@ -113,22 +134,27 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				break;
 		}
 
-		Integer[] newState = actOnAction(action, state_);
+		State newState = actOnAction(action, state_);
+		steps_++;
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// If our new state is different, update observations
-		if (!Arrays.equals(state_, newState)) {
+		if (!state_.equals(newState)) {
 			state_ = newState;
-			stateKB_ = formState(state_);
+			stateKB_ = formState(state_.getState());
 		} else {
+			double excess = (steps_ >= optimalSteps_) ? steps_ - optimalSteps_ : 0;
 			return new Reward_observation_terminal(-numBlocks_ * STEP_CONSTANT
-					+ steps_, obs, true);
+					+ excess, new Observation(), true);
 		}
-		steps_++;
 
 		ObjectObservations.getInstance().predicateKB = stateKB_;
-		Reward_observation_terminal rot = new Reward_observation_terminal(-1,
-				obs, isGoal(stateKB_, StateSpec.getInstance().getGoalState()));
+		
+		double reward = (steps_ < optimalSteps_) ? 0 : -1;
+		Reward_observation_terminal rot = new Reward_observation_terminal(
+				reward, obs, isGoal(stateKB_, StateSpec.getInstance()
+						.getGoalState()));
+
 		return rot;
 	}
 
@@ -169,7 +195,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private Integer[] actOnAction(Fact action, Integer[] worldState) {
+	private State actOnAction(Fact action, State worldState) {
 		if (action == null)
 			return worldState;
 
@@ -189,14 +215,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Convert the blocks to indices
+		Integer[] stateArray = worldState.getState();
 		for (int i = 0; i < indices.length; i++) {
 			indices[i] = ((int) blocks[i].getName().charAt(0)) - ((int) 'a');
 			// In order to do either action, both blocks must be free
 			for (int j = 0; j < worldState.length; j++) {
-				newState[j] = worldState[j];
+				newState[j] = stateArray[j];
 				// If something is on that index/block, return the unchanged
 				// state
-				if (worldState[j] - 1 == indices[i])
+				if (stateArray[j] - 1 == indices[i])
 					return worldState;
 			}
 		}
@@ -208,7 +235,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			newState[indices[0]] = indices[1] + 1;
 		}
 
-		return newState;
+		return new State(newState);
 	}
 
 	/**
@@ -240,7 +267,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The goal state.
 	 * @return The newly initialised blocks world state.
 	 */
-	private Integer[] initialiseWorld(int numBlocks, Rule goalState) {
+	private State initialiseWorld(int numBlocks, Rule goalState) {
 		Integer[] worldState = new Integer[numBlocks];
 		int[] contourState = new int[numBlocks];
 		Random random = new Random();
@@ -268,7 +295,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		if (isGoal(stateKB_, goalState))
 			return initialiseWorld(numBlocks, goalState);
 		else
-			return worldState;
+			return new State(worldState);
 	}
 
 	/**
@@ -382,6 +409,70 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 */
 	private int optimalSteps() {
 		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
-		return 0;
+
+		// Check it hasn't already solved the state
+		if (optimalMap_.containsKey(state_))
+			return optimalMap_.get(state_);
+
+		State initialState = state_.clone();
+		// Run the policy through the environment until goal is satisfied.
+		PolicyAgent optimalAgent = new PolicyAgent();
+		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
+		optimalAgent.agent_message("Policy");
+		Action act = optimalAgent.agent_start(formObs_Start());
+		// Loop until the task is complete
+		Reward_observation_terminal rot = null;
+		while ((rot == null) || (!rot.isTerminal())) {
+			rot = env_step(act);
+			optimalAgent.agent_step(rot.r, rot.o);
+		}
+
+		// Return the state to normal
+		state_ = initialState;
+		stateKB_ = formState(state_.getState());
+		optimalMap_.put(state_, steps_);
+		return steps_;
+	}
+
+	/**
+	 * A wrapper class for blocks world states
+	 * 
+	 * @author Samuel J. Sarjant
+	 */
+	private class State {
+		private Integer[] state_;
+		public int length;
+
+		public State(Integer[] state) {
+			state_ = state;
+			length = state.length;
+		}
+
+		public Integer[] getState() {
+			return state_;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if ((obj != null) && (obj instanceof State)) {
+				State other = (State) obj;
+				if (Arrays.equals(state_, other.state_))
+					return true;
+			}
+			return false;
+		}
+
+		@Override
+		public int hashCode() {
+			return state_.hashCode();
+		}
+
+		public State clone() {
+			return new State(Arrays.copyOf(state_, state_.length));
+		}
+
+		public String toString() {
+			return Arrays.toString(state_);
+		}
 	}
 }

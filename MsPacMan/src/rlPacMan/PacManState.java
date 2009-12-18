@@ -13,9 +13,6 @@ import relationalFramework.State;
 public enum PacManState implements State {
 	PACMAN, DOT_COLLECTION, POWERDOT_COLLECTION, GHOST_ARRAY, FRUIT, DISTANCE_GRID;
 
-	// TODO Code these as predicates in a similar manner to those in the state
-	// spec. So a State is made up of the predicates created by this class every
-	// step.
 	public static Player getPlayer(Object[] observations) {
 		return (Player) observations[PACMAN.ordinal()];
 	}
