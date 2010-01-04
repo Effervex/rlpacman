@@ -78,7 +78,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	// @Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
-			return (numBlocks_ * STEP_CONSTANT) + "";
+			return (numBlocks_ * STEP_CONSTANT + 1) + "";
 		if (arg0.equals("freeze")) {
 			RuleBase.getInstance().freezeState(true);
 			return null;
@@ -103,7 +103,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
+		System.out.println("\t\t\tOptimal test: "
+				+ Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
+		System.out
+				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -135,7 +139,12 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		State newState = actOnAction(action, state_);
-		steps_++;
+		if (action != null)
+			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
+					+ "   ->   " + Arrays.toString(newState.state_));
+		else
+			System.out.println("\t\t\tNo action chosen.");
+
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// If our new state is different, update observations
@@ -143,14 +152,18 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			state_ = newState;
 			stateKB_ = formState(state_.getState());
 		} else {
-			double excess = (steps_ >= optimalSteps_) ? steps_ - optimalSteps_ : 0;
+			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
+					: 0;
 			return new Reward_observation_terminal(-numBlocks_ * STEP_CONSTANT
 					+ excess, new Observation(), true);
 		}
 
+		steps_++;
 		ObjectObservations.getInstance().predicateKB = stateKB_;
-		
-		double reward = (steps_ < optimalSteps_) ? 0 : -1;
+
+		double reward = (steps_ <= optimalSteps_) ? 0
+				: ((-numBlocks_ * STEP_CONSTANT * 1.0) / (numBlocks_
+						* STEP_CONSTANT - optimalSteps_));
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isGoal(stateKB_, StateSpec.getInstance()
 						.getGoalState()));
@@ -409,6 +422,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 */
 	private int optimalSteps() {
 		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
+		steps_ = 0;
 
 		// Check it hasn't already solved the state
 		if (optimalMap_.containsKey(state_))

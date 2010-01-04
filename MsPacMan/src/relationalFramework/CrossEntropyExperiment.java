@@ -270,14 +270,13 @@ public class CrossEntropyExperiment {
 		PolicyValue bestPolicy = null;
 
 		// Determine the initial run (as previous runs may have already been
-		// done
-		// in a previous experiment)
+		// done in a previous experiment)
 		int run = checkFiles();
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
-			episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
+			//episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
 			float runningAverage = 0;
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
@@ -358,7 +357,7 @@ public class CrossEntropyExperiment {
 
 	/**
 	 * Tests the agent at its current state. This is achieved by 'freezing' the
-	 * generators and trialling the agent several times over the environment to
+	 * generators and trialing the agent several times over the environment to
 	 * get an idea of the average performance at this point.
 	 * 
 	 * @param maxSteps

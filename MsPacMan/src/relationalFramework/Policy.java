@@ -9,7 +9,6 @@ import java.util.Map;
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Query;
 import org.mandarax.kernel.Replacement;
 import org.mandarax.kernel.ResultSet;
@@ -25,7 +24,7 @@ import org.mandarax.util.LogicFactorySupport;
  */
 public class Policy {
 	public static final String PREFIX = "Policy";
-	public static final char DELIMITER = ',';
+	public static final char DELIMITER = '#';
 	/** The rules of this policy, under their respective priorities. */
 	private GuidedRule[] priorityRules_;
 	private boolean[] triggered_;
@@ -143,30 +142,6 @@ public class Policy {
 	public static int priorityZero(int priorityLevel, int policySize) {
 		int priorityNumber = policySize / ActionSwitch.NUM_PRIORITIES + 1;
 		return priorityLevel * priorityNumber;
-	}
-
-	/**
-	 * Parses a policy from a string representation of the policy.
-	 * 
-	 * @param strPolicy
-	 *            The string version of the policy.
-	 * @return The parsed policy or null if invalid.
-	 */
-	public static Policy parsePolicy(String strPolicy) {
-		String[] split = strPolicy.split("" + DELIMITER);
-		if (!split[0].equals(PREFIX))
-			return null;
-
-		// Parse the rules
-		Policy policy = new Policy(split.length - 2);
-		for (int i = 1; i < split.length - 1; i++) {
-			// If there is a rule
-			if (split[i].length() != 0) {
-				policy.addRule(i - 1, RuleBase.getInstance().getRule(
-						Integer.parseInt(split[i]), i - 1));
-			}
-		}
-		return policy;
 	}
 
 	/**
