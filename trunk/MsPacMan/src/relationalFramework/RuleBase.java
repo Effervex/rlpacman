@@ -271,7 +271,11 @@ public class RuleBase {
 			FileReader reader = new FileReader(ruleBaseFile);
 			BufferedReader bf = new BufferedReader(reader);
 
-			String input = null;
+			String input = bf.readLine();
+			if (!input.equals(StateSpec.getInstance().getGoalState().toString())) {
+				System.err.println("Environment goal does not match! Crashing...");
+				return null;
+			}
 
 			// Read the rules in.
 			Map<String, Object> constants = StateSpec.getInstance()
@@ -328,7 +332,7 @@ public class RuleBase {
 		for (int f = 0; f <= prereqs.size(); f++) {
 			Fact fact = (f < prereqs.size()) ? prereqs.get(f) : rule.getHead();
 
-			int offset = (fact instanceof JConstructor) ? 1 : 0;
+			int offset = (fact.getPredicate() instanceof JConstructor) ? 1 : 0;
 			GuidedPredicate structure = StateSpec.getInstance()
 					.getGuidedPredicate(fact.getPredicate().getName());
 
@@ -337,7 +341,7 @@ public class RuleBase {
 				PredTerm[] predTerms = new PredTerm[structure.getPredValues().length];
 
 				for (int i = 0; i < predTerms.length; i++) {
-					Term matcher = fact.getTerms()[i - offset];
+					Term matcher = fact.getTerms()[i + offset];
 
 					// If we're dealing with a variable term, it can be TIED
 					// or FREE
@@ -384,6 +388,7 @@ public class RuleBase {
 			FileWriter writer = new FileWriter(ruleBaseFile);
 			BufferedWriter bf = new BufferedWriter(writer);
 
+			bf.write(StateSpec.getInstance().getGoalState() + "\n");
 			// For each of the rule bases
 			for (int i = 0; i < ruleGenerators_.length; i++) {
 				// For each of the rules

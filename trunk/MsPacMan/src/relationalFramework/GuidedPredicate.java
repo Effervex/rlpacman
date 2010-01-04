@@ -362,6 +362,18 @@ public class GuidedPredicate {
 	public String toString() {
 		if (predicate_ == null)
 			return "true";
+		if (looseInstantiation_ != null) {
+			StringBuffer buffer = new StringBuffer(predicate_.toString() + "(");
+			boolean first = true;
+			for (PredTerm pt : looseInstantiation_) {
+				if (!first)
+					buffer.append(",");
+				buffer.append(pt.toString());
+				first = false;
+			}
+			buffer.append(")");
+			return buffer.toString();
+		}
 		return predicate_.toString();
 	}
 

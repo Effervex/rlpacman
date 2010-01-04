@@ -78,7 +78,7 @@ public class PredTerm {
 		if ((object != null) && (object instanceof PredTerm)) {
 			PredTerm otherTerm = (PredTerm) object;
 			if (type_ == otherTerm.type_) {
-				if (value_.equals(otherTerm.value_)) {
+				if ((type_ != VALUE) || (value_.equals(otherTerm.value_))) {
 					if (termClass_.equals(termClass_)) {
 						return true;
 					}
