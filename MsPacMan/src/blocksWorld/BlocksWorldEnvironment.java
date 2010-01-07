@@ -54,7 +54,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private int steps_;
 
 	/** The optimal number of steps for a state to be solved. */
-	private Map<State, Integer> optimalMap_;
+	private Map<State, Integer> optimalMap_ = new HashMap<State, Integer>();
 
 	/** The optimal number of steps. */
 	private int optimalSteps_;
@@ -71,7 +71,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		stateKB_ = new org.mandarax.reference.KnowledgeBase();
 		// Assign the blocks
 		blocks_ = createBlocks(numBlocks_);
-		optimalMap_ = new HashMap<State, Integer>();
 		return null;
 	}
 
@@ -83,7 +82,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			RuleBase.getInstance().freezeState(true);
 			return null;
 		}
-		if (arg0.equals("freeze")) {
+		if (arg0.equals("unfreeze")) {
 			RuleBase.getInstance().freezeState(false);
 			return null;
 		}
@@ -91,6 +90,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			numBlocks_ = Integer.parseInt(arg0);
 			// Assign the blocks
 			blocks_ = createBlocks(numBlocks_);
+			optimalMap_ = new HashMap<State, Integer>();
 			return null;
 		} catch (Exception e) {
 
@@ -141,7 +141,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		State newState = actOnAction(action, state_);
 		if (action != null)
 			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
-					+ "   ->   " + Arrays.toString(newState.state_));
+					+ "   ->   " + Arrays.toString(newState.intState_));
 		else
 			System.out.println("\t\t\tNo action chosen.");
 
@@ -425,8 +425,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		steps_ = 0;
 
 		// Check it hasn't already solved the state
-		if (optimalMap_.containsKey(state_))
+		if (optimalMap_.containsKey(state_)) {
+			System.out.println("\t\t\tAlready calculated");
 			return optimalMap_.get(state_);
+		}
 
 		State initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
@@ -453,24 +455,24 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * 
 	 * @author Samuel J. Sarjant
 	 */
-	private class State {
-		private Integer[] state_;
+	public class State {
+		private Integer[] intState_;
 		public int length;
 
 		public State(Integer[] state) {
-			state_ = state;
+			intState_ = state;
 			length = state.length;
 		}
 
 		public Integer[] getState() {
-			return state_;
+			return intState_;
 		}
 
 		@Override
 		public boolean equals(Object obj) {
 			if ((obj != null) && (obj instanceof State)) {
 				State other = (State) obj;
-				if (Arrays.equals(state_, other.state_))
+				if (Arrays.equals(intState_, other.intState_))
 					return true;
 			}
 			return false;
@@ -478,15 +480,23 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		@Override
 		public int hashCode() {
-			return state_.hashCode();
+			int sum = 0;
+			for (int i = 0; i < intState_.length; i++) {
+				sum += intState_[i] * 6451;
+			}
+			return sum;
 		}
 
 		public State clone() {
-			return new State(Arrays.copyOf(state_, state_.length));
+			Integer[] cloneState = new Integer[intState_.length];
+			for (int i = 0; i < intState_.length; i++) {
+				cloneState[i] = intState_[i];
+			}
+			return new State(cloneState);
 		}
 
 		public String toString() {
-			return Arrays.toString(state_);
+			return Arrays.toString(intState_);
 		}
 	}
 }

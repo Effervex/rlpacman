@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.Random;
 
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
+
 /**
  * A class representing a probability distribution of values. These values are
  * sampled randomly according to their probabilities.
@@ -262,6 +264,16 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			elites.add(iter.next().getItem());
 		}
 		return elites;
+	}
+
+	public ArrayList<T> getNonZero() {
+		ArrayList<T> nonZeroes = new ArrayList<T>();
+		for (ItemProb ip : itemProbs_) {
+			if (ip.prob_ > 0) {
+				nonZeroes.add(ip.element_);
+			}
+		}
+		return nonZeroes;
 	}
 
 	/**

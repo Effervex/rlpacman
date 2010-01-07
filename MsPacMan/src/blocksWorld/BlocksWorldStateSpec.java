@@ -90,7 +90,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	@Override
 	protected Rule initialiseGoalState(LogicFactory factory) {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
-		goal_ = "stack";
+		goal_ = "onab";
 
 		try {
 			// On(a,b) goal
@@ -170,8 +170,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "clear([a]) & clear([b]) -> move([a],[b])";
 			rules[1] = "clear(<X>) & above(<X>,[a]) -> moveFloor(<X>)";
 			rules[2] = "clear(<X>) & above(<X>,[b]) -> moveFloor(<X>)";
-			constantMap.put("[a]", new Block("a"));
-			constantMap.put("[b]", new Block("b"));
+			constantMap.put("a", new Block("a"));
+			constantMap.put("b", new Block("b"));
 		} else if (goal_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "clear(<X>) & highest(<Y>) -> move(<X>,<Y>)";
@@ -181,7 +181,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		} else if (goal_.equals("clearA")) {
 			rules = new String[1];
 			rules[0] = "clear(<X>) & above(<X>,[a]) -> moveFloor(<X>)";
-			constantMap.put("[a]", new Block("a"));
+			constantMap.put("a", new Block("a"));
 		}
 
 		optimal = new Policy(rules.length);
