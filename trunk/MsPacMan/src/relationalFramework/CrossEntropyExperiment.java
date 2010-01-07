@@ -28,6 +28,8 @@ public class CrossEntropyExperiment {
 	private File policyFile_;
 	/** The generator states file. */
 	private File generatorFile_;
+	/** The generator states file. */
+	private File humanGeneratorFile_;
 	/** The performance output file. */
 	private File performanceFile_;
 	/** The folder to store the temp files. */
@@ -128,12 +130,15 @@ public class CrossEntropyExperiment {
 		// Create the output files if necessary
 		policyFile_ = new File(policyFile);
 		generatorFile_ = new File(generatorFile);
+		humanGeneratorFile_ = new File("readable-" + generatorFile);
 		performanceFile_ = new File(performanceFile);
 		try {
 			if (!policyFile_.exists())
 				policyFile_.createNewFile();
 			if (!generatorFile_.exists())
 				generatorFile_.createNewFile();
+			if (!humanGeneratorFile_.exists())
+				humanGeneratorFile_.createNewFile();
 			if (!performanceFile_.exists())
 				performanceFile_.createNewFile();
 			TEMP_FOLDER.mkdir();
@@ -276,7 +281,7 @@ public class CrossEntropyExperiment {
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
-			//episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
+			episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
 			float runningAverage = 0;
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
@@ -403,6 +408,13 @@ public class CrossEntropyExperiment {
 		}
 		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 
+		// Write the state of the generators out in human readable form
+		try {
+			saveHumanGenerators(frozenSlotGen, run);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		RLGlue.RL_env_message("unfreeze");
 		return averageScore;
 	}
@@ -504,6 +516,41 @@ public class CrossEntropyExperiment {
 		RuleBase.getInstance().writeGenerators(buf);
 		buf.write(episode + "");
 
+		buf.close();
+		wr.close();
+	}
+
+	/**
+	 * Saves a frozen, human readable version of the generators out
+	 * 
+	 * @param slotGen
+	 *            The frozen slot generator
+	 * @param run
+	 *            The current run
+	 */
+	private void saveHumanGenerators(ProbabilityDistribution<Integer> slotGen,
+			int run) throws Exception {
+		File tempGen = new File(TEMP_FOLDER + "/" + humanGeneratorFile_.getName()
+				+ run);
+		tempGen.createNewFile();
+		FileWriter wr = new FileWriter(tempGen);
+		BufferedWriter buf = new BufferedWriter(wr);
+
+		// Go through each slot, writing out those that fire
+		for (int i = 0; i < slotGen.size(); i++) {
+			if (slotGen.bernoulliSample(i) != null) {
+				// Output every non-zero rule
+				boolean single = true;
+				for (GuidedRule rule : RuleBase.getInstance().getRuleGenerator(i).getNonZero()) {
+					if (!single)
+						buf.write("/ ");
+					buf.write(StateSpec.encodeRule(rule.getRule()));
+					single = false;
+				}
+				buf.write("\n");
+			}
+		}
+		
 		buf.close();
 		wr.close();
 	}

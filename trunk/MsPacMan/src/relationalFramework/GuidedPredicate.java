@@ -274,11 +274,10 @@ public class GuidedPredicate {
 				if (term.getType().equals(usedTerm.getType())) {
 					// If at least one is a variable
 					if ((term.isVariable()) || (usedTerm.isVariable())) {
-						Term[] terms = new Term[4];
+						Term[] terms = new Term[3];
 						terms[0] = StateSpec.getSpecTerm(factory);
-						terms[1] = StateSpec.getStateTerm(factory);
-						terms[2] = term;
-						terms[3] = usedTerm;
+						terms[1] = term;
+						terms[2] = usedTerm;
 						Prerequisite ineqPreq = factory.createPrerequisite(
 								inequal, terms, false);
 						result.add(ineqPreq);

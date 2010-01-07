@@ -78,18 +78,22 @@ public abstract class StateSpec {
 
 	/** The name of the inequal predicate. */
 	public static final String INEQUAL = "inequal";
+	
+	/** The LogicFactory for the experiment. */
+	private LogicFactory factory_;
 
 	/**
 	 * The constructor for a state specification.
 	 */
 	protected void initialise(LogicFactory factory) {
+		factory_ = factory;
 		constants_ = new HashMap<String, Object>();
 		typePredicates_ = initialiseTypePredicates();
 		predicates_ = initialisePredicates();
 		actions_ = initialiseActions();
 		predByNames_ = createPredNameMap();
-		goalState_ = initialiseGoalState(factory);
-		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory);
+		goalState_ = initialiseGoalState(factory_);
+		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory_);
 		addGoalConstants(predicates_, goalState_);
 	}
 
@@ -186,12 +190,11 @@ public abstract class StateSpec {
 	 * @return An instantiated rule.
 	 */
 	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
-		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
 		String[][] info = extractInfo(rule);
 		// Compiling the initial term map of constants
 		Map<String, Term> termMap = new HashMap<String, Term>();
 		for (String constant : constantTerms.keySet()) {
-			termMap.put(constant, factory.createConstantTerm(constantTerms
+			termMap.put(constant, factory_.createConstantTerm(constantTerms
 					.get(constant)));
 		}
 
@@ -205,10 +208,10 @@ public abstract class StateSpec {
 			// Check if it's a JConstructor
 			int offset = (cond.getPredicate() instanceof JConstructor) ? 1 : 0;
 			// Find the terms used in the predicate arguments
-			Term[] terms = findTerms(factory, termMap, info[i], cond
+			Term[] terms = findTerms(factory_, termMap, info[i], cond
 					.getPredicate().getStructure(), offset);
 			// Instantiate the guided predicate with the args.
-			List<Prerequisite> rulePreqs = cond.factify(factory, terms, false,
+			List<Prerequisite> rulePreqs = cond.factify(factory_, terms, false,
 					false, allTerms);
 			// Add the resulting prerequisites
 			for (Prerequisite prereq : rulePreqs) {
@@ -226,7 +229,7 @@ public abstract class StateSpec {
 			}
 		}
 
-		return factory.createRule(prereqs, actionFact);
+		return factory_.createRule(prereqs, actionFact);
 	}
 
 	/**
@@ -247,8 +250,7 @@ public abstract class StateSpec {
 
 		for (int i = 0; i < terms.length; i++) {
 			// If the term is a constant or has occurred already, get it from
-			// the
-			// map
+			// the map
 			if (termMap.containsKey(predArgs[i + 1])) {
 				terms[i] = termMap.get(predArgs[i + 1]);
 			} else {
@@ -454,12 +456,7 @@ public abstract class StateSpec {
 	}
 
 	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		buffer.append("StateSpec: ");
-		buffer.append(predicates_.size() + " preds, ");
-		buffer.append(typePredicates_.size() + " type preds, ");
-		buffer.append(actions_.size() + " actions");
-		return buffer.toString();
+		return "StateSpec";
 	}
 
 	/**
@@ -571,7 +568,7 @@ public abstract class StateSpec {
 	protected static Predicate getInequalityPredicate(LogicFactory factory) {
 		if (inequalityPred_ == null) {
 			try {
-				Class[] types = { Object[].class, Object.class, Object.class };
+				Class[] types = { Object.class, Object.class };
 				Method method = StateSpec.class.getMethod(INEQUAL, types);
 				inequalityPred_ = new JPredicate(method);
 			} catch (Exception e) {
@@ -726,7 +723,7 @@ public abstract class StateSpec {
 	 *            The second object.
 	 * @return True if the objects are inequal.
 	 */
-	public boolean inequal(Object[] state, Object objA, Object objB) {
+	public boolean inequal(Object objA, Object objB) {
 		if (objA.equals(objB))
 			return false;
 		return true;
