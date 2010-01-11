@@ -9,7 +9,7 @@ import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Fact;
 
-import relationalFramework.RuleBase;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 // GameState is primarly maintained by the int[][] m_gameState
@@ -122,8 +122,8 @@ public class GameModel {
 		stateKB_ = new org.mandarax.reference.KnowledgeBase();
 		addBackgroundKnowledge(stateKB_);
 		clauseMap_ = new HashMap<Object, Fact>();
-		factory_ = RuleBase.getInstance().getLogicFactory();
-		classPrefix_ = RuleBase.getInstance().getClassPrefix();
+		factory_ = PolicyGenerator.getInstance().getLogicFactory();
+		classPrefix_ = PolicyGenerator.getInstance().getClassPrefix();
 
 		// GameState
 		m_gameSizeX = 28;

@@ -44,6 +44,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		return actions;
 	}
+	
+	@Override
+	protected int initialiseActionsPerStep() {
+		return 1;
+	}
 
 	@Override
 	protected KnowledgeBase initialiseBackgroundKnowledge(LogicFactory factory) {
@@ -184,10 +189,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 			constantMap.put("a", new Block("a"));
 		}
 
-		optimal = new Policy(rules.length);
+		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(i, new GuidedRule(parseRule(rules[i], constantMap),
-					null, null));
+			optimal.addRule(rules.length - i, new GuidedRule(parseRule(rules[i], constantMap),
+					null, null, null));
 
 		return optimal;
 	}

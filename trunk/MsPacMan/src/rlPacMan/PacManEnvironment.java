@@ -21,7 +21,7 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
-import relationalFramework.RuleBase;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
@@ -67,11 +67,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 			return 1000000 + "";
 		}
 		if (arg0.equals("freeze")) {
-			RuleBase.getInstance().freezeState(true);
+			PolicyGenerator.getInstance().freeze(true);
 			return null;
 		}
 		if (arg0.equals("unfreeze")) {
-			RuleBase.getInstance().freezeState(false);
+			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
 		return null;

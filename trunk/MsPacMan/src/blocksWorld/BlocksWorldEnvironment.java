@@ -26,7 +26,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyAgent;
-import relationalFramework.RuleBase;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 /**
@@ -79,11 +79,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		if (arg0.equals("maxSteps"))
 			return (numBlocks_ * STEP_CONSTANT + 1) + "";
 		if (arg0.equals("freeze")) {
-			RuleBase.getInstance().freezeState(true);
+			PolicyGenerator.getInstance().freeze(true);
 			return null;
 		}
 		if (arg0.equals("unfreeze")) {
-			RuleBase.getInstance().freezeState(false);
+			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
 		try {
@@ -141,7 +141,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		State newState = actOnAction(action, state_);
 		if (action != null)
 			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
-					+ "   ->   " + Arrays.toString(newState.intState_));
+					+ "\t->  " + Arrays.toString(newState.intState_));
 		else
 			System.out.println("\t\t\tNo action chosen.");
 
@@ -181,13 +181,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return True if we're in the goal state, false otherwise.
 	 */
 	private boolean isGoal(KnowledgeBase stateKB, Rule goalState) {
-		LogicFactorySupport factorySupport = new LogicFactorySupport(RuleBase
+		LogicFactorySupport factorySupport = new LogicFactorySupport(PolicyGenerator
 				.getInstance().getLogicFactory());
 		Fact[] ruleConditions = (Fact[]) goalState.getBody().toArray(
 				new Fact[goalState.getBody().size()]);
 		Query query = factorySupport.query(ruleConditions, "isGoal");
 		try {
-			org.mandarax.kernel.ResultSet results = RuleBase.getInstance()
+			org.mandarax.kernel.ResultSet results = PolicyGenerator.getInstance()
 					.getInferenceEngine().query(query, stateKB,
 							InferenceEngine.ONE,
 							InferenceEngine.BUBBLE_EXCEPTIONS);
@@ -260,7 +260,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 */
 	private ConstantTerm[] createBlocks(int numBlocks) {
 		ConstantTerm[] blocks = new ConstantTerm[numBlocks];
-		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
+		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
 
 		for (int i = 0; i < numBlocks; i++) {
 			String name = (char) ((int) 'a' + i) + "";
@@ -325,7 +325,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		for (ClauseSet background : backgroundClauses)
 			stateKB_.add(background);
 
-		LogicFactory factory = RuleBase.getInstance().getLogicFactory();
+		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
 
 		// Stating everything is clear until covered
 		List<Integer> clearBlocks = new ArrayList<Integer>();
@@ -426,7 +426,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Check it hasn't already solved the state
 		if (optimalMap_.containsKey(state_)) {
-			System.out.println("\t\t\tAlready calculated");
+			System.out.println("\t\t\tAlready calculated (" + optimalMap_.get(state_) + ")");
 			return optimalMap_.get(state_);
 		}
 

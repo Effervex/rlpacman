@@ -20,6 +20,9 @@ public class GuidedRule {
 	/** The guided predicate that defined the action. */
 	private final GuidedPredicate action_;
 
+	/** The slot this rule was generated from. */
+	private final Slot slot_;
+
 	/**
 	 * A constructor for the guided rule.
 	 * 
@@ -31,10 +34,11 @@ public class GuidedRule {
 	 *            The guided action to make the action.
 	 */
 	public GuidedRule(Rule rule, Collection<GuidedPredicate> conditions,
-			GuidedPredicate action) {
+			GuidedPredicate action, Slot slot) {
 		rule_ = rule;
 		conditions_ = conditions;
 		action_ = action;
+		slot_ = slot;
 	}
 
 	public Rule getRule() {
@@ -49,13 +53,22 @@ public class GuidedRule {
 		return action_;
 	}
 
+	public Slot getSlot() {
+		return slot_;
+	}
+
 	public boolean equals(Object obj) {
 		if ((obj != null) && (obj instanceof GuidedRule)) {
 			GuidedRule gr = (GuidedRule) obj;
 			if (rule_.equals(gr.rule_)) {
-				if (conditions_.equals(gr.conditions_)) {
-					if (action_.equals(gr.action_)) {
-						return true;
+				if (((conditions_ == null) && (conditions_ == gr.conditions_))
+						|| (conditions_.equals(gr.conditions_))) {
+					if (((action_ == null) && (action_ == gr.action_))
+							|| (action_.equals(gr.action_))) {
+						if (((slot_ == null) && (slot_ == gr.slot_))
+								|| (slot_.equals(gr.slot_))) {
+							return true;
+						}
 					}
 				}
 			}
@@ -63,7 +76,17 @@ public class GuidedRule {
 		return false;
 	}
 
+	@Override
 	public int hashCode() {
-		return rule_.hashCode() * conditions_.hashCode() * action_.hashCode();
+		int condVal = 71;
+		if (conditions_ != null)
+			condVal = slot_.hashCode();
+		int actVal = 7689423;
+		if (action_ != null)
+			actVal = slot_.hashCode();
+		int slotVal = 4563;
+		if (slot_ != null)
+			slotVal = slot_.hashCode();
+		return rule_.hashCode() * condVal * actVal * slotVal;
 	}
 }
