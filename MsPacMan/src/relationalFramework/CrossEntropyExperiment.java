@@ -35,8 +35,8 @@ public class CrossEntropyExperiment {
 	/** The folder to store the temp files. */
 	private static final File TEMP_FOLDER = new File("temp/");
 
-	public static final String ELEMENT_DELIMITER = ",";
-
+	/** The policy generator for the experiment. */
+	private PolicyGenerator policyGenerator_;
 	/** The population size of the experiment. */
 	private int population_;
 	/** The number of episodes to run. */
@@ -45,16 +45,8 @@ public class CrossEntropyExperiment {
 	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
-	/** The rate of decay on the slots. */
-	private static final double SLOT_DECAY_RATE = 0.98;
-	/** The cross-entropy generator for the slots in the policy. */
-	private ProbabilityDistribution<Integer> slotGenerator_;
-	/** The maximum size of the policy. */
-	private int policySize_;
 	/** The time that the experiment started. */
 	private long experimentStart_;
-	/** The ratio of shared/regenerated rules. */
-	private float ratioShared_ = 0.08f;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -173,14 +165,8 @@ public class CrossEntropyExperiment {
 				performanceFile);
 
 		// Load the generators from the input file
-		RuleBase.initInstance(environmentClass);
-		policySize_ = RuleBase.getInstance().getNumSlots();
-
-		slotGenerator_ = new ProbabilityDistribution<Integer>();
-		// Filling the generators
-		for (int i = 0; i < policySize_; i++) {
-			slotGenerator_.add(i, 0.5);
-		}
+		PolicyGenerator.initInstance(environmentClass);
+		policyGenerator_ = PolicyGenerator.getInstance();
 	}
 
 	/**
@@ -208,15 +194,9 @@ public class CrossEntropyExperiment {
 				performanceFile);
 
 		// Load the generators from the input file
-		RuleBase.initInstance(environmentClass, new File(ruleFile));
-		RuleBase.getInstance().normaliseDistributions();
-		policySize_ = RuleBase.getInstance().getNumSlots();
-
-		slotGenerator_ = new ProbabilityDistribution<Integer>();
-		// Filling the generators
-		for (int i = 0; i < policySize_; i++) {
-			slotGenerator_.add(i, 0.5);
-		}
+		PolicyGenerator.initInstance(environmentClass, new File(ruleFile));
+		PolicyGenerator.getInstance().normaliseDistributions();
+		policyGenerator_ = PolicyGenerator.getInstance();
 	}
 
 	/**
@@ -250,7 +230,7 @@ public class CrossEntropyExperiment {
 
 		// Load the generators from the input file
 		try {
-			loadGenerators(new File(genInputFile));
+			policyGenerator_.loadGenerators(new File(genInputFile));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -269,7 +249,7 @@ public class CrossEntropyExperiment {
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("5");
+		RLGlue.RL_env_message("25");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
@@ -282,7 +262,6 @@ public class CrossEntropyExperiment {
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
 			episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
-			float runningAverage = 0;
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
 				// Forming a population of solutions
@@ -291,7 +270,7 @@ public class CrossEntropyExperiment {
 				// showing good results even with populations of 10. Perhaps
 				// this could be equal to the policy size * 10?
 				for (int i = 0; i < population_; i++) {
-					Policy pol = generatePolicy(policySize_, slotGenerator_);
+					Policy pol = policyGenerator_.generatePolicy();
 					System.out.println(pol);
 					// Send the agent a generated policy
 					ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -304,8 +283,6 @@ public class CrossEntropyExperiment {
 					}
 					score /= AVERAGE_ITERATIONS;
 					System.out.println(score);
-					// Set the fired rules back to this policy
-					pol.setFired(RLGlue.RL_agent_message("getFired"));
 
 					PolicyValue thisPolicy = new PolicyValue(pol, score);
 					pvs.add(thisPolicy);
@@ -326,17 +303,13 @@ public class CrossEntropyExperiment {
 
 				// Test the agent and record the performances
 				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs);
-				runningAverage = ((episodePerformances[t + 1] - episodePerformances[t]) + runningAverage) / 2;
-
-				// Run post-update operations on the distributions
-				double sineRatio = (-Math.cos((t * 2 * Math.PI)
-						/ (episodes_ - 1)) + 1) / 2 * 0.08;
-				ratioShared_ = RuleBase.getInstance().postUpdateOperations(
-						runningAverage, (float) sineRatio, STEP_SIZE);
 
 				// Save the results at each episode
 				try {
-					saveGenerators(t, run);
+					File tempGen = new File(TEMP_FOLDER + "/"
+							+ generatorFile_.getName() + run);
+					tempGen.createNewFile();
+					policyGenerator_.saveGenerators(tempGen);
 					saveBestPolicy(bestPolicy);
 					// Output the episode averages
 					savePerformance(episodePerformances, run);
@@ -346,8 +319,7 @@ public class CrossEntropyExperiment {
 			}
 
 			// Resetting experiment values
-			RuleBase.getInstance().resetInstance();
-			slotGenerator_.resetProbs(0.5);
+			PolicyGenerator.getInstance().resetGenerator();
 		}
 
 		RLGlue.RL_cleanup();
@@ -383,12 +355,10 @@ public class CrossEntropyExperiment {
 		float averageScore = 0;
 		RLGlue.RL_env_message("freeze");
 
-		ProbabilityDistribution<Integer> frozenSlotGen = slotGenerator_
-				.bindProbs(true);
 		// Run the agent through several test iterations, resampling the agent
 		// at each step
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
-			Policy pol = generatePolicy(policySize_, frozenSlotGen);
+			Policy pol = policyGenerator_.generatePolicy();
 			System.out.println(pol);
 			// Send the agent a generated policy
 			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -410,7 +380,10 @@ public class CrossEntropyExperiment {
 
 		// Write the state of the generators out in human readable form
 		try {
-			saveHumanGenerators(frozenSlotGen, run);
+			File output = new File(TEMP_FOLDER + "/"
+					+ humanGeneratorFile_.getName() + run);
+			output.createNewFile();
+			policyGenerator_.saveHumanGenerators(output);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -485,72 +458,9 @@ public class CrossEntropyExperiment {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		buf.write(bestPolicy.getPolicy().toParseableString() + "\n");
+		buf.write(bestPolicy.getPolicy().toString() + "\n");
 		buf.write(bestPolicy.getValue() + "\n");
 
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Saves the generators/distributions to file.
-	 * 
-	 * @throws Exception
-	 *             Should something go awry.
-	 */
-	private void saveGenerators(int episode, int run) throws Exception {
-		File tempGen = new File(TEMP_FOLDER + "/" + generatorFile_.getName()
-				+ run);
-		tempGen.createNewFile();
-		FileWriter wr = new FileWriter(tempGen);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		StringBuffer strBuffer = new StringBuffer();
-		// Write the slot generator
-		for (int i = 0; i < slotGenerator_.size(); i++) {
-			strBuffer.append(slotGenerator_.getProb(i) + ELEMENT_DELIMITER);
-		}
-		strBuffer.append("\n");
-		buf.write(strBuffer.toString());
-		// Write the rule generators
-		RuleBase.getInstance().writeGenerators(buf);
-		buf.write(episode + "");
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Saves a frozen, human readable version of the generators out
-	 * 
-	 * @param slotGen
-	 *            The frozen slot generator
-	 * @param run
-	 *            The current run
-	 */
-	private void saveHumanGenerators(ProbabilityDistribution<Integer> slotGen,
-			int run) throws Exception {
-		File tempGen = new File(TEMP_FOLDER + "/" + humanGeneratorFile_.getName()
-				+ run);
-		tempGen.createNewFile();
-		FileWriter wr = new FileWriter(tempGen);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		// Go through each slot, writing out those that fire
-		for (int i = 0; i < slotGen.size(); i++) {
-			if (slotGen.bernoulliSample(i) != null) {
-				// Output every non-zero rule
-				boolean single = true;
-				for (GuidedRule rule : RuleBase.getInstance().getRuleGenerator(i).getNonZero()) {
-					if (!single)
-						buf.write("/ ");
-					buf.write(StateSpec.encodeRule(rule.getRule()));
-					single = false;
-				}
-				buf.write("\n");
-			}
-		}
-		
 		buf.close();
 		wr.close();
 	}
@@ -647,77 +557,7 @@ public class CrossEntropyExperiment {
 	 *             Should something go awry...
 	 */
 	private void combineGenerators(int runs) throws Exception {
-		Double[][] probs = new Double[policySize_ + 1][];
-		// For every generator file
-		for (int i = 0; i < runs; i++) {
-			File tempGen = new File(TEMP_FOLDER + "/" + generatorFile_ + i);
-			FileReader reader = new FileReader(tempGen);
-			BufferedReader buf = new BufferedReader(reader);
-
-			int dist = 0;
-			String input;
-			// For each value in the generator file
-			while (((input = buf.readLine()) != null) && (!input.equals(""))) {
-				ArrayList<Double> vals = new ArrayList<Double>();
-				String[] split = input.split(ELEMENT_DELIMITER);
-				if (split.length > 1) {
-					for (String str : split) {
-						vals.add(Double.parseDouble(str));
-					}
-
-					// Adding the values
-					if (probs[dist] == null)
-						probs[dist] = vals.toArray(new Double[vals.size()]);
-					else {
-						for (int j = 0; j < vals.size(); j++) {
-							probs[dist][j] += vals.get(j);
-						}
-					}
-
-					dist++;
-				}
-			}
-
-			buf.close();
-			reader.close();
-		}
-
-		// Average and write the generators out
-		FileWriter writer = new FileWriter(generatorFile_);
-		BufferedWriter buf = new BufferedWriter(writer);
-		for (Double[] values : probs) {
-			for (Double val : values) {
-				buf.write((val / runs) + ELEMENT_DELIMITER);
-			}
-			buf.write("\n");
-		}
-		buf.close();
-		writer.close();
-	}
-
-	/**
-	 * Loads the generators/distributions from file.
-	 * 
-	 * @param file
-	 *            The file to laod from.
-	 * @throws Exception
-	 *             Should something go awry.
-	 */
-	private void loadGenerators(File file) throws Exception {
-		FileReader reader = new FileReader(file);
-		BufferedReader buf = new BufferedReader(reader);
-
-		// Parse the slots
-		String[] split = buf.readLine().split(ELEMENT_DELIMITER);
-		for (int i = 0; i < split.length; i++) {
-			slotGenerator_.set(i, Double.parseDouble(split[i]));
-		}
-
-		// Parse the rules
-		RuleBase.getInstance().readGenerators(buf);
-
-		buf.close();
-		reader.close();
+		// TODO Combine generators in a modular fashion
 	}
 
 	/**
@@ -731,20 +571,13 @@ public class CrossEntropyExperiment {
 	 */
 	private void updateWeights(Iterator<PolicyValue> iter, int numElite) {
 		// Keep count of the rules seen (and slots used)
-		int[][] slotCounter = new int[policySize_][1 + RuleBase.getInstance()
-				.size()];
-		countRules(iter, numElite, slotCounter);
+		Map<Slot, Integer> slotCounts = new HashMap<Slot, Integer>();
+		Map<GuidedRule, Integer> ruleCounts = new HashMap<GuidedRule, Integer>();
+		countRules(iter, numElite, slotCounts, ruleCounts);
 
 		// Apply the weights to the distributions
-		for (int s = 0; s < slotGenerator_.size(); s++) {
-			// Change the slot probabilities, factoring in decay
-			slotGenerator_.updateElement(numElite, slotCounter[s][0],
-					STEP_SIZE, SLOT_DECAY_RATE, s);
-
-			// Update the internal rule distributions
-			RuleBase.getInstance().updateDistribution(s, slotCounter[s], 1,
-					STEP_SIZE, 1);
-		}
+		policyGenerator_.updateDistributions(numElite, slotCounts, ruleCounts,
+				STEP_SIZE);
 	}
 
 	/**
@@ -755,55 +588,37 @@ public class CrossEntropyExperiment {
 	 *            The iterator through the samples.
 	 * @param numElite
 	 *            The number of elite samples to iterate through.
-	 * @param slotCounter
-	 *            The storage for the rule counts.
+	 * @param slotCounts
+	 *            The counts for the slots
+	 * @param ruleCounts
+	 *            The counts for the individual rules.
 	 * @return The average value of the elite samples.
 	 */
 	private void countRules(Iterator<PolicyValue> iter, int numElite,
-			int[][] slotCounter) {
+			Map<Slot, Integer> slotCounts, Map<GuidedRule, Integer> ruleCounts) {
 		// Only selecting the top elite samples
 		for (int k = 0; k < numElite; k++) {
 			PolicyValue pv = iter.next();
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			// TODO Use firing rules only. Note that this stuffs up testAgent...
-			GuidedRule[] polRules = eliteSolution.getRules();
-			for (int i = 0; i < polRules.length; i++) {
-				// If there is a rule
-				if (polRules[i] != null) {
-					slotCounter[i][0]++;
-					slotCounter[i][1 + RuleBase.getInstance().indexOf(
-							polRules[i], i)]++;
-				}
+			Collection<GuidedRule> polRules = eliteSolution.getFiringRules();
+			// TODO Ensure this is performing correctly.
+			for (GuidedRule rule : polRules) {
+				// Slot counts
+				Slot ruleSlot = rule.getSlot();
+				Integer count = slotCounts.get(ruleSlot);
+				if (count == null)
+					count = 0;
+				slotCounts.put(ruleSlot, count + 1);
+
+				// Rule counts
+				count = ruleCounts.get(ruleSlot);
+				if (count == null)
+					count = 0;
+				ruleCounts.put(rule, count + 1);
 			}
 		}
-	}
-
-	/**
-	 * Generates a random policy using the weights present in the probability
-	 * distribution.
-	 * 
-	 * @param policySize
-	 *            The size of the policy to create.
-	 * @param generator
-	 *            The generator for generating the policy.
-	 * @return A new policy, formed using weights from the probability
-	 *         distributions.
-	 */
-	private Policy generatePolicy(int policySize,
-			ProbabilityDistribution<Integer> generator) {
-		Policy policy = new Policy(policySize);
-
-		// Run through the policy, adding any rule with probability p and a
-		// particular rule with probability q.
-		for (int i = 0; i < policySize; i++) {
-			if (generator.bernoulliSample(i) != null) {
-				policy.addRule(i, RuleBase.getInstance().getRuleGenerator(i)
-						.sample());
-			}
-		}
-		return policy;
 	}
 
 	/**

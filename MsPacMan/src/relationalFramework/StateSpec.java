@@ -2,7 +2,6 @@ package relationalFramework;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,6 +54,9 @@ public abstract class StateSpec {
 	/** The actions of the rules. */
 	private List<GuidedPredicate> actions_;
 
+	/** The number of simultaneous actions per step to take. */
+	private int actionNum_;
+
 	/** A map for retrieving predicates by name. */
 	private Map<String, GuidedPredicate> predByNames_;
 
@@ -78,7 +80,7 @@ public abstract class StateSpec {
 
 	/** The name of the inequal predicate. */
 	public static final String INEQUAL = "inequal";
-	
+
 	/** The LogicFactory for the experiment. */
 	private LogicFactory factory_;
 
@@ -91,6 +93,7 @@ public abstract class StateSpec {
 		typePredicates_ = initialiseTypePredicates();
 		predicates_ = initialisePredicates();
 		actions_ = initialiseActions();
+		actionNum_ = initialiseActionsPerStep();
 		predByNames_ = createPredNameMap();
 		goalState_ = initialiseGoalState(factory_);
 		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory_);
@@ -141,6 +144,13 @@ public abstract class StateSpec {
 	protected abstract List<GuidedPredicate> initialiseActions();
 
 	/**
+	 * Initialises the number fo actions to take per time step.
+	 * 
+	 * @return The number of actions to take per step.
+	 */
+	protected abstract int initialiseActionsPerStep();
+
+	/**
 	 * Initialises the goal state.
 	 * 
 	 * @return The rule that is true when it is the goal state,
@@ -169,8 +179,10 @@ public abstract class StateSpec {
 	/**
 	 * Adds a string id to a constant used.
 	 * 
-	 * @param id The string id, sans the "[X]" brackets
-	 * @param obj The object linked to.
+	 * @param id
+	 *            The string id, sans the "[X]" brackets
+	 * @param obj
+	 *            The object linked to.
 	 */
 	public void addConstant(String id, Object obj) {
 		constants_.put(id, obj);
@@ -412,6 +424,10 @@ public abstract class StateSpec {
 		return actions_;
 	}
 
+	public int getNumActions() {
+		return actionNum_;
+	}
+
 	public org.mandarax.kernel.Rule getGoalState() {
 		return goalState_;
 	}
@@ -630,7 +646,6 @@ public abstract class StateSpec {
 		// Only output the prereqs that aren't type preds
 		List<Prerequisite> body = rule.getBody();
 
-		boolean noRules = true;
 		boolean plural = false;
 		// Check all prereqs, only outputting the Java preds
 		for (Prerequisite prereq : body) {
@@ -645,7 +660,6 @@ public abstract class StateSpec {
 
 				buffer.append(StateSpec.lightenFact(prereq));
 				plural = true;
-				noRules = false;
 			}
 		}
 

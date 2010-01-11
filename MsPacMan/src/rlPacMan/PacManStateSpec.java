@@ -128,19 +128,16 @@ public class PacManStateSpec extends StateSpec {
 			// MOVE FROM
 			actions.add(createDefinedPredicate(PacManStateSpec.class,
 					moveStructure, predVals, "moveFrom"));
-
-			// KEEP DIRECTION
-			// moveStructure = new Class[1];
-			// moveStructure[0] = Object[].class;
-			// predVals = new PredTerm[1][];
-			// predVals[0] = createTied("State", Object[].class);
-			// actions.add(createDefinedPredicate(moveStructure, predVals,
-			// "keepDirection"));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		return actions;
+	}
+
+	@Override
+	protected int initialiseActionsPerStep() {
+		return 3;
 	}
 
 	@Override

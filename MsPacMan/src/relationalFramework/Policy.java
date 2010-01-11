@@ -2,9 +2,16 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
@@ -25,9 +32,10 @@ import org.mandarax.util.LogicFactorySupport;
 public class Policy {
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = '#';
-	/** The rules of this policy, under their respective priorities. */
-	private GuidedRule[] priorityRules_;
-	private boolean[] triggered_;
+	/** The rules of this policy, organised in a hierarchy */
+	private SortedMap<Integer, Collection<GuidedRule>> ruleHierarchy_;
+	/** The triggered rules in the policy */
+	private Set<GuidedRule> triggeredRules_;
 
 	/**
 	 * A constructor for creating a new policy.
@@ -35,9 +43,10 @@ public class Policy {
 	 * @param policySize
 	 *            The maximum size of the policy.
 	 */
-	public Policy(int policySize) {
-		priorityRules_ = new GuidedRule[policySize];
-		triggered_ = new boolean[policySize];
+	public Policy() {
+		ruleHierarchy_ = new TreeMap<Integer, Collection<GuidedRule>>(
+				Collections.reverseOrder());
+		triggeredRules_ = new HashSet<GuidedRule>();
 	}
 
 	/**
@@ -49,16 +58,13 @@ public class Policy {
 	 *            The rule to be added.
 	 */
 	public void addRule(int index, GuidedRule rule) {
-		priorityRules_[index] = rule;
-	}
+		Collection<GuidedRule> rules = ruleHierarchy_.get(index);
+		if (rules == null) {
+			rules = new ArrayList<GuidedRule>();
+			ruleHierarchy_.put(index, rules);
+		}
 
-	/**
-	 * Gets the rules of the policy.
-	 * 
-	 * @return The rules of the policy.
-	 */
-	public GuidedRule[] getRules() {
-		return priorityRules_;
+		rules.add(rule);
 	}
 
 	/**
@@ -66,132 +72,57 @@ public class Policy {
 	 * 
 	 * @return The rules that fired in this policy
 	 */
-	public GuidedRule[] getFiringRules() {
-		GuidedRule[] firedRules = new GuidedRule[priorityRules_.length];
-		for (int i = 0; i < firedRules.length; i++) {
-			if (triggered_[i])
-				firedRules[i] = priorityRules_[i];
-		}
-		return firedRules;
-	}
-
-	/**
-	 * Returns a string version of the policy, parseable by an agent.
-	 */
-	public String toParseableString() {
-		StringBuffer buffer = new StringBuffer(PREFIX);
-		for (int i = 0; i < priorityRules_.length; i++) {
-			buffer.append(DELIMITER);
-			if (priorityRules_[i] != null)
-				buffer.append(RuleBase.getInstance().indexOf(priorityRules_[i],
-						i));
-		}
-		buffer.append(DELIMITER + "END");
-		return buffer.toString();
-	}
-
-	/**
-	 * Converts the triggered array into a string.
-	 * 
-	 * @return A string equal to the state of the triggered list.
-	 */
-	public String getFiredString() {
-		StringBuffer buffer = new StringBuffer();
-		for (int i = 0; i < triggered_.length; i++) {
-			buffer.append(triggered_[i] + "" + DELIMITER);
-		}
-		return buffer.toString();
+	public Collection<GuidedRule> getFiringRules() {
+		return triggeredRules_;
 	}
 
 	@Override
 	public String toString() {
+		if (ruleHierarchy_.isEmpty())
+			return "<EMPTY POLICY>";
+		
 		StringBuffer buffer = new StringBuffer();
-		for (int i = 0; i < priorityRules_.length; i++) {
-			if (priorityRules_[i] != null) {
-				buffer.append("[" + (getPriority(i, priorityRules_.length) + 1)
-						+ "]: ");
-				buffer.append(StateSpec.encodeRule(priorityRules_[i].getRule()) + "\n");
+		for (Integer key : ruleHierarchy_.keySet()) {
+			Collection<GuidedRule> rules = ruleHierarchy_.get(key);
+			for (GuidedRule rule : rules) {
+				buffer.append("[" + key + "]: ");
+				buffer.append(StateSpec.encodeRule(rule.getRule()) + "\n");
 			}
 		}
 		return buffer.toString();
 	}
 
 	/**
-	 * Gets the priority of a slot within the policy.
-	 * 
-	 * @param slot
-	 *            The slot within the policy.
-	 * @param policySize
-	 *            The size of the policy.
-	 * @return A value between 1-NUM_PRIORITIES.
-	 */
-	public static int getPriority(int slot, int policySize) {
-		int priorityNumber = policySize / ActionSwitch.NUM_PRIORITIES + 1;
-		return slot / priorityNumber;
-	}
-
-	/**
-	 * Gets the first element of a priority level.
-	 * 
-	 * @param priorityLevel
-	 *            The priority level to go to.
-	 * @param policySize
-	 *            The size of the policy.
-	 * @return The first element of a priority level.
-	 */
-	public static int priorityZero(int priorityLevel, int policySize) {
-		int priorityNumber = policySize / ActionSwitch.NUM_PRIORITIES + 1;
-		return priorityLevel * priorityNumber;
-	}
-
-	/**
-	 * Evaluates the policy for applicable rules within each priority. If
-	 * multiple rules are applicable, only apply the highest priority ones.
+	 * Evaluates a policy for a number of firing rules, and switches on the
+	 * necessary rules.
 	 * 
 	 * @param state
 	 *            The current state in predicates.
 	 * @param actionSwitch
 	 *            The current actions.
+	 * @param actionsReturned
+	 *            The number of actions to be returned.
 	 */
-	public void evaluatePolicy(KnowledgeBase state, ActionSwitch actionSwitch) {
-		// Get the applicable actions from the priority levels.
-		List<Fact>[] results = evaluateRules(state);
-
-		// Apply the actions in the action switch.
-		for (int i = 0; i < results.length; i++) {
-			if (results[i] != null) {
-				actionSwitch.switchOn(results[i], i);
-			}
-		}
-	}
-
-	/**
-	 * Evaluates the rules within the policy, returning the sets of rules
-	 * applicable at each policy level. The policy is ordered as a decision
-	 * list, so the first rule to activate is the rule to use at that priority
-	 * level and further evaluation ceases at the activated level.
-	 * 
-	 * @param state
-	 *            The state of the system, in predicate form.
-	 * @return A set of grounded facts for each priority level.
-	 */
-	private List<Fact>[] evaluateRules(KnowledgeBase state) {
-		List<Fact>[] activatedActions = new List[ActionSwitch.NUM_PRIORITIES];
-
+	public void evaluatePolicy(KnowledgeBase state, ActionSwitch actionSwitch,
+			int actionsReturned) {
 		// Logic constructs
-		LogicFactorySupport factorySupport = new LogicFactorySupport(RuleBase
+		LogicFactorySupport factorySupport = new LogicFactorySupport(PolicyGenerator
 				.getInstance().getLogicFactory());
-		InferenceEngine ie = RuleBase.getInstance().getInferenceEngine();
+		InferenceEngine ie = PolicyGenerator.getInstance().getInferenceEngine();
 
+		// A table for already completed requests
 		Map<RuleCondition, ResultSet> resultTable = new HashMap<RuleCondition, ResultSet>();
+
 		// Check every slot, from top-to-bottom until one activates
-		for (int i = 0; i < priorityRules_.length; i++) {
-			int priorityLevel = getPriority(i, priorityRules_.length);
-			List<Fact> priorityActions = activatedActions[priorityLevel];
-			// Check if the rule exists and the current priority level hasn't
-			// fired.
-			if (priorityRules_[i] != null) {
-				Rule rule = priorityRules_[i].getRule();
+		int actionsFound = 0;
+		Iterator<Integer> iter = ruleHierarchy_.keySet().iterator();
+		while ((actionsFound < actionsReturned) && (iter.hasNext())) {
+			Integer priority = iter.next();
+			Collection<GuidedRule> rules = ruleHierarchy_.get(priority);
+
+			ArrayList<List<Fact>> ruleResults = new ArrayList<List<Fact>>();
+			for (GuidedRule gr : rules) {
+				Rule rule = gr.getRule();
 
 				// Setting up the necessary variables
 				RuleCondition ruleConds = new RuleCondition(rule.getBody());
@@ -212,14 +143,16 @@ public class Policy {
 					}
 					// If there is at least one result
 					if (results.next()) {
-						priorityActions = new ArrayList<Fact>();
+						triggeredRules_.add(gr);
+						List<Fact> actionResults = new ArrayList<Fact>();
+						ruleResults.add(actionResults);
 						// For each possible replacement
 						do {
 							Map<Term, Term> replacementMap = results
 									.getResults();
 							Collection<Replacement> replacements = new ArrayList<Replacement>();
-							// Find the replacements for the variable terms in
-							// the action
+							// Find the replacements for the variable terms
+							// in the action
 							for (Term var : rule.getHead().getTerms()) {
 								if (var instanceof VariableTerm) {
 									replacements.add(new Replacement(var,
@@ -229,38 +162,33 @@ public class Policy {
 								}
 							}
 
-							// Apply the replacements and add the fact to the
-							// set
+							// Apply the replacements and add the fact to
+							// the set
 							Fact groundAction = rule.getHead().applyToFact(
 									replacements);
 							// If the action is ground
-							if (!priorityActions.contains(groundAction))
-								priorityActions.add(groundAction);
+							if (!actionResults.contains(groundAction))
+								actionResults.add(groundAction);
 						} while (results.next());
 					}
 					results.close();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				if ((priorityActions != null) && (!priorityActions.isEmpty())) {
-					i = priorityZero(priorityLevel + 1, priorityRules_.length) - 1;
-					activatedActions[priorityLevel] = priorityActions;
+			}
+
+			// Choose a random action set from the rules at this level
+			if (!ruleResults.isEmpty()) {
+				// Add action sets until actions found equals the amount
+				// required
+				Random random = new Random();
+				while ((!ruleResults.isEmpty()) && (actionsFound < actionsReturned)) {
+					List<Fact> actionResults = ruleResults.remove(random
+							.nextInt(ruleResults.size()));
+					actionSwitch.switchOn(actionResults, actionsFound);
+					actionsFound++;
 				}
 			}
-		}
-
-		return activatedActions;
-	}
-
-	/**
-	 * Sets the fired rules of this policy to that given in string form.
-	 * 
-	 * @param firedString
-	 */
-	public void setFired(String firedString) {
-		String[] split = firedString.split(DELIMITER + "");
-		for (int i = 0; i < split.length; i++) {
-			triggered_[i] = Boolean.parseBoolean(split[i]);
 		}
 	}
 

@@ -41,8 +41,6 @@ public class PolicyAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
-		} else if (arg0.equals("getFired")) {
-			return policy_.getFiredString();
 		}
 		return null;
 	}
@@ -78,7 +76,7 @@ public class PolicyAgent implements AgentInterface {
 	private List[] chooseAction(KnowledgeBase state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
-		policy_.evaluatePolicy(state, actionsModule_);
+		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance().getNumActions());
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();
