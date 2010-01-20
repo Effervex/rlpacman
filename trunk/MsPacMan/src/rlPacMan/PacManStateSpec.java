@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.awt.Point;
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import org.mandarax.kernel.Term;
 import relationalFramework.GuidedPredicate;
 import relationalFramework.Policy;
 import relationalFramework.PredTerm;
+import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 /**
@@ -35,7 +37,7 @@ public class PacManStateSpec extends StateSpec {
 		// Simply load the arrays with names and classes and loop through.
 		Class[] typeClasses = { Player.class, Dot.class, PowerDot.class,
 				Ghost.class, Fruit.class, JunctionPoint.class, PacPoint.class,
-				Object[].class };
+				State.class };
 		String[] predNames = { "pacman", "dot", "powerdot", "ghost", "fruit",
 				"junction", "location", "state" };
 
@@ -96,15 +98,15 @@ public class PacManStateSpec extends StateSpec {
 
 			// GHOSTS FLASHING
 			predicates.add(createDefinedPredicate(PacManStateSpec.class,
-					new Class[] { Object[].class },
-					new PredTerm[][] { createTied("State", Object[].class) },
+					new Class[] { State.class },
+					new PredTerm[][] { createTied("State", State.class) },
 					"ghostsFlashing"));
 
 			// EMPTY PREDICATE
 			Predicate empty = new SimplePredicate("true",
-					new Class[] { Object[].class });
+					new Class[] { State.class });
 			predicates.add(new GuidedPredicate(empty,
-					new PredTerm[][] { createTied("State", Object[].class) }));
+					new PredTerm[][] { createTied("State", State.class) }));
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -118,9 +120,9 @@ public class PacManStateSpec extends StateSpec {
 
 		try {
 			// MOVE TOWARDS
-			Class[] moveStructure = { Object[].class, PacPoint.class };
+			Class[] moveStructure = { State.class, PacPoint.class };
 			PredTerm[][] predVals = new PredTerm[2][];
-			predVals[0] = createTied("State", Object[].class);
+			predVals[0] = createTied("State", State.class);
 			predVals[1] = createTied("Location", PacPoint.class);
 			actions.add(createDefinedPredicate(PacManStateSpec.class,
 					moveStructure, predVals, "moveTowards"));
@@ -138,6 +140,12 @@ public class PacManStateSpec extends StateSpec {
 	@Override
 	protected int initialiseActionsPerStep() {
 		return 3;
+	}
+
+	@Override
+	protected Map<Predicate, Rule> initialiseActionPreconditions(List<GuidedPredicate> actions) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	@Override
@@ -192,12 +200,12 @@ public class PacManStateSpec extends StateSpec {
 	private GuidedPredicate valuePredicate(Double[] vals, String methodName) throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[2][];
-		predValues[0] = createTied("State", Object[].class);
+		predValues[0] = createTied("State", State.class);
 		predValues[1] = PredTerm.createValueArray(vals);
 
 		// Defining the predicate
 		Class[] predicateStructure = new Class[2];
-		predicateStructure[0] = Object[].class;
+		predicateStructure[0] = State.class;
 		predicateStructure[1] = Double.class;
 		return createDefinedPredicate(PacManStateSpec.class,
 				predicateStructure, predValues, methodName);
@@ -223,13 +231,13 @@ public class PacManStateSpec extends StateSpec {
 			Integer[] distanceVals, Class secondClass, String methodName) throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[3][];
-		predValues[0] = createTied("State", Object[].class);
+		predValues[0] = createTied("State", State.class);
 		predValues[1] = createTiedAndFree(secondParamName, secondClass);
 		predValues[2] = PredTerm.createValueArray(distanceVals);
 
 		// Defining the predicate
 		Class[] predicateStructure = new Class[3];
-		predicateStructure[0] = Object[].class;
+		predicateStructure[0] = State.class;
 		predicateStructure[1] = secondClass;
 		predicateStructure[2] = Integer.class;
 		return createDefinedPredicate(PacManStateSpec.class,
@@ -260,44 +268,49 @@ public class PacManStateSpec extends StateSpec {
 	 * An assortment of wrapper methods checking distance between Pacman and a
 	 * Thing.
 	 */
-	public boolean proximalDot(Object[] state, Dot dot, Integer distance) {
-		return proximalThing(PacManState.getDistanceGrid(state), dot, distance);
+	public boolean proximalDot(State state, Dot dot, Integer distance) {
+		PacManState pacState = (PacManState) state;
+		return proximalThing(pacState.getDistanceGrid(), dot, distance);
 	}
 
-	public boolean proximalPowerDot(Object[] state, PowerDot powerDot,
+	public boolean proximalPowerDot(State state, PowerDot powerDot,
 			Integer distance) {
-		return proximalThing(PacManState.getDistanceGrid(state), powerDot,
+		PacManState pacState = (PacManState) state;
+		return proximalThing(pacState.getDistanceGrid(), powerDot,
 				distance);
 	}
 
-	public boolean proximalGhost(Object[] state, Ghost ghost, Integer distance) {
+	public boolean proximalGhost(State state, Ghost ghost, Integer distance) {
+		PacManState pacState = (PacManState) state;
 		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
 			if (ghost.m_nTicks2Flee <= 0)
-				return proximalThing(PacManState.getDistanceGrid(state), ghost,
+				return proximalThing(pacState.getDistanceGrid(), ghost,
 						distance);
 		}
 		return false;
 	}
 
-	public boolean proximalEdibleGhost(Object[] state, Ghost ghost,
+	public boolean proximalEdibleGhost(State state, Ghost ghost,
 			Integer distance) {
+		PacManState pacState = (PacManState) state;
 		if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
 			if (ghost.m_nTicks2Flee > 0)
-				return proximalThing(PacManState.getDistanceGrid(state), ghost,
+				return proximalThing(pacState.getDistanceGrid(), ghost,
 						distance);
 		}
 		return false;
 	}
 
-	public boolean proximalFruit(Object[] state, Fruit fruit, Integer distance) {
+	public boolean proximalFruit(State state, Fruit fruit, Integer distance) {
+		PacManState pacState = (PacManState) state;
 		if ((fruit.m_nTicks2Show == 0) && (fruit.m_bAvailable)) {
-			return proximalThing(PacManState.getDistanceGrid(state), fruit,
+			return proximalThing(pacState.getDistanceGrid(), fruit,
 					distance);
 		}
 		return false;
 	}
 
-	public boolean safeJunction(Object[] state, JunctionPoint junction,
+	public boolean safeJunction(State state, JunctionPoint junction,
 			Integer safety) {
 		// Make the check
 		if (junction.getSafety() <= safety) {
@@ -306,42 +319,45 @@ public class PacManStateSpec extends StateSpec {
 		return false;
 	}
 
-	public boolean ghostCentre(Object[] state, Double distance) {
+	public boolean ghostCentre(State state, Double distance) {
+		PacManState pacState = (PacManState) state;
 		double sumX = 0;
 		double sumY = 0;
-		Ghost[] ghosts = PacManState.getGhosts(state);
-		Player pacman = PacManState.getPlayer(state);
+		Ghost[] ghosts = pacState.getGhosts();
+		Player pacman = pacState.getPlayer();
 		for (Ghost ghost : ghosts) {
 			sumX += ghost.m_locX;
 			sumY += ghost.m_locY;
 		}
 		double centreX = sumX / ghosts.length;
 		double centreY = sumY / ghosts.length;
-		if (Point.distance(centreX, centreY, pacman.m_locX, pacman.m_locY) <= distance)
+		if (Point2D.distance(centreX, centreY, pacman.m_locX, pacman.m_locY) <= distance)
 			return true;
 
 		return false;
 	}
 
-	public boolean dotCentre(Object[] state, Double distance) {
+	public boolean dotCentre(State state, Double distance) {
+		PacManState pacState = (PacManState) state;
 		double sumX = 0;
 		double sumY = 0;
-		Collection<Dot> dots = PacManState.getDots(state);
-		Player pacman = PacManState.getPlayer(state);
+		Collection<Dot> dots = pacState.getDots();
+		Player pacman = pacState.getPlayer();
 		for (Dot dot : dots) {
 			sumX += dot.m_locX;
 			sumY += dot.m_locY;
 		}
 		double centreX = sumX / dots.size();
 		double centreY = sumY / dots.size();
-		if (Point.distance(centreX, centreY, pacman.m_locX, pacman.m_locY) <= distance)
+		if (Point2D.distance(centreX, centreY, pacman.m_locX, pacman.m_locY) <= distance)
 			return true;
 
 		return false;
 	}
 
-	public boolean ghostDensity(Object[] state, Double density) {
-		if (calculateDensity(PacManState.getGhosts(state)) <= density)
+	public boolean ghostDensity(State state, Double density) {
+		PacManState pacState = (PacManState) state;
+		if (calculateDensity(pacState.getGhosts()) <= density)
 			return true;
 		return false;
 	}
@@ -359,7 +375,7 @@ public class PacManStateSpec extends StateSpec {
 			for (int j = i + 1; j < ghosts.length; j++) {
 				Ghost thatGhost = ghosts[j];
 				double distance = Ghost.DENSITY_RADIUS
-						- Point.distance(thisGhost.m_locX, thisGhost.m_locY,
+						- Point2D.distance(thisGhost.m_locX, thisGhost.m_locY,
 								thatGhost.m_locX, thatGhost.m_locY);
 				if (distance > 0)
 					density += distance;
@@ -368,10 +384,11 @@ public class PacManStateSpec extends StateSpec {
 		return density;
 	}
 
-	public boolean ghostDistanceSum(Object[] state, Double distance) {
-		Thing currentThing = PacManState.getPlayer(state);
+	public boolean ghostDistanceSum(State state, Double distance) {
+		PacManState pacState = (PacManState) state;
+		Thing currentThing = pacState.getPlayer();
 		Set<Thing> thingsToVisit = new HashSet<Thing>();
-		for (Ghost ghost : PacManState.getGhosts(state))
+		for (Ghost ghost : pacState.getGhosts())
 			thingsToVisit.add(ghost);
 		double totalDistance = 0;
 		// While there are things to go to.
@@ -380,7 +397,7 @@ public class PacManStateSpec extends StateSpec {
 			double closest = Integer.MAX_VALUE;
 			Thing closestThing = null;
 			for (Thing thing : thingsToVisit) {
-				double distanceBetween = Point.distance(currentThing.m_locX,
+				double distanceBetween = Point2D.distance(currentThing.m_locX,
 						currentThing.m_locY, thing.m_locX, thing.m_locY);
 				if (distanceBetween < closest) {
 					closest = distanceBetween;
@@ -403,8 +420,9 @@ public class PacManStateSpec extends StateSpec {
 		return false;
 	}
 
-	public boolean ghostsFlashing(Object[] state) {
-		for (Ghost ghost : PacManState.getGhosts(state)) {
+	public boolean ghostsFlashing(State state) {
+		PacManState pacState = (PacManState) state;
+		for (Ghost ghost : pacState.getGhosts()) {
 			if (ghost.isFlashing())
 				return true;
 		}
@@ -420,9 +438,10 @@ public class PacManStateSpec extends StateSpec {
 	 *            The point to move towards.
 	 * @return A byte corresponding to a constant given in Thing
 	 */
-	public Byte moveTowards(Object[] state, PacPoint point) {
+	public Byte moveTowards(State state, PacPoint point) {
+		PacManState pacState = (PacManState) state;
 		return (byte) followPath(point.m_locX, point.m_locY,
-				PacManState.getDistanceGrid(state)).ordinal();
+				pacState.getDistanceGrid()).ordinal();
 	}
 
 	/**
@@ -434,9 +453,10 @@ public class PacManStateSpec extends StateSpec {
 	 *            The point to move away from.
 	 * @return A negative of a byte corresponding to a constant given in Thing
 	 */
-	public Byte moveFrom(Object[] state, PacPoint point) {
+	public Byte moveFrom(State state, PacPoint point) {
+		PacManState pacState = (PacManState) state;
 		return (byte) (-followPath(point.m_locX, point.m_locY,
-				PacManState.getDistanceGrid(state)).ordinal());
+				pacState.getDistanceGrid()).ordinal());
 	}
 
 	/**
@@ -490,9 +510,10 @@ public class PacManStateSpec extends StateSpec {
 	 * @return A positive byte between 1 and 4 corresponding to a constant given
 	 *         in Thing.
 	 */
-	public Byte keepDirection(Object[] state) {
-		Player player = PacManState.getPlayer(state);
-		int[][] distanceGrid = PacManState.getDistanceGrid(state);
+	public Byte keepDirection(State state) {
+		PacManState pacState = (PacManState) state;
+		Player player = pacState.getPlayer();
+		int[][] distanceGrid = pacState.getDistanceGrid();
 
 		int xOffset = 0;
 		int yOffset = 0;

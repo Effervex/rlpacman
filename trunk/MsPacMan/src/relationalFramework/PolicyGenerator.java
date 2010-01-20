@@ -1,22 +1,23 @@
 package relationalFramework;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.mandarax.kernel.ClauseSet;
 import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
+import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.VariableTerm;
@@ -30,11 +31,7 @@ import org.mandarax.reference.DefaultInferenceEngine;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator {
-	/** The element delimiter between elements in the generator files. */
-	public static final String ELEMENT_DELIMITER = ",";
-
-	/** The delimiter character between rules within the same rule base. */
-	public static final String RULE_DELIMITER = "@";
+	private static final int MAX_UNIFICATION_INACTIVITY = 3;
 
 	/** The probability distributions defining the policy generator. */
 	private ProbabilityDistribution<Slot> policyGenerator_;
@@ -55,13 +52,10 @@ public class PolicyGenerator {
 	private InferenceEngine inferenceEngine_;
 
 	/** The cross-entropy generators for the conditions within the rules. */
-	private ProbabilityDistribution<GuidedPredicate> conditionGenerators_;
+	private Collection<GuidedPredicate> conditionGenerator_;
 
 	/** The cross-entropy generators for the actions within the rules. */
-	private ProbabilityDistribution<GuidedPredicate> actionGenerators_;
-
-	/** The file the initial rulebase is read from. */
-	private File initialFile_;
+	private Collection<GuidedPredicate> actionGenerator_;
 
 	/** The class prefix for the experiment. */
 	private String classPrefix_;
@@ -78,13 +72,12 @@ public class PolicyGenerator {
 		StateSpec.initInstance(classPrefix, factory_);
 		actionSet_ = StateSpec.getInstance().getActions();
 		classPrefix_ = classPrefix;
-		conditionGenerators_ = formConditions();
-		actionGenerators_ = formActions();
+		conditionGenerator_ = formConditions();
+		actionGenerator_ = formActions();
 
-		initialFile_ = null;
 		resetGenerator();
 	}
-	
+
 	/**
 	 * A private constructor for creating a rule base from file.
 	 * 
@@ -93,12 +86,23 @@ public class PolicyGenerator {
 	 * @param ruleBaseFile
 	 *            The file from which to load the rules.
 	 */
-	private void loadRuleBase(String classPrefix, File ruleBaseFile) {
-		initialFile_ = ruleBaseFile;
-		policyGenerator_ = loadRulesFromFile(initialFile_, conditionGenerators_,
-				actionGenerators_);
+	private ProbabilityDistribution<Slot> loadRuleBase(String classPrefix,
+			File ruleBaseFile) {
+		return RuleFileManager.loadRulesFromFile(ruleBaseFile,
+				conditionGenerator_, actionGenerator_);
 	}
-	
+
+	/**
+	 * Loads the generator values into the rule base. This method needs to be
+	 * modified later.
+	 * 
+	 * @param input
+	 *            The generator file.
+	 */
+	public void loadGenerators(File input) {
+		RuleFileManager.loadGenerators(input, policyGenerator_);
+	}
+
 	/**
 	 * Creates all possible conditions from within the StateSpec.
 	 * 
@@ -182,9 +186,221 @@ public class PolicyGenerator {
 					.next();
 			GuidedRule gr = slot.getGenerator().sample();
 			if (gr != null)
-				policy.addRule(i, gr);
+				policy.addRule(gr);
 		}
 		return policy;
+	}
+
+	/**
+	 * Triggers covering of a state. This works by finding the maximally general
+	 * (valid) set of conditions for each valid action type in the state (not
+	 * individual actions).
+	 * 
+	 * @param state
+	 *            The observations of the current state, including the valid
+	 *            actions to take.
+	 * @return The list of covered rules, one for each action type.
+	 */
+	public List<GuidedRule> triggerCovering(KnowledgeBase state) {
+		// TODO Covering
+		System.out.println("<COVERING TRIGGERED:>");
+
+		// Find the relevant conditions for each term
+		MultiMap<Term, Fact> relevantConditions = new MultiMap<Term, Fact>();
+		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
+
+		// Maintain a mapping for each action, to be used in unification between
+		// actions
+		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
+
+		// Arrange the actions in a heuristical order such that unification
+		// should be most effective.
+		@SuppressWarnings("unchecked")
+		MultiMap<Predicate, Fact> validActions = arrangeActions((Set<Fact>) ((ConstantTerm) actionFact
+				.getTerms()[0]).getObject());
+		for (Predicate action : validActions.keySet()) {
+			GuidedRule actionRule = unifyActionRules(validActions.get(action),
+					relevantConditions);
+			generalActions.add(actionRule);
+		}
+
+		return generalActions;
+	}
+
+	/**
+	 * Unifies action rules together into one general all-covering rule.
+	 * 
+	 * @param actionsList
+	 *            A heuristically sorted list of actions for a single predicate.
+	 * @param relevantConditions
+	 *            The relevant conditions for each term in the state.
+	 * @return A GuidedRule representing a general action.
+	 */
+	private GuidedRule unifyActionRules(List<Fact> actionsList,
+			MultiMap<Term, Fact> relevantConditions) {
+		// TODO Modify this to a while loop.
+		for (Fact action : actionsList) {
+			List<Fact> actionFacts = new ArrayList<Fact>();
+
+			Term[] actionTerms = action.getTerms();
+			// Find the facts containing the same (useful) terms in the action
+			for (int i = 0; i < actionTerms.length; i++) {
+				Term term = actionTerms[i];
+				if (StateSpec.getInstance().isUsefulTerm((ConstantTerm) term,
+						factory_)) {
+					List<Fact> termFacts = relevantConditions.get(term);
+					for (Fact termFact : termFacts) {
+						if (!actionFacts.contains(termFact))
+							actionFacts.add(termFact);
+					}
+				}
+			}
+
+			// Inversely substitute the terms for variables
+
+			// Unify with other action rules of the same action
+		}
+
+		// Use the unified rules to create new rules
+		return null;
+	}
+
+	/**
+	 * Arranges the collection of actions into a heuristical ordering which
+	 * attempts to find maximally dissimilar actions of the same type. The list
+	 * is ordered such that the actions of the same predicate, each one with
+	 * different arguments from the last, are first, followed by randomly
+	 * ordered remaining actions.
+	 * 
+	 * @param validActions
+	 *            The set of valid actions.
+	 * @return A multimap of each action predicate, containing the heuristically
+	 *         ordered actions.
+	 */
+	private MultiMap<Predicate, Fact> arrangeActions(Set<Fact> validActions) {
+		// Initialise a map for each action predicate
+		MultiMap<Predicate, Fact> actionsMap = new MultiMap<Predicate, Fact>();
+		MultiMap<Predicate, Set<Term>> usedTermsMap = new MultiMap<Predicate, Set<Term>>();
+
+		MultiMap<Predicate, Fact> notUsedMap = new MultiMap<Predicate, Fact>();
+		// For each action
+		for (Fact action : validActions) {
+			Predicate actionPred = action.getPredicate();
+			if (isDissimilarAction(action, usedTermsMap)) {
+				actionsMap.put(actionPred, action);
+			} else {
+				notUsedMap.put(actionPred, action);
+			}
+		}
+
+		// If we have some actions not used (likely, then shuffle the ordering
+		// and add them to the end of the actions map.
+		if (!notUsedMap.isEmpty()) {
+			for (List<Fact> notUsed : notUsedMap.valuesLists()) {
+				Collections.shuffle(notUsed);
+			}
+			actionsMap.putAll(notUsedMap);
+		}
+
+		return actionsMap;
+	}
+
+	/**
+	 * Is the given action dissimilar from the already seen actions? This is
+	 * measured by which terms have already been seen in their appropriate
+	 * predicate slots.
+	 * 
+	 * @param action
+	 *            The action being checked.
+	 * @param usedTermsMap
+	 *            The already used terms mapping.
+	 * @return True if the action is dissimilar, false otherwise.
+	 */
+	private boolean isDissimilarAction(Fact action,
+			MultiMap<Predicate, Set<Term>> usedTermsMap) {
+		Term[] terms = action.getTerms();
+		Predicate actionPred = action.getPredicate();
+		// Run through each term
+		for (int i = 0; i < terms.length; i++) {
+			// Checking if the term set already exists
+			Set<Term> usedTerms = usedTermsMap.getIndex(actionPred, i);
+			if (usedTerms == null) {
+				usedTerms = new HashSet<Term>();
+				usedTermsMap.put(actionPred, usedTerms);
+			}
+
+			ConstantTerm term = (ConstantTerm) terms[i];
+			// If the term has already been used (but isn't a state or state
+			// spec term), return false
+			if ((usedTerms.contains(term))
+					&& (StateSpec.getInstance().isUsefulTerm(term, factory_)))
+				return false;
+		}
+
+		// If the terms have not been used before, add them all to their
+		// appropriate sets.
+		for (int i = 0; i < terms.length; i++) {
+			usedTermsMap.getIndex(actionPred, i).add(terms[i]);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Compiles the relevant term conditions from the state into map format,
+	 * with the term as the key and the fact as the value. This makes finding
+	 * relevant conditions a quick matter.
+	 * 
+	 * @param state
+	 *            The state containing the conditions.
+	 * @return A mapping of conditions with terms as the key. Ignores type,
+	 *         inequal, action facts and state and state spec terms.
+	 */
+	private Fact compileRelevantConditionMap(KnowledgeBase state,
+			MultiMap<Term, Fact> relevantConditions) {
+		Fact actionFact = null;
+
+		List<ClauseSet> clauseSets = state.getClauseSets();
+		for (ClauseSet cs : clauseSets) {
+			// If the clause is a fact, use it
+			if (cs instanceof Fact) {
+				Fact stateFact = (Fact) cs;
+				// Ignore the type, inequal and actions pred
+				if (StateSpec.getInstance().isUsefulPredicate(
+						stateFact.getPredicate()))
+					extractTerms(stateFact, relevantConditions);
+				// Find the action fact
+				else if (stateFact.getPredicate().equals(
+						StateSpec.getValidActionsPredicate()))
+					actionFact = stateFact;
+			}
+
+			// TODO If the clause is a rule, use the rule to find background
+			// clause facts.
+		}
+
+		return actionFact;
+	}
+
+	/**
+	 * Extracts the terms from a fact and adds them to an appropriate position
+	 * within the conditionMap.
+	 * 
+	 * @param stateFact
+	 *            The fact being examined.
+	 * @param conditionMap
+	 *            The condition map to add to.
+	 */
+	private void extractTerms(Fact stateFact, MultiMap<Term, Fact> conditionMap) {
+		Term[] terms = stateFact.getTerms();
+		for (Term term : terms) {
+			// Ignore the state and state spec terms
+			if (StateSpec.getInstance().isUsefulTerm((ConstantTerm) term,
+					factory_)) {
+				// Add to map, if not already there
+				conditionMap.putContains(term, stateFact);
+			}
+		}
 	}
 
 	/**
@@ -252,120 +468,14 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Save rules to a file in the format
-	 * 
-	 * @param ruleBaseFile
-	 *            The file to save the rules to.
-	 */
-	public void saveRulesToFile(File ruleBaseFile) {
-		try {
-			if (!ruleBaseFile.exists())
-				ruleBaseFile.createNewFile();
-
-			FileWriter writer = new FileWriter(ruleBaseFile);
-			BufferedWriter bf = new BufferedWriter(writer);
-
-			bf.write(StateSpec.getInstance().getGoalState() + "\n");
-			// For each of the rule bases
-			for (Slot slot : policyGenerator_) {
-				// For each of the rules
-				for (GuidedRule r : slot.getGenerator()) {
-					bf
-							.write(StateSpec.encodeRule(r.getRule())
-									+ RULE_DELIMITER);
-				}
-				bf.write("\n");
-			}
-
-			System.out.println("Random rulebases saved to: " + ruleBaseFile);
-
-			bf.close();
-			writer.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Load the rules from a file.
-	 * 
-	 * @param ruleBaseFile
-	 *            The file to load the rules from.
-	 * @param actGenerator
-	 *            The actions generator.
-	 * @param condGenerator
-	 *            The conditions generator.
-	 * @return The rules loaded in.
-	 */
-	private ProbabilityDistribution<Slot> loadRulesFromFile(File ruleBaseFile,
-			ProbabilityDistribution<GuidedPredicate> condGenerator,
-			ProbabilityDistribution<GuidedPredicate> actGenerator) {
-		ProbabilityDistribution<Slot> ruleBases = new ProbabilityDistribution<Slot>();
-
-		try {
-			FileReader reader = new FileReader(ruleBaseFile);
-			BufferedReader bf = new BufferedReader(reader);
-
-			// Checking the environment goals match.
-			String input = bf.readLine();
-			if (!input
-					.equals(StateSpec.getInstance().getGoalState().toString())) {
-				System.err
-						.println("Environment goal does not match! Crashing...");
-				return null;
-			}
-
-			// Read the rules in.
-			Map<String, Object> constants = StateSpec.getInstance()
-					.getConstants();
-			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
-				Slot slot = null;
-				// Split the base into rules
-				String[] split = input.split(RULE_DELIMITER);
-				// For each rule, add it to the rulebase
-				for (int i = 0; i < split.length; i++) {
-					Rule rule = StateSpec.getInstance().parseRule(split[i],
-							constants);
-					ArrayList<GuidedPredicate> condsAct = inferGuidedPreds(
-							rule, condGenerator, actGenerator);
-					GuidedPredicate action = condsAct
-							.remove(condsAct.size() - 1);
-					if (slot == null) {
-						slot = new Slot(action.getPredicate());
-					}
-
-					GuidedRule gr = new GuidedRule(rule, condsAct, action, slot);
-					slot.getGenerator().add(gr);
-				}
-				slot.getGenerator().normaliseProbs();
-				ruleBases.add(slot);
-			}
-
-			bf.close();
-			reader.close();
-
-			return ruleBases;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
-
-	/**
 	 * Infers GuidedPredicates from a rule - how it was composed.
 	 * 
 	 * @param rule
 	 *            The rule being inferred.
-	 * @param condGenerator
-	 *            The conditions distribution.
-	 * @param actGenerator
-	 *            The actions distribution.
 	 * @return The guided predicates used to make up the rule, with the action
 	 *         predicate at the end.
 	 */
-	private ArrayList<GuidedPredicate> inferGuidedPreds(Rule rule,
-			ProbabilityDistribution<GuidedPredicate> condGenerator,
-			ProbabilityDistribution<GuidedPredicate> actGenerator) {
+	public ArrayList<GuidedPredicate> inferGuidedPreds(Rule rule) {
 		ArrayList<GuidedPredicate> guidedPreds = new ArrayList<GuidedPredicate>();
 		List<Fact> prereqs = rule.getBody();
 
@@ -417,85 +527,6 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Saves the generators/distributions to file. TODO Modify this method to
-	 * save the generators in a more dynamic format.
-	 * 
-	 * @param output
-	 *            The file to output the generator to.
-	 * @throws Exception
-	 *             Should something go awry.
-	 */
-	public void saveGenerators(File output) throws Exception {
-		FileWriter wr = new FileWriter(output);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		buf.write(policyGenerator_.generatorString(ELEMENT_DELIMITER) + "\n");
-
-		// For each of the rule generators
-		for (Slot slot : policyGenerator_) {
-			buf.write(slot.getGenerator().generatorString(ELEMENT_DELIMITER)
-					+ "\n");
-		}
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Saves a frozen, human readable version of the generators out
-	 * 
-	 * @param output
-	 *            The file to output the human readable generators to.
-	 */
-	public void saveHumanGenerators(File output) throws Exception {
-		FileWriter wr = new FileWriter(output);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		// Go through each slot, writing out those that fire
-		ArrayList<Slot> probs = policyGenerator_.getOrderedElements();
-		for (Slot slot : probs) {
-			// Output every non-zero rule
-			boolean single = true;
-			for (GuidedRule rule : slot.getGenerator().getNonZero()) {
-				if (!single)
-					buf.write("/ ");
-				buf.write(StateSpec.encodeRule(rule.getRule()));
-				single = false;
-			}
-			buf.write("\n");
-		}
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Loads the generators/distributions from file.
-	 * 
-	 * @param file
-	 *            The file to load from.
-	 * @throws Exception
-	 *             Should something go awry.
-	 */
-	public void loadGenerators(File input) throws Exception {
-		// TODO Modify this method
-		FileReader reader = new FileReader(input);
-		BufferedReader buf = new BufferedReader(reader);
-
-		// Parse the slots
-		String[] split = buf.readLine().split(ELEMENT_DELIMITER);
-		for (int i = 0; i < split.length; i++) {
-			policyGenerator_.set(i, Double.parseDouble(split[i]));
-		}
-
-		// Parse the rules
-		// RuleBase.getInstance().readGenerators(buf);
-
-		buf.close();
-		reader.close();
-	}
-
-	/**
 	 * Gets the rule base instance.
 	 * 
 	 * @return The rule base instance or null if not yet initialised.
@@ -511,7 +542,7 @@ public class PolicyGenerator {
 		instance_ = new PolicyGenerator(classPrefix);
 		try {
 			File ruleBaseFile = new File("ruleBase.txt");
-			instance_.saveRulesToFile(ruleBaseFile);
+			RuleFileManager.saveRulesToFile(ruleBaseFile);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -541,5 +572,13 @@ public class PolicyGenerator {
 
 	public String getClassPrefix() {
 		return classPrefix_;
+	}
+
+	public boolean isFrozen() {
+		return frozen_;
+	}
+
+	public ProbabilityDistribution<Slot> getGenerator() {
+		return policyGenerator_;
 	}
 }

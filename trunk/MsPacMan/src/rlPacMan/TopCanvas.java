@@ -19,10 +19,12 @@ class TopCanvas extends Canvas {
 		m_font = new Font("Helvetica", Font.BOLD, 14);
 	}
 
+	@Override
 	public void update(Graphics g) {
 		paint(g);
 	}
 
+	@Override
 	public void paint(Graphics g) {
 		int y;
 		int x;
@@ -95,10 +97,12 @@ class BottomCanvas extends Canvas {
 		m_font = new Font("Helvetica", Font.BOLD, 14);
 	}
 
+	@Override
 	public void update(Graphics g) {
 		paint(g);
 	}
 
+	@Override
 	public void paint(Graphics g) {
 		Dimension dim = getSize();
 

@@ -963,6 +963,7 @@ class Ghost extends Thing {
 		pixelShrink_ = -pixelSize_ / 4;
 	}
 	
+	@Override
 	public String toString() {
 		String ghostString = null;
 		switch(m_type) {

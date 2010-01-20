@@ -2,6 +2,7 @@ package relationalFramework;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,17 +13,21 @@ import java.util.regex.Pattern;
 
 import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
+import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
+import org.mandarax.kernel.Query;
+import org.mandarax.kernel.Replacement;
+import org.mandarax.kernel.ResultSet;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
+import org.mandarax.kernel.VariableTerm;
 import org.mandarax.kernel.meta.JConstructor;
 import org.mandarax.kernel.meta.JPredicate;
-
-import blocksWorld.Block;
+import org.mandarax.util.LogicFactorySupport;
 
 /**
  * A class to outline the specifications of the environment.
@@ -45,6 +50,9 @@ public abstract class StateSpec {
 	/** The predicate for handling inequality. */
 	private static Predicate inequalityPred_;
 
+	/** The predicate containing the valid actions. */
+	private static Predicate validActionsPred_;
+
 	/** The prerequisites of the rules. */
 	private List<GuidedPredicate> predicates_;
 
@@ -56,6 +64,9 @@ public abstract class StateSpec {
 
 	/** The number of simultaneous actions per step to take. */
 	private int actionNum_;
+
+	/** The rules relating to an actions precondition. */
+	private Map<Predicate, Rule> actionPreconditions_;
 
 	/** A map for retrieving predicates by name. */
 	private Map<String, GuidedPredicate> predByNames_;
@@ -87,7 +98,7 @@ public abstract class StateSpec {
 	/**
 	 * The constructor for a state specification.
 	 */
-	protected void initialise(LogicFactory factory) {
+	private final void initialise(LogicFactory factory) {
 		factory_ = factory;
 		constants_ = new HashMap<String, Object>();
 		typePredicates_ = initialiseTypePredicates();
@@ -98,6 +109,8 @@ public abstract class StateSpec {
 		goalState_ = initialiseGoalState(factory_);
 		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory_);
 		addGoalConstants(predicates_, goalState_);
+
+		actionPreconditions_ = initialiseActionPreconditions(actions_);
 	}
 
 	/**
@@ -144,11 +157,20 @@ public abstract class StateSpec {
 	protected abstract List<GuidedPredicate> initialiseActions();
 
 	/**
-	 * Initialises the number fo actions to take per time step.
+	 * Initialises the number of actions to take per time step.
 	 * 
 	 * @return The number of actions to take per step.
 	 */
 	protected abstract int initialiseActionsPerStep();
+
+	/**
+	 * Initialises the rules for finding valid actions.
+	 * 
+	 * @return A map of actions and their corresponding preconditions to be
+	 *         valid.
+	 */
+	protected abstract Map<Predicate, Rule> initialiseActionPreconditions(
+			List<GuidedPredicate> actions);
 
 	/**
 	 * Initialises the goal state.
@@ -177,6 +199,70 @@ public abstract class StateSpec {
 			LogicFactory factory);
 
 	/**
+	 * Inserts the valid actions into the state knowledge base using the state
+	 * observations to determine validity.
+	 * 
+	 * @param stateKB
+	 *            The current observations of the state to be inserted into.
+	 */
+	public final void insertValidActions(KnowledgeBase stateKB) {
+		// Logic constructs
+		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
+		LogicFactorySupport factorySupport = new LogicFactorySupport(factory);
+		InferenceEngine ie = PolicyGenerator.getInstance().getInferenceEngine();
+
+		Set<Fact> validActions = new HashSet<Fact>();
+
+		try {
+			for (Predicate action : actionPreconditions_.keySet()) {
+				Rule actionRule = actionPreconditions_.get(action);
+				RuleCondition ruleConds = new RuleCondition(actionRule
+						.getBody());
+
+				// Forming the query
+				Query query = factorySupport.query(ruleConds.getFactArray(),
+						actionRule.toString());
+
+				ResultSet results = ie.query(query, stateKB,
+						InferenceEngine.ALL, InferenceEngine.BUBBLE_EXCEPTIONS);
+
+				if (results.next()) {
+					do {
+						Map<Term, Term> replacementMap = results.getResults();
+						Collection<Replacement> replacements = new ArrayList<Replacement>();
+						// Find the replacements for the variable terms
+						// in the action
+						for (Term var : actionRule.getHead().getTerms()) {
+							if (var instanceof VariableTerm) {
+								replacements.add(new Replacement(var,
+										replacementMap.get(var)));
+							} else {
+								replacements.add(new Replacement(var, var));
+							}
+						}
+
+						// Apply the replacements and add the fact to
+						// the set
+						Fact groundAction = actionRule.getHead().applyToFact(
+								replacements);
+
+						// If the action is ground
+						validActions.add(groundAction);
+					} while (results.next());
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// Add the valid actions fact to the knowledge base
+		Term[] terms = { factory.createConstantTerm(validActions) };
+		Fact validActionsFact = factory.createFact(getValidActionsPredicate(),
+				terms);
+		stateKB.add(validActionsFact);
+	}
+
+	/**
 	 * Adds a string id to a constant used.
 	 * 
 	 * @param id
@@ -197,17 +283,19 @@ public abstract class StateSpec {
 	 * @param rule
 	 *            The string representation of the rule.
 	 * @param constantTerms
-	 *            The objects to replace the constants with.
+	 *            The objects to replace the constants with or null
 	 * 
 	 * @return An instantiated rule.
 	 */
-	public Rule parseRule(String rule, Map<String, Object> constantTerms) {
+	public final Rule parseRule(String rule, Map<String, Object> constantTerms) {
 		String[][] info = extractInfo(rule);
 		// Compiling the initial term map of constants
 		Map<String, Term> termMap = new HashMap<String, Term>();
-		for (String constant : constantTerms.keySet()) {
-			termMap.put(constant, factory_.createConstantTerm(constantTerms
-					.get(constant)));
+		if (constantTerms != null) {
+			for (String constant : constantTerms.keySet()) {
+				termMap.put(constant, factory_.createConstantTerm(constantTerms
+						.get(constant)));
+			}
 		}
 
 		// Form the rule
@@ -330,20 +418,14 @@ public abstract class StateSpec {
 			org.mandarax.kernel.Rule goalState) {
 		List<ConstantTerm> constantTerms = new ArrayList<ConstantTerm>();
 		List<Fact> body = goalState.getBody();
-		Map<Class, Set<ConstantTerm>> constantMap = new HashMap<Class, Set<ConstantTerm>>();
+		MultiMap<Class, ConstantTerm> constantMap = new MultiMap<Class, ConstantTerm>();
 		// For every fact in the body of the rule, extract the constants
 		for (Fact fact : body) {
 			Term[] factTerms = fact.getTerms();
 			for (Term term : factTerms) {
 				// Add any constant terms found.
 				if (term.isConstant()) {
-					Set<ConstantTerm> constants = constantMap.get(term
-							.getType());
-					if (constants == null) {
-						constants = new HashSet<ConstantTerm>();
-						constantMap.put(term.getType(), constants);
-					}
-					constants.add((ConstantTerm) term);
+					constantMap.putContains(term.getType(), (ConstantTerm) term);
 					constantTerms.add((ConstantTerm) term);
 				}
 			}
@@ -401,7 +483,7 @@ public abstract class StateSpec {
 	 * @return The expanded term array.
 	 */
 	private PredTerm[] addConstants(PredTerm[] predTerms,
-			Set<ConstantTerm> constants) {
+			Collection<ConstantTerm> constants) {
 		// Move the existing terms into a set
 		Set<PredTerm> newTerms = new HashSet<PredTerm>();
 		for (PredTerm predTerm : predTerms) {
@@ -465,12 +547,53 @@ public abstract class StateSpec {
 		return typePredicates_.values().contains(predicate);
 	}
 
+	/**
+	 * Checks if the predicate is useful (not type, action or inequal).
+	 * 
+	 * @param predicate
+	 *            The predicate being checked.
+	 * @return True if the predicate is useful, false if it is type, action,
+	 *         inequal or otherwise.
+	 */
+	public boolean isUsefulPredicate(Predicate predicate) {
+		if (predicate.equals(getInequalityPredicate()))
+			return false;
+		if (predicate.equals(getValidActionsPredicate()))
+			return false;
+		if (isTypePredicate(predicate))
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks if a term is useful (not a state or spec term).
+	 * 
+	 * @param term
+	 *            The term being checked.
+	 * @param factory
+	 *            The logic factory.
+	 * @return True if the term is useful, false otherwise.
+	 */
+	@SuppressWarnings("unchecked")
+	public static boolean isUsefulTerm(ConstantTerm term, LogicFactory factory) {
+		// Checking spec term
+		if (term.equals(getSpecTerm(factory)))
+			return false;
+		// Checking state term
+		Class termClass = term.getObject().getClass();
+		Class stateClass = getStateTerm(factory).getType();
+		if (stateClass.isAssignableFrom(termClass))
+			return false;
+		return true;
+	}
+
 	public GuidedPredicate getGuidedPredicate(String name) {
 		if (name != null)
 			return predByNames_.get(name);
 		return null;
 	}
 
+	@Override
 	public String toString() {
 		return "StateSpec";
 	}
@@ -534,7 +657,7 @@ public abstract class StateSpec {
 	 */
 	protected Class[] insertState(Class[] types) {
 		Class[] stateTypes = new Class[types.length + 1];
-		stateTypes[0] = Object[].class;
+		stateTypes[0] = State.class;
 		for (int i = 0; i < types.length; i++) {
 			stateTypes[i + 1] = types[i];
 		}
@@ -553,7 +676,7 @@ public abstract class StateSpec {
 	protected static Fact getTerminalFact(LogicFactory factory) {
 		if (terminal_ == null) {
 			Predicate termPred = new SimplePredicate("terminal",
-					new Class[] { Object[].class });
+					new Class[] { State.class });
 			terminal_ = factory.createFact(termPred,
 					new Term[] { getStateTerm(factory) });
 		}
@@ -569,11 +692,19 @@ public abstract class StateSpec {
 	 */
 	protected static Term getStateTerm(LogicFactory factory) {
 		if (stateTerm_ == null) {
-			stateTerm_ = factory.createVariableTerm("State", Object[].class);
+			stateTerm_ = factory.createVariableTerm("State", State.class);
 		}
 		return stateTerm_;
 	}
 
+	/**
+	 * Gets the state specification term to be shared among the predicates. To
+	 * be used with JPredicates.
+	 * 
+	 * @param factory
+	 *            The factory to generate the term.
+	 * @return The state specification term.
+	 */
 	protected static Term getSpecTerm(LogicFactory factory) {
 		if (specTerm_ == null) {
 			specTerm_ = factory.createConstantTerm(getInstance());
@@ -581,7 +712,13 @@ public abstract class StateSpec {
 		return specTerm_;
 	}
 
-	protected static Predicate getInequalityPredicate(LogicFactory factory) {
+	/**
+	 * Gets the inequality predicate, used for enforcing the inequality rule
+	 * among differing terms.
+	 * 
+	 * @return The inequality predicate.
+	 */
+	protected static Predicate getInequalityPredicate() {
 		if (inequalityPred_ == null) {
 			try {
 				Class[] types = { Object.class, Object.class };
@@ -592,6 +729,24 @@ public abstract class StateSpec {
 			}
 		}
 		return inequalityPred_;
+	}
+
+	/**
+	 * Gets the valid actions predicate, for conveying the valid actions to take
+	 * in the state to the agent. The argument for the fact is a Set<Fact>.
+	 * 
+	 * @return The valid actions predicate.
+	 */
+	protected static Predicate getValidActionsPredicate() {
+		if (validActionsPred_ == null) {
+			try {
+				Class[] types = { Set.class };
+				validActionsPred_ = new SimplePredicate("validActions", types);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		return validActionsPred_;
 	}
 
 	/**

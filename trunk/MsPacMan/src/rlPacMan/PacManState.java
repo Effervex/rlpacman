@@ -10,31 +10,45 @@ import relationalFramework.State;
  * 
  * @author Sam Sarjant
  */
-public enum PacManState implements State {
-	PACMAN, DOT_COLLECTION, POWERDOT_COLLECTION, GHOST_ARRAY, FRUIT, DISTANCE_GRID;
+public class PacManState extends State {
+	public static final int PACMAN = 0;
+	public static final int DOT_COLLECTION = 1;
+	public static final int POWERDOT_COLLECTION = 2;
+	public static final int GHOST_ARRAY = 3;
+	public static final int FRUIT = 4;
+	public static final int DISTANCE_GRID = 5;
 
-	public static Player getPlayer(Object[] observations) {
-		return (Player) observations[PACMAN.ordinal()];
+	/**
+	 * A constructor for a pacman state.
+	 * 
+	 * @param stateArray
+	 *            The state array.
+	 */
+	public PacManState(Object[] stateArray) {
+		super(stateArray);
 	}
 
-	public static Collection<Dot> getDots(Object[] observations) {
-		return (Collection<Dot>) observations[DOT_COLLECTION.ordinal()];
+	public Player getPlayer() {
+		return (Player) getStateArray()[PACMAN];
 	}
 
-	public static Collection<PowerDot> getPowerDots(Object[] observations) {
-		return (Collection<PowerDot>) observations[POWERDOT_COLLECTION
-				.ordinal()];
+	public Collection<Dot> getDots() {
+		return (Collection<Dot>) getStateArray()[DOT_COLLECTION];
 	}
 
-	public static Ghost[] getGhosts(Object[] observations) {
-		return (Ghost[]) observations[GHOST_ARRAY.ordinal()];
+	public Collection<PowerDot> getPowerDots() {
+		return (Collection<PowerDot>) getStateArray()[POWERDOT_COLLECTION];
 	}
 
-	public static Fruit getFruit(Object[] observations) {
-		return (Fruit) observations[FRUIT.ordinal()];
+	public Ghost[] getGhosts() {
+		return (Ghost[]) getStateArray()[GHOST_ARRAY];
 	}
 
-	public static int[][] getDistanceGrid(Object[] observations) {
-		return (int[][]) observations[DISTANCE_GRID.ordinal()];
+	public Fruit getFruit() {
+		return (Fruit) getStateArray()[FRUIT];
+	}
+
+	public int[][] getDistanceGrid() {
+		return (int[][]) getStateArray()[DISTANCE_GRID];
 	}
 }

@@ -23,6 +23,7 @@ class Fruit extends Thing {
 	}
 
 	// Overriden to draw Fruit
+	@Override
 	public void draw(GameUI gameUI, Graphics g2) {
 		double fruitX = gameUI.m_gridInset + m_locX * gameUI.CELL_LENGTH;
 		double fruitY = gameUI.m_gridInset + m_locY * gameUI.CELL_LENGTH;
@@ -186,6 +187,7 @@ class Fruit extends Thing {
 		}
 	}
 
+	@Override
 	public void returnToStart() {
 		super.returnToStart();
 		m_destinationX = -1;
@@ -197,6 +199,7 @@ class Fruit extends Thing {
 	// This method will check if the bounding box of the fruit intersects with
 	// the bound box of the player. If so, then player eats the fruit for points
 	// return: 0 for no collision, 3 for ate the fruit
+	@Override
 	public int checkCollision(Player player) {
 		if (!m_bAvailable || !m_bVisible)
 			return 0;
@@ -244,6 +247,7 @@ class Fruit extends Thing {
 		pixelShrink_ = 0;
 	}
 	
+	@Override
 	public String toString() {
 		return "Fruit";
 	}

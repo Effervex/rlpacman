@@ -2,14 +2,19 @@ package blocksWorld;
 
 import relationalFramework.State;
 
-public enum BlocksWorldState implements State {
-	INT_STATE, HIGHEST_BLOCK;
+public class BlocksWorldState extends State {
+	public static final int INT_STATE = 0;
+	public static final int HIGHEST_BLOCK = 1;
 	
-	public static Integer getHighestBlock(Object[] observations) {
-		return (Integer) observations[HIGHEST_BLOCK.ordinal()];
+	public BlocksWorldState(Object[] stateArray) {
+		super(stateArray);
+	}
+
+	public Integer getHighestBlock() {
+		return (Integer) getStateArray()[HIGHEST_BLOCK];
 	}
 	
-	public static Integer[] getIntState(Object[] observations) {
-		return (Integer[]) observations[INT_STATE.ordinal()];
+	public Integer[] getIntState() {
+		return (Integer[]) getStateArray()[INT_STATE];
 	}
 }

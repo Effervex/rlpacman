@@ -19,6 +19,7 @@ public class PowerDot extends Dot {
 		value_ = 40;
 	}
 	
+	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		if (m_locY < (m_gameModel.m_gameSizeY / 2))

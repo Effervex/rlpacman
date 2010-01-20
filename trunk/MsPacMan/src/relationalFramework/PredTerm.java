@@ -69,6 +69,7 @@ public class PredTerm {
 		return termClass_;
 	}
 
+	@Override
 	public String toString() {
 		return value_.toString();
 	}

@@ -22,6 +22,8 @@ public class GuidedRule {
 
 	/** The slot this rule was generated from. */
 	private final Slot slot_;
+	
+	private boolean mutant_;
 
 	/**
 	 * A constructor for the guided rule.
@@ -39,6 +41,7 @@ public class GuidedRule {
 		conditions_ = conditions;
 		action_ = action;
 		slot_ = slot;
+		mutant_ = false;
 	}
 
 	public Rule getRule() {
@@ -57,36 +60,52 @@ public class GuidedRule {
 		return slot_;
 	}
 
-	public boolean equals(Object obj) {
-		if ((obj != null) && (obj instanceof GuidedRule)) {
-			GuidedRule gr = (GuidedRule) obj;
-			if (rule_.equals(gr.rule_)) {
-				if (((conditions_ == null) && (conditions_ == gr.conditions_))
-						|| (conditions_.equals(gr.conditions_))) {
-					if (((action_ == null) && (action_ == gr.action_))
-							|| (action_.equals(gr.action_))) {
-						if (((slot_ == null) && (slot_ == gr.slot_))
-								|| (slot_.equals(gr.slot_))) {
-							return true;
-						}
-					}
-				}
-			}
-		}
-		return false;
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
+		result = prime * result
+				+ ((conditions_ == null) ? 0 : conditions_.hashCode());
+		result = prime * result + (mutant_ ? 1231 : 1237);
+		result = prime * result + ((rule_ == null) ? 0 : rule_.hashCode());
+		result = prime * result + ((slot_ == null) ? 0 : slot_.hashCode());
+		return result;
 	}
 
 	@Override
-	public int hashCode() {
-		int condVal = 71;
-		if (conditions_ != null)
-			condVal = slot_.hashCode();
-		int actVal = 7689423;
-		if (action_ != null)
-			actVal = slot_.hashCode();
-		int slotVal = 4563;
-		if (slot_ != null)
-			slotVal = slot_.hashCode();
-		return rule_.hashCode() * condVal * actVal * slotVal;
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		final GuidedRule other = (GuidedRule) obj;
+		if (action_ == null) {
+			if (other.action_ != null)
+				return false;
+		} else if (!action_.equals(other.action_))
+			return false;
+		if (conditions_ == null) {
+			if (other.conditions_ != null)
+				return false;
+		} else if (!conditions_.equals(other.conditions_))
+			return false;
+		if (mutant_ != other.mutant_)
+			return false;
+		if (rule_ == null) {
+			if (other.rule_ != null)
+				return false;
+		} else if (!rule_.equals(other.rule_))
+			return false;
+		if (slot_ == null) {
+			if (other.slot_ != null)
+				return false;
+		} else if (!slot_.equals(other.slot_))
+			return false;
+		return true;
 	}
+
+	
 }

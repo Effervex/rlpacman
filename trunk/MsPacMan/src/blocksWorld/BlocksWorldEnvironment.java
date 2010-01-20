@@ -27,6 +27,7 @@ import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyAgent;
 import relationalFramework.PolicyGenerator;
+import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 /**
@@ -42,7 +43,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private int numBlocks_ = 5;
 
 	/** The state of the blocks world. */
-	private State state_;
+	private BlocksState state_;
 
 	/** The state of the blocks world in base predicates. */
 	private KnowledgeBase stateKB_;
@@ -54,7 +55,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private int steps_;
 
 	/** The optimal number of steps for a state to be solved. */
-	private Map<State, Integer> optimalMap_ = new HashMap<State, Integer>();
+	private Map<BlocksState, Integer> optimalMap_ = new HashMap<BlocksState, Integer>();
 
 	/** The optimal number of steps. */
 	private int optimalSteps_;
@@ -90,7 +91,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			numBlocks_ = Integer.parseInt(arg0);
 			// Assign the blocks
 			blocks_ = createBlocks(numBlocks_);
-			optimalMap_ = new HashMap<State, Integer>();
+			optimalMap_ = new HashMap<BlocksState, Integer>();
 			return null;
 		} catch (Exception e) {
 
@@ -138,7 +139,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				break;
 		}
 
-		State newState = actOnAction(action, state_);
+		BlocksState newState = actOnAction(action, state_);
 		if (action != null)
 			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
 					+ "\t->  " + Arrays.toString(newState.intState_));
@@ -181,14 +182,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return True if we're in the goal state, false otherwise.
 	 */
 	private boolean isGoal(KnowledgeBase stateKB, Rule goalState) {
-		LogicFactorySupport factorySupport = new LogicFactorySupport(PolicyGenerator
-				.getInstance().getLogicFactory());
+		LogicFactorySupport factorySupport = new LogicFactorySupport(
+				PolicyGenerator.getInstance().getLogicFactory());
 		Fact[] ruleConditions = (Fact[]) goalState.getBody().toArray(
 				new Fact[goalState.getBody().size()]);
 		Query query = factorySupport.query(ruleConditions, "isGoal");
 		try {
-			org.mandarax.kernel.ResultSet results = PolicyGenerator.getInstance()
-					.getInferenceEngine().query(query, stateKB,
+			org.mandarax.kernel.ResultSet results = PolicyGenerator
+					.getInstance().getInferenceEngine().query(query, stateKB,
 							InferenceEngine.ONE,
 							InferenceEngine.BUBBLE_EXCEPTIONS);
 			if (results.next())
@@ -208,7 +209,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private State actOnAction(Fact action, State worldState) {
+	private BlocksState actOnAction(Fact action, BlocksState worldState) {
 		if (action == null)
 			return worldState;
 
@@ -230,7 +231,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Convert the blocks to indices
 		Integer[] stateArray = worldState.getState();
 		for (int i = 0; i < indices.length; i++) {
-			indices[i] = ((int) blocks[i].getName().charAt(0)) - ((int) 'a');
+			indices[i] = (blocks[i].getName().charAt(0)) - ('a');
 			// In order to do either action, both blocks must be free
 			for (int j = 0; j < worldState.length; j++) {
 				newState[j] = stateArray[j];
@@ -248,7 +249,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			newState[indices[0]] = indices[1] + 1;
 		}
 
-		return new State(newState);
+		return new BlocksState(newState);
 	}
 
 	/**
@@ -263,7 +264,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
 
 		for (int i = 0; i < numBlocks; i++) {
-			String name = (char) ((int) 'a' + i) + "";
+			String name = (char) ('a' + i) + "";
 			blocks[i] = factory
 					.createConstantTerm(new Block(name), Block.class);
 		}
@@ -280,7 +281,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The goal state.
 	 * @return The newly initialised blocks world state.
 	 */
-	private State initialiseWorld(int numBlocks, Rule goalState) {
+	private BlocksState initialiseWorld(int numBlocks, Rule goalState) {
 		Integer[] worldState = new Integer[numBlocks];
 		int[] contourState = new int[numBlocks];
 		Random random = new Random();
@@ -308,7 +309,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		if (isGoal(stateKB_, goalState))
 			return initialiseWorld(numBlocks, goalState);
 		else
-			return new State(worldState);
+			return new BlocksState(worldState);
 	}
 
 	/**
@@ -334,10 +335,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Add the state information for fulfilling goals
-		Object[] state = new Object[BlocksWorldState.values().length];
-		state[BlocksWorldState.INT_STATE.ordinal()] = worldState;
-		state[BlocksWorldState.HIGHEST_BLOCK.ordinal()] = 1;
-		Term currentState = factory.createConstantTerm(state, Object[].class);
+		Object[] stateArray = {worldState, 1 };
+		BlocksWorldState state = new BlocksWorldState(stateArray);
+		Term currentState = factory.createConstantTerm(state, State.class);
 
 		// Scanning through, making predicates
 		Integer maxHeight = 0;
@@ -363,7 +363,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 								false, false, null));
 
 				// The other block is not clear
-				clearBlocks.remove((Object) (new Integer(worldState[i] - 1)));
+				clearBlocks.remove((new Integer(worldState[i] - 1)));
 			}
 
 			// Finding the heights
@@ -372,7 +372,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 						worldState));
 			}
 		}
-		state[BlocksWorldState.HIGHEST_BLOCK.ordinal()] = maxHeight;
+		
+		// Modify the height value
+		state.getStateArray()[BlocksWorldState.HIGHEST_BLOCK] = maxHeight;
 		// Note the clear blocks
 		for (Integer blockInd : clearBlocks) {
 			Term[] terms = new Term[2];
@@ -387,6 +389,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		for (Prerequisite preq : preds) {
 			stateKB_.add(preq);
 		}
+
+		// Adding the valid actions
+		StateSpec.getInstance().insertValidActions(stateKB_);
 
 		return stateKB_;
 	}
@@ -426,11 +431,12 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Check it hasn't already solved the state
 		if (optimalMap_.containsKey(state_)) {
-			System.out.println("\t\t\tAlready calculated (" + optimalMap_.get(state_) + ")");
+			System.out.println("\t\t\tAlready calculated ("
+					+ optimalMap_.get(state_) + ")");
 			return optimalMap_.get(state_);
 		}
 
-		State initialState = state_.clone();
+		BlocksState initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
 		PolicyAgent optimalAgent = new PolicyAgent();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
@@ -455,11 +461,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * 
 	 * @author Samuel J. Sarjant
 	 */
-	public class State {
+	public class BlocksState {
 		private Integer[] intState_;
 		public int length;
 
-		public State(Integer[] state) {
+		public BlocksState(Integer[] state) {
 			intState_ = state;
 			length = state.length;
 		}
@@ -470,8 +476,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		@Override
 		public boolean equals(Object obj) {
-			if ((obj != null) && (obj instanceof State)) {
-				State other = (State) obj;
+			if ((obj != null) && (obj instanceof BlocksState)) {
+				BlocksState other = (BlocksState) obj;
 				if (Arrays.equals(intState_, other.intState_))
 					return true;
 			}
@@ -487,14 +493,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			return sum;
 		}
 
-		public State clone() {
+		@Override
+		public BlocksState clone() {
 			Integer[] cloneState = new Integer[intState_.length];
 			for (int i = 0; i < intState_.length; i++) {
 				cloneState[i] = intState_[i];
 			}
-			return new State(cloneState);
+			return new BlocksState(cloneState);
 		}
 
+		@Override
 		public String toString() {
 			return Arrays.toString(intState_);
 		}

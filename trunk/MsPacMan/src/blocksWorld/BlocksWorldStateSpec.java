@@ -22,6 +22,7 @@ import relationalFramework.GuidedPredicate;
 import relationalFramework.GuidedRule;
 import relationalFramework.Policy;
 import relationalFramework.PredTerm;
+import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 public class BlocksWorldStateSpec extends StateSpec {
@@ -44,10 +45,29 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		return actions;
 	}
-	
+
 	@Override
 	protected int initialiseActionsPerStep() {
 		return 1;
+	}
+
+	@Override
+	protected Map<Predicate, Rule> initialiseActionPreconditions(List<GuidedPredicate> actions) {
+		Map<Predicate, Rule> actionPreconditions = new HashMap<Predicate, Rule>();
+		
+		// Run through each action
+		for (GuidedPredicate action : actions) {
+			Predicate actionPred = action.getPredicate();
+			String ruleString = null;
+			if (actionPred.getName().equals("move")) {
+				ruleString = "clear(<X>) & clear(<Y>) -> move(<X>,<Y>)";
+			} else if (actionPred.getName().equals("moveFloor")) {
+				ruleString = "clear(<X>) & on(<X>,<Y>) -> moveFloor(<X>)";
+			}
+			Rule actRule = parseRule(ruleString, null);
+			actionPreconditions.put(actionPred, actRule);
+		}
+		return actionPreconditions;
 	}
 
 	@Override
@@ -191,7 +211,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(rules.length - i, new GuidedRule(parseRule(rules[i], constantMap),
+			optimal.addRule(new GuidedRule(parseRule(rules[i], constantMap),
 					null, null, null));
 
 		return optimal;
@@ -233,7 +253,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		try {
 			// Highest predicate (requires JPredicate)
 			types = new Class[2];
-			types[0] = Object[].class;
+			types[0] = State.class;
 			types[1] = Block.class;
 			PredTerm[][] predValues = new PredTerm[types.length][];
 			predValues[0] = createTied("State", types[0]);
@@ -256,8 +276,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 		typePreds.put(Block.class, new SimplePredicate("block",
 				new Class[] { Block.class }));
 
-		typePreds.put(Object[].class, new SimplePredicate("state",
-				new Class[] { Object[].class }));
+		typePreds.put(State.class, new SimplePredicate("state",
+				new Class[] { State.class }));
 
 		return typePreds;
 	}
@@ -297,9 +317,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 	 *            The block being checked.
 	 * @return True if the block if the highest.
 	 */
-	public boolean highest(Object[] state, Block block) {
-		Integer highBlock = BlocksWorldState.getHighestBlock(state);
-		Integer[] intState = BlocksWorldState.getIntState(state);
+	public boolean highest(State state, Block block) {
+		BlocksWorldState bwState = (BlocksWorldState) state;
+		Integer highBlock = bwState.getHighestBlock();
+		Integer[] intState = bwState.getIntState();
 		int blockIndex = block.getName().charAt(0) - 'a';
 
 		int blockHeight = 1;
@@ -320,8 +341,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 	 *            The state of the world. Needs to be all 0s.
 	 * @return True if the state is unstacked.
 	 */
-	public boolean unstacked(Object[] state) {
-		Integer[] worldState = BlocksWorldState.getIntState(state);
+	public boolean unstacked(State state) {
+		BlocksWorldState bwState = (BlocksWorldState) state;
+		Integer[] worldState = bwState.getIntState();
 		for (int i = 0; i < worldState.length; i++) {
 			if (worldState[i] != 0)
 				return false;
@@ -336,8 +358,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 	 *            The state of the world. Only one can be a 0.
 	 * @return True if the state is stacked.
 	 */
-	public boolean stacked(Object[] state) {
-		Integer[] worldState = BlocksWorldState.getIntState(state);
+	public boolean stacked(State state) {
+		BlocksWorldState bwState = (BlocksWorldState) state;
+		Integer[] worldState = bwState.getIntState();
 		boolean oneFound = false;
 		for (int i = 0; i < worldState.length; i++) {
 			if (worldState[i] == 0) {

@@ -8,7 +8,8 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
 /**
- * An agent that chooses its decisions based on a fixed policy, fed in via agent message.
+ * An agent that chooses its decisions based on a fixed policy, fed in via agent
+ * message.
  * 
  * @author Sam Sarjant
  */
@@ -27,7 +28,7 @@ public class PolicyAgent implements AgentInterface {
 
 	// @Override
 	public void agent_end(double arg0) {
-		actionsModule_ = null;		
+		actionsModule_ = null;
 	}
 
 	// @Override
@@ -48,12 +49,14 @@ public class PolicyAgent implements AgentInterface {
 	// @Override
 	public Action agent_start(Observation arg0) {
 		// Initialising the actions
-		actionsModule_ = new ActionSwitch();
+		actionsModule_ = new ActionSwitch(StateSpec.getInstance()
+				.getNumActions());
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations.getInstance().predicateKB);
-		
+		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations
+				.getInstance().predicateKB);
+
 		return action;
 	}
 
@@ -61,7 +64,8 @@ public class PolicyAgent implements AgentInterface {
 	public Action agent_step(double arg0, Observation arg1) {
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations.getInstance().predicateKB);
+		ObjectObservations.getInstance().objectArray = chooseAction(ObjectObservations
+				.getInstance().predicateKB);
 
 		return action;
 	}
@@ -76,7 +80,8 @@ public class PolicyAgent implements AgentInterface {
 	private List[] chooseAction(KnowledgeBase state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
-		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance().getNumActions());
+		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
+				.getNumActions());
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();

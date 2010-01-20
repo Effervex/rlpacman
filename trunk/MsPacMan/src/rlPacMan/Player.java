@@ -30,6 +30,7 @@ class Player extends Thing {
 	// lookAhead check is also used because the Player's bounding box is larger
 	// than
 	// CELL_LENGTH and extends into other gamestate cells
+	@Override
 	public void eatItem() {
 		Point pacLoc = new Point(m_locX, m_locY);
 		// Eating a dot
@@ -101,6 +102,7 @@ class Player extends Thing {
 	}
 
 	// Overriden to draw Pacman
+	@Override
 	public void draw(GameUI gameUI, Graphics g2) {
 		if (!m_bVisible)
 			return;
@@ -159,6 +161,7 @@ class Player extends Thing {
 	}
 
 	// Overriden to update Pacman's direction
+	@Override
 	public void tickThing(GameUI gameUI) {
 		super.tickThing(gameUI);
 		m_boundingBoxFull.setBounds(m_boundingBox);
@@ -217,6 +220,7 @@ class Player extends Thing {
 			m_direction = m_requestedDirection;
 	}
 
+	@Override
 	public void returnToStart() {
 		super.returnToStart();
 		m_degreeRotation = 0;
@@ -254,6 +258,7 @@ class Player extends Thing {
 		pixelShrink_ = -pixelSize_ / 5;
 	}
 	
+	@Override
 	public String toString() {
 		return "Player";
 	}
