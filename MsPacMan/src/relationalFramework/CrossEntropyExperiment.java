@@ -230,7 +230,7 @@ public class CrossEntropyExperiment {
 
 		// Load the generators from the input file
 		try {
-			policyGenerator_.loadGenerators(new File(genInputFile));
+			policyGenerator_.loadGenerators(new File(generatorFile));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -249,7 +249,7 @@ public class CrossEntropyExperiment {
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("25");
+		RLGlue.RL_env_message("5");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
@@ -309,7 +309,7 @@ public class CrossEntropyExperiment {
 					File tempGen = new File(TEMP_FOLDER + "/"
 							+ generatorFile_.getName() + run);
 					tempGen.createNewFile();
-					policyGenerator_.saveGenerators(tempGen);
+					RuleFileManager.saveGenerators(tempGen);
 					saveBestPolicy(bestPolicy);
 					// Output the episode averages
 					savePerformance(episodePerformances, run);
@@ -383,7 +383,7 @@ public class CrossEntropyExperiment {
 			File output = new File(TEMP_FOLDER + "/"
 					+ humanGeneratorFile_.getName() + run);
 			output.createNewFile();
-			policyGenerator_.saveHumanGenerators(output);
+			RuleFileManager.saveHumanGenerators(output);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -683,7 +683,7 @@ public class CrossEntropyExperiment {
 		public int compareTo(PolicyValue o) {
 			if ((o == null) || (!(o instanceof PolicyValue)))
 				return -1;
-			PolicyValue pv = (PolicyValue) o;
+			PolicyValue pv = o;
 			// If this value is bigger, it comes first
 			if (value_ > pv.value_) {
 				return -1;
@@ -697,6 +697,7 @@ public class CrossEntropyExperiment {
 		}
 
 		// @Override
+		@Override
 		public boolean equals(Object obj) {
 			if ((obj == null) || (!(obj instanceof PolicyValue)))
 				return false;
@@ -710,6 +711,7 @@ public class CrossEntropyExperiment {
 		}
 
 		// @Override
+		@Override
 		public int hashCode() {
 			return (int) (value_ * policy_.hashCode());
 		}

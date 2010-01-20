@@ -616,10 +616,11 @@ public class PacMan {
 			m_pacMan = pacMan;
 		}
 
+		@Override
 		public void run() {
 			while (Thread.currentThread() == m_pacMan.m_ticker) {
 				try {
-					this.sleep(m_pacMan.m_delay);
+					Thread.sleep(m_pacMan.m_delay);
 
 				} catch (InterruptedException e) {
 					break;
@@ -641,6 +642,7 @@ public class PacMan {
 			m_pacMan = pacMan;
 		}
 
+		@Override
 		public void keyPressed(KeyEvent event) {
 			activateEvent(event.getKeyCode());
 		}

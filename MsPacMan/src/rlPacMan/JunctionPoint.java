@@ -44,6 +44,7 @@ public class JunctionPoint extends PacPoint implements
 	}
 
 	// @Override
+	@Override
 	public boolean equals(Object obj) {
 		if ((obj == null) || (!(obj instanceof JunctionPoint)))
 			return false;
@@ -58,6 +59,7 @@ public class JunctionPoint extends PacPoint implements
 	}
 
 	// @Override
+	@Override
 	public int hashCode() {
 		return distance_ + direction_ + m_locX + m_locY;
 	}

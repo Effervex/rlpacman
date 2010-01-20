@@ -10,6 +10,7 @@ import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Fact;
 
 import relationalFramework.PolicyGenerator;
+import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 // GameState is primarly maintained by the int[][] m_gameState
@@ -151,7 +152,8 @@ public class GameModel {
 	/**
 	 * Adds the background knowledge to the knowledge base.
 	 * 
-	 * @param kb The kb to add to.
+	 * @param kb
+	 *            The kb to add to.
 	 */
 	private void addBackgroundKnowledge(KnowledgeBase kb) {
 		KnowledgeBase bk = StateSpec.getInstance().getBackgroundKnowledge();
@@ -311,8 +313,9 @@ public class GameModel {
 	 *            The fact being added.
 	 */
 	public void addKBFact(Object obj) {
-		Fact fact = StateSpec.addKBFact(obj, obj.getClass(), stateKB_,
-				factory_, classPrefix_);
+		Class clazz = (obj instanceof State) ? State.class : obj.getClass();
+		Fact fact = StateSpec.addKBFact(obj, clazz, stateKB_, factory_,
+				classPrefix_);
 		clauseMap_.put(obj, fact);
 	}
 

@@ -88,7 +88,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
 			if (!environment_.experimentMode_)
-				Thread.currentThread().sleep(PLAYER_SPEED);
+				Thread.sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -121,7 +121,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
 			if (!environment_.experimentMode_)
-				Thread.currentThread().sleep(PLAYER_SPEED);
+				Thread.sleep(PLAYER_SPEED);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -333,32 +333,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Remove the old state
 		model_.removeKBFact(state_);
 
-		Object[] observations = new Object[PacManState.values().length];
-		for (int i = 0; i < observations.length; i++) {
-			switch (PacManState.values()[i]) {
-			case PACMAN:
-				observations[i] = model_.m_player;
-				break;
-			case DOT_COLLECTION:
-				observations[i] = model_.m_dots.values();
-				break;
-			case POWERDOT_COLLECTION:
-				observations[i] = model_.m_powerdots.values();
-				break;
-			case GHOST_ARRAY:
-				observations[i] = model_.m_ghosts;
-				break;
-			case FRUIT:
-				observations[i] = model_.m_fruit;
-				break;
-			case DISTANCE_GRID:
-				observations[i] = distanceGrid_;
-				break;
-			}
-		}
+		Object[] observations = { model_.m_player, model_.m_dots.values(),
+				model_.m_powerdots.values(), model_.m_ghosts, model_.m_fruit,
+				distanceGrid_ };
 
 		// State
-		model_.addKBFact(observations);
+		model_.addKBFact(new PacManState(observations));
 		return observations;
 	}
 

@@ -37,6 +37,7 @@ public class Dot extends Thing {
 	protected void updatePixelVals(GameUI gameUI) {
 	}
 	
+	@Override
 	public String toString() {
 		return "Dot: " + m_locX + "," + m_locY;
 	}

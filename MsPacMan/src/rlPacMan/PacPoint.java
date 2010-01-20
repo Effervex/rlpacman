@@ -10,6 +10,7 @@ public abstract class PacPoint {
 	int m_locX;
 	int m_locY;
 
+	@Override
 	public String toString() {
 		return "Point: " + m_locX + "," + m_locY;
 	}

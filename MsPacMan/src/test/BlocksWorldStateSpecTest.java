@@ -1,4 +1,4 @@
-package blocksWorld;
+package test;
 
 import static org.junit.Assert.*;
 
@@ -8,8 +8,11 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
+import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Rule;
 import org.mandarax.reference.DefaultLogicFactory;
+
+import blocksWorld.Block;
 
 import relationalFramework.StateSpec;
 
@@ -22,7 +25,7 @@ public class BlocksWorldStateSpecTest {
 		BasicConfigurator.configure();
 		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		spec_ = StateSpec.initInstance("blocksWorld.BlocksWorld",
-				DefaultLogicFactory.getDefaultFactory());
+				LogicFactory.getDefaultFactory());
 	}
 
 	@Test

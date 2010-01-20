@@ -16,6 +16,7 @@ public class Block {
 		return name_;
 	}
 	
+	@Override
 	public boolean equals(Object obj) {
 		if ((obj != null) && (obj instanceof Block)) {
 			Block block = (Block) obj;
@@ -25,6 +26,7 @@ public class Block {
 		return false;
 	}
 	
+	@Override
 	public String toString() {
 		return name_;
 	}

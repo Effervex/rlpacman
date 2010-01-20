@@ -100,6 +100,7 @@ public class GameUI extends Canvas {
 	}
 
 	// Update will only redraw the changed game cells..
+	@Override
 	public void update(Graphics g) {
 		try {
 			if (g != null) {
@@ -150,6 +151,7 @@ public class GameUI extends Canvas {
 	}
 
 	// Draws everything
+	@Override
 	public void paint(Graphics g) {
 		try {
 			Dimension dim = getSize();

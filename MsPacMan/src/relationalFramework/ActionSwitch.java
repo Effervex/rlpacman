@@ -10,10 +10,12 @@ import org.mandarax.kernel.Fact;
  *
  */
 public class ActionSwitch {
-	/** The number of priorities. */
-	public static final int NUM_PRIORITIES = 3;
 	/** The prioritised list of switched actions. Max 3. */ 
-	private List<Fact>[] activeActions_ = new List[NUM_PRIORITIES];
+	private List<Fact>[] activeActions_;
+	
+	public ActionSwitch(int actionsPerStep) {
+		activeActions_ = new List[actionsPerStep];
+	}
 	
 	/**
 	 * Switches on a high action at the given priority.
@@ -25,8 +27,11 @@ public class ActionSwitch {
 		activeActions_[priority] = clause;
 	}
 
+	/**
+	 * Switches off all action slots.
+	 */
 	public void switchOffAll() {
-		for (int i = 0; i < NUM_PRIORITIES; i++) {
+		for (int i = 0; i < activeActions_.length; i++) {
 			activeActions_[i] = null;
 		}
 	}
@@ -47,7 +52,7 @@ public class ActionSwitch {
 	 * @return True if it is on, false otherwise
 	 */
 	public boolean isActionActive(Fact action) {
-		for (int i = 0; i < NUM_PRIORITIES; i++) {
+		for (int i = 0; i < activeActions_.length; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
 				return true;
 		}
@@ -57,9 +62,10 @@ public class ActionSwitch {
 	/**
 	 * Converts the action switch into a string version
 	 */
+	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		for (int i = 0; i < NUM_PRIORITIES; i++) {
+		for (int i = 0; i < activeActions_.length; i++) {
 			buffer.append("[" + (i + 1) + "]: ");
 			buffer.append(activeActions_[i] + "\n");
 		}

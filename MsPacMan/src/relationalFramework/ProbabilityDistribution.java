@@ -7,8 +7,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
-
 /**
  * A class representing a probability distribution of values. These values are
  * sampled randomly according to their probabilities.
@@ -426,6 +424,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 * @return A clone of this distribution (but not the elements contained
 	 *         within).
 	 */
+	@Override
 	public ProbabilityDistribution<T> clone() {
 		ProbabilityDistribution<T> clone = new ProbabilityDistribution<T>();
 		for (ItemProb ip : itemProbs_) {

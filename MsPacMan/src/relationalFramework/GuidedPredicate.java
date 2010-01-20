@@ -268,7 +268,7 @@ public class GuidedPredicate {
 			}
 
 			// Adding the inequality predicate/s
-			Predicate inequal = StateSpec.getInequalityPredicate(factory);
+			Predicate inequal = StateSpec.getInequalityPredicate();
 			// We need to define an inequality relation for each of these
 			for (Term usedTerm : allTerms) {
 				if (term.getType().equals(usedTerm.getType())) {
@@ -358,6 +358,7 @@ public class GuidedPredicate {
 		return looseInstantiation_;
 	}
 
+	@Override
 	public String toString() {
 		if (predicate_ == null)
 			return "true";
@@ -376,6 +377,7 @@ public class GuidedPredicate {
 		return predicate_.toString();
 	}
 
+	@Override
 	public boolean equals(Object obj) {
 		if ((obj != null) && (obj instanceof GuidedPredicate)) {
 			GuidedPredicate gp = (GuidedPredicate) obj;
@@ -399,6 +401,7 @@ public class GuidedPredicate {
 		return false;
 	}
 
+	@Override
 	public int hashCode() {
 		if (predicate_ == null)
 			return 7919;

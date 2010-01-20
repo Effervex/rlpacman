@@ -65,8 +65,8 @@ public class PacManExperiment {
         }
         RLGlue.RL_agent_message("unfreeze learning");
 
-        mean = sum / (double)n;
-        variance = (sum_of_squares - (double)n * mean * mean) / ((double)n - 1.0f);
+        mean = sum / n;
+        variance = (sum_of_squares - n * mean * mean) / ((double)n - 1.0f);
         return new EvaluationPoint(mean, Math.sqrt(variance));
     }
     /*
