@@ -69,7 +69,7 @@ public class Policy {
 		if (policyRules_.isEmpty())
 			return "<EMPTY POLICY>";
 
-		StringBuffer buffer = new StringBuffer();
+		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
 			buffer.append(StateSpec.encodeRule(rule.getRule()) + "\n");
 		}
@@ -169,7 +169,8 @@ public class Policy {
 		if (actionsFound < actionsReturned) {
 			List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
 					.triggerCovering(state);
-			
+			policyRules_.addAll(coveredRules);
+			evaluatePolicy(state, actionSwitch, actionsReturned);
 		}
 	}
 }

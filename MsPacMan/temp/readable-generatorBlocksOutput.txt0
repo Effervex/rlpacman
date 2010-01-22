@@ -1,2 +1,2 @@
-
-
+clear(<X>) & clear(<Y>) -> move(<X>,<Y>)
+on(<X>,<_0>) & clear(<X>) -> moveFloor(<X>)

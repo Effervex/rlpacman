@@ -104,11 +104,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-		System.out.println("\t\t\tOptimal test: "
-				+ Arrays.toString(state_.getState()));
+//		System.out.println("\t\t\tOptimal test: "
+//				+ Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-		System.out
-				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+//		System.out
+//				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -140,11 +140,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-		if (action != null)
-			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
-					+ "\t->  " + Arrays.toString(newState.intState_));
-		else
-			System.out.println("\t\t\tNo action chosen.");
+//		if (action != null)
+//			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
+//					+ "\t->  " + Arrays.toString(newState.intState_));
+//		else
+//			System.out.println("\t\t\tNo action chosen.");
 
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -351,7 +351,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				terms[1] = blocks_[i];
 				StateSpec.addContains(preds, StateSpec.getInstance()
 						.getGuidedPredicate("onFloor").factify(factory, terms,
-								false, false, null));
+								false, false, null, null));
 			} else {
 				// On another block
 				Term[] terms = new Term[3];
@@ -360,7 +360,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				terms[2] = blocks_[worldState[i] - 1];
 				StateSpec.addContains(preds, StateSpec.getInstance()
 						.getGuidedPredicate("on").factify(factory, terms,
-								false, false, null));
+								false, false, null, null));
 
 				// The other block is not clear
 				clearBlocks.remove((new Integer(worldState[i] - 1)));
@@ -382,7 +382,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			terms[1] = blocks_[blockInd];
 			StateSpec.addContains(preds, StateSpec.getInstance()
 					.getGuidedPredicate("clear").factify(factory, terms, false,
-							false, null));
+							false, null, null));
 		}
 
 		// Adding the prereqs

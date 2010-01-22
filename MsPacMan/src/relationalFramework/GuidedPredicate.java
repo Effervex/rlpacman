@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -175,16 +176,20 @@ public class GuidedPredicate {
 	 *            If the prerequisite is negated.
 	 * @param allTerms
 	 *            The list of all terms used so far.
+	 * @param anonymousTerms
+	 *            The collection of anonymous terms present in the rule.
 	 * @return A instantiated version of this guided predicate with type
 	 *         predicates, if it can be. Also fills the existing terms array
 	 *         with the terms used.
 	 */
 	public List<Prerequisite> factify(LogicFactory factory,
 			Term[] replacementTerms, boolean negated, boolean mustTie,
-			Collection<Term> allTerms) {
+			Collection<Term> allTerms, Collection<Term> anonymousTerms) {
 		// If we don't have all terms, create one
 		if (allTerms == null)
 			allTerms = new HashSet<Term>();
+		if (anonymousTerms == null)
+			anonymousTerms = new ArrayList<Term>();
 
 		List<Prerequisite> result = new LinkedList<Prerequisite>();
 
@@ -221,7 +226,7 @@ public class GuidedPredicate {
 
 				// Add the type predicates and the inequality predicates.
 				addTypesAndInequals(factory, allTerms, result,
-						predStructure[i], terms[i]);
+						predStructure[i], terms[i], anonymousTerms);
 
 				// Adding to the return array
 				if (replacementTerms != null) {
@@ -245,14 +250,16 @@ public class GuidedPredicate {
 	 *            The existing terms to swap.
 	 * @param result
 	 *            The list of prereqs to add to.
-	 * @param predStructure
-	 *            The predicate structure.
 	 * @param term
 	 *            The current term of the predicate.
+	 * @param anonymousTerms
+	 *            The collection of anonymous terms present in the rule.
+	 * @param predStructure
+	 *            The predicate structure.
 	 */
 	private void addTypesAndInequals(LogicFactory factory,
 			Collection<Term> allTerms, List<Prerequisite> result,
-			Class termClass, Term term) {
+			Class termClass, Term term, Collection<Term> anonymousTerms) {
 		// If the term is already in the used terms, it has already been
 		// defined.
 		if (!allTerms.contains(term)) {
@@ -274,13 +281,17 @@ public class GuidedPredicate {
 				if (term.getType().equals(usedTerm.getType())) {
 					// If at least one is a variable
 					if ((term.isVariable()) || (usedTerm.isVariable())) {
-						Term[] terms = new Term[3];
-						terms[0] = StateSpec.getSpecTerm(factory);
-						terms[1] = term;
-						terms[2] = usedTerm;
-						Prerequisite ineqPreq = factory.createPrerequisite(
-								inequal, terms, false);
-						result.add(ineqPreq);
+						// Ignore inequality if both are anonymous
+						if ((!anonymousTerms.contains(term))
+								|| (!anonymousTerms.contains(usedTerm))) {
+							Term[] terms = new Term[3];
+							terms[0] = StateSpec.getSpecTerm(factory);
+							terms[1] = term;
+							terms[2] = usedTerm;
+							Prerequisite ineqPreq = factory.createPrerequisite(
+									inequal, terms, false);
+							result.add(ineqPreq);
+						}
 					}
 				}
 			}

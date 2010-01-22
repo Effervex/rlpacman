@@ -79,7 +79,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		terms[0] = factory.createVariableTerm("X", Block.class);
 		terms[1] = factory.createVariableTerm("Y", Block.class);
 		List<Prerequisite> prereqs = getGuidedPredicate("on").factify(factory,
-				terms, false, false, null);
+				terms, false, false, null, null);
 		Term[] terms2 = new Term[3];
 		terms2[0] = StateSpec.getStateTerm(factory);
 		terms2[1] = terms[0];
@@ -95,12 +95,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Set<Term> allTerms = new HashSet<Term>();
 		allTerms.add(terms[0]);
 		prereqs = getGuidedPredicate("on").factify(factory, terms, false,
-				false, null);
+				false, null, null);
 		terms2 = new Term[2];
 		terms2[0] = terms[1];
 		terms2[1] = factory.createVariableTerm("Z", Block.class);
 		addContains(prereqs, getGuidedPredicate("above").factify(factory,
-				terms2, false, false, null));
+				terms2, false, false, null, null));
 		Term[] terms3 = new Term[3];
 		terms3[0] = StateSpec.getStateTerm(factory);
 		terms3[1] = terms[0];

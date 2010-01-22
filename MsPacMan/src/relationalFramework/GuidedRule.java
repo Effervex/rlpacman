@@ -22,7 +22,8 @@ public class GuidedRule {
 
 	/** The slot this rule was generated from. */
 	private final Slot slot_;
-	
+
+	/** If this slot is a mutation. */
 	private boolean mutant_;
 
 	/**
@@ -69,7 +70,6 @@ public class GuidedRule {
 				+ ((conditions_ == null) ? 0 : conditions_.hashCode());
 		result = prime * result + (mutant_ ? 1231 : 1237);
 		result = prime * result + ((rule_ == null) ? 0 : rule_.hashCode());
-		result = prime * result + ((slot_ == null) ? 0 : slot_.hashCode());
 		return result;
 	}
 
@@ -107,5 +107,12 @@ public class GuidedRule {
 		return true;
 	}
 
-	
+	@Override
+	public String toString() {
+		if (conditions_ == null) {
+			return rule_.toString();
+		}
+		return conditions_.toString() + " " + StateSpec.INFERS_ACTION + " "
+				+ action_.toString();
+	}
 }

@@ -35,6 +35,12 @@ import org.mandarax.util.LogicFactorySupport;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
+	public static final String AND = "&";
+
+	public static final String INFERS_ACTION = "->";
+
+	public static final char ANONYMOUS = '_';
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -302,24 +308,32 @@ public abstract class StateSpec {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
 		Fact actionFact = null;
 		Set<Term> allTerms = new HashSet<Term>();
+		Collection<Term> anonymousTerms = new ArrayList<Term>();
 		for (int i = 0; i < info.length; i++) {
+			
 			// Get the guided predicate
 			GuidedPredicate cond = getGuidedPredicate(info[i][0]);
+			
 			// Check if it's a JConstructor
 			int offset = (cond.getPredicate() instanceof JConstructor) ? 1 : 0;
+			
 			// Find the terms used in the predicate arguments
 			Term[] terms = findTerms(factory_, termMap, info[i], cond
-					.getPredicate().getStructure(), offset);
+					.getPredicate().getStructure(), offset, anonymousTerms);
+			
 			// Instantiate the guided predicate with the args.
 			List<Prerequisite> rulePreqs = cond.factify(factory_, terms, false,
-					false, allTerms);
+					false, allTerms, anonymousTerms);
+			
 			// Add the resulting prerequisites
 			for (Prerequisite prereq : rulePreqs) {
+				
 				// Separate the action
 				if (i < info.length - 1) {
 					// Add as condition
 					if (!prereqs.contains(prereq))
 						prereqs.add(prereq);
+					
 				} else {
 					// Add as action
 					if (prereq.getPredicate().getName().equals(info[i][0])) {
@@ -341,19 +355,41 @@ public abstract class StateSpec {
 	 *            The map of existing terms.
 	 * @param predArgs
 	 *            The predicate and its arguments.
-	 * 
+	 * @param anonymousTerms
+	 *            The anonymous terms present in the rule.
 	 * @return An array of terms used in the predicate.
 	 */
 	private Term[] findTerms(LogicFactory factory, Map<String, Term> termMap,
-			String[] predArgs, Class[] predStructure, int offset) {
+			String[] predArgs, Class[] predStructure, int offset,
+			Collection<Term> anonymousTerms) {
 		Term[] terms = new Term[predArgs.length - 1];
 
 		for (int i = 0; i < terms.length; i++) {
+
 			// If the term is a constant or has occurred already, get it from
 			// the map
 			if (termMap.containsKey(predArgs[i + 1])) {
 				terms[i] = termMap.get(predArgs[i + 1]);
+
+			} else if (predArgs[i + 1].charAt(0) == ANONYMOUS) {
+				// Anonymous variable, is a variable, but not bound by inequals
+				// among other anonymous variables.
+
+				// Forming the name (appending a number to ANONYMOUS, if nto
+				// already there.
+				String name = predArgs[i + 1];
+				name = name + ((name.equals(ANONYMOUS + "")) ? anonymousTerms.size() : "");
+
+				terms[i] = factory.createVariableTerm(name,
+						predStructure[i + 1 + offset]);
+				termMap.put(name, terms[i]);
+				anonymousTerms.add(terms[i]);
+
 			} else {
+				// Convention check, variables should be uppercase
+				if (Character.isLowerCase(predArgs[i + 1].charAt(0)))
+					System.err.println("Variable term: " + predArgs[i + 1]
+							+ " should be uppercase");
 				// The term is a new variable
 				terms[i] = factory.createVariableTerm(predArgs[i + 1],
 						predStructure[i + 1 + offset]);
@@ -374,20 +410,31 @@ public abstract class StateSpec {
 	 */
 	private String[][] extractInfo(String rule) {
 		// Split the rule into conditions and actions
-		String[] split = rule.split("->");
+		String[] split = rule.split(INFERS_ACTION);
 		if (split.length < 2)
 			return null;
 
-		String[] conditions = split[0].split("&");
+		String[] conditions = split[0].split(AND);
 		String[][] info = new String[conditions.length + 1][];
 		for (int i = 0; i < info.length; i++) {
 			String predicate = (i < info.length - 1) ? conditions[i] : split[1];
 
-			// A Regexp looking for a predicate with args 'clear([a])'
-			// 'move([b],<X>)' 'cool()'
-			Pattern p = Pattern
-					.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>))"
-							+ "(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)))*)*)\\)");
+			// Condition pattern
+			Pattern p = null;
+			if (i < conditions.length) {
+				// A Regexp looking for a predicate with args 'clear([a])'
+				// 'move([b],<X>)' 'cool()' 'on(<X>,_)'
+				p = Pattern
+						.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>)|(?:"
+								+ ANONYMOUS
+								+ "))(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)|(?:"
+								+ ANONYMOUS + ")))*)*)\\)");
+			} else {
+				// Action pattern (no anonymous variables)
+				p = Pattern
+						.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>))"
+								+ "(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)))*)*)\\)");
+			}
 			Matcher m = p.matcher(predicate);
 			if (m.find()) {
 				// Group 1 is the predicate name, Group 2 is the arg(s)
@@ -425,7 +472,8 @@ public abstract class StateSpec {
 			for (Term term : factTerms) {
 				// Add any constant terms found.
 				if (term.isConstant()) {
-					constantMap.putContains(term.getType(), (ConstantTerm) term);
+					constantMap
+							.putContains(term.getType(), (ConstantTerm) term);
 					constantTerms.add((ConstantTerm) term);
 				}
 			}
@@ -583,6 +631,27 @@ public abstract class StateSpec {
 		Class termClass = term.getObject().getClass();
 		Class stateClass = getStateTerm(factory).getType();
 		if (stateClass.isAssignableFrom(termClass))
+			return false;
+		return true;
+	}
+
+	/**
+	 * Checks if a term is useful (not a state or spec term).
+	 * 
+	 * @param term
+	 *            The term being checked.
+	 * @param factory
+	 *            The logic factory.
+	 * @return True if the term is useful, false otherwise.
+	 */
+	@SuppressWarnings("unchecked")
+	public static boolean isUsefulClass(Class clazz, LogicFactory factory) {
+		// Checking spec term
+		if (StateSpec.class.isAssignableFrom(clazz))
+			return false;
+		// Checking state term
+		Class stateClass = getStateTerm(factory).getType();
+		if (stateClass.isAssignableFrom(clazz))
 			return false;
 		return true;
 	}
@@ -811,14 +880,14 @@ public abstract class StateSpec {
 							StateSpec.INEQUAL))) {
 				// If we have more than one condition
 				if (plural)
-					buffer.append("& ");
+					buffer.append(" & ");
 
 				buffer.append(StateSpec.lightenFact(prereq));
 				plural = true;
 			}
 		}
 
-		buffer.append("-> ");
+		buffer.append(" -> ");
 		buffer.append(StateSpec.lightenFact(rule.getHead()));
 
 		return buffer.toString();
@@ -844,14 +913,14 @@ public abstract class StateSpec {
 			jSkip = 1;
 		for (int i = jSkip; i < terms.length; i++) {
 			// Don't bother noting the state term
-			if (!Object[].class.isAssignableFrom(terms[i].getType())) {
+			if (!State.class.isAssignableFrom(terms[i].getType())) {
 				if (plural)
 					buffer.append(",");
 				buffer.append(terms[i]);
 				plural = true;
 			}
 		}
-		buffer.append(") ");
+		buffer.append(")");
 		return buffer.toString();
 	}
 
