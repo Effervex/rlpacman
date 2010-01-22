@@ -132,6 +132,50 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(stringBody.contains("inequal([StateSpec],<X>,<Y>)")
 				|| stringBody.contains("inequal([StateSpec],<Y>,<X>)"));
 		stringBody.clear();
+		
+		// Test anonymous variable
+		rule = spec_.parseRule("clear(<X>) & on(<X>,_) -> moveFloor(<X>)", null);
+		body = rule.getBody();
+		for (Object obj : body)
+			stringBody.add(obj.toString());
+		// 6 assertions in the body: state, clear, on, two blocks, and an inequals
+		assertEquals(6, stringBody.size());
+		assertTrue(stringBody.contains("clear(<State>,<X>)"));
+		assertTrue(stringBody.contains("on(<State>,<X>,<_0>)"));
+		assertTrue(stringBody.contains("state(<State>)"));
+		assertTrue(stringBody.contains("block(<X>)"));
+		assertTrue(stringBody.contains("block(<_0>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<X>,<_0>)")
+				|| stringBody.contains("inequal([StateSpec],<_0>,<X>)"));
+		stringBody.clear();
+		
+		// Test anonymous variables
+		rule = spec_.parseRule("clear(<X>) & on(<X>,_) & on(<Y>,_) -> moveFloor(<X>)", null);
+		body = rule.getBody();
+		for (Object obj : body)
+			stringBody.add(obj.toString());
+		// 13 assertions in the body: state, clear, 2 ons, 4 blocks, and 5 inequals
+		// Note no inequals between _1 and _2
+		assertEquals(13, stringBody.size());
+		assertTrue(stringBody.contains("clear(<State>,<X>)"));
+		assertTrue(stringBody.contains("on(<State>,<X>,<_0>)"));
+		assertTrue(stringBody.contains("on(<State>,<Y>,<_1>)"));
+		assertTrue(stringBody.contains("state(<State>)"));
+		assertTrue(stringBody.contains("block(<X>)"));
+		assertTrue(stringBody.contains("block(<Y>)"));
+		assertTrue(stringBody.contains("block(<_0>)"));
+		assertTrue(stringBody.contains("block(<_1>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<X>,<_0>)")
+				|| stringBody.contains("inequal([StateSpec],<_0>,<X>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<X>,<_1>)")
+				|| stringBody.contains("inequal([StateSpec],<_1>,<X>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<Y>,<_0>)")
+				|| stringBody.contains("inequal([StateSpec],<_0>,<Y>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<Y>,<_1>)")
+				|| stringBody.contains("inequal([StateSpec],<_1>,<Y>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<Y>,<X>)")
+				|| stringBody.contains("inequal([StateSpec],<X>,<Y>)"));
+		stringBody.clear();
 	}
 
 	@Test
@@ -181,7 +225,7 @@ public class BlocksWorldStateSpecTest {
 
 	@Test
 	public void testToString() {
-		fail("Not yet implemented");
+		assertEquals("StateSpec", spec_.toString());
 	}
 
 	@Test

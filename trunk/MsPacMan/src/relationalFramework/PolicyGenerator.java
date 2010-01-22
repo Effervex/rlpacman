@@ -18,6 +18,7 @@ import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
+import org.mandarax.kernel.Replacement;
 import org.mandarax.kernel.Rule;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.VariableTerm;
@@ -31,8 +32,6 @@ import org.mandarax.reference.DefaultInferenceEngine;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator {
-	private static final int MAX_UNIFICATION_INACTIVITY = 3;
-
 	/** The probability distributions defining the policy generator. */
 	private ProbabilityDistribution<Slot> policyGenerator_;
 
@@ -60,6 +59,9 @@ public class PolicyGenerator {
 	/** The class prefix for the experiment. */
 	private String classPrefix_;
 
+	/** The covering object. */
+	private Covering covering_;
+
 	/**
 	 * The constructor for creating a new Policy Generator.
 	 * 
@@ -74,6 +76,7 @@ public class PolicyGenerator {
 		classPrefix_ = classPrefix;
 		conditionGenerator_ = formConditions();
 		actionGenerator_ = formActions();
+		covering_ = new Covering(factory_);
 
 		resetGenerator();
 	}
@@ -202,205 +205,43 @@ public class PolicyGenerator {
 	 * @return The list of covered rules, one for each action type.
 	 */
 	public List<GuidedRule> triggerCovering(KnowledgeBase state) {
-		// TODO Covering
 		System.out.println("<COVERING TRIGGERED:>");
 
-		// Find the relevant conditions for each term
-		MultiMap<Term, Fact> relevantConditions = new MultiMap<Term, Fact>();
-		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
+		List<Rule> covered = covering_.coverState(state);
 
-		// Maintain a mapping for each action, to be used in unification between
-		// actions
-		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
+		// Format rules into GuidedRules.
+		List<GuidedRule> coveredGuidedRules = new ArrayList<GuidedRule>();
+		for (Rule coveredRule : covered) {
+			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule);
+			GuidedPredicate action = rulePreds.remove(rulePreds.size() - 1);
+			Slot slot = findSlot(coveredRule.getHead().getPredicate());
+			GuidedRule guidedRule = new GuidedRule(coveredRule, rulePreds,
+					action, slot);
+			coveredGuidedRules.add(guidedRule);
 
-		// Arrange the actions in a heuristical order such that unification
-		// should be most effective.
-		@SuppressWarnings("unchecked")
-		MultiMap<Predicate, Fact> validActions = arrangeActions((Set<Fact>) ((ConstantTerm) actionFact
-				.getTerms()[0]).getObject());
-		for (Predicate action : validActions.keySet()) {
-			GuidedRule actionRule = unifyActionRules(validActions.get(action),
-					relevantConditions);
-			generalActions.add(actionRule);
+			// Adding the rule to the slot
+			slot.addNewRule(guidedRule);
 		}
 
-		return generalActions;
+		Collections.shuffle(coveredGuidedRules);
+		return coveredGuidedRules;
 	}
 
 	/**
-	 * Unifies action rules together into one general all-covering rule.
-	 * 
-	 * @param actionsList
-	 *            A heuristically sorted list of actions for a single predicate.
-	 * @param relevantConditions
-	 *            The relevant conditions for each term in the state.
-	 * @return A GuidedRule representing a general action.
-	 */
-	private GuidedRule unifyActionRules(List<Fact> actionsList,
-			MultiMap<Term, Fact> relevantConditions) {
-		// TODO Modify this to a while loop.
-		for (Fact action : actionsList) {
-			List<Fact> actionFacts = new ArrayList<Fact>();
-
-			Term[] actionTerms = action.getTerms();
-			// Find the facts containing the same (useful) terms in the action
-			for (int i = 0; i < actionTerms.length; i++) {
-				Term term = actionTerms[i];
-				if (StateSpec.getInstance().isUsefulTerm((ConstantTerm) term,
-						factory_)) {
-					List<Fact> termFacts = relevantConditions.get(term);
-					for (Fact termFact : termFacts) {
-						if (!actionFacts.contains(termFact))
-							actionFacts.add(termFact);
-					}
-				}
-			}
-
-			// Inversely substitute the terms for variables
-
-			// Unify with other action rules of the same action
-		}
-
-		// Use the unified rules to create new rules
-		return null;
-	}
-
-	/**
-	 * Arranges the collection of actions into a heuristical ordering which
-	 * attempts to find maximally dissimilar actions of the same type. The list
-	 * is ordered such that the actions of the same predicate, each one with
-	 * different arguments from the last, are first, followed by randomly
-	 * ordered remaining actions.
-	 * 
-	 * @param validActions
-	 *            The set of valid actions.
-	 * @return A multimap of each action predicate, containing the heuristically
-	 *         ordered actions.
-	 */
-	private MultiMap<Predicate, Fact> arrangeActions(Set<Fact> validActions) {
-		// Initialise a map for each action predicate
-		MultiMap<Predicate, Fact> actionsMap = new MultiMap<Predicate, Fact>();
-		MultiMap<Predicate, Set<Term>> usedTermsMap = new MultiMap<Predicate, Set<Term>>();
-
-		MultiMap<Predicate, Fact> notUsedMap = new MultiMap<Predicate, Fact>();
-		// For each action
-		for (Fact action : validActions) {
-			Predicate actionPred = action.getPredicate();
-			if (isDissimilarAction(action, usedTermsMap)) {
-				actionsMap.put(actionPred, action);
-			} else {
-				notUsedMap.put(actionPred, action);
-			}
-		}
-
-		// If we have some actions not used (likely, then shuffle the ordering
-		// and add them to the end of the actions map.
-		if (!notUsedMap.isEmpty()) {
-			for (List<Fact> notUsed : notUsedMap.valuesLists()) {
-				Collections.shuffle(notUsed);
-			}
-			actionsMap.putAll(notUsedMap);
-		}
-
-		return actionsMap;
-	}
-
-	/**
-	 * Is the given action dissimilar from the already seen actions? This is
-	 * measured by which terms have already been seen in their appropriate
-	 * predicate slots.
+	 * Finds the slot for the action given, as each slot has an action assigned
+	 * to it. Some slots may be fixed,a nd not allow new rules, in which case
+	 * another slot of the same action will be available to add to.
 	 * 
 	 * @param action
-	 *            The action being checked.
-	 * @param usedTermsMap
-	 *            The already used terms mapping.
-	 * @return True if the action is dissimilar, false otherwise.
+	 *            The action predicate.
+	 * @return The slot representing rules for that slot.
 	 */
-	private boolean isDissimilarAction(Fact action,
-			MultiMap<Predicate, Set<Term>> usedTermsMap) {
-		Term[] terms = action.getTerms();
-		Predicate actionPred = action.getPredicate();
-		// Run through each term
-		for (int i = 0; i < terms.length; i++) {
-			// Checking if the term set already exists
-			Set<Term> usedTerms = usedTermsMap.getIndex(actionPred, i);
-			if (usedTerms == null) {
-				usedTerms = new HashSet<Term>();
-				usedTermsMap.put(actionPred, usedTerms);
-			}
-
-			ConstantTerm term = (ConstantTerm) terms[i];
-			// If the term has already been used (but isn't a state or state
-			// spec term), return false
-			if ((usedTerms.contains(term))
-					&& (StateSpec.getInstance().isUsefulTerm(term, factory_)))
-				return false;
+	private Slot findSlot(Predicate action) {
+		for (Slot slot : policyGenerator_) {
+			if ((slot.getAction().equals(action)) && (!slot.isFixed()))
+				return slot;
 		}
-
-		// If the terms have not been used before, add them all to their
-		// appropriate sets.
-		for (int i = 0; i < terms.length; i++) {
-			usedTermsMap.getIndex(actionPred, i).add(terms[i]);
-		}
-
-		return true;
-	}
-
-	/**
-	 * Compiles the relevant term conditions from the state into map format,
-	 * with the term as the key and the fact as the value. This makes finding
-	 * relevant conditions a quick matter.
-	 * 
-	 * @param state
-	 *            The state containing the conditions.
-	 * @return A mapping of conditions with terms as the key. Ignores type,
-	 *         inequal, action facts and state and state spec terms.
-	 */
-	private Fact compileRelevantConditionMap(KnowledgeBase state,
-			MultiMap<Term, Fact> relevantConditions) {
-		Fact actionFact = null;
-
-		List<ClauseSet> clauseSets = state.getClauseSets();
-		for (ClauseSet cs : clauseSets) {
-			// If the clause is a fact, use it
-			if (cs instanceof Fact) {
-				Fact stateFact = (Fact) cs;
-				// Ignore the type, inequal and actions pred
-				if (StateSpec.getInstance().isUsefulPredicate(
-						stateFact.getPredicate()))
-					extractTerms(stateFact, relevantConditions);
-				// Find the action fact
-				else if (stateFact.getPredicate().equals(
-						StateSpec.getValidActionsPredicate()))
-					actionFact = stateFact;
-			}
-
-			// TODO If the clause is a rule, use the rule to find background
-			// clause facts.
-		}
-
-		return actionFact;
-	}
-
-	/**
-	 * Extracts the terms from a fact and adds them to an appropriate position
-	 * within the conditionMap.
-	 * 
-	 * @param stateFact
-	 *            The fact being examined.
-	 * @param conditionMap
-	 *            The condition map to add to.
-	 */
-	private void extractTerms(Fact stateFact, MultiMap<Term, Fact> conditionMap) {
-		Term[] terms = stateFact.getTerms();
-		for (Term term : terms) {
-			// Ignore the state and state spec terms
-			if (StateSpec.getInstance().isUsefulTerm((ConstantTerm) term,
-					factory_)) {
-				// Add to map, if not already there
-				conditionMap.putContains(term, stateFact);
-			}
-		}
+		return null;
 	}
 
 	/**
@@ -580,5 +421,10 @@ public class PolicyGenerator {
 
 	public ProbabilityDistribution<Slot> getGenerator() {
 		return policyGenerator_;
+	}
+	
+	@Override
+	public String toString() {
+		return policyGenerator_.toString();
 	}
 }
