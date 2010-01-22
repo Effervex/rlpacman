@@ -261,7 +261,7 @@ public class CrossEntropyExperiment {
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
-			episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
+			//episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
 				// Forming a population of solutions
