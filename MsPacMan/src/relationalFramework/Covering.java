@@ -106,7 +106,6 @@ public class Covering {
 		Collection<String> stringTerms = new HashSet<String>();
 		String actionString = formatAction(actionPred, stringTerms);
 
-		// TODO Modify this to a while loop.
 		int lastChanged = 0;
 		Iterator<Fact> actionIter = actionsList.iterator();
 		// Do until:
@@ -141,7 +140,6 @@ public class Covering {
 				generalRule = inverseSubbed;
 			} else {
 				// Unify the rules through a simply retainment operation.
-				// TODO Need to check this doesn't wipe the rule.
 				boolean changed = generalRule.retainAll(inverseSubbed);
 				if (changed)
 					lastChanged = 0;
