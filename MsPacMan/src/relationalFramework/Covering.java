@@ -35,6 +35,9 @@ public class Covering {
 	/** The logic factory for the experiment. */
 	private LogicFactory factory_;
 
+	/** The pre-goal state, for use in covering specialisations. */
+	private List<Fact> preGoalState_;
+
 	/**
 	 * Covering constructor.
 	 * 
@@ -53,14 +56,14 @@ public class Covering {
 	 *            The state of the environment, containing the valid actions.
 	 * @return A list of guided rules, one for each action type.
 	 */
-	public List<Rule> coverState(KnowledgeBase state) {
+	public List<GuidedRule> coverState(KnowledgeBase state) {
 		// Find the relevant conditions for each term
 		MultiMap<Term, Fact> relevantConditions = new MultiMap<Term, Fact>();
 		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
 
 		// Maintain a mapping for each action, to be used in unification between
 		// actions
-		List<Rule> generalActions = new ArrayList<Rule>();
+		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
 
 		// Arrange the actions in a heuristical order such that unification
 		// should be most effective.
@@ -68,7 +71,7 @@ public class Covering {
 		MultiMap<Predicate, Fact> validActions = arrangeActions((Set<Fact>) ((ConstantTerm) actionFact
 				.getTerms()[0]).getObject());
 		for (Predicate action : validActions.keySet()) {
-			Rule actionRule = unifyActionRules(validActions.get(action),
+			GuidedRule actionRule = unifyActionRules(validActions.get(action),
 					relevantConditions, action);
 			generalActions.add(actionRule);
 		}
@@ -81,10 +84,27 @@ public class Covering {
 	 * can be multiple specialisations.
 	 * 
 	 * @param rule
+	 *            The general rule to be specialised.
 	 * @param state
-	 * @return
+	 *            The state used as a specialisation.
+	 * @return A list of newly specialised rules, where each is more specialised
+	 *         than the general rule but still match the state.
 	 */
 	public List<GuidedRule> specialiseRule(GuidedRule rule, KnowledgeBase state) {
+		// TODO Specialise rule to a state
+		return null;
+	}
+
+	/**
+	 * Specialises a rule towards conditions seen in the pre-goal state.
+	 * 
+	 * @param rule
+	 *            The rule to specialise.
+	 * @return All single-step mutations the rule can take towards matching the
+	 *         pre-goal state.
+	 */
+	public List<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+		// TODO Specialise rule to pre-goal state
 		return null;
 	}
 
@@ -99,7 +119,7 @@ public class Covering {
 	 *            The action predicate spawning this rule.
 	 * @return A Rule representing a general action.
 	 */
-	private Rule unifyActionRules(List<Fact> actionsList,
+	private GuidedRule unifyActionRules(List<Fact> actionsList,
 			MultiMap<Term, Fact> relevantConditions, Predicate actionPred) {
 		// The general rule for the action
 		Collection<String> generalRule = null;
@@ -112,8 +132,8 @@ public class Covering {
 		// 1) We have no actions left to look at
 		// 2) Or the general rule isn't minimal
 		// 3) Or the general rule hasn't changed for X turns
-		while ((actionIter.hasNext())
-				&& (!isMinimal(generalRule, stringTerms))
+		boolean isMinimal = false;
+		while ((actionIter.hasNext()) && (!isMinimal)
 				&& (lastChanged < MAX_UNIFICATION_INACTIVITY)) {
 			Fact action = actionIter.next();
 			List<Fact> actionFacts = new ArrayList<Fact>();
@@ -146,11 +166,14 @@ public class Covering {
 				else
 					lastChanged++;
 			}
+
+			isMinimal = isMinimal(generalRule, stringTerms);
 		}
 
 		// Use the unified rules to create new rules
 		String joinedRule = joinRule(generalRule, actionString);
-		return StateSpec.getInstance().parseRule(joinedRule, null);
+		GuidedRule rule = new GuidedRule(joinedRule, isMinimal, false);
+		return rule;
 	}
 
 	/**
@@ -172,7 +195,7 @@ public class Covering {
 					+ conditions + ", " + terms);
 			return false;
 		}
-		
+
 		terms = new HashSet<String>(terms);
 
 		// Run through the conditions, ensuring each one has at least one unique
@@ -432,6 +455,28 @@ public class Covering {
 				conditionMap.putContains(term, stateFact);
 			}
 		}
+	}
+
+	/**
+	 * Forms the pre-goal state by adding to it a pre-goal state the agent has
+	 * seen (or was given). This method forms the pre-goal state by finding the
+	 * bare minimal conditions seen in every pre-goal state.
+	 * 
+	 * @param state
+	 *            The pre-goal state seen by the agent.
+	 */
+	public void formPreGoalState(KnowledgeBase state) {
+		// Get the list of clause sets, turn them all into facts, and unify them
+		List<ClauseSet> clauseSets = state.getClauseSets();
+	}
+
+	/**
+	 * Gets the pre-goal general state, seen by the agent.
+	 * 
+	 * @return The pre-goal state, in the form of a list of facts.
+	 */
+	public List<Fact> getPreGoalState() {
+		return preGoalState_;
 	}
 
 	/**

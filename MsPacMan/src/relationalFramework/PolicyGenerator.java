@@ -35,7 +35,7 @@ public class PolicyGenerator {
 	/** The probability distributions defining the policy generator. */
 	private ProbabilityDistribution<Slot> policyGenerator_;
 
-	/** A hang on for when the generator is reset. */
+	/** The actions set the generator was initialised with. */
 	private Collection<GuidedPredicate> actionSet_;
 
 	/** If the generator is currently frozen. */
@@ -61,6 +61,9 @@ public class PolicyGenerator {
 
 	/** The covering object. */
 	private Covering covering_;
+	
+	/** The maximally general rules for each action. */
+	private Map<Predicate, GuidedRule> maximallyGeneralRules_;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -77,6 +80,7 @@ public class PolicyGenerator {
 		conditionGenerator_ = formConditions();
 		actionGenerator_ = formActions();
 		covering_ = new Covering(factory_);
+		maximallyGeneralRules_ = new HashMap<Predicate, GuidedRule>();
 
 		resetGenerator();
 	}
@@ -207,24 +211,27 @@ public class PolicyGenerator {
 	public List<GuidedRule> triggerCovering(KnowledgeBase state) {
 		System.out.println("<COVERING TRIGGERED:>");
 
-		List<Rule> covered = covering_.coverState(state);
+		List<GuidedRule> covered = covering_.coverState(state);
 
-		// Format rules into GuidedRules.
-		List<GuidedRule> coveredGuidedRules = new ArrayList<GuidedRule>();
-		for (Rule coveredRule : covered) {
-			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule);
+		// Add remaining information to rules.
+		for (GuidedRule coveredRule : covered) {
+			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule.getRule());
 			GuidedPredicate action = rulePreds.remove(rulePreds.size() - 1);
-			Slot slot = findSlot(coveredRule.getHead().getPredicate());
-			GuidedRule guidedRule = new GuidedRule(coveredRule, rulePreds,
-					action, slot);
-			coveredGuidedRules.add(guidedRule);
+			Slot slot = findSlot(action.getPredicate());
+			coveredRule.setSlot(slot);
+			coveredRule.setConditions(rulePreds);
+			coveredRule.setAction(action);
 
 			// Adding the rule to the slot
-			slot.addNewRule(guidedRule);
+			slot.addNewRule(coveredRule);
+			
+			// If the rule is maximally general, be sure to store it
+			if (coveredRule.isMaximallyGeneral())
+				maximallyGeneralRules_.put(action.getPredicate(), coveredRule);
 		}
 
-		Collections.shuffle(coveredGuidedRules);
-		return coveredGuidedRules;
+		Collections.shuffle(covered);
+		return covered;
 	}
 
 	/**
