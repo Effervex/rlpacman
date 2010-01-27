@@ -59,6 +59,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	/** The optimal number of steps. */
 	private int optimalSteps_;
+	
+	
 
 	// @Override
 	public void env_cleanup() {
@@ -441,11 +443,18 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		PolicyAgent optimalAgent = new PolicyAgent();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 		optimalAgent.agent_message("Policy");
+		optimalAgent.agent_message("Optimal");
 		Action act = optimalAgent.agent_start(formObs_Start());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = null;
 		while ((rot == null) || (!rot.isTerminal())) {
 			rot = env_step(act);
+			
+			// Check if the optimal policy has already seen this state
+			if (optimalMap_.containsKey(state_)) {
+				steps_ += optimalMap_.get(state_);
+				break;
+			}
 			optimalAgent.agent_step(rot.r, rot.o);
 		}
 

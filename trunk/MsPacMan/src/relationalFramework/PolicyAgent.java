@@ -16,14 +16,21 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 public class PolicyAgent implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
+
 	/** The currently switched actions. */
 	private ActionSwitch actionsModule_;
 
+	/** The previous state seen by the agent. */
+	private KnowledgeBase prevState_;
+
+	/**
+	 * If this agent is the optimal agent (defined by the environment, not how
+	 * the agent sees itself).
+	 */
+	private boolean optimal_;
+
 	// @Override
 	public void agent_cleanup() {
-		// Save the generator values
-
-		// Save the final policy
 	}
 
 	// @Override
@@ -33,8 +40,8 @@ public class PolicyAgent implements AgentInterface {
 
 	// @Override
 	public void agent_init(String arg0) {
-		// Initialise the generator
-
+		prevState_ = null;
+		optimal_ = false;
 	}
 
 	// @Override
@@ -42,6 +49,8 @@ public class PolicyAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
+		} else if (arg0.equals("Optimal")) {
+			optimal_ = true;
 		}
 		return null;
 	}
@@ -82,6 +91,10 @@ public class PolicyAgent implements AgentInterface {
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
 				.getNumActions());
+
+		// Save the previous state (if not an optimal agent).
+		if (!optimal_)
+			prevState_ = state;
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();

@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.util.ArrayList;
 import java.util.Collection;
 
 import org.mandarax.kernel.Rule;
@@ -15,16 +16,52 @@ public class GuidedRule {
 	private final Rule rule_;
 
 	/** The guided predicates that built the condition of the rule. */
-	private final Collection<GuidedPredicate> conditions_;
+	private Collection<GuidedPredicate> conditions_;
 
 	/** The guided predicate that defined the action. */
-	private final GuidedPredicate action_;
+	private GuidedPredicate action_;
+
+	/** The parsable string which defines the rule. */
+	private String ruleString_;
 
 	/** The slot this rule was generated from. */
-	private final Slot slot_;
+	private Slot slot_;
 
 	/** If this slot is a mutation. */
 	private boolean mutant_;
+	
+	/** If this rule has spawned any mutant rules yet. */
+	private boolean hasSpawned_;
+
+	/** If this rule is maximally general. */
+	private boolean maxGeneral_;
+
+	/**
+	 * A constructor taking the bare minimum for a guided rule.
+	 * 
+	 * @param rule
+	 *            The rule this rule represents
+	 */
+	public GuidedRule(Rule rule) {
+		rule_ = rule;
+	}
+
+	/**
+	 * A constructor taking the bare minimum for a guided rule.
+	 * 
+	 * @param ruleString
+	 *            The string representing this rule.
+	 * @param maxGeneral
+	 *            If this rule is maximally general.
+	 * @param mutant
+	 *            If this rule is a mutant (implying max general is false).
+	 */
+	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant) {
+		rule_ = StateSpec.getInstance().parseRule(ruleString, null);
+		ruleString_ = ruleString;
+		maxGeneral_ = maxGeneral;
+		mutant_ = mutant;
+	}
 
 	/**
 	 * A constructor for the guided rule.
@@ -53,12 +90,28 @@ public class GuidedRule {
 		return conditions_;
 	}
 
+	public void setConditions(ArrayList<GuidedPredicate> conditions) {
+		conditions_ = conditions;
+	}
+
 	public GuidedPredicate getAction() {
 		return action_;
+	}
+	
+	public void setAction(GuidedPredicate action) {
+		action_ = action;
 	}
 
 	public Slot getSlot() {
 		return slot_;
+	}
+
+	public void setSlot(Slot slot) {
+		slot_ = slot;
+	}
+
+	public boolean isMaximallyGeneral() {
+		return maxGeneral_;
 	}
 
 	@Override
@@ -68,7 +121,10 @@ public class GuidedRule {
 		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
 		result = prime * result
 				+ ((conditions_ == null) ? 0 : conditions_.hashCode());
+		result = prime * result + (maxGeneral_ ? 1231 : 1237);
 		result = prime * result + (mutant_ ? 1231 : 1237);
+		result = prime * result
+				+ ((ruleString_ == null) ? 0 : ruleString_.hashCode());
 		result = prime * result + ((rule_ == null) ? 0 : rule_.hashCode());
 		return result;
 	}
@@ -81,7 +137,7 @@ public class GuidedRule {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		final GuidedRule other = (GuidedRule) obj;
+		GuidedRule other = (GuidedRule) obj;
 		if (action_ == null) {
 			if (other.action_ != null)
 				return false;
@@ -92,17 +148,19 @@ public class GuidedRule {
 				return false;
 		} else if (!conditions_.equals(other.conditions_))
 			return false;
+		if (maxGeneral_ != other.maxGeneral_)
+			return false;
 		if (mutant_ != other.mutant_)
+			return false;
+		if (ruleString_ == null) {
+			if (other.ruleString_ != null)
+				return false;
+		} else if (!ruleString_.equals(other.ruleString_))
 			return false;
 		if (rule_ == null) {
 			if (other.rule_ != null)
 				return false;
 		} else if (!rule_.equals(other.rule_))
-			return false;
-		if (slot_ == null) {
-			if (other.slot_ != null)
-				return false;
-		} else if (!slot_.equals(other.slot_))
 			return false;
 		return true;
 	}
