@@ -176,6 +176,38 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(stringBody.contains("inequal([StateSpec],<Y>,<X>)")
 				|| stringBody.contains("inequal([StateSpec],<X>,<Y>)"));
 		stringBody.clear();
+		
+		// Test type predicate
+		rule = spec_.parseRule("block(<X>) -> moveFloor(<X>)", null);
+		body = rule.getBody();
+		for (Object obj : body)
+			stringBody.add(obj.toString());
+		assertEquals(1, stringBody.size());
+		assertTrue(stringBody.contains("block(<X>)"));
+		stringBody.clear();
+		
+		// Test inequal type predicates
+		rule = spec_.parseRule("block(<X>) & block(<Y>) -> move(<X>,<Y>)", null);
+		body = rule.getBody();
+		for (Object obj : body)
+			stringBody.add(obj.toString());
+		assertEquals(3, stringBody.size());
+		assertTrue(stringBody.contains("block(<X>)"));
+		assertTrue(stringBody.contains("block(<Y>)"));
+		assertTrue(stringBody.contains("inequal([StateSpec],<X>,<Y>)")
+				|| stringBody.contains("inequal([StateSpec],<Y>,<X>)"));
+		stringBody.clear();
+		
+		// Test existing type predicate
+		rule = spec_.parseRule("block(<X>) & clear(<X>) -> moveFloor(<X>)", null);
+		body = rule.getBody();
+		for (Object obj : body)
+			stringBody.add(obj.toString());
+		assertEquals(3, stringBody.size());
+		assertTrue(stringBody.contains("block(<X>)"));
+		assertTrue(stringBody.contains("clear(<State>,<X>)"));
+		assertTrue(stringBody.contains("state(<State>)"));
+		stringBody.clear();
 	}
 
 	@Test

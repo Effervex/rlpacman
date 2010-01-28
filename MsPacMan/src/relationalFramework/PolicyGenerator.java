@@ -61,7 +61,7 @@ public class PolicyGenerator {
 
 	/** The covering object. */
 	private Covering covering_;
-	
+
 	/** The maximally general rules for each action. */
 	private Map<Predicate, GuidedRule> maximallyGeneralRules_;
 
@@ -215,7 +215,8 @@ public class PolicyGenerator {
 
 		// Add remaining information to rules.
 		for (GuidedRule coveredRule : covered) {
-			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule.getRule());
+			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule
+					.getRule());
 			GuidedPredicate action = rulePreds.remove(rulePreds.size() - 1);
 			Slot slot = findSlot(action.getPredicate());
 			coveredRule.setSlot(slot);
@@ -224,7 +225,7 @@ public class PolicyGenerator {
 
 			// Adding the rule to the slot
 			slot.addNewRule(coveredRule);
-			
+
 			// If the rule is maximally general, be sure to store it
 			if (coveredRule.isMaximallyGeneral())
 				maximallyGeneralRules_.put(action.getPredicate(), coveredRule);
@@ -232,6 +233,42 @@ public class PolicyGenerator {
 
 		Collections.shuffle(covered);
 		return covered;
+	}
+
+	/**
+	 * Forms the pre-goal state using the given pre-goal state seen by the
+	 * agent.
+	 * 
+	 * @param preGoalState
+	 *            The pre-goal state seen by the agent.
+	 * @param actions
+	 *            The final action(s) taken by the agent.
+	 */
+	public void formPreGoalState(KnowledgeBase preGoalState, Fact[] actions) {
+		// If the state has settled and is probably at minimum, trigger
+		// mutation.
+		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
+			// For each maximally general rule
+			for (Predicate action : maximallyGeneralRules_.keySet()) {
+				GuidedRule general = maximallyGeneralRules_.get(action);
+				List<GuidedRule> mutants = covering_
+						.specialiseToPreGoal(general);
+				mutants.add(general);
+
+				// Retain these mutant children
+				general.getSlot().getGenerator().retainAll(mutants);
+
+				// Just a check. Can probably remove this
+				// Ensure all mutants are in the distribution
+				for (GuidedRule mutant : mutants) {
+					if (!general.getSlot().getGenerator().contains(mutant)) {
+						System.err
+								.println("Seems a mutant exists in the minimal set not in the more specific set.");
+						throw new RuntimeException();
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -429,7 +466,7 @@ public class PolicyGenerator {
 	public ProbabilityDistribution<Slot> getGenerator() {
 		return policyGenerator_;
 	}
-	
+
 	@Override
 	public String toString() {
 		return policyGenerator_.toString();

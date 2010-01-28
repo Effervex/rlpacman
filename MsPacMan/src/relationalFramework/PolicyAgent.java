@@ -2,6 +2,7 @@ package relationalFramework;
 
 import java.util.List;
 
+import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.KnowledgeBase;
 import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
@@ -35,6 +36,10 @@ public class PolicyAgent implements AgentInterface {
 
 	// @Override
 	public void agent_end(double arg0) {
+		// Save the pre-goal state and goal action
+		PolicyGenerator.getInstance().formPreGoalState(prevState_,
+				actionsModule_.getPrioritisedActions());
+
 		actionsModule_ = null;
 	}
 
@@ -86,7 +91,7 @@ public class PolicyAgent implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private List[] chooseAction(KnowledgeBase state) {
+	private Fact[] chooseAction(KnowledgeBase state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()

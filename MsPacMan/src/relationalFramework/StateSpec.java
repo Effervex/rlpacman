@@ -63,7 +63,7 @@ public abstract class StateSpec {
 	private List<GuidedPredicate> predicates_;
 
 	/** The type predicates, only used implicitly. */
-	private Map<Class, Predicate> typePredicates_;
+	private Map<Class, GuidedPredicate> typePredicates_;
 
 	/** The actions of the rules. */
 	private List<GuidedPredicate> actions_;
@@ -133,6 +133,10 @@ public abstract class StateSpec {
 			mapping.put(gp.getPredicate().getName(), gp);
 		}
 
+		for (GuidedPredicate gp : typePredicates_.values()) {
+			mapping.put(gp.getPredicate().getName(), gp);
+		}
+
 		// Scanning the actions
 		for (GuidedPredicate gp : actions_) {
 			mapping.put(gp.getPredicate().getName(), gp);
@@ -146,7 +150,7 @@ public abstract class StateSpec {
 	 * 
 	 * @return The list of guided predicates.
 	 */
-	protected abstract Map<Class, Predicate> initialiseTypePredicates();
+	protected abstract Map<Class, GuidedPredicate> initialiseTypePredicates();
 
 	/**
 	 * Initialises the state predicates.
@@ -310,30 +314,34 @@ public abstract class StateSpec {
 		Set<Term> allTerms = new HashSet<Term>();
 		Collection<Term> anonymousTerms = new ArrayList<Term>();
 		for (int i = 0; i < info.length; i++) {
-			
-			// Get the guided predicate
+
+			// Get the guided predicate or type predicate
 			GuidedPredicate cond = getGuidedPredicate(info[i][0]);
-			
+
 			// Check if it's a JConstructor
-			int offset = (cond.getPredicate() instanceof JConstructor) ? 1 : 0;
-			
+			int offset = 0;
+			if (cond.getPredicate() instanceof JConstructor)
+				offset++;
+			if (isTypePredicate(cond.getPredicate()))
+				offset--;
+
 			// Find the terms used in the predicate arguments
 			Term[] terms = findTerms(factory_, termMap, info[i], cond
 					.getPredicate().getStructure(), offset, anonymousTerms);
-			
+
 			// Instantiate the guided predicate with the args.
 			List<Prerequisite> rulePreqs = cond.factify(factory_, terms, false,
 					false, allTerms, anonymousTerms);
-			
+
 			// Add the resulting prerequisites
 			for (Prerequisite prereq : rulePreqs) {
-				
+
 				// Separate the action
 				if (i < info.length - 1) {
 					// Add as condition
 					if (!prereqs.contains(prereq))
 						prereqs.add(prereq);
-					
+
 				} else {
 					// Add as action
 					if (prereq.getPredicate().getName().equals(info[i][0])) {
@@ -378,10 +386,12 @@ public abstract class StateSpec {
 				// Forming the name (appending a number to ANONYMOUS, if nto
 				// already there.
 				String name = predArgs[i + 1];
-				name = name + ((name.equals(ANONYMOUS + "")) ? anonymousTerms.size() : "");
+				name = name
+						+ ((name.equals(ANONYMOUS + "")) ? anonymousTerms
+								.size() : "");
 
-				terms[i] = factory.createVariableTerm(name,
-						predStructure[i + 1 + offset]);
+				terms[i] = factory.createVariableTerm(name, predStructure[i + 1
+						+ offset]);
 				termMap.put(name, terms[i]);
 				anonymousTerms.add(terms[i]);
 
@@ -588,11 +598,23 @@ public abstract class StateSpec {
 	 *         key.
 	 */
 	public Predicate getTypePredicate(Class key) {
-		return typePredicates_.get(key);
+		return typePredicates_.get(key).getPredicate();
+	}
+
+	public Predicate getTypePredicate(String name) {
+		for (GuidedPredicate type : typePredicates_.values()) {
+			if (type.getPredicate().getName().equals(name))
+				return type.getPredicate();
+		}
+		return null;
 	}
 
 	public boolean isTypePredicate(Predicate predicate) {
-		return typePredicates_.values().contains(predicate);
+		for (GuidedPredicate type : typePredicates_.values()) {
+			if (type.getPredicate().equals(predicate))
+				return true;
+		}
+		return false;
 	}
 
 	/**
@@ -607,8 +629,6 @@ public abstract class StateSpec {
 		if (predicate.equals(getInequalityPredicate()))
 			return false;
 		if (predicate.equals(getValidActionsPredicate()))
-			return false;
-		if (isTypePredicate(predicate))
 			return false;
 		return true;
 	}
@@ -715,6 +735,50 @@ public abstract class StateSpec {
 		PredTerm[] terms = { new PredTerm(termName, termClass, PredTerm.TIED),
 				new PredTerm(termName, termClass, PredTerm.FREE) };
 		return terms;
+	}
+
+	/**
+	 * Creates a simple predicate given some basic predicate information.
+	 * 
+	 * @param name
+	 *            The predicate name.
+	 * @param types
+	 *            The args in the predicate.
+	 * @param typeNames
+	 *            The names for the slots of the args.
+	 * @return A GuidedPredicate covering the created predicate.
+	 */
+	protected GuidedPredicate createSimplePredicate(String name, Class[] types,
+			String[] typeNames, boolean onlyTied) {
+		types = insertState(types);
+		Predicate predicate = new SimplePredicate(name, types);
+		PredTerm[][] predValues = new PredTerm[types.length][];
+		predValues[0] = createTied("State", types[0]);
+		for (int i = 1; i < predValues.length; i++) {
+			if (onlyTied)
+				predValues[i] = createTied(typeNames[i - 1], types[i]);
+			else
+				predValues[i] = createTiedAndFree(typeNames[i - 1], types[i]);
+		}
+		return new GuidedPredicate(predicate, predValues);
+	}
+
+	/**
+	 * Creates a type guided predicate.
+	 * 
+	 * @param predName
+	 *            The name of the type predicate.
+	 * @param type
+	 *            The type this predicate represents.
+	 * @return The guided predicate representing the type predicate.
+	 */
+	protected GuidedPredicate createTypeGuidedPredicate(String predName,
+			Class type) {
+		Class[] types = { type };
+		Predicate predicate = new SimplePredicate(predName, types);
+		PredTerm[][] terms = { { new PredTerm(type.getSimpleName(), type,
+				PredTerm.FREE) } };
+		return new GuidedPredicate(predicate, terms);
 	}
 
 	/**

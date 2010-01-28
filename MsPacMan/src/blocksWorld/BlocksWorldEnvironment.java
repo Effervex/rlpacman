@@ -23,6 +23,7 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyAgent;
@@ -59,8 +60,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	/** The optimal number of steps. */
 	private int optimalSteps_;
-	
-	
 
 	// @Override
 	public void env_cleanup() {
@@ -106,11 +105,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-//		System.out.println("\t\t\tOptimal test: "
-//				+ Arrays.toString(state_.getState()));
+		// System.out.println("\t\t\tOptimal test: "
+		// + Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-//		System.out
-//				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+		// System.out
+		// .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -134,19 +133,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		Fact action = null;
 		Random random = new Random();
 		for (int i = 0; i < ObjectObservations.getInstance().objectArray.length; i++) {
-			List<Fact> actions = (List<Fact>) ObjectObservations.getInstance().objectArray[i];
-			if ((actions != null) && (!actions.isEmpty()))
-				action = actions.get(random.nextInt(actions.size()));
-			if (action != null)
-				break;
+			action = (Fact) ObjectObservations.getInstance().objectArray[i];
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-//		if (action != null)
-//			System.out.println("\t\t\t" + StateSpec.lightenFact(action)
-//					+ "\t->  " + Arrays.toString(newState.intState_));
-//		else
-//			System.out.println("\t\t\tNo action chosen.");
+		// if (action != null)
+		// System.out.println("\t\t\t" + StateSpec.lightenFact(action)
+		// + "\t->  " + Arrays.toString(newState.intState_));
+		// else
+		// System.out.println("\t\t\tNo action chosen.");
 
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -322,11 +317,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The knowledge base representing the world.
 	 */
 	private KnowledgeBase formState(Integer[] worldState) {
-		stateKB_.removeAll();
+		KnowledgeBase stateKB = new org.mandarax.reference.KnowledgeBase();
 		List<ClauseSet> backgroundClauses = StateSpec.getInstance()
 				.getBackgroundKnowledge().getClauseSets();
 		for (ClauseSet background : backgroundClauses)
-			stateKB_.add(background);
+			stateKB.add(background);
 
 		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
 
@@ -337,13 +332,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Add the state information for fulfilling goals
-		Object[] stateArray = {worldState, 1 };
+		Object[] stateArray = { worldState, 1 };
 		BlocksWorldState state = new BlocksWorldState(stateArray);
 		Term currentState = factory.createConstantTerm(state, State.class);
 
 		// Scanning through, making predicates
+		// Height values
 		Integer maxHeight = 0;
 		int[] heightMap = new int[worldState.length];
+		List<ConstantTerm> highestBlocks = new ArrayList<ConstantTerm>();
+		
 		List<Prerequisite> preds = new ArrayList<Prerequisite>();
 		for (int i = 0; i < worldState.length; i++) {
 			// On the floor
@@ -369,14 +367,19 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			}
 
 			// Finding the heights
-			if (heightMap[i] == 0) {
-				maxHeight = Math.max(maxHeight, recurseHeight(i, heightMap,
-						worldState));
+			int blockHeight = heightMap[i];
+			if (blockHeight == 0) {
+				blockHeight = recurseHeight(i, heightMap, worldState);
+			}
+			if (blockHeight > maxHeight) {
+				maxHeight = blockHeight;
+				highestBlocks.clear();
+			}
+			if (blockHeight == maxHeight) {
+				highestBlocks.add(blocks_[i]);
 			}
 		}
-		
-		// Modify the height value
-		state.getStateArray()[BlocksWorldState.HIGHEST_BLOCK] = maxHeight;
+
 		// Note the clear blocks
 		for (Integer blockInd : clearBlocks) {
 			Term[] terms = new Term[2];
@@ -386,16 +389,26 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 					.getGuidedPredicate("clear").factify(factory, terms, false,
 							false, null, null));
 		}
+		
+		// Add the highest block/s
+		for (ConstantTerm block : highestBlocks) {
+			Term[] terms = new Term[2];
+			terms[0] = currentState;
+			terms[1] = block;
+			StateSpec.addContains(preds, StateSpec.getInstance()
+					.getGuidedPredicate("highest").factify(factory, terms, false,
+							false, null, null));
+		}
 
 		// Adding the prereqs
 		for (Prerequisite preq : preds) {
-			stateKB_.add(preq);
+			stateKB.add(preq);
 		}
 
 		// Adding the valid actions
-		StateSpec.getInstance().insertValidActions(stateKB_);
+		StateSpec.getInstance().insertValidActions(stateKB);
 
-		return stateKB_;
+		return stateKB;
 	}
 
 	/**
@@ -449,7 +462,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		Reward_observation_terminal rot = null;
 		while ((rot == null) || (!rot.isTerminal())) {
 			rot = env_step(act);
-			
+
 			// Check if the optimal policy has already seen this state
 			if (optimalMap_.containsKey(state_)) {
 				steps_ += optimalMap_.get(state_);

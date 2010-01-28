@@ -14,7 +14,6 @@ import org.mandarax.kernel.LogicFactory;
 import org.mandarax.kernel.Predicate;
 import org.mandarax.kernel.Prerequisite;
 import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.SimplePredicate;
 import org.mandarax.kernel.Term;
 import org.mandarax.kernel.meta.JPredicate;
 
@@ -52,9 +51,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<Predicate, Rule> initialiseActionPreconditions(List<GuidedPredicate> actions) {
+	protected Map<Predicate, Rule> initialiseActionPreconditions(
+			List<GuidedPredicate> actions) {
 		Map<Predicate, Rule> actionPreconditions = new HashMap<Predicate, Rule>();
-		
+
 		// Run through each action
 		for (GuidedPredicate action : actions) {
 			Predicate actionPred = action.getPredicate();
@@ -115,7 +115,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	@Override
 	protected Rule initialiseGoalState(LogicFactory factory) {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
-		goal_ = "onab";
+		goal_ = "unstack";
 
 		try {
 			// On(a,b) goal
@@ -135,7 +135,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			// Unstack goal
 			if (goal_.equals("unstack")) {
 				Class[] types = new Class[1];
-				types[0] = Object[].class;
+				types[0] = State.class;
 				Method method = BlocksWorldStateSpec.class.getMethod(
 						"unstacked", types);
 				Predicate goalPred = new JPredicate(method);
@@ -152,7 +152,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			// Stack goal
 			if (goal_.equals("stack")) {
 				Class[] types = new Class[1];
-				types[0] = Object[].class;
+				types[0] = State.class;
 				Method method = BlocksWorldStateSpec.class.getMethod("stacked",
 						types);
 				Predicate goalPred = new JPredicate(method);
@@ -250,88 +250,28 @@ public class BlocksWorldStateSpec extends StateSpec {
 		typeNames[1] = "Below";
 		predicates.add(createSimplePredicate("above", types, typeNames, false));
 
-		try {
-			// Highest predicate (requires JPredicate)
-			types = new Class[2];
-			types[0] = State.class;
-			types[1] = Block.class;
-			PredTerm[][] predValues = new PredTerm[types.length][];
-			predValues[0] = createTied("State", types[0]);
-			predValues[1] = createTiedAndFree("Highest", types[1]);
-			predicates.add(createDefinedPredicate(BlocksWorldStateSpec.class,
-					types, predValues, "highest"));
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		// predicates.add(getInequalityPredicate());
+		// Highest predicate (requires JPredicate)
+		types = new Class[1];
+		types[0] = Block.class;
+		typeNames = new String[1];
+		typeNames[0] = "Highest";
+		predicates
+				.add(createSimplePredicate("highest", types, typeNames, false));
 
 		return predicates;
 	}
 
 	@Override
-	protected Map<Class, Predicate> initialiseTypePredicates() {
-		Map<Class, Predicate> typePreds = new HashMap<Class, Predicate>();
+	protected Map<Class, GuidedPredicate> initialiseTypePredicates() {
+		Map<Class, GuidedPredicate> typePreds = new HashMap<Class, GuidedPredicate>();
 
-		typePreds.put(Block.class, new SimplePredicate("block",
-				new Class[] { Block.class }));
+		typePreds.put(Block.class, createTypeGuidedPredicate("block",
+				Block.class));
 
-		typePreds.put(State.class, new SimplePredicate("state",
-				new Class[] { State.class }));
+		typePreds.put(State.class, createTypeGuidedPredicate("state",
+				State.class));
 
 		return typePreds;
-	}
-
-	/**
-	 * Creates a simple predicate given some basic predicate information.
-	 * 
-	 * @param name
-	 *            The predicate name.
-	 * @param types
-	 *            The args in the predicate.
-	 * @param typeNames
-	 *            The names for the slots of the args.
-	 * @return A GuidedPredicate covering the created predicate.
-	 */
-	private GuidedPredicate createSimplePredicate(String name, Class[] types,
-			String[] typeNames, boolean onlyTied) {
-		types = insertState(types);
-		Predicate predicate = new SimplePredicate(name, types);
-		PredTerm[][] predValues = new PredTerm[types.length][];
-		predValues[0] = createTied("State", types[0]);
-		for (int i = 1; i < predValues.length; i++) {
-			if (onlyTied)
-				predValues[i] = createTied(typeNames[i - 1], types[i]);
-			else
-				predValues[i] = createTiedAndFree(typeNames[i - 1], types[i]);
-		}
-		return new GuidedPredicate(predicate, predValues);
-	}
-
-	/**
-	 * Method for determining if a block is the highest.
-	 * 
-	 * @param state
-	 *            The state (actually an Integer[])
-	 * @param block
-	 *            The block being checked.
-	 * @return True if the block if the highest.
-	 */
-	public boolean highest(State state, Block block) {
-		BlocksWorldState bwState = (BlocksWorldState) state;
-		Integer highBlock = bwState.getHighestBlock();
-		Integer[] intState = bwState.getIntState();
-		int blockIndex = block.getName().charAt(0) - 'a';
-
-		int blockHeight = 1;
-		while (intState[blockIndex] > 0) {
-			blockIndex = intState[blockIndex] - 1;
-			blockHeight++;
-		}
-
-		if (blockHeight == highBlock)
-			return true;
-		return false;
 	}
 
 	/**

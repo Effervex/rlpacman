@@ -11,20 +11,20 @@ import org.mandarax.kernel.Fact;
  */
 public class ActionSwitch {
 	/** The prioritised list of switched actions. Max 3. */ 
-	private List<Fact>[] activeActions_;
+	private Fact[] activeActions_;
 	
 	public ActionSwitch(int actionsPerStep) {
-		activeActions_ = new List[actionsPerStep];
+		activeActions_ = new Fact[actionsPerStep];
 	}
 	
 	/**
 	 * Switches on a high action at the given priority.
 	 * 
-	 * @param clause The action being switched on.
+	 * @param action The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(List<Fact> clause, int priority) {
-		activeActions_[priority] = clause;
+	public void switchOn(Fact action, int priority) {
+		activeActions_[priority] = action;
 	}
 
 	/**
@@ -41,7 +41,7 @@ public class ActionSwitch {
 	 * 
 	 * @return The int version of the action list.
 	 */
-	public List<Fact>[] getPrioritisedActions() {
+	public Fact[] getPrioritisedActions() {
 		return activeActions_;
 	}
 	

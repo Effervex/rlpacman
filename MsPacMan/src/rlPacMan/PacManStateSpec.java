@@ -32,8 +32,8 @@ import relationalFramework.StateSpec;
  */
 public class PacManStateSpec extends StateSpec {
 	@Override
-	protected Map<Class, Predicate> initialiseTypePredicates() {
-		Map<Class, Predicate> typeMap = new HashMap<Class, Predicate>();
+	protected Map<Class, GuidedPredicate> initialiseTypePredicates() {
+		Map<Class, GuidedPredicate> typeMap = new HashMap<Class, GuidedPredicate>();
 		// Simply load the arrays with names and classes and loop through.
 		Class[] typeClasses = { Player.class, Dot.class, PowerDot.class,
 				Ghost.class, Fruit.class, JunctionPoint.class, PacPoint.class,
@@ -43,9 +43,8 @@ public class PacManStateSpec extends StateSpec {
 
 		// Creating each type predicate
 		for (int pred = 0; pred < typeClasses.length; pred++) {
-			Class[] typeClass = { typeClasses[pred] };
-			typeMap.put(typeClass[0], new SimplePredicate(predNames[pred],
-					typeClass));
+			typeMap.put(typeClasses[pred], createTypeGuidedPredicate(
+					predNames[pred], typeClasses[pred]));
 		}
 		return typeMap;
 	}
@@ -68,9 +67,8 @@ public class PacManStateSpec extends StateSpec {
 					15, 21, 99 }, Ghost.class, "proximalGhost"));
 
 			// NEAREST EDIBLE GHOST
-			predicates
-					.add(pacPointPredicate("Ghost", new Integer[] { 3, 6, 10,
-							13, 19, 99 }, Ghost.class, "proximalEdibleGhost"));
+			predicates.add(pacPointPredicate("Ghost", new Integer[] { 3, 6, 10,
+					13, 19, 99 }, Ghost.class, "proximalEdibleGhost"));
 
 			// NEAREST FRUIT
 			predicates.add(pacPointPredicate("Fruit", new Integer[] { 2, 8, 13,
@@ -98,9 +96,8 @@ public class PacManStateSpec extends StateSpec {
 
 			// GHOSTS FLASHING
 			predicates.add(createDefinedPredicate(PacManStateSpec.class,
-					new Class[] { State.class },
-					new PredTerm[][] { createTied("State", State.class) },
-					"ghostsFlashing"));
+					new Class[] { State.class }, new PredTerm[][] { createTied(
+							"State", State.class) }, "ghostsFlashing"));
 
 			// EMPTY PREDICATE
 			Predicate empty = new SimplePredicate("true",
@@ -143,7 +140,8 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<Predicate, Rule> initialiseActionPreconditions(List<GuidedPredicate> actions) {
+	protected Map<Predicate, Rule> initialiseActionPreconditions(
+			List<GuidedPredicate> actions) {
 		// TODO Auto-generated method stub
 		return null;
 	}
@@ -197,7 +195,8 @@ public class PacManStateSpec extends StateSpec {
 	 * @throws NoSuchMethodException
 	 *             If the method doesn't exist.
 	 */
-	private GuidedPredicate valuePredicate(Double[] vals, String methodName) throws NoSuchMethodException {
+	private GuidedPredicate valuePredicate(Double[] vals, String methodName)
+			throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[2][];
 		predValues[0] = createTied("State", State.class);
@@ -228,7 +227,8 @@ public class PacManStateSpec extends StateSpec {
 	 *             If the method does not exist.
 	 */
 	private GuidedPredicate pacPointPredicate(String secondParamName,
-			Integer[] distanceVals, Class secondClass, String methodName) throws NoSuchMethodException {
+			Integer[] distanceVals, Class secondClass, String methodName)
+			throws NoSuchMethodException {
 		// Defining the predicate values
 		PredTerm[][] predValues = new PredTerm[3][];
 		predValues[0] = createTied("State", State.class);
@@ -276,8 +276,7 @@ public class PacManStateSpec extends StateSpec {
 	public boolean proximalPowerDot(State state, PowerDot powerDot,
 			Integer distance) {
 		PacManState pacState = (PacManState) state;
-		return proximalThing(pacState.getDistanceGrid(), powerDot,
-				distance);
+		return proximalThing(pacState.getDistanceGrid(), powerDot, distance);
 	}
 
 	public boolean proximalGhost(State state, Ghost ghost, Integer distance) {
@@ -304,8 +303,7 @@ public class PacManStateSpec extends StateSpec {
 	public boolean proximalFruit(State state, Fruit fruit, Integer distance) {
 		PacManState pacState = (PacManState) state;
 		if ((fruit.m_nTicks2Show == 0) && (fruit.m_bAvailable)) {
-			return proximalThing(pacState.getDistanceGrid(), fruit,
-					distance);
+			return proximalThing(pacState.getDistanceGrid(), fruit, distance);
 		}
 		return false;
 	}

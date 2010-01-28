@@ -237,7 +237,6 @@ public class GuidedPredicate {
 
 		// Create the prereq
 		result.add(factory.createPrerequisite(predicate_, terms, negated));
-		// }
 		return result;
 	}
 
