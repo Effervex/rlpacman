@@ -528,9 +528,24 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		return false;
 	}
 
-	// @Override
-	public boolean retainAll(Collection<?> arg0) {
-		return false;
+	@Override
+	public boolean retainAll(Collection<?> collection) {
+		if (collection == null)
+			throw new NullPointerException();
+		
+		int size = itemProbs_.size();
+		for (Iterator<ItemProb> iter = itemProbs_.iterator(); iter.hasNext();) {
+			ItemProb element = iter.next();
+			if (!collection.contains(element.element_))
+				itemProbs_.remove(element);
+		}
+		
+		// If the sizes haven't changed, return false.
+		if (size == itemProbs_.size())
+			return false;
+		
+		normaliseProbs();
+		return true;
 	}
 
 	// @Override

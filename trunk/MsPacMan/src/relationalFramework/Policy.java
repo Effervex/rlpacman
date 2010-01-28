@@ -119,7 +119,7 @@ public class Policy {
 					Query query = factorySupport.query(ruleConditions, rule
 							.toString());
 
-					results = ie.query(query, state, InferenceEngine.ALL,
+					results = ie.query(query, state, InferenceEngine.ONE,
 							InferenceEngine.BUBBLE_EXCEPTIONS);
 					resultTable.put(ruleConds, results);
 				}
@@ -127,7 +127,7 @@ public class Policy {
 				// If there is at least one result
 				if (results.next()) {
 					triggeredRules_.add(gr);
-					List<Fact> actionResults = new ArrayList<Fact>();
+					Fact action = null;
 					// For each possible replacement
 					do {
 						Map<Term, Term> replacementMap = results.getResults();
@@ -150,12 +150,11 @@ public class Policy {
 						Fact groundAction = rule.getHead().applyToFact(
 								replacements);
 						// If the action is ground
-						if (!actionResults.contains(groundAction))
-							actionResults.add(groundAction);
+						action = groundAction;
 					} while (results.next());
 
 					// Use the found action set as a result.
-					actionSwitch.switchOn(actionResults, actionsFound);
+					actionSwitch.switchOn(action, actionsFound);
 					actionsFound++;
 				}
 				results.close();

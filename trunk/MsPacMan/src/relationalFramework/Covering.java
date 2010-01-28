@@ -31,12 +31,16 @@ public class Covering {
 	private static final char MODULO_CHAR = 'Z' + 1;
 	private static final char FIRST_CHAR = 'A';
 	private static final int MAX_UNIFICATION_INACTIVITY = 3;
+	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 10;
 
 	/** The logic factory for the experiment. */
 	private LogicFactory factory_;
 
 	/** The pre-goal state, for use in covering specialisations. */
 	private List<Fact> preGoalState_;
+
+	/** The last time since the pre-goal state changed. */
+	private int preGoalUnificationInactivity_ = 0;
 
 	/**
 	 * Covering constructor.
@@ -464,10 +468,23 @@ public class Covering {
 	 * 
 	 * @param state
 	 *            The pre-goal state seen by the agent.
+	 * @param action
+	 *            The final action taken by the agent.
+	 * @return True if the state was last active at most
+	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
 	 */
-	public void formPreGoalState(KnowledgeBase state) {
-		// Get the list of clause sets, turn them all into facts, and unify them
-		List<ClauseSet> clauseSets = state.getClauseSets();
+	public boolean formPreGoalState(KnowledgeBase state, Fact action) {
+		// If the preGoal state hasn't changed for
+		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
+		// again, it's probably already at minimum.
+		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY) {
+			// Get the list of clause sets, turn them all into facts, and unify
+			// them
+			List<ClauseSet> clauseSets = state.getClauseSets();
+			// TODO Form the pre goal state in a general form.
+			return true;
+		}
+		return false;
 	}
 
 	/**
