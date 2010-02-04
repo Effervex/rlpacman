@@ -113,6 +113,32 @@ public class Covering {
 	}
 
 	/**
+	 * Forms the pre-goal state by adding to it a pre-goal state the agent has
+	 * seen (or was given). This method forms the pre-goal state by finding the
+	 * bare minimal conditions seen in every pre-goal state.
+	 * 
+	 * @param state
+	 *            The pre-goal state seen by the agent.
+	 * @param action
+	 *            The final action taken by the agent.
+	 * @return True if the state was last active at most
+	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
+	 */
+	public boolean formPreGoalState(KnowledgeBase state, Fact action) {
+		// If the preGoal state hasn't changed for
+		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
+		// again, it's probably already at minimum.
+		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY) {
+			// Get the list of clause sets, turn them all into facts, and unify
+			// them
+			List<ClauseSet> clauseSets = state.getClauseSets();
+			// TODO Form the pre goal state in a general form.
+			return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Unifies action rules together into one general all-covering rule.
 	 * 
 	 * @param actionsList
@@ -135,10 +161,8 @@ public class Covering {
 		// Do until:
 		// 1) We have no actions left to look at
 		// 2) Or the general rule isn't minimal
-		// 3) Or the general rule hasn't changed for X turns
 		boolean isMinimal = false;
-		while ((actionIter.hasNext()) && (!isMinimal)
-				&& (lastChanged < MAX_UNIFICATION_INACTIVITY)) {
+		while ((actionIter.hasNext()) && (!isMinimal)) {
 			Fact action = actionIter.next();
 			List<Fact> actionFacts = new ArrayList<Fact>();
 
@@ -459,32 +483,6 @@ public class Covering {
 				conditionMap.putContains(term, stateFact);
 			}
 		}
-	}
-
-	/**
-	 * Forms the pre-goal state by adding to it a pre-goal state the agent has
-	 * seen (or was given). This method forms the pre-goal state by finding the
-	 * bare minimal conditions seen in every pre-goal state.
-	 * 
-	 * @param state
-	 *            The pre-goal state seen by the agent.
-	 * @param action
-	 *            The final action taken by the agent.
-	 * @return True if the state was last active at most
-	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
-	 */
-	public boolean formPreGoalState(KnowledgeBase state, Fact action) {
-		// If the preGoal state hasn't changed for
-		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
-		// again, it's probably already at minimum.
-		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY) {
-			// Get the list of clause sets, turn them all into facts, and unify
-			// them
-			List<ClauseSet> clauseSets = state.getClauseSets();
-			// TODO Form the pre goal state in a general form.
-			return true;
-		}
-		return false;
 	}
 
 	/**
