@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import jess.Rete;
+
 import org.mandarax.kernel.ClauseSet;
 import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
@@ -307,6 +309,12 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			return initialiseWorld(numBlocks, goalState);
 		else
 			return new BlocksState(worldState);
+	}
+	
+	
+	private Rete formStateRete(Integer[] worldState) {
+		Rete stateKB = new Rete();
+		return null;
 	}
 
 	/**
