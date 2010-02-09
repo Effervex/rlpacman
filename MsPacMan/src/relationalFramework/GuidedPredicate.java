@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 
+import jess.Deftemplate;
+
 import org.mandarax.kernel.InferenceEngine;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
@@ -23,7 +25,7 @@ import org.mandarax.kernel.meta.JConstructor;
  */
 public class GuidedPredicate {
 	/** The predicate defined. */
-	private Predicate predicate_;
+	private Deftemplate predicate_;
 
 	/** The possible values the predicate can use. */
 	private PredTerm[][] predValues_;
@@ -43,7 +45,7 @@ public class GuidedPredicate {
 	 * @param predValues
 	 *            The values that can be used within the predicate.
 	 */
-	public GuidedPredicate(Predicate predicate, PredTerm[][] predValues) {
+	public GuidedPredicate(Deftemplate predicate, PredTerm[][] predValues) {
 		predicate_ = predicate;
 		predValues_ = predValues;
 		looseInstantiation_ = null;
@@ -58,7 +60,7 @@ public class GuidedPredicate {
 	 * @param looseTerms
 	 *            The guiding values for the predicate.
 	 */
-	public GuidedPredicate(Predicate predicate, PredTerm[] looseTerms) {
+	public GuidedPredicate(Deftemplate predicate, PredTerm[] looseTerms) {
 		predicate_ = predicate;
 		predValues_ = null;
 		looseInstantiation_ = looseTerms;
@@ -182,7 +184,7 @@ public class GuidedPredicate {
 	 *         predicates, if it can be. Also fills the existing terms array
 	 *         with the terms used.
 	 */
-	public List<Prerequisite> factify(LogicFactory factory,
+	public String factify(LogicFactory factory,
 			Term[] replacementTerms, boolean negated, boolean mustTie,
 			Collection<Term> allTerms, Collection<Term> anonymousTerms) {
 		// If we don't have all terms, create one

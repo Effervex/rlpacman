@@ -8,6 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jess.Deftemplate;
+import jess.JessException;
+import jess.Rete;
+
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.KnowledgeBase;
 import org.mandarax.kernel.LogicFactory;
@@ -27,20 +31,15 @@ import relationalFramework.StateSpec;
 public class BlocksWorldStateSpec extends StateSpec {
 
 	@Override
-	protected List<GuidedPredicate> initialiseActions() {
-		List<GuidedPredicate> actions = new ArrayList<GuidedPredicate>();
+	protected List<String> initialiseActionTemplates(Rete rete) {
+		List<String> actions = new ArrayList<String>();
 
 		// Move action
-		Class[] types = { Block.class, Block.class };
-		String[] typeNames = { "MovedBlock", "CoveredBlock" };
-		actions.add(createSimplePredicate("move", types, typeNames, true));
+		actions.add(defineTemplate("move", "Moves block X to block Y.", rete));
 
 		// MoveFloor action
-		types = new Class[1];
-		types[0] = Block.class;
-		typeNames = new String[1];
-		typeNames[0] = "MovedBlock";
-		actions.add(createSimplePredicate("moveFloor", types, typeNames, true));
+		actions.add(defineTemplate("moveFloor", "Moves block X to the floor.",
+				rete));
 
 		return actions;
 	}
@@ -51,69 +50,35 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<Predicate, Rule> initialiseActionPreconditions(
-			List<GuidedPredicate> actions) {
-		Map<Predicate, Rule> actionPreconditions = new HashMap<Predicate, Rule>();
+	protected Map<String, String> initialiseActionPreconditions() {
+		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
-		// Run through each action
-		for (GuidedPredicate action : actions) {
-			Predicate actionPred = action.getPredicate();
-			String ruleString = null;
-			if (actionPred.getName().equals("move")) {
-				ruleString = "clear(<X>) & clear(<Y>) -> move(<X>,<Y>)";
-			} else if (actionPred.getName().equals("moveFloor")) {
-				ruleString = "clear(<X>) & on(<X>,<Y>) -> moveFloor(<X>)";
-			}
-			Rule actRule = parseRule(ruleString, null);
-			actionPreconditions.put(actionPred, actRule);
-		}
+		// Put the pure precondition in, the rest is taken care of...
+		actionPreconditions.put("move", "(clear ?X) (clear ?Y &:(neq ?X ?Y))");
+
+		actionPreconditions.put("moveFloor", "(clear ?X) (on ?X ?)");
+
 		return actionPreconditions;
 	}
 
 	@Override
-	protected KnowledgeBase initialiseBackgroundKnowledge(LogicFactory factory) {
-		KnowledgeBase backgroundKB = new org.mandarax.reference.KnowledgeBase();
-
+	protected Map<String, String> initialiseBackgroundKnowledge() {
+		Map<String, String> bkMap = new HashMap<String, String>();
+		
+		// Block(Y) & !On(X,Y) -> Clear(Y)
+		bkMap.put("clearRule", "(logical (block ?Y) (not (on ?X ?Y)) => (assert (clear ?Y))");
+		
 		// On(X,Y) -> Above(X,Y)
-		Term[] terms = new Term[2];
-		terms[0] = factory.createVariableTerm("X", Block.class);
-		terms[1] = factory.createVariableTerm("Y", Block.class);
-		List<Prerequisite> prereqs = getGuidedPredicate("on").factify(factory,
-				terms, false, false, null, null);
-		Term[] terms2 = new Term[3];
-		terms2[0] = StateSpec.getStateTerm(factory);
-		terms2[1] = terms[0];
-		terms2[2] = terms[1];
-		Fact fact = factory.createFact(getGuidedPredicate("above")
-				.getPredicate(), terms2);
-		backgroundKB.add(factory.createRule(prereqs, fact));
+		bkMap.put("aboveRule1", "(logical (on ?X ?Y)) => (assert (above ?X ?Y))");
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
-		terms = new Term[2];
-		terms[0] = factory.createVariableTerm("X", Block.class);
-		terms[1] = factory.createVariableTerm("Y", Block.class);
-		Set<Term> allTerms = new HashSet<Term>();
-		allTerms.add(terms[0]);
-		prereqs = getGuidedPredicate("on").factify(factory, terms, false,
-				false, null, null);
-		terms2 = new Term[2];
-		terms2[0] = terms[1];
-		terms2[1] = factory.createVariableTerm("Z", Block.class);
-		addContains(prereqs, getGuidedPredicate("above").factify(factory,
-				terms2, false, false, null, null));
-		Term[] terms3 = new Term[3];
-		terms3[0] = StateSpec.getStateTerm(factory);
-		terms3[1] = terms[0];
-		terms3[2] = terms2[1];
-		fact = factory.createPrerequisite(getGuidedPredicate("above")
-				.getPredicate(), terms3, false);
-		backgroundKB.add(factory.createRule(prereqs, fact));
+		bkMap.put("aboveRule2", "(logical (on ?X ?Y) (above ?X ?Z)) => (assert (above ?X ?Z))");
 
-		return backgroundKB;
+		return bkMap;
 	}
 
 	@Override
-	protected Rule initialiseGoalState(LogicFactory factory) {
+	protected String initialiseGoalState() {
 		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
 		goal_ = "unstack";
 
@@ -218,7 +183,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected List<GuidedPredicate> initialisePredicates() {
+	protected List<GuidedPredicate> initialisePredicateTemplates() {
 		List<GuidedPredicate> predicates = new ArrayList<GuidedPredicate>();
 
 		// On predicate
@@ -262,7 +227,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<Class, GuidedPredicate> initialiseTypePredicates() {
+	protected Map<Class, GuidedPredicate> initialiseTypePredicateTemplates() {
 		Map<Class, GuidedPredicate> typePreds = new HashMap<Class, GuidedPredicate>();
 
 		typePreds.put(Block.class, createTypeGuidedPredicate("block",
