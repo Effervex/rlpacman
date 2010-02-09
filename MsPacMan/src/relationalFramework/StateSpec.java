@@ -63,6 +63,8 @@ public abstract class StateSpec {
 	/** The predicate containing the valid actions. */
 	private static Predicate validActionsPred_;
 
+	private Rete ruleBase_;
+
 	/** The prerequisites of the rules. */
 	private List<String> predicates_;
 
@@ -82,7 +84,7 @@ public abstract class StateSpec {
 	private Map<String, GuidedPredicate> predByNames_;
 
 	/** The state the agent must reach to successfully end the episode. */
-	private org.mandarax.kernel.Rule goalState_;
+	private String goalState_;
 
 	/** The constants found within the goal. */
 	private Map<String, Object> constants_;
@@ -112,26 +114,34 @@ public abstract class StateSpec {
 			predicates_ = initialisePredicateTemplates(rete_);
 			actions_ = initialiseActionTemplates(rete_);
 			actionNum_ = initialiseActionsPerStep();
+			
+			// Initialise the goal state rules
+			goalState_ = initialiseGoalState();
+			rete_.eval("(deftemplate goalState (slot goalMet))");
+			rete_.eval("(defrule goalState " + goalState_
+					+ " => (assert (goal (goalMet TRUE))))");
+
+			// Initialise the background knowledge rules
 			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
 			for (String ruleNames : backgroundRules.keySet()) {
 				rete_.eval("(defrule " + ruleNames + " "
 						+ backgroundRules.get(ruleNames) + ")");
 			}
 
+			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
 			actionPreconditions_ = new HashMap<String, String>();
 			for (String action : purePreConds.keySet()) {
 				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
 						+ " " + purePreConds.get(action) + ")";
 				rete_.eval(query);
-				actionPreconditions_.put(action, query);
+				actionPreconditions_.put(action, purePreConds.get(action));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		// constants_ = new HashMap<String, Object>();
 		// predByNames_ = createPredNameMap();
-		// goalState_ = initialiseGoalState(factory_);
 		// addGoalConstants(predicates_, goalState_);
 	}
 
