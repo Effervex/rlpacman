@@ -11,6 +11,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jess.Rete;
+
 import org.mandarax.kernel.ConstantTerm;
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.InferenceEngine;
@@ -41,6 +43,8 @@ public abstract class StateSpec {
 
 	public static final char ANONYMOUS = '_';
 
+	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -60,19 +64,19 @@ public abstract class StateSpec {
 	private static Predicate validActionsPred_;
 
 	/** The prerequisites of the rules. */
-	private List<GuidedPredicate> predicates_;
+	private List<String> predicates_;
 
 	/** The type predicates, only used implicitly. */
-	private Map<Class, GuidedPredicate> typePredicates_;
+	private Map<Class, String> typePredicates_;
 
 	/** The actions of the rules. */
-	private List<GuidedPredicate> actions_;
+	private List<String> actions_;
 
 	/** The number of simultaneous actions per step to take. */
 	private int actionNum_;
 
 	/** The rules relating to an actions precondition. */
-	private Map<Predicate, Rule> actionPreconditions_;
+	private Map<String, String> actionPreconditions_;
 
 	/** A map for retrieving predicates by name. */
 	private Map<String, GuidedPredicate> predByNames_;
@@ -89,9 +93,6 @@ public abstract class StateSpec {
 	/** The optimal policy for the goal. */
 	private Policy optimalPolicy_;
 
-	/** The background knowledge regarding the predicates and actions. */
-	private KnowledgeBase backgroundKnowledge_;
-
 	/** The suffix to this class for use with dynamically loaded classes. */
 	public static final String CLASS_SUFFIX = "StateSpec";
 
@@ -99,24 +100,39 @@ public abstract class StateSpec {
 	public static final String INEQUAL = "inequal";
 
 	/** The LogicFactory for the experiment. */
-	private LogicFactory factory_;
+	private Rete rete_;
 
 	/**
 	 * The constructor for a state specification.
 	 */
 	private final void initialise(LogicFactory factory) {
-		factory_ = factory;
-		constants_ = new HashMap<String, Object>();
-		typePredicates_ = initialiseTypePredicates();
-		predicates_ = initialisePredicates();
-		actions_ = initialiseActions();
-		actionNum_ = initialiseActionsPerStep();
-		predByNames_ = createPredNameMap();
-		goalState_ = initialiseGoalState(factory_);
-		backgroundKnowledge_ = initialiseBackgroundKnowledge(factory_);
-		addGoalConstants(predicates_, goalState_);
+		try {
+			rete_ = new Rete();
+			typePredicates_ = initialiseTypePredicateTemplates(rete_);
+			predicates_ = initialisePredicateTemplates(rete_);
+			actions_ = initialiseActionTemplates(rete_);
+			actionNum_ = initialiseActionsPerStep();
+			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
+			for (String ruleNames : backgroundRules.keySet()) {
+				rete_.eval("(defrule " + ruleNames + " "
+						+ backgroundRules.get(ruleNames) + ")");
+			}
 
-		actionPreconditions_ = initialiseActionPreconditions(actions_);
+			Map<String, String> purePreConds = initialiseActionPreconditions();
+			actionPreconditions_ = new HashMap<String, String>();
+			for (String action : purePreConds.keySet()) {
+				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
+						+ " " + purePreConds.get(action) + ")";
+				rete_.eval(query);
+				actionPreconditions_.put(action, query);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		// constants_ = new HashMap<String, Object>();
+		// predByNames_ = createPredNameMap();
+		// goalState_ = initialiseGoalState(factory_);
+		// addGoalConstants(predicates_, goalState_);
 	}
 
 	/**
@@ -148,23 +164,26 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the state type predicates.
 	 * 
-	 * @return The list of guided predicates.
+	 * @param rete
+	 *            The rete object.
+	 * @return A mapping of classes to guided predicate names.
 	 */
-	protected abstract Map<Class, GuidedPredicate> initialiseTypePredicates();
+	protected abstract Map<Class, String> initialiseTypePredicateTemplates(
+			Rete rete);
 
 	/**
 	 * Initialises the state predicates.
 	 * 
-	 * @return The list of guided predicates.
+	 * @return The list of guided predicate names.
 	 */
-	protected abstract List<GuidedPredicate> initialisePredicates();
+	protected abstract List<String> initialisePredicateTemplates(Rete rete);
 
 	/**
 	 * Initialises the state actions.
 	 * 
 	 * @return The list of guided actions.
 	 */
-	protected abstract List<GuidedPredicate> initialiseActions();
+	protected abstract List<String> initialiseActionTemplates(Rete rete);
 
 	/**
 	 * Initialises the number of actions to take per time step.
@@ -176,19 +195,16 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the rules for finding valid actions.
 	 * 
-	 * @return A map of actions and their corresponding preconditions to be
-	 *         valid.
+	 * @return A map of actions and the pure preconditions to be valid.
 	 */
-	protected abstract Map<Predicate, Rule> initialiseActionPreconditions(
-			List<GuidedPredicate> actions);
+	protected abstract Map<String, String> initialiseActionPreconditions();
 
 	/**
 	 * Initialises the goal state.
 	 * 
-	 * @return The rule that is true when it is the goal state,
+	 * @return The minimal state that is true when the goal is satisfied.
 	 */
-	protected abstract org.mandarax.kernel.Rule initialiseGoalState(
-			LogicFactory factory);
+	protected abstract String initialiseGoalState();
 
 	/**
 	 * Initialises the optimal policy for the goal.
@@ -203,10 +219,10 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the background knowledge.
 	 * 
-	 * @return The background knowledge base.
+	 * @return A mapping of rule names to the pure rules themselves (just pre =>
+	 *         post).
 	 */
-	protected abstract KnowledgeBase initialiseBackgroundKnowledge(
-			LogicFactory factory);
+	protected abstract Map<String, String> initialiseBackgroundKnowledge();
 
 	/**
 	 * Inserts the valid actions into the state knowledge base using the state
@@ -738,29 +754,26 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates a simple predicate given some basic predicate information.
+	 * Creates a template for a fact using the given arguments and asserts it to
+	 * the rete object. Returns the name of the fact template.
 	 * 
-	 * @param name
-	 *            The predicate name.
-	 * @param types
-	 *            The args in the predicate.
-	 * @param typeNames
-	 *            The names for the slots of the args.
-	 * @return A GuidedPredicate covering the created predicate.
+	 * @param factName
+	 *            The name of the fact template.
+	 * @param factDescription
+	 *            The description for the fact.
+	 * @param rete
+	 *            The rete object being asserted to.
+	 * @return The name of the fact template.
 	 */
-	protected GuidedPredicate createSimplePredicate(String name, Class[] types,
-			String[] typeNames, boolean onlyTied) {
-		types = insertState(types);
-		Predicate predicate = new SimplePredicate(name, types);
-		PredTerm[][] predValues = new PredTerm[types.length][];
-		predValues[0] = createTied("State", types[0]);
-		for (int i = 1; i < predValues.length; i++) {
-			if (onlyTied)
-				predValues[i] = createTied(typeNames[i - 1], types[i]);
-			else
-				predValues[i] = createTiedAndFree(typeNames[i - 1], types[i]);
+	protected String defineTemplate(String factName, String factDescription,
+			Rete rete) {
+		try {
+			rete.eval("(deftemplate " + factName + " \"" + factDescription
+					+ "\" (declare (ordered TRUE)))");
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		return new GuidedPredicate(predicate, predValues);
+		return factName;
 	}
 
 	/**

@@ -31,7 +31,7 @@ import relationalFramework.StateSpec;
  */
 public class PacManStateSpec extends StateSpec {
 	@Override
-	protected Map<Class, GuidedPredicate> initialiseTypePredicates() {
+	protected Map<Class, GuidedPredicate> initialiseTypePredicateTemplates() {
 		Map<Class, GuidedPredicate> typeMap = new HashMap<Class, GuidedPredicate>();
 		// Simply load the arrays with names and classes and loop through.
 		Class[] typeClasses = { Player.class, Dot.class, PowerDot.class,
@@ -49,7 +49,7 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected List<GuidedPredicate> initialisePredicates() {
+	protected List<GuidedPredicate> initialisePredicateTemplates() {
 		List<GuidedPredicate> predicates = new ArrayList<GuidedPredicate>();
 
 		try {
@@ -111,7 +111,7 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected List<GuidedPredicate> initialiseActions() {
+	protected List<GuidedPredicate> initialiseActionTemplates() {
 		List<GuidedPredicate> actions = new ArrayList<GuidedPredicate>();
 
 		try {
