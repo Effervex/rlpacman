@@ -2,6 +2,8 @@ package relationalFramework;
 
 import java.util.List;
 
+import jess.Rete;
+
 import org.mandarax.kernel.Fact;
 import org.mandarax.kernel.KnowledgeBase;
 import org.rlcommunity.rlglue.codec.AgentInterface;
@@ -39,7 +41,7 @@ public class PolicyAgent implements AgentInterface {
 		// Save the pre-goal state and goal action
 		PolicyGenerator.getInstance().formPreGoalState(prevState_,
 				actionsModule_.getPrioritisedActions());
-
+		
 		actionsModule_ = null;
 	}
 

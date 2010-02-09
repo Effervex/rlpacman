@@ -24,7 +24,6 @@ import org.mandarax.kernel.meta.JPredicate;
 import relationalFramework.GuidedPredicate;
 import relationalFramework.GuidedRule;
 import relationalFramework.Policy;
-import relationalFramework.PredTerm;
 import relationalFramework.State;
 import relationalFramework.StateSpec;
 

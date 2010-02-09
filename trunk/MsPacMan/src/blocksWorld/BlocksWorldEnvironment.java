@@ -314,6 +314,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	
 	private Rete formStateRete(Integer[] worldState) {
 		Rete stateKB = new Rete();
+		
 		return null;
 	}
 
