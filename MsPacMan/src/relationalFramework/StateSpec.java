@@ -2,9 +2,11 @@ package relationalFramework;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,42 +39,28 @@ import org.mandarax.util.LogicFactorySupport;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
-	public static final String AND = "&";
-
-	public static final String INFERS_ACTION = "->";
+	public static final String INFERS_ACTION = "=>";
 
 	public static final char ANONYMOUS = '_';
 
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
+	public static final String VALID_ACTIONS = "validActions";
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
-	/** The terminal fact. */
-	private static Fact terminal_;
-
-	/** The variable state term. */
-	private static Term stateTerm_;
-
-	/** The constant state spec term. */
-	private static Term specTerm_;
-
-	/** The predicate for handling inequality. */
-	private static Predicate inequalityPred_;
-
-	/** The predicate containing the valid actions. */
-	private static Predicate validActionsPred_;
-
+	/** The rete rulebase. */
 	private Rete ruleBase_;
 
-	/** The prerequisites of the rules. */
-	private List<String> predicates_;
+	/** The prerequisites of the rules and their structure. */
+	private MultiMap<String, Class> predicates_;
 
 	/** The type predicates, only used implicitly. */
 	private Map<Class, String> typePredicates_;
 
-	/** The actions of the rules. */
-	private List<String> actions_;
+	/** The actions of the rules and their structure. */
+	private MultiMap<String, Class> actions_;
 
 	/** The number of simultaneous actions per step to take. */
 	private int actionNum_;
@@ -87,19 +75,13 @@ public abstract class StateSpec {
 	private String goalState_;
 
 	/** The constants found within the goal. */
-	private Map<String, Object> constants_;
+	private List<String> constants_;
 
 	/** The name of the goal. */
 	protected String goal_;
 
 	/** The optimal policy for the goal. */
 	private Policy optimalPolicy_;
-
-	/** The suffix to this class for use with dynamically loaded classes. */
-	public static final String CLASS_SUFFIX = "StateSpec";
-
-	/** The name of the inequal predicate. */
-	public static final String INEQUAL = "inequal";
 
 	/** The LogicFactory for the experiment. */
 	private Rete rete_;
@@ -110,13 +92,35 @@ public abstract class StateSpec {
 	private final void initialise(LogicFactory factory) {
 		try {
 			rete_ = new Rete();
-			typePredicates_ = initialiseTypePredicateTemplates(rete_);
-			predicates_ = initialisePredicateTemplates(rete_);
-			actions_ = initialiseActionTemplates(rete_);
+
+			// Type predicates
+			typePredicates_ = initialiseTypePredicateTemplates();
+			for (String typeName : typePredicates_.values()) {
+				defineTemplate(typeName, rete_);
+			}
+
+			// Main predicates
+			predicates_ = initialisePredicateTemplates();
+			for (String predName : predicates_.keySet()) {
+				defineTemplate(predName, rete_);
+			}
+
+			// Set up the valid actions template
+			StringBuffer actBuf = new StringBuffer("(deftemplate "
+					+ VALID_ACTIONS);
+			// Actions
+			actions_ = initialiseActionTemplates();
+			for (String actName : actions_.keySet()) {
+				defineTemplate(actName, rete_);
+				actBuf.append(" (multislot " + actName + ")");
+			}
+			actBuf.append(")");
+			rete_.eval(actBuf.toString());
 			actionNum_ = initialiseActionsPerStep();
-			
+
 			// Initialise the goal state rules
-			goalState_ = initialiseGoalState();
+			constants_ = new ArrayList<String>();
+			goalState_ = initialiseGoalState(constants_);
 			rete_.eval("(deftemplate goalState (slot goalMet))");
 			rete_.eval("(defrule goalState " + goalState_
 					+ " => (assert (goal (goalMet TRUE))))");
@@ -140,35 +144,6 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		// constants_ = new HashMap<String, Object>();
-		// predByNames_ = createPredNameMap();
-		// addGoalConstants(predicates_, goalState_);
-	}
-
-	/**
-	 * Creates a map of predicates accessed by their name from the existing
-	 * predicates and action predicates.
-	 * 
-	 * @return The mapping of Predicates to Strings.
-	 */
-	private Map<String, GuidedPredicate> createPredNameMap() {
-		Map<String, GuidedPredicate> mapping = new HashMap<String, GuidedPredicate>();
-
-		// Scanning the predicates
-		for (GuidedPredicate gp : predicates_) {
-			mapping.put(gp.getPredicate().getName(), gp);
-		}
-
-		for (GuidedPredicate gp : typePredicates_.values()) {
-			mapping.put(gp.getPredicate().getName(), gp);
-		}
-
-		// Scanning the actions
-		for (GuidedPredicate gp : actions_) {
-			mapping.put(gp.getPredicate().getName(), gp);
-		}
-
-		return mapping;
 	}
 
 	/**
@@ -178,22 +153,21 @@ public abstract class StateSpec {
 	 *            The rete object.
 	 * @return A mapping of classes to guided predicate names.
 	 */
-	protected abstract Map<Class, String> initialiseTypePredicateTemplates(
-			Rete rete);
+	protected abstract Map<Class, String> initialiseTypePredicateTemplates();
 
 	/**
 	 * Initialises the state predicates.
 	 * 
 	 * @return The list of guided predicate names.
 	 */
-	protected abstract List<String> initialisePredicateTemplates(Rete rete);
+	protected abstract MultiMap<String, Class> initialisePredicateTemplates();
 
 	/**
 	 * Initialises the state actions.
 	 * 
 	 * @return The list of guided actions.
 	 */
-	protected abstract List<String> initialiseActionTemplates(Rete rete);
+	protected abstract MultiMap<String, Class> initialiseActionTemplates();
 
 	/**
 	 * Initialises the number of actions to take per time step.
@@ -212,9 +186,11 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the goal state.
 	 * 
+	 * @param constants
+	 *            The constants that are used in the goal. To be filled.
 	 * @return The minimal state that is true when the goal is satisfied.
 	 */
-	protected abstract String initialiseGoalState();
+	protected abstract String initialiseGoalState(List<String> constants);
 
 	/**
 	 * Initialises the optimal policy for the goal.
@@ -235,204 +211,53 @@ public abstract class StateSpec {
 	protected abstract Map<String, String> initialiseBackgroundKnowledge();
 
 	/**
-	 * Inserts the valid actions into the state knowledge base using the state
-	 * observations to determine validity.
-	 * 
-	 * @param stateKB
-	 *            The current observations of the state to be inserted into.
-	 */
-	public final void insertValidActions(KnowledgeBase stateKB) {
-		// Logic constructs
-		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
-		LogicFactorySupport factorySupport = new LogicFactorySupport(factory);
-		InferenceEngine ie = PolicyGenerator.getInstance().getInferenceEngine();
-
-		Set<Fact> validActions = new HashSet<Fact>();
-
-		try {
-			for (Predicate action : actionPreconditions_.keySet()) {
-				Rule actionRule = actionPreconditions_.get(action);
-				RuleCondition ruleConds = new RuleCondition(actionRule
-						.getBody());
-
-				// Forming the query
-				Query query = factorySupport.query(ruleConds.getFactArray(),
-						actionRule.toString());
-
-				ResultSet results = ie.query(query, stateKB,
-						InferenceEngine.ALL, InferenceEngine.BUBBLE_EXCEPTIONS);
-
-				if (results.next()) {
-					do {
-						Map<Term, Term> replacementMap = results.getResults();
-						Collection<Replacement> replacements = new ArrayList<Replacement>();
-						// Find the replacements for the variable terms
-						// in the action
-						for (Term var : actionRule.getHead().getTerms()) {
-							if (var instanceof VariableTerm) {
-								replacements.add(new Replacement(var,
-										replacementMap.get(var)));
-							} else {
-								replacements.add(new Replacement(var, var));
-							}
-						}
-
-						// Apply the replacements and add the fact to
-						// the set
-						Fact groundAction = actionRule.getHead().applyToFact(
-								replacements);
-
-						// If the action is ground
-						validActions.add(groundAction);
-					} while (results.next());
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		// Add the valid actions fact to the knowledge base
-		Term[] terms = { factory.createConstantTerm(validActions) };
-		Fact validActionsFact = factory.createFact(getValidActionsPredicate(),
-				terms);
-		stateKB.add(validActionsFact);
-	}
-
-	/**
-	 * Adds a string id to a constant used.
-	 * 
-	 * @param id
-	 *            The string id, sans the "[X]" brackets
-	 * @param obj
-	 *            The object linked to.
-	 */
-	public void addConstant(String id, Object obj) {
-		constants_.put(id, obj);
-	}
-
-	/**
 	 * Parses a rule from a human readable string. the string is in the format
-	 * 'predicate(arg[,arg]) [& predicate(arg[,arg])] -> predicate(arg[,arg])'.
-	 * If an arg is uppercase, it is considered a variable. If lowercase, a
-	 * constant which must be referenced in the constant terms map.
+	 * '[(predicate [ arg]) ]+ => (predicate [ arg])'.
+	 * 
+	 * Generally, lowercase variables are constants, while ?uppercase variables
+	 * are variables. Also, anonymous variables are allowed in the body. These
+	 * are like fully generalised variables in that anonymous variables may or
+	 * may not equal each other.
 	 * 
 	 * @param rule
 	 *            The string representation of the rule.
-	 * @param constantTerms
-	 *            The objects to replace the constants with or null
-	 * 
 	 * @return An instantiated rule.
 	 */
-	public final Rule parseRule(String rule, Map<String, Object> constantTerms) {
-		String[][] info = extractInfo(rule);
-		// Compiling the initial term map of constants
-		Map<String, Term> termMap = new HashMap<String, Term>();
-		if (constantTerms != null) {
-			for (String constant : constantTerms.keySet()) {
-				termMap.put(constant, factory_.createConstantTerm(constantTerms
-						.get(constant)));
+	public final String parseRule(String rule) {
+		StringRule stringRule = extractInfo(rule);
+
+		// Organise the rule back into a string
+		StringBuffer buffer = new StringBuffer();
+		// Main preds first
+		for (String[] fact : stringRule.getMainConditions()) {
+			buffer.append("(" + fact[0]);
+			for (int i = 1; i < fact.length; i++) {
+				buffer.append(" " + fact[i]);
 			}
+			buffer.append(") ");
 		}
 
-		// Form the rule
-		List<Prerequisite> prereqs = new ArrayList<Prerequisite>();
-		Fact actionFact = null;
-		Set<Term> allTerms = new HashSet<Term>();
-		Collection<Term> anonymousTerms = new ArrayList<Term>();
-		for (int i = 0; i < info.length; i++) {
+		// Inequals tests
+		buffer.append(stringRule.createInequalsTests());
 
-			// Get the guided predicate or type predicate
-			GuidedPredicate cond = getGuidedPredicate(info[i][0]);
-
-			// Check if it's a JConstructor
-			int offset = 0;
-			if (cond.getPredicate() instanceof JConstructor)
-				offset++;
-			if (isTypePredicate(cond.getPredicate()))
-				offset--;
-
-			// Find the terms used in the predicate arguments
-			Term[] terms = findTerms(factory_, termMap, info[i], cond
-					.getPredicate().getStructure(), offset, anonymousTerms);
-
-			// Instantiate the guided predicate with the args.
-			List<Prerequisite> rulePreqs = cond.factify(factory_, terms, false,
-					false, allTerms, anonymousTerms);
-
-			// Add the resulting prerequisites
-			for (Prerequisite prereq : rulePreqs) {
-
-				// Separate the action
-				if (i < info.length - 1) {
-					// Add as condition
-					if (!prereqs.contains(prereq))
-						prereqs.add(prereq);
-
-				} else {
-					// Add as action
-					if (prereq.getPredicate().getName().equals(info[i][0])) {
-						actionFact = prereq;
-					}
-				}
+		// Type preds
+		for (String[] typeFact : stringRule.getTypeConditions()) {
+			buffer.append("(" + typeFact[0]);
+			for (int i = 1; i < typeFact.length; i++) {
+				buffer.append(" " + typeFact[i]);
 			}
+			buffer.append(") ");
 		}
 
-		return factory_.createRule(prereqs, actionFact);
-	}
-
-	/**
-	 * Finds or creates the terms present in the predicate
-	 * 
-	 * @param factory
-	 *            The factory to create terms.
-	 * @param termMap
-	 *            The map of existing terms.
-	 * @param predArgs
-	 *            The predicate and its arguments.
-	 * @param anonymousTerms
-	 *            The anonymous terms present in the rule.
-	 * @return An array of terms used in the predicate.
-	 */
-	private Term[] findTerms(LogicFactory factory, Map<String, Term> termMap,
-			String[] predArgs, Class[] predStructure, int offset,
-			Collection<Term> anonymousTerms) {
-		Term[] terms = new Term[predArgs.length - 1];
-
-		for (int i = 0; i < terms.length; i++) {
-
-			// If the term is a constant or has occurred already, get it from
-			// the map
-			if (termMap.containsKey(predArgs[i + 1])) {
-				terms[i] = termMap.get(predArgs[i + 1]);
-
-			} else if (predArgs[i + 1].charAt(0) == ANONYMOUS) {
-				// Anonymous variable, is a variable, but not bound by inequals
-				// among other anonymous variables.
-
-				// Forming the name (appending a number to ANONYMOUS, if nto
-				// already there.
-				String name = predArgs[i + 1];
-				name = name
-						+ ((name.equals(ANONYMOUS + "")) ? anonymousTerms
-								.size() : "");
-
-				terms[i] = factory.createVariableTerm(name, predStructure[i + 1
-						+ offset]);
-				termMap.put(name, terms[i]);
-				anonymousTerms.add(terms[i]);
-
-			} else {
-				// Convention check, variables should be uppercase
-				if (Character.isLowerCase(predArgs[i + 1].charAt(0)))
-					System.err.println("Variable term: " + predArgs[i + 1]
-							+ " should be uppercase");
-				// The term is a new variable
-				terms[i] = factory.createVariableTerm(predArgs[i + 1],
-						predStructure[i + 1 + offset]);
-				termMap.put(predArgs[i + 1], terms[i]);
-			}
+		// Action
+		String[] action = stringRule.getAction();
+		buffer.append(INFERS_ACTION + " (" + action[0]);
+		for (int i = 1; i < action.length; i++) {
+			buffer.append(" " + action[i]);
 		}
-		return terms;
+		buffer.append(")");
+
+		return buffer.toString();
 	}
 
 	/**
@@ -444,45 +269,42 @@ public abstract class StateSpec {
 	 *         array containing the pred name and the arguments. The last
 	 *         predicate is the action.
 	 */
-	private String[][] extractInfo(String rule) {
+	private final StringRule extractInfo(String rule) {
 		// Split the rule into conditions and actions
 		String[] split = rule.split(INFERS_ACTION);
 		if (split.length < 2)
 			return null;
 
-		String[] conditions = split[0].split(AND);
-		String[][] info = new String[conditions.length + 1][];
-		for (int i = 0; i < info.length; i++) {
-			String predicate = (i < info.length - 1) ? conditions[i] : split[1];
+		StringRule info = new StringRule();
+		for (int i = 0; i < split.length; i++) {
+			String predicate = split[i];
 
-			// Condition pattern
+			// A Regexp looking for a predicate with args '(clear a)'
+			// '(move b ?X)' '(cool)' '(on ?X _)'
 			Pattern p = null;
-			if (i < conditions.length) {
-				// A Regexp looking for a predicate with args 'clear([a])'
-				// 'move([b],<X>)' 'cool()' 'on(<X>,_)'
-				p = Pattern
-						.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>)|(?:"
-								+ ANONYMOUS
-								+ "))(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)|(?:"
-								+ ANONYMOUS + ")))*)*)\\)");
+			if (i == 0) {
+				p = Pattern.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)|(?:"
+						+ ANONYMOUS + ")))*)\\)");
 			} else {
-				// Action pattern (no anonymous variables)
 				p = Pattern
-						.compile("(\\w+)\\(((?:(?:(?:\\[\\w+\\])|(?:<\\w+>))"
-								+ "(?:,(?:(?:\\[\\w+\\])|(?:<\\w+>)))*)*)\\)");
+						.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)))*)\\)");
 			}
+
 			Matcher m = p.matcher(predicate);
-			if (m.find()) {
+			while (m.find()) {
 				// Group 1 is the predicate name, Group 2 is the arg(s)
-				String arguments = m.group(2).replaceAll("(\\[|\\]|<|>)", "");
-				String[] args = arguments.split(",");
-				info[i] = new String[args.length + 1];
-				info[i][0] = m.group(1);
+				String arguments = m.group(2).trim();
+				String[] args = arguments.split(" ");
+				String[] fact = new String[args.length + 1];
+				fact[0] = m.group(1);
 				for (int j = 0; j < args.length; j++) {
-					info[i][j + 1] = args[j];
+					fact[j + 1] = args[j];
 				}
-			} else {
-				return null;
+
+				if (i == 0)
+					info.addCondition(fact);
+				else
+					info.setAction(fact);
 			}
 		}
 
@@ -582,11 +404,11 @@ public abstract class StateSpec {
 		return newTerms.toArray(new PredTerm[newTerms.size()]);
 	}
 
-	public List<GuidedPredicate> getPredicates() {
+	public MultiMap<String, Class> getPredicates() {
 		return predicates_;
 	}
 
-	public List<GuidedPredicate> getActions() {
+	public MultiMap<String, Class> getActions() {
 		return actions_;
 	}
 
@@ -594,7 +416,7 @@ public abstract class StateSpec {
 		return actionNum_;
 	}
 
-	public org.mandarax.kernel.Rule getGoalState() {
+	public String getGoalState() {
 		return goalState_;
 	}
 
@@ -609,11 +431,7 @@ public abstract class StateSpec {
 		return optimalPolicy_;
 	}
 
-	public KnowledgeBase getBackgroundKnowledge() {
-		return backgroundKnowledge_;
-	}
-
-	public Map<String, Object> getConstants() {
+	public List<String> getConstants() {
 		return constants_;
 	}
 
@@ -623,23 +441,13 @@ public abstract class StateSpec {
 	 * @return The predicate associated with the class, or null if no such class
 	 *         key.
 	 */
-	public Predicate getTypePredicate(Class key) {
-		return typePredicates_.get(key).getPredicate();
+	public String getTypePredicate(Class key) {
+		return typePredicates_.get(key);
 	}
 
-	public Predicate getTypePredicate(String name) {
-		for (GuidedPredicate type : typePredicates_.values()) {
-			if (type.getPredicate().getName().equals(name))
-				return type.getPredicate();
-		}
-		return null;
-	}
-
-	public boolean isTypePredicate(Predicate predicate) {
-		for (GuidedPredicate type : typePredicates_.values()) {
-			if (type.getPredicate().equals(predicate))
-				return true;
-		}
+	public boolean isTypePredicate(String predicate) {
+		if (typePredicates_.values().contains(predicate))
+			return true;
 		return false;
 	}
 
@@ -648,56 +456,13 @@ public abstract class StateSpec {
 	 * 
 	 * @param predicate
 	 *            The predicate being checked.
-	 * @return True if the predicate is useful, false if it is type, action,
-	 *         inequal or otherwise.
+	 * @return True if the predicate is useful, false if it is action, inequal
+	 *         or otherwise.
 	 */
-	public boolean isUsefulPredicate(Predicate predicate) {
-		if (predicate.equals(getInequalityPredicate()))
+	public boolean isUsefulPredicate(String predicate) {
+		if (predicate.equals("test"))
 			return false;
-		if (predicate.equals(getValidActionsPredicate()))
-			return false;
-		return true;
-	}
-
-	/**
-	 * Checks if a term is useful (not a state or spec term).
-	 * 
-	 * @param term
-	 *            The term being checked.
-	 * @param factory
-	 *            The logic factory.
-	 * @return True if the term is useful, false otherwise.
-	 */
-	@SuppressWarnings("unchecked")
-	public static boolean isUsefulTerm(ConstantTerm term, LogicFactory factory) {
-		// Checking spec term
-		if (term.equals(getSpecTerm(factory)))
-			return false;
-		// Checking state term
-		Class termClass = term.getObject().getClass();
-		Class stateClass = getStateTerm(factory).getType();
-		if (stateClass.isAssignableFrom(termClass))
-			return false;
-		return true;
-	}
-
-	/**
-	 * Checks if a term is useful (not a state or spec term).
-	 * 
-	 * @param term
-	 *            The term being checked.
-	 * @param factory
-	 *            The logic factory.
-	 * @return True if the term is useful, false otherwise.
-	 */
-	@SuppressWarnings("unchecked")
-	public static boolean isUsefulClass(Class clazz, LogicFactory factory) {
-		// Checking spec term
-		if (StateSpec.class.isAssignableFrom(clazz))
-			return false;
-		// Checking state term
-		Class stateClass = getStateTerm(factory).getType();
-		if (stateClass.isAssignableFrom(clazz))
+		if (predicate.equals(VALID_ACTIONS))
 			return false;
 		return true;
 	}
@@ -714,195 +479,24 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Convenience method for creating a defined predicate.
-	 * 
-	 * @param stateSpecClass
-	 *            The class containing the method.
-	 * @param predicateStructure
-	 *            The structure of the method/predicate.
-	 * @param predValues
-	 *            The possible values to be used within the predicate.
-	 * @param methodName
-	 *            The name of the method/predicate.
-	 * 
-	 * @return A new defined predicate from the above parameters.
-	 * @throws NoSuchMethodException
-	 *             If the method doesn't exist.
-	 */
-	protected GuidedPredicate createDefinedPredicate(Class stateSpecClass,
-			Class[] predicateStructure, PredTerm[][] predValues,
-			String methodName) throws NoSuchMethodException {
-		Method method = stateSpecClass
-				.getMethod(methodName, predicateStructure);
-		Predicate predicate = new JPredicate(method);
-		return new GuidedPredicate(predicate, predValues);
-	}
-
-	/**
-	 * Convenience method for creating a tied PredTerm.
-	 * 
-	 * @param termName
-	 *            The term name.
-	 * @return The array containing the tied term.
-	 */
-	protected PredTerm[] createTied(String termName, Class termClass) {
-		PredTerm[] terms = { new PredTerm(termName, termClass, PredTerm.TIED) };
-		return terms;
-	}
-
-	/**
-	 * Convenience method for creating a tied and free PredTerm.
-	 * 
-	 * @param termName
-	 *            The term name.
-	 * @return The array containing the tied and free terms.
-	 */
-	protected PredTerm[] createTiedAndFree(String termName, Class termClass) {
-		PredTerm[] terms = { new PredTerm(termName, termClass, PredTerm.TIED),
-				new PredTerm(termName, termClass, PredTerm.FREE) };
-		return terms;
-	}
-
-	/**
 	 * Creates a template for a fact using the given arguments and asserts it to
 	 * the rete object. Returns the name of the fact template.
 	 * 
 	 * @param factName
 	 *            The name of the fact template.
-	 * @param factDescription
-	 *            The description for the fact.
 	 * @param rete
 	 *            The rete object being asserted to.
 	 * @return The name of the fact template.
 	 */
-	protected String defineTemplate(String factName, String factDescription,
-			Rete rete) {
+	protected String defineTemplate(String factName, Rete rete) {
 		try {
-			rete.eval("(deftemplate " + factName + " \"" + factDescription
-					+ "\" (declare (ordered TRUE)))");
+			rete
+					.eval("(deftemplate " + factName
+							+ " (declare (ordered TRUE)))");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return factName;
-	}
-
-	/**
-	 * Creates a type guided predicate.
-	 * 
-	 * @param predName
-	 *            The name of the type predicate.
-	 * @param type
-	 *            The type this predicate represents.
-	 * @return The guided predicate representing the type predicate.
-	 */
-	protected GuidedPredicate createTypeGuidedPredicate(String predName,
-			Class type) {
-		Class[] types = { type };
-		Predicate predicate = new SimplePredicate(predName, types);
-		PredTerm[][] terms = { { new PredTerm(type.getSimpleName(), type,
-				PredTerm.FREE) } };
-		return new GuidedPredicate(predicate, terms);
-	}
-
-	/**
-	 * Inserts the state argument into a type array.
-	 * 
-	 * @param types
-	 *            The type array.
-	 * @return An expanded array with the state slot at position 0.
-	 */
-	protected Class[] insertState(Class[] types) {
-		Class[] stateTypes = new Class[types.length + 1];
-		stateTypes[0] = State.class;
-		for (int i = 0; i < types.length; i++) {
-			stateTypes[i + 1] = types[i];
-		}
-
-		return stateTypes;
-	}
-
-	/**
-	 * Gets the terminal fact used in all environments. If true, then the
-	 * episode should be successfully completed.
-	 * 
-	 * @param factory
-	 *            The factory to generate the fact.
-	 * @return The terminal fact.
-	 */
-	protected static Fact getTerminalFact(LogicFactory factory) {
-		if (terminal_ == null) {
-			Predicate termPred = new SimplePredicate("terminal",
-					new Class[] { State.class });
-			terminal_ = factory.createFact(termPred,
-					new Term[] { getStateTerm(factory) });
-		}
-		return terminal_;
-	}
-
-	/**
-	 * Gets the state term to be shared among the predicates.
-	 * 
-	 * @param factory
-	 *            The factory to generate the term.
-	 * @return The variable state term.
-	 */
-	protected static Term getStateTerm(LogicFactory factory) {
-		if (stateTerm_ == null) {
-			stateTerm_ = factory.createVariableTerm("State", State.class);
-		}
-		return stateTerm_;
-	}
-
-	/**
-	 * Gets the state specification term to be shared among the predicates. To
-	 * be used with JPredicates.
-	 * 
-	 * @param factory
-	 *            The factory to generate the term.
-	 * @return The state specification term.
-	 */
-	protected static Term getSpecTerm(LogicFactory factory) {
-		if (specTerm_ == null) {
-			specTerm_ = factory.createConstantTerm(getInstance());
-		}
-		return specTerm_;
-	}
-
-	/**
-	 * Gets the inequality predicate, used for enforcing the inequality rule
-	 * among differing terms.
-	 * 
-	 * @return The inequality predicate.
-	 */
-	protected static Predicate getInequalityPredicate() {
-		if (inequalityPred_ == null) {
-			try {
-				Class[] types = { Object.class, Object.class };
-				Method method = StateSpec.class.getMethod(INEQUAL, types);
-				inequalityPred_ = new JPredicate(method);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		return inequalityPred_;
-	}
-
-	/**
-	 * Gets the valid actions predicate, for conveying the valid actions to take
-	 * in the state to the agent. The argument for the fact is a Set<Fact>.
-	 * 
-	 * @return The valid actions predicate.
-	 */
-	protected static Predicate getValidActionsPredicate() {
-		if (validActionsPred_ == null) {
-			try {
-				Class[] types = { Set.class };
-				validActionsPred_ = new SimplePredicate("validActions", types);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		return validActionsPred_;
 	}
 
 	/**
@@ -924,6 +518,27 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Adds an array element to a list of arrays if the array is not already in
+	 * there.
+	 * 
+	 * @param addTo
+	 *            The list to add to.
+	 * @param addFrom
+	 *            The list to add from, if the terms are not contained.
+	 */
+	public static boolean addContainsArray(List<String[]> arrayList,
+			String[] array) {
+		Iterator<String[]> iter = arrayList.iterator();
+		while (iter.hasNext()) {
+			if (Arrays.equals(iter.next(), array))
+				return false;
+		}
+
+		arrayList.add(array);
+		return true;
+	}
+
+	/**
 	 * Gets the singleton instance of the state spec.
 	 * 
 	 * @return The instance.
@@ -936,7 +551,8 @@ public abstract class StateSpec {
 			LogicFactory factory) {
 		try {
 			instance_ = (StateSpec) Class.forName(
-					classPrefix + StateSpec.CLASS_SUFFIX).newInstance();
+					classPrefix + StateSpec.class.getSimpleName())
+					.newInstance();
 			instance_.initialise(factory);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -952,105 +568,171 @@ public abstract class StateSpec {
 	 *            The rule begin output.
 	 * @return A light, parsable representation of the rule.
 	 */
-	public static String encodeRule(Rule rule) {
-		StringBuffer buffer = new StringBuffer();
-		// Only output the prereqs that aren't type preds
-		List<Prerequisite> body = rule.getBody();
+	public static String encodeRule(String rule) {
+		// TODO Remove the type and inequals predicates
+		return rule;
+	}
 
-		boolean plural = false;
-		// Check all prereqs, only outputting the Java preds
-		for (Prerequisite prereq : body) {
-			// Don't show type and inequal predicates.
-			if ((!StateSpec.getInstance()
-					.isTypePredicate(prereq.getPredicate()))
-					&& (!prereq.getPredicate().getName().equals(
-							StateSpec.INEQUAL))) {
-				// If we have more than one condition
-				if (plural)
-					buffer.append(" & ");
+	/**
+	 * A class for storing string rule information and organising it properly.
+	 * 
+	 * @author Samuel J. Sarjant
+	 */
+	private class StringRule {
+		private List<String[]> mainConditions_;
+		private List<String[]> typeConditions_;
+		private String[] action_;
+		private List<String> terms_;
+		private int anonVariables = 0;
 
-				buffer.append(StateSpec.lightenFact(prereq));
-				plural = true;
+		public StringRule() {
+			mainConditions_ = new ArrayList<String[]>();
+			typeConditions_ = new ArrayList<String[]>();
+			terms_ = new ArrayList<String>();
+		}
+
+		/**
+		 * Adds a conditions to the string rule. If the rule is not a type
+		 * predicate, types are added automatically. Terms are also added
+		 * automatically.
+		 * 
+		 * @param fact
+		 *            The condition being added with the pred at the head, and
+		 *            the args as later elements.
+		 */
+		public void addCondition(String[] fact) {
+			// Convert anonymous symbols to variables
+			convertAnonymous(fact);
+
+			// If the condition is a main predicate
+			if (predicates_.keySet().contains(fact[0])) {
+				mainConditions_.add(fact);
+				addTerms(fact);
+				addTypeConds(fact);
+			} else if (isTypePredicate(fact[0])) {
+				// Type predicate
+				addTerms(fact);
+				addTypeConds(fact);
 			}
 		}
 
-		buffer.append(" -> ");
-		buffer.append(StateSpec.lightenFact(rule.getHead()));
-
-		return buffer.toString();
-	}
-
-	/**
-	 * Encodes a fact by removing unnecessary terms from the description.
-	 * 
-	 * @param fact
-	 *            The fact being simplified.
-	 * @return A string output of the simplified fact.
-	 */
-	public static String lightenFact(Fact fact) {
-		StringBuffer buffer = new StringBuffer();
-
-		// Output the i+1 arguments and the predicate
-		buffer.append(fact.getPredicate().getName() + "(");
-		boolean plural = false;
-		Term[] terms = fact.getTerms();
-
-		int jSkip = 0;
-		if (fact.getPredicate() instanceof JConstructor)
-			jSkip = 1;
-		for (int i = jSkip; i < terms.length; i++) {
-			// Don't bother noting the state term
-			if (!State.class.isAssignableFrom(terms[i].getType())) {
-				if (plural)
-					buffer.append(",");
-				buffer.append(terms[i]);
-				plural = true;
+		/**
+		 * Converts any anonymous symbols to numbered variables.
+		 * 
+		 * @param fact
+		 *            The fact being converted.
+		 */
+		private void convertAnonymous(String[] fact) {
+			for (int i = 1; i < fact.length; i++) {
+				if (fact[i].equals(ANONYMOUS + ""))
+					fact[i] = "?" + ANONYMOUS + anonVariables++;
 			}
 		}
-		buffer.append(")");
-		return buffer.toString();
-	}
 
-	/**
-	 * Adds a fact to the KB, using the given object as a constant and a class
-	 * for the object.
-	 * 
-	 * @param obj
-	 *            The object to add as a constant.
-	 * @param clazz
-	 *            The class of the object.
-	 * @param returnedKB
-	 *            The kb to add to.
-	 * @param factory
-	 *            The logic factory.
-	 * @param classPrefix
-	 *            The class prefix of the environment.
-	 * @return the newly created fact.
-	 */
-	public static Fact addKBFact(Object obj, Class clazz,
-			KnowledgeBase returnedKB, LogicFactory factory, String classPrefix) {
-		Term[] terms = { factory.createConstantTerm(obj, clazz) };
-		Fact fact = factory.createFact(StateSpec.getInstance()
-				.getTypePredicate(clazz), terms);
-		returnedKB.add(fact);
-		return fact;
-	}
+		/**
+		 * Adds terms to the rule from a fact.
+		 * 
+		 * @param fact
+		 *            The fact.
+		 */
+		private void addTerms(String[] fact) {
+			// Ignore the first argument
+			for (int i = 1; i < fact.length; i++) {
+				// If the term is anonymous, convert it
+				String term = fact[i];
+				if (!terms_.contains(term))
+					terms_.add(term);
+			}
+		}
 
-	/**
-	 * A JPredicate for the inequality clause. It is implicit that all differing
-	 * terms are inequal and this predicate implements the test.
-	 * 
-	 * @param state
-	 *            The current state.
-	 * @param objA
-	 *            The first object.
-	 * @param objB
-	 *            The second object.
-	 * @return True if the objects are inequal.
-	 */
-	public boolean inequal(Object objA, Object objB) {
-		if (objA.equals(objB))
-			return false;
-		return true;
+		/**
+		 * Adds type predicates to the rule from a fact if they are not already
+		 * there.
+		 * 
+		 * @param fact
+		 *            The fact.
+		 */
+		private void addTypeConds(String[] fact) {
+			if (isTypePredicate(fact[0])) {
+				addContainsArray(typeConditions_, fact);
+				return;
+			}
+			List<Class> classes = predicates_.get(fact[0]);
+			for (int i = 1; i < fact.length; i++) {
+				String[] typePred = new String[2];
+				typePred[0] = typePredicates_.get(classes.get(i - 1));
+				typePred[1] = fact[i];
+				addContainsArray(typeConditions_, typePred);
+			}
+		}
+
+		/**
+		 * Creates the inequals tests from the terms stored. Note anonymous
+		 * terms are special in that they aren't inequal to one-another.
+		 * 
+		 * @return The string for detailing inequality '(test (<> ?X a b ?Y
+		 *         ?_0)) (test (<> ?Y a ...))'
+		 */
+		public String createInequalsTests() {
+			StringBuffer buffer = new StringBuffer();
+			// Run through each term
+			List<String> constants = new ArrayList<String>();
+			for (int i = 0; i < terms_.size(); i++) {
+				// If the term is a variable, assert an inequals
+				if (terms_.get(i).charAt(0) == '?') {
+					boolean isAnon = (terms_.get(i).charAt(1) == ANONYMOUS) ? true
+							: false;
+
+					StringBuffer subBuffer = new StringBuffer();
+					boolean isValid = false;
+					// The base term
+					subBuffer.append("(test (<> " + terms_.get(i));
+					// The constants already seen
+					for (String constant : constants) {
+						subBuffer.append(" " + constant);
+						isValid = true;
+					}
+
+					// Later terms seen (excluding anonymous if this term is
+					// anonymous
+					for (int j = i + 1; j < terms_.size(); j++) {
+						// If the current variable isn't anonymous or if it is,
+						// the later term isn't anonymous, add it to inequality
+						String laterTerm = terms_.get(j);
+						if ((!isAnon) || (laterTerm.charAt(0) == '?')
+								|| (laterTerm.charAt(1) == ANONYMOUS)) {
+							subBuffer.append(" " + laterTerm);
+							isValid = true;
+						}
+					}
+
+					subBuffer.append(")) ");
+
+					// If we have a valid inequality expression
+					if (isValid)
+						buffer.append(subBuffer);
+				} else {
+					// Add the constant to the list of constants
+					constants.add(terms_.get(i));
+				}
+			}
+			return buffer.toString();
+		}
+
+		public String[] getAction() {
+			return action_;
+		}
+
+		public void setAction(String[] action) {
+			action_ = action;
+		}
+
+		public List<String[]> getMainConditions() {
+			return mainConditions_;
+		}
+
+		public List<String[]> getTypeConditions() {
+			return typeConditions_;
+		}
 	}
 }
