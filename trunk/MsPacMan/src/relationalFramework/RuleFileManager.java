@@ -100,8 +100,7 @@ public class RuleFileManager {
 				String[] split = input.split(RULE_DELIMITER);
 				// For each rule, add it to the rulebase
 				for (int i = 0; i < split.length; i++) {
-					Rule rule = StateSpec.getInstance().parseRule(split[i],
-							constants);
+					Rule rule = StateSpec.getInstance().parseRule(split[i]);
 					ArrayList<GuidedPredicate> condsAct = PolicyGenerator
 							.getInstance().inferGuidedPreds(rule);
 					GuidedPredicate action = condsAct

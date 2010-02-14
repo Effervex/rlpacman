@@ -71,7 +71,7 @@ public class Policy {
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
-			buffer.append(StateSpec.encodeRule(rule.getRule()) + "\n");
+			buffer.append(StateSpec.encodeRule(rule.toString()) + "\n");
 		}
 		return buffer.toString();
 	}
