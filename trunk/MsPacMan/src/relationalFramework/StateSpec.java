@@ -86,6 +86,9 @@ public abstract class StateSpec {
 	/** The LogicFactory for the experiment. */
 	private Rete rete_;
 
+	/** A RegExp for filtering out unnecessary facts from a rule. */
+	private String unnecessaries_;
+
 	/**
 	 * The constructor for a state specification.
 	 */
@@ -141,9 +144,25 @@ public abstract class StateSpec {
 				rete_.eval(query);
 				actionPreconditions_.put(action, purePreConds.get(action));
 			}
+
+			unnecessaries_ = formUnnecessaryString(typePredicates_.values());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Forms the unnecessary facts regexp string.
+	 * 
+	 * @param types The types that need not be in rules.
+	 * @return The regexp string.
+	 */
+	private String formUnnecessaryString(Collection<String> types) {
+		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
+		for (String type : types)
+			buffer.append("|(\\(" + type + " .+?\\))");
+		buffer.append(") ");
+		return buffer.toString();
 	}
 
 	/**
@@ -312,96 +331,18 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Adds the constants used in the goal to all predicates in the system.
+	 * Creates a string representation of a rule, in a light, easy-to-read, and
+	 * parsable format.
 	 * 
-	 * @param predicates
-	 *            The predicates in the system.
-	 * @param goalState
-	 *            The goal state.
+	 * @param rule
+	 *            The rule begin output.
+	 * @return A light, parsable representation of the rule.
 	 */
-	private ConstantTerm[] addGoalConstants(List<GuidedPredicate> predicates,
-			org.mandarax.kernel.Rule goalState) {
-		List<ConstantTerm> constantTerms = new ArrayList<ConstantTerm>();
-		List<Fact> body = goalState.getBody();
-		MultiMap<Class, ConstantTerm> constantMap = new MultiMap<Class, ConstantTerm>();
-		// For every fact in the body of the rule, extract the constants
-		for (Fact fact : body) {
-			Term[] factTerms = fact.getTerms();
-			for (Term term : factTerms) {
-				// Add any constant terms found.
-				if (term.isConstant()) {
-					constantMap
-							.putContains(term.getType(), (ConstantTerm) term);
-					constantTerms.add((ConstantTerm) term);
-				}
-			}
-		}
-
-		// If there are no constants, exit
-		if (constantMap.isEmpty())
-			return new ConstantTerm[0];
-
-		// Now with the constants, add those to the predicates that can accept
-		// them
-		for (GuidedPredicate pred : predicates) {
-			Class[] predStructure = pred.getPredicate().getStructure();
-			int offset = 0;
-			if (pred.getPredicate() instanceof JConstructor)
-				offset = 1;
-
-			// For each of the classes in the predicate
-			for (int i = 0; i < predStructure.length - offset; i++) {
-				for (Class constClass : constantMap.keySet()) {
-					// If the predicate is the same or superclass of the
-					// constant
-					if (predStructure[i + offset].isAssignableFrom(constClass)) {
-						// Check that this pred slot can take consts
-						boolean addConsts = false;
-						for (int j = 0; j < pred.getPredValues()[i].length; j++) {
-							if (pred.getPredValues()[i][j].getTermType() != PredTerm.VALUE) {
-								addConsts = true;
-								break;
-							}
-						}
-
-						// If there is a free or tied value, we can add
-						// constants
-						if (addConsts)
-							pred.getPredValues()[i] = addConstants(pred
-									.getPredValues()[i], constantMap
-									.get(constClass));
-					}
-				}
-			}
-		}
-
-		return constantTerms.toArray(new ConstantTerm[constantTerms.size()]);
-	}
-
-	/**
-	 * Adds the constants to the array of pred terms, if they're not already
-	 * there.
-	 * 
-	 * @param predTerms
-	 *            The predicate term array to add to.
-	 * @param constants
-	 *            The constants to be added.
-	 * @return The expanded term array.
-	 */
-	private PredTerm[] addConstants(PredTerm[] predTerms,
-			Collection<ConstantTerm> constants) {
-		// Move the existing terms into a set
-		Set<PredTerm> newTerms = new HashSet<PredTerm>();
-		for (PredTerm predTerm : predTerms) {
-			newTerms.add(predTerm);
-		}
-
-		// Add the constants to the set
-		for (ConstantTerm ct : constants) {
-			newTerms.add(new PredTerm(ct.getObject()));
-		}
-
-		return newTerms.toArray(new PredTerm[newTerms.size()]);
+	public final String encodeRule(String rule) {
+		String replacement = rule.replaceAll(unnecessaries_, "");
+		if (replacement.split(INFERS_ACTION)[0].isEmpty())
+			return rule;
+		return replacement;
 	}
 
 	public MultiMap<String, Class> getPredicates() {
@@ -558,19 +499,6 @@ public abstract class StateSpec {
 			e.printStackTrace();
 		}
 		return instance_;
-	}
-
-	/**
-	 * Creates a string representation of a rule, in a light, easy-to-read, and
-	 * parsable format.
-	 * 
-	 * @param rule
-	 *            The rule begin output.
-	 * @return A light, parsable representation of the rule.
-	 */
-	public static String encodeRule(String rule) {
-		// TODO Remove the type and inequals predicates
-		return rule;
 	}
 
 	/**

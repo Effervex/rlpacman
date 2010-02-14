@@ -135,11 +135,11 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(block ?X)"));
 		assertTrue(body.contains("(highest ?Y)"));
 		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y)"));
+		assertTrue(body.contains("(test (<> ?X ?Y))"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
-		
+
 		// Variables and constants
 		rule = spec_.parseRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
@@ -154,8 +154,8 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(above b ?Y)"));
 		assertTrue(body.contains("(block b)"));
 		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X a b ?Y)"));
-		assertTrue(body.contains("(test (<> ?Y a b)"));
+		assertTrue(body.contains("(test (<> ?X a b ?Y))"));
+		assertTrue(body.contains("(test (<> ?Y a b))"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
@@ -172,7 +172,7 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(block ?X)"));
 		assertTrue(body.contains("(on ?X ?_0)"));
 		assertTrue(body.contains("(block ?_0)"));
-		assertTrue(body.contains("(test (<> ?X ?_0)"));
+		assertTrue(body.contains("(test (<> ?X ?_0))"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
@@ -194,9 +194,9 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(on ?Y ?_1)"));
 		assertTrue(body.contains("(block ?Y)"));
 		assertTrue(body.contains("(block ?_1)"));
-		assertTrue(body.contains("(test (<> ?X ?_0 ?Y ?_1)"));
-		assertTrue(body.contains("(test (<> ?_0 ?Y ?_1)"));
-		assertTrue(body.contains("(test (<> ?Y ?_1)"));
+		assertTrue(body.contains("(test (<> ?X ?_0 ?Y ?_1))"));
+		assertTrue(body.contains("(test (<> ?_0 ?Y ?_1))"));
+		assertTrue(body.contains("(test (<> ?Y ?_1))"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
@@ -218,7 +218,7 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(condCount, 3);
 		assertTrue(body.contains("(block ?X)"));
 		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y)"));
+		assertTrue(body.contains("(test (<> ?X ?Y))"));
 		assertTrue(head.contains("(move ?X ?Y)"));
 
 		// Test existing type predicate
@@ -339,22 +339,23 @@ public class BlocksWorldStateSpecTest {
 
 	@Test
 	public void testEncodeRule() {
-		String result = StateSpec
+		String result = spec_
 				.encodeRule("(block a) (clear a) => (moveFloor a)");
 		assertTrue(result.equals("(clear a) => (moveFloor a)"));
 
-		result = StateSpec
-				.encodeRule("(block a) (block b) (on a b) => (move a b)");
+		result = spec_.encodeRule("(block a) (block b) (on a b) => (move a b)");
 		assertTrue(result.equals("(on a b) => (move a b)"));
 
-		result = StateSpec
-				.encodeRule("(block ?X) (clear ?X) => (moveFloor ?X)");
+		result = spec_.encodeRule("(block ?X) (clear ?X) => (moveFloor ?X)");
 		assertTrue(result.equals("(clear ?X) => (moveFloor ?X)"));
 
-		result = StateSpec
-				.encodeRule("(block ?X) (block ?Y) (test (<> ?X ?Y)) "
-						+ "(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		result = spec_.encodeRule("(block ?X) (block ?Y) (test (<> ?X ?Y)) "
+				+ "(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		assertTrue(result.equals("(clear ?X) (clear ?Y) => (move ?X ?Y)"));
+
+		result = spec_
+				.encodeRule("(block a) => (moveFloor a)");
+		assertTrue(result.equals("(block a) => (moveFloor a)"));
 	}
 
 	@Test
