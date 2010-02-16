@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import jess.Fact;
 import jess.Rete;
 
 /**
@@ -144,7 +145,7 @@ public class PolicyGenerator {
 	 * @param actions
 	 *            The final action(s) taken by the agent.
 	 */
-	public void formPreGoalState(Rete preGoalState, String[] actions) {
+	public void formPreGoalState(Collection<Fact> preGoalState, String[] actions) {
 		// If the state has settled and is probably at minimum, trigger
 		// mutation.
 		if (!covering_.formPreGoalState(preGoalState, actions[0])) {

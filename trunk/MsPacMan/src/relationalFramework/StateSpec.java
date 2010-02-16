@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -406,6 +407,22 @@ public abstract class StateSpec {
 		}
 		buffer.append(")");
 		return buffer.toString();
+	}
+
+	/**
+	 * Extracts a collection of facts from the state.
+	 * 
+	 * @param state The rete state to extract facts from.
+	 * @return A collection of facts in the state.
+	 */
+	@SuppressWarnings("unchecked")
+	public static Collection<Fact> extractFacts(Rete state) {
+		Collection<Fact> facts = new ArrayList<Fact>();
+		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext(); ) {
+			facts.add(factIter.next());
+		}
+		
+		return facts;
 	}
 
 	public MultiMap<String, Class> getPredicates() {
