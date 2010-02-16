@@ -49,8 +49,8 @@ public class Policy {
 		try {
 			for (int i = 0; i < policyRules_.size(); i++) {
 				String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
-				rete.eval("(defquery " + prefix + i + " ("
-						+ policyRules_.get(i).getConditions() + "))");
+				rete.eval("(defquery " + prefix + i + " "
+						+ policyRules_.get(i).getConditions() + ")");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -105,8 +105,6 @@ public class Policy {
 	 */
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
 			int actionsReturned, boolean optimal) {
-		// A table for already completed requests
-		Map<String, QueryResult> resultTable = new HashMap<String, QueryResult>();
 
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
@@ -116,20 +114,14 @@ public class Policy {
 			GuidedRule gr = iter.next();
 			String conditions = gr.getConditions();
 
-			// Setting up the necessary variables
-			QueryResult results = resultTable.get(conditions);
-
 			// Find the result set
 			// TODO Evaluate rules in a step-wise fashion, to infer how much of
 			// a rule fires
 			try {
-				if (results == null) {
-					// Forming the query
-					String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
-					results = state.runQueryStar(prefix + ruleNumber,
-							new ValueVector());
-					resultTable.put(conditions, results);
-				}
+				// Forming the query
+				String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
+				QueryResult results = state.runQueryStar(prefix + ruleNumber,
+						new ValueVector());
 
 				// If there is at least one result
 				if (results.next()) {
@@ -149,16 +141,19 @@ public class Policy {
 									+ results.getSymbol(split[i].substring(1)));
 						}
 						actBuffer.append(")");
-						
+
 						// Use the found action set as a result.
-						actionSwitch.switchOn(actBuffer.toString(), actionsFound);
+						actionSwitch.switchOn(actBuffer.toString(),
+								actionsFound);
 						actionsFound++;
-					} while (results.next());
+					} while ((actionsFound < actionsReturned)
+							&& (results.next()));
 				}
 				results.close();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
+			ruleNumber++;
 		}
 
 		// If the policy didn't generate enough rules, cover a set of new rules

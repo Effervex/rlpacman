@@ -174,7 +174,7 @@ public class Covering {
 		}
 
 		// Use the unified rules to create new rules
-		String joinedRule = joinRule(generalRule, actionString);
+		String joinedRule = StateSpec.getInstance().parseRule(joinRule(generalRule, actionString));
 		GuidedRule rule = new GuidedRule(joinedRule, isMinimal, false, null);
 		return rule;
 	}
@@ -334,7 +334,6 @@ public class Covering {
 		MultiMap<String, String> notUsedMap = new MultiMap<String, String>();
 		// For each action
 		for (String action : StateSpec.getInstance().getActions().keySet()) {
-			// TODO May have to provide context
 			ValueVector args = validActions.getSlotValue(action)
 					.listValue(null);
 			// Run through the valid args for the action

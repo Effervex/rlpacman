@@ -4,11 +4,6 @@ import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.mandarax.kernel.ClauseSet;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Fact;
-
 import relationalFramework.PolicyGenerator;
 import relationalFramework.State;
 import relationalFramework.StateSpec;
@@ -60,8 +55,6 @@ public class GameModel {
 	static final int STATE_ABOUT = 10; // About page
 
 	int[][] m_gameState; // Represents maze as integers
-	private KnowledgeBase stateKB_;
-	private LogicFactory factory_;
 	private String classPrefix_;
 	Map<Point, Dot> m_dots;
 	Map<Point, PowerDot> m_powerdots;
@@ -120,10 +113,8 @@ public class GameModel {
 	GameModel(PacMan pacMan) {
 		m_pacMan = pacMan;
 		m_stage = 1;
-		stateKB_ = new org.mandarax.reference.KnowledgeBase();
 		addBackgroundKnowledge(stateKB_);
 		clauseMap_ = new HashMap<Object, Fact>();
-		factory_ = PolicyGenerator.getInstance().getLogicFactory();
 		classPrefix_ = PolicyGenerator.getInstance().getClassPrefix();
 
 		// GameState

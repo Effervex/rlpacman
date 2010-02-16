@@ -131,14 +131,11 @@ public class BlocksWorldStateSpecTest {
 		head = rule.split("=>")[1];
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
-		assertEquals(condCount, 5);
+		assertEquals(condCount, 3);
 		assertTrue(body.contains("(clear ?X)"));
 		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(on ?X ?_0)"));
-		assertTrue(body.contains("(block ?_0)"));
-		assertTrue(body.contains("(test (<> ?X ?_0))"));
-		assertTrue(body.indexOf("clear") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("block"));
+		assertTrue(body.contains("(on ?X ?)"));
+		assertTrue(body.indexOf("clear") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
 
 		// Test anonymous variables
@@ -150,17 +147,13 @@ public class BlocksWorldStateSpecTest {
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
 		// Note no inequals between _1 and _2
-		assertEquals(condCount, 10);
+		assertEquals(condCount, 6);
 		assertTrue(body.contains("(clear ?X)"));
 		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(on ?X ?_0)"));
-		assertTrue(body.contains("(block ?_0)"));
-		assertTrue(body.contains("(on ?Y ?_1)"));
+		assertTrue(body.contains("(on ?X ?)"));
+		assertTrue(body.contains("(on ?Y ?)"));
 		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(block ?_1)"));
-		assertTrue(body.contains("(test (<> ?X ?_0 ?Y ?_1))"));
-		assertTrue(body.contains("(test (<> ?_0 ?Y ?_1))"));
-		assertTrue(body.contains("(test (<> ?Y ?_1))"));
+		assertTrue(body.contains("(test (<> ?X ?Y))"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
 		assertTrue(head.contains("(moveFloor ?X)"));
