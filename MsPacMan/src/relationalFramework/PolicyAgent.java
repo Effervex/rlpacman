@@ -1,11 +1,11 @@
 package relationalFramework;
 
+import java.util.Collection;
 import java.util.List;
 
+import jess.Fact;
 import jess.Rete;
 
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.KnowledgeBase;
 import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
@@ -24,7 +24,7 @@ public class PolicyAgent implements AgentInterface {
 	private ActionSwitch actionsModule_;
 
 	/** The previous state seen by the agent. */
-	private KnowledgeBase prevState_;
+	private Collection<Fact> prevState_;
 
 	/**
 	 * If this agent is the optimal agent (defined by the environment, not how
@@ -94,7 +94,7 @@ public class PolicyAgent implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private Fact[] chooseAction(Rete state) {
+	private String[] chooseAction(Rete state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
@@ -102,7 +102,7 @@ public class PolicyAgent implements AgentInterface {
 
 		// Save the previous state (if not an optimal agent).
 		if (!optimal_)
-			prevState_ = state;
+			prevState_ = StateSpec.extractFacts(state);
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();

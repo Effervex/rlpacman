@@ -97,14 +97,14 @@ public class Covering {
 	 * seen (or was given). This method forms the pre-goal state by finding the
 	 * bare minimal conditions seen in every pre-goal state.
 	 * 
-	 * @param state
+	 * @param preGoalState
 	 *            The pre-goal state seen by the agent.
 	 * @param action
 	 *            The final action taken by the agent.
 	 * @return True if the state was last active at most
 	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
 	 */
-	public boolean formPreGoalState(Rete state, String action) {
+	public boolean formPreGoalState(Collection<Fact> preGoalState, String action) {
 		// If the preGoal state hasn't changed for
 		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
 		// again, it's probably already at minimum.

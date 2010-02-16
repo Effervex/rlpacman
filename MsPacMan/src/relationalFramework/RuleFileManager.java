@@ -7,9 +7,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-
-import org.mandarax.kernel.Rule;
 
 /**
  * A class handling the loading and saving of files within the system, boith of
@@ -46,9 +45,8 @@ public class RuleFileManager {
 			for (Slot slot : policyGenerator) {
 				// For each of the rules
 				for (GuidedRule r : slot.getGenerator()) {
-					bf
-							.write(StateSpec.encodeRule(r.getRule())
-									+ RULE_DELIMITER);
+					bf.write(StateSpec.getInstance().encodeRule(r.toString())
+							+ RULE_DELIMITER);
 				}
 				bf.write("\n");
 			}
@@ -74,8 +72,7 @@ public class RuleFileManager {
 	 * @return The rules loaded in.
 	 */
 	public static ProbabilityDistribution<Slot> loadRulesFromFile(
-			File ruleBaseFile, Collection<GuidedPredicate> condGenerator,
-			Collection<GuidedPredicate> actGenerator) {
+			File ruleBaseFile) {
 		ProbabilityDistribution<Slot> ruleBases = new ProbabilityDistribution<Slot>();
 
 		try {
@@ -91,25 +88,20 @@ public class RuleFileManager {
 				return null;
 			}
 
-			// Read the rules in.
-			Map<String, Object> constants = StateSpec.getInstance()
-					.getConstants();
+			// Read in a line of rules, all infering the same slot.
 			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
 				Slot slot = null;
 				// Split the base into rules
 				String[] split = input.split(RULE_DELIMITER);
 				// For each rule, add it to the rulebase
 				for (int i = 0; i < split.length; i++) {
-					Rule rule = StateSpec.getInstance().parseRule(split[i]);
-					ArrayList<GuidedPredicate> condsAct = PolicyGenerator
-							.getInstance().inferGuidedPreds(rule);
-					GuidedPredicate action = condsAct
-							.remove(condsAct.size() - 1);
+					String rule = StateSpec.getInstance().parseRule(split[i]);
 					if (slot == null) {
-						slot = new Slot(action.getPredicate());
+						slot = new Slot(StateSpec.splitFact(rule
+								.split(StateSpec.INFERS_ACTION)[1].trim())[0]);
 					}
 
-					GuidedRule gr = new GuidedRule(rule, condsAct, action, slot);
+					GuidedRule gr = new GuidedRule(rule, slot);
 					slot.getGenerator().add(gr);
 				}
 				slot.getGenerator().normaliseProbs();
@@ -175,7 +167,7 @@ public class RuleFileManager {
 			for (GuidedRule rule : slot.getGenerator().getNonZero()) {
 				if (!single)
 					buf.write("/ ");
-				buf.write(StateSpec.encodeRule(rule.getRule()));
+				buf.write(StateSpec.getInstance().encodeRule(rule.toString()));
 				single = false;
 			}
 			buf.write("\n");

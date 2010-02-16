@@ -44,6 +44,19 @@ public class GuidedRule {
 	}
 
 	/**
+	 * A constructor taking the rule and slot.
+	 * 
+	 * @param rule
+	 *            The rule this rule represents
+	 * @param slot
+	 *            The slot this rule is under.
+	 */
+	public GuidedRule(String ruleString, Slot slot) {
+		this(ruleString);
+		slot_ = slot;
+	}
+
+	/**
 	 * A constructor taking the bare minimum for a guided rule.
 	 * 
 	 * @param ruleString
@@ -53,7 +66,8 @@ public class GuidedRule {
 	 * @param mutant
 	 *            If this rule is a mutant (implying max general is false).
 	 */
-	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant, Slot slot) {
+	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant,
+			Slot slot) {
 		this(ruleString);
 		maxGeneral_ = maxGeneral;
 		mutant_ = mutant;
@@ -63,11 +77,11 @@ public class GuidedRule {
 	public Slot getSlot() {
 		return slot_;
 	}
-	
+
 	public String getConditions() {
 		return ruleConditions_;
 	}
-	
+
 	public String getAction() {
 		return ruleAction_;
 	}
