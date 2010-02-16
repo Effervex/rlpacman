@@ -109,11 +109,11 @@ public abstract class StateSpec {
 			// Initialise the goal state rules
 			constants_ = new ArrayList<String>();
 			goalState_ = initialiseGoalState(constants_);
-			rete_.eval("(deftemplate goalState (slot goalMet))");
+			rete_.eval("(deftemplate goal (slot goalMet))");
 			rete_.eval("(defrule goalState " + goalState_
 					+ " => (assert (goal (goalMet TRUE))))");
 			// Initialise the goal checking query
-			rete_.eval("(defquery " + GOAL_QUERY + " (goalState (goalMet ?)))");
+			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
 
 			// Initialise the background knowledge rules
 			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
@@ -132,6 +132,9 @@ public abstract class StateSpec {
 				actionPreconditions_.putCollection(action,
 						extractTerms(purePreConds.get(action)));
 			}
+
+			// Initialise the optimal policy
+			optimalPolicy_ = initialiseOptimalPolicy();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -397,7 +400,8 @@ public abstract class StateSpec {
 	/**
 	 * Reforms a fact back together again from a split array.
 	 * 
-	 * @param factSplit The split fact.
+	 * @param factSplit
+	 *            The split fact.
 	 * @return A string representation of the fact.
 	 */
 	public static String reformFact(String[] factSplit) {
@@ -412,16 +416,17 @@ public abstract class StateSpec {
 	/**
 	 * Extracts a collection of facts from the state.
 	 * 
-	 * @param state The rete state to extract facts from.
+	 * @param state
+	 *            The rete state to extract facts from.
 	 * @return A collection of facts in the state.
 	 */
 	@SuppressWarnings("unchecked")
 	public static Collection<Fact> extractFacts(Rete state) {
 		Collection<Fact> facts = new ArrayList<Fact>();
-		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext(); ) {
+		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
 			facts.add(factIter.next());
 		}
-		
+
 		return facts;
 	}
 
@@ -447,8 +452,6 @@ public abstract class StateSpec {
 	 * @return The policy that is optimal.
 	 */
 	public Policy getOptimalPolicy() {
-		if (optimalPolicy_ == null)
-			optimalPolicy_ = initialiseOptimalPolicy();
 		return optimalPolicy_;
 	}
 
@@ -612,7 +615,7 @@ public abstract class StateSpec {
 		private void convertAnonymous(String[] fact) {
 			for (int i = 1; i < fact.length; i++) {
 				if (fact[i].equals(ANONYMOUS + ""))
-					fact[i] = "?" + ANONYMOUS + anonVariables++;
+					fact[i] = "?";
 			}
 		}
 
@@ -625,9 +628,9 @@ public abstract class StateSpec {
 		private void addTerms(String[] fact) {
 			// Ignore the first argument
 			for (int i = 1; i < fact.length; i++) {
-				// If the term is anonymous, convert it
 				String term = fact[i];
-				if (!terms_.contains(term))
+				// If the term isn't anonymous and isn't already in, add it.
+				if (!term.equals("?") && !terms_.contains(term))
 					terms_.add(term);
 			}
 		}
@@ -646,10 +649,12 @@ public abstract class StateSpec {
 			}
 			List<Class> classes = predicates_.get(fact[0]);
 			for (int i = 1; i < fact.length; i++) {
-				String[] typePred = new String[2];
-				typePred[0] = typePredicates_.get(classes.get(i - 1));
-				typePred[1] = fact[i];
-				addContainsArray(typeConditions_, typePred);
+				if (!fact[i].equals("?")) {
+					String[] typePred = new String[2];
+					typePred[0] = typePredicates_.get(classes.get(i - 1));
+					typePred[1] = fact[i];
+					addContainsArray(typeConditions_, typePred);
+				}
 			}
 		}
 
@@ -667,11 +672,8 @@ public abstract class StateSpec {
 			for (int i = 0; i < terms_.size(); i++) {
 				// If the term is a variable, assert an inequals
 				if (terms_.get(i).charAt(0) == '?') {
-					boolean isAnon = (terms_.get(i).charAt(1) == ANONYMOUS) ? true
-							: false;
-
-					StringBuffer subBuffer = new StringBuffer();
 					boolean isValid = false;
+					StringBuffer subBuffer = new StringBuffer();
 					// The base term
 					subBuffer.append("(test (<> " + terms_.get(i));
 					// The constants already seen
@@ -680,22 +682,15 @@ public abstract class StateSpec {
 						isValid = true;
 					}
 
-					// Later terms seen (excluding anonymous if this term is
-					// anonymous
+					// Later terms seen
 					for (int j = i + 1; j < terms_.size(); j++) {
-						// If the current variable isn't anonymous or if it is,
-						// the later term isn't anonymous, add it to inequality
-						String laterTerm = terms_.get(j);
-						if ((!isAnon) || (laterTerm.charAt(0) == '?')
-								|| (laterTerm.charAt(1) == ANONYMOUS)) {
-							subBuffer.append(" " + laterTerm);
-							isValid = true;
-						}
+						subBuffer.append(" " + terms_.get(j));
+						isValid = true;
 					}
 
 					subBuffer.append(")) ");
 
-					// If we have a valid inequality expression
+					// If the expression is valid, add it
 					if (isValid)
 						buffer.append(subBuffer);
 				} else {

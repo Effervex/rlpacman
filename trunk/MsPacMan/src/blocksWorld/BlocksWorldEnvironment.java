@@ -98,11 +98,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-		// System.out.println("\t\t\tOptimal test: "
-		// + Arrays.toString(state_.getState()));
+//		System.out.println("\t\t\tOptimal test: "
+//				+ Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-		// System.out
-		// .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+//		System.out
+//				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -121,7 +121,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		return obs;
 	}
 
-	// @Override
+	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		String action = null;
 		for (int i = 0; i < ObjectObservations.getInstance().objectArray.length; i++) {
@@ -129,6 +129,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
+//		if (action != null)
+//			System.out.println("\t\t\t" + action + "   ->   "
+//					+ Arrays.toString(newState.getState()));
+//		else
+//			System.out.println("\t\t\tNo action chosen.");
 
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -255,7 +260,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 */
 	private BlocksState initialiseWorld(int numBlocks, String goalState) {
 		Integer[] worldState = new Integer[numBlocks];
-		int[] contourState = new int[numBlocks];
+		List<Double> contourState = new ArrayList<Double>();
+		contourState.add(0d);
 		Random random = new Random();
 		List<Integer> blocksLeft = new ArrayList<Integer>();
 		for (int i = 1; i <= numBlocks; i++) {
@@ -267,15 +273,17 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			Integer block = blocksLeft
 					.remove(random.nextInt(blocksLeft.size()));
 
-			// Put it in a random position in the world (from max numBlocks
-			// columns)
-			int position = random.nextInt(numBlocks - 1);
-			// Put the block on top of whatever was there
-			worldState[block - 1] = contourState[position];
-			// Then that block is now the top of that stack
-			contourState[position] = block;
+			// Put the block in a random position, influenced by the number of
+			// free blocks.
+			int index = random.nextInt(contourState.size());
+			worldState[block - 1] = contourState.get(index).intValue();
+			if (worldState[block - 1] == 0) {
+				contourState.add(new Double(block));
+			} else {
+				contourState.set(index, new Double(block));
+			}
 		}
-
+		
 		// Check this isn't the goal state
 		formState(worldState);
 		if (isGoal(rete_, goalState))
@@ -376,8 +384,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Check it hasn't already solved the state
 		if (optimalMap_.containsKey(state_)) {
-			System.out.println("\t\t\tAlready calculated ("
-					+ optimalMap_.get(state_) + ")");
+			// System.out.println("\t\t\tAlready calculated ("
+			//		+ optimalMap_.get(state_) + ")");
 			return optimalMap_.get(state_);
 		}
 

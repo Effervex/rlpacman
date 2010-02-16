@@ -249,7 +249,7 @@ public class CrossEntropyExperiment {
 		// Initialise the environment/agent
 		RLGlue.RL_init();
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("20");
+		RLGlue.RL_env_message("5");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
@@ -583,6 +583,7 @@ public class CrossEntropyExperiment {
 	/**
 	 * Counts the rules from the elite samples and stores their frequencies and
 	 * total score.
+	 * TODO Fix this up
 	 * 
 	 * @param iter
 	 *            The iterator through the samples.

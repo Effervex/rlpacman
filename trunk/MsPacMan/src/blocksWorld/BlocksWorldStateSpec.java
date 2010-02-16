@@ -53,15 +53,15 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Block(Y) & !On(X,Y) -> Clear(Y)
 		bkMap.put("clearRule",
-				"(logical (block ?Y) (not (on ?X ?Y))) => (assert (clear ?Y))");
+				"(block ?Y) (not (on ?X ?Y)) => (assert (clear ?Y))");
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1",
-				"(logical (on ?X ?Y)) => (assert (above ?X ?Y))");
+				"(on ?X ?Y) => (assert (above ?X ?Y))");
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2",
-				"(logical (on ?X ?Y) (above ?X ?Z)) => (assert (above ?X ?Z))");
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))");
 
 		return bkMap;
 	}
