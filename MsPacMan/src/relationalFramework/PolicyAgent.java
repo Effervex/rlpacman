@@ -56,6 +56,7 @@ public class PolicyAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
+			policy_.createQueries(StateSpec.getInstance().getRete(), optimal_);
 		} else if (arg0.equals("Optimal")) {
 			optimal_ = true;
 		}
@@ -93,11 +94,11 @@ public class PolicyAgent implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private Fact[] chooseAction(KnowledgeBase state) {
+	private Fact[] chooseAction(Rete state) {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
-				.getNumActions());
+				.getNumActions(), optimal_);
 
 		// Save the previous state (if not an optimal agent).
 		if (!optimal_)

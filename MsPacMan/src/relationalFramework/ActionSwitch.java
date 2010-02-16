@@ -1,9 +1,5 @@
 package relationalFramework;
 
-import java.util.List;
-
-import org.mandarax.kernel.Fact;
-
 /**
  * This class represents an actions module. It controls which actions are switched on and off
  * @author Samuel J. Sarjant
@@ -11,10 +7,10 @@ import org.mandarax.kernel.Fact;
  */
 public class ActionSwitch {
 	/** The prioritised list of switched actions. Max 3. */ 
-	private Fact[] activeActions_;
+	private String[] activeActions_;
 	
 	public ActionSwitch(int actionsPerStep) {
-		activeActions_ = new Fact[actionsPerStep];
+		activeActions_ = new String[actionsPerStep];
 	}
 	
 	/**
@@ -23,7 +19,7 @@ public class ActionSwitch {
 	 * @param action The action being switched on.
 	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(Fact action, int priority) {
+	public void switchOn(String action, int priority) {
 		activeActions_[priority] = action;
 	}
 
@@ -41,7 +37,7 @@ public class ActionSwitch {
 	 * 
 	 * @return The int version of the action list.
 	 */
-	public Fact[] getPrioritisedActions() {
+	public String[] getPrioritisedActions() {
 		return activeActions_;
 	}
 	
@@ -51,7 +47,7 @@ public class ActionSwitch {
 	 * @param action The action to check.
 	 * @return True if it is on, false otherwise
 	 */
-	public boolean isActionActive(Fact action) {
+	public boolean isActionActive(String action) {
 		for (int i = 0; i < activeActions_.length; i++) {
 			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
 				return true;

@@ -1,31 +1,13 @@
 package blocksWorld;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
-import jess.Deftemplate;
-import jess.JessException;
-import jess.Rete;
-
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Predicate;
-import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.Term;
-import org.mandarax.kernel.meta.JPredicate;
-
-import relationalFramework.GuidedPredicate;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
-import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 public class BlocksWorldStateSpec extends StateSpec {
@@ -120,7 +102,6 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
-		Map<String, Object> constantMap = new HashMap<String, Object>();
 		if (goal_.equals("onab")) {
 			rules = new String[3];
 			rules[0] = "(clear a) (clear b) => (move a b)";

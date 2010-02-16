@@ -1,6 +1,6 @@
 package relationalFramework;
 
-import org.mandarax.kernel.KnowledgeBase;
+import jess.Rete;
 
 /**
  * A bridge for the observations that need to be as Java Objects, rather than
@@ -19,7 +19,7 @@ public class ObjectObservations {
 	public Object[] objectArray;
 
 	/** The knowledge base of current state predicate and background knowledge. */
-	public KnowledgeBase predicateKB;
+	public Rete predicateKB;
 
 	/**
 	 * The private, empty constructor

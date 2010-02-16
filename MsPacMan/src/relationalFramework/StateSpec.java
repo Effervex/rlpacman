@@ -13,25 +13,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jess.QueryResult;
 import jess.Rete;
-
-import org.mandarax.kernel.ConstantTerm;
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.InferenceEngine;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Predicate;
-import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Query;
-import org.mandarax.kernel.Replacement;
-import org.mandarax.kernel.ResultSet;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.SimplePredicate;
-import org.mandarax.kernel.Term;
-import org.mandarax.kernel.VariableTerm;
-import org.mandarax.kernel.meta.JConstructor;
-import org.mandarax.kernel.meta.JPredicate;
-import org.mandarax.util.LogicFactorySupport;
+import jess.ValueVector;
 
 /**
  * A class to outline the specifications of the environment.
@@ -46,6 +30,8 @@ public abstract class StateSpec {
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
 	public static final String VALID_ACTIONS = "validActions";
+
+	public static final String GOAL_QUERY = "isGoal";
 
 	/** The singleton instance. */
 	private static StateSpec instance_;
@@ -65,11 +51,8 @@ public abstract class StateSpec {
 	/** The number of simultaneous actions per step to take. */
 	private int actionNum_;
 
-	/** The rules relating to an actions precondition. */
-	private Map<String, String> actionPreconditions_;
-
-	/** A map for retrieving predicates by name. */
-	private Map<String, GuidedPredicate> predByNames_;
+	/** The terms present in an action's precondition. */
+	private MultiMap<String, String> actionPreconditions_;
 
 	/** The state the agent must reach to successfully end the episode. */
 	private String goalState_;
@@ -92,7 +75,7 @@ public abstract class StateSpec {
 	/**
 	 * The constructor for a state specification.
 	 */
-	private final void initialise(LogicFactory factory) {
+	private final void initialise() {
 		try {
 			rete_ = new Rete();
 
@@ -101,6 +84,7 @@ public abstract class StateSpec {
 			for (String typeName : typePredicates_.values()) {
 				defineTemplate(typeName, rete_);
 			}
+			unnecessaries_ = formUnnecessaryString(typePredicates_.values());
 
 			// Main predicates
 			predicates_ = initialisePredicateTemplates();
@@ -127,6 +111,8 @@ public abstract class StateSpec {
 			rete_.eval("(deftemplate goalState (slot goalMet))");
 			rete_.eval("(defrule goalState " + goalState_
 					+ " => (assert (goal (goalMet TRUE))))");
+			// Initialise the goal checking query
+			rete_.eval("(defquery " + GOAL_QUERY + " (goalState (goalMet ?)))");
 
 			// Initialise the background knowledge rules
 			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
@@ -137,24 +123,46 @@ public abstract class StateSpec {
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
-			actionPreconditions_ = new HashMap<String, String>();
+			actionPreconditions_ = new MultiMap<String, String>();
 			for (String action : purePreConds.keySet()) {
 				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
 						+ " " + purePreConds.get(action) + ")";
 				rete_.eval(query);
-				actionPreconditions_.put(action, purePreConds.get(action));
+				actionPreconditions_.putCollection(action,
+						extractTerms(purePreConds.get(action)));
 			}
-
-			unnecessaries_ = formUnnecessaryString(typePredicates_.values());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
 	/**
+	 * Extract the terms from a set of facts.
+	 * 
+	 * @param facts
+	 *            The facts to extract the terms from.
+	 * @return The terms in a list.
+	 */
+	private List<String> extractTerms(String facts) {
+		List<String> terms = new ArrayList<String>();
+		// ?X ?x ?_4 ?g4 ?#...
+		Pattern p = Pattern.compile("\\?[A-Za-z$*=+/<>_?#.][\\w$*=+/<>_?#.]*");
+		Matcher m = p.matcher(facts);
+		while (m.find()) {
+			// Removing the '?'
+			String term = m.group().substring(1);
+			if (!terms.contains(term))
+				terms.add(term);
+		}
+
+		return terms;
+	}
+
+	/**
 	 * Forms the unnecessary facts regexp string.
 	 * 
-	 * @param types The types that need not be in rules.
+	 * @param types
+	 *            The types that need not be in rules.
 	 * @return The regexp string.
 	 */
 	private String formUnnecessaryString(Collection<String> types) {
@@ -249,11 +257,7 @@ public abstract class StateSpec {
 		StringBuffer buffer = new StringBuffer();
 		// Main preds first
 		for (String[] fact : stringRule.getMainConditions()) {
-			buffer.append("(" + fact[0]);
-			for (int i = 1; i < fact.length; i++) {
-				buffer.append(" " + fact[i]);
-			}
-			buffer.append(") ");
+			buffer.append(reformFact(fact) + " ");
 		}
 
 		// Inequals tests
@@ -261,20 +265,12 @@ public abstract class StateSpec {
 
 		// Type preds
 		for (String[] typeFact : stringRule.getTypeConditions()) {
-			buffer.append("(" + typeFact[0]);
-			for (int i = 1; i < typeFact.length; i++) {
-				buffer.append(" " + typeFact[i]);
-			}
-			buffer.append(") ");
+			buffer.append(reformFact(typeFact) + " ");
 		}
 
 		// Action
 		String[] action = stringRule.getAction();
-		buffer.append(INFERS_ACTION + " (" + action[0]);
-		for (int i = 1; i < action.length; i++) {
-			buffer.append(" " + action[i]);
-		}
-		buffer.append(")");
+		buffer.append(INFERS_ACTION + " " + reformFact(action));
 
 		return buffer.toString();
 	}
@@ -345,6 +341,73 @@ public abstract class StateSpec {
 		return replacement;
 	}
 
+	/**
+	 * Inserts the valid actions for the state into the state for the agent to
+	 * use. Actions are given in string format of just the arguments.
+	 * 
+	 * @param state
+	 *            The state into which the valid actions are calculated and
+	 *            inserted.
+	 */
+	public final void insertValidActions(Rete state) {
+		StringBuffer factBuffer = new StringBuffer("(assert (" + VALID_ACTIONS);
+
+		try {
+			for (String action : actions_.keySet()) {
+				factBuffer.append(" (" + action);
+				QueryResult result = state.runQueryStar(action
+						+ ACTION_PRECOND_SUFFIX, new ValueVector());
+				while (result.next()) {
+					factBuffer.append(" \"");
+					boolean first = true;
+					for (String term : actionPreconditions_.get(action)) {
+						if (!first)
+							factBuffer.append(" ");
+						factBuffer.append(result.getSymbol(term));
+						first = false;
+					}
+					factBuffer.append("\"");
+				}
+				factBuffer.append(")");
+			}
+
+			// Finalise the expression and assert it
+			factBuffer.append("))");
+			state.eval(factBuffer.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Splits a fact up into an array format, with the first index the fact
+	 * name.
+	 * 
+	 * @param fact
+	 *            The fact being split.
+	 * @return A string array of the facts.
+	 */
+	public static String[] splitFact(String fact) {
+		// Remove any module declarations
+		fact = fact.substring(fact.lastIndexOf(':') + 1);
+		return fact.replaceAll("(\\(|\\))", "").split(" ");
+	}
+
+	/**
+	 * Reforms a fact back together again from a split array.
+	 * 
+	 * @param factSplit The split fact.
+	 * @return A string representation of the fact.
+	 */
+	public static String reformFact(String[] factSplit) {
+		StringBuffer buffer = new StringBuffer("(" + factSplit[0]);
+		for (int i = 1; i < factSplit.length; i++) {
+			buffer.append(" " + factSplit[i]);
+		}
+		buffer.append(")");
+		return buffer.toString();
+	}
+
 	public MultiMap<String, Class> getPredicates() {
 		return predicates_;
 	}
@@ -374,6 +437,10 @@ public abstract class StateSpec {
 
 	public List<String> getConstants() {
 		return constants_;
+	}
+
+	public Rete getRete() {
+		return rete_;
 	}
 
 	/**
@@ -408,12 +475,6 @@ public abstract class StateSpec {
 		return true;
 	}
 
-	public GuidedPredicate getGuidedPredicate(String name) {
-		if (name != null)
-			return predByNames_.get(name);
-		return null;
-	}
-
 	@Override
 	public String toString() {
 		return "StateSpec";
@@ -438,24 +499,6 @@ public abstract class StateSpec {
 			e.printStackTrace();
 		}
 		return factName;
-	}
-
-	/**
-	 * Adds all elements from a list to another if the list being added to
-	 * doesn't already contain them.
-	 * 
-	 * @param addTo
-	 *            The list to add to.
-	 * @param addFrom
-	 *            The list to add from, if the terms are not contained.
-	 */
-	public static void addContains(List<Prerequisite> addTo,
-			List<Prerequisite> addFrom) {
-		for (Prerequisite prereq : addFrom) {
-			if (!addTo.contains(prereq)) {
-				addTo.add(prereq);
-			}
-		}
 	}
 
 	/**
@@ -488,13 +531,12 @@ public abstract class StateSpec {
 		return instance_;
 	}
 
-	public static StateSpec initInstance(String classPrefix,
-			LogicFactory factory) {
+	public static StateSpec initInstance(String classPrefix) {
 		try {
 			instance_ = (StateSpec) Class.forName(
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
-			instance_.initialise(factory);
+			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

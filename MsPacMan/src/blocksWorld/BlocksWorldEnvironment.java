@@ -7,19 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import jess.QueryResult;
 import jess.Rete;
+import jess.ValueVector;
 
-import org.mandarax.kernel.ClauseSet;
-import org.mandarax.kernel.ConstantTerm;
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.InferenceEngine;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Query;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.Term;
-import org.mandarax.util.LogicFactorySupport;
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
@@ -49,10 +40,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private BlocksState state_;
 
 	/** The state of the blocks world in base predicates. */
-	private KnowledgeBase stateKB_;
+	private Rete rete_;
 
 	/** The blocks contained within the environment. */
-	private ConstantTerm[] blocks_;
+	private Block[] blocks_;
 
 	/** The number of steps taken. */
 	private int steps_;
@@ -65,14 +56,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public void env_cleanup() {
-		stateKB_ = null;
+		rete_ = null;
 		state_ = null;
 		blocks_ = null;
 	}
 
 	// @Override
 	public String env_init() {
-		stateKB_ = new org.mandarax.reference.KnowledgeBase();
+		rete_ = StateSpec.getInstance().getRete();
 		// Assign the blocks
 		blocks_ = createBlocks(numBlocks_);
 		return null;
@@ -126,31 +117,25 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private Observation formObs_Start() {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		ObjectObservations.getInstance().predicateKB = stateKB_;
+		ObjectObservations.getInstance().predicateKB = rete_;
 		return obs;
 	}
 
 	// @Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		Fact action = null;
-		Random random = new Random();
+		String action = null;
 		for (int i = 0; i < ObjectObservations.getInstance().objectArray.length; i++) {
-			action = (Fact) ObjectObservations.getInstance().objectArray[i];
+			action = (String) ObjectObservations.getInstance().objectArray[i];
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-		// if (action != null)
-		// System.out.println("\t\t\t" + StateSpec.lightenFact(action)
-		// + "\t->  " + Arrays.toString(newState.intState_));
-		// else
-		// System.out.println("\t\t\tNo action chosen.");
 
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
-			stateKB_ = formState(state_.getState());
+			formState(state_.getState());
 		} else {
 			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
 					: 0;
@@ -159,20 +144,21 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		steps_++;
-		ObjectObservations.getInstance().predicateKB = stateKB_;
+		ObjectObservations.getInstance().predicateKB = rete_;
 
 		double reward = (steps_ <= optimalSteps_) ? 0
 				: ((-numBlocks_ * STEP_CONSTANT * 1.0) / (numBlocks_
 						* STEP_CONSTANT - optimalSteps_));
 		Reward_observation_terminal rot = new Reward_observation_terminal(
-				reward, obs, isGoal(stateKB_, StateSpec.getInstance()
+				reward, obs, isGoal(rete_, StateSpec.getInstance()
 						.getGoalState()));
 
 		return rot;
 	}
 
 	/**
-	 * Checks if the current state is a goal state.
+	 * Checks if the current state is a goal state by looking for the terminal
+	 * fact.
 	 * 
 	 * @param stateKB
 	 *            The current state.
@@ -180,18 +166,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The goal state.
 	 * @return True if we're in the goal state, false otherwise.
 	 */
-	private boolean isGoal(KnowledgeBase stateKB, Rule goalState) {
-		LogicFactorySupport factorySupport = new LogicFactorySupport(
-				PolicyGenerator.getInstance().getLogicFactory());
-		Fact[] ruleConditions = (Fact[]) goalState.getBody().toArray(
-				new Fact[goalState.getBody().size()]);
-		Query query = factorySupport.query(ruleConditions, "isGoal");
+	private boolean isGoal(Rete rete, String goalState) {
 		try {
-			org.mandarax.kernel.ResultSet results = PolicyGenerator
-					.getInstance().getInferenceEngine().query(query, stateKB,
-							InferenceEngine.ONE,
-							InferenceEngine.BUBBLE_EXCEPTIONS);
-			if (results.next())
+			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
+					new ValueVector());
+			if (result.next())
 				return true;
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -200,7 +179,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Acts on the action given.
+	 * Acts on the action given. (e.g. 'move a b' 'moveFloor z')
 	 * 
 	 * @param action
 	 *            The action to act upon.
@@ -208,20 +187,17 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private BlocksState actOnAction(Fact action, BlocksState worldState) {
+	private BlocksState actOnAction(String action, BlocksState worldState) {
 		if (action == null)
 			return worldState;
 
 		Integer[] newState = new Integer[worldState.length];
 
-		Term[] actionTerms = action.getTerms();
+		String[] split = action.split(" ");
 
 		// Finding the block objects
 		int[] indices = null;
-		Block[] blocks = new Block[2];
-		blocks[0] = (Block) ((ConstantTerm) actionTerms[1]).getObject();
-		if (action.getPredicate().getName().equals("move")) {
-			blocks[1] = (Block) ((ConstantTerm) actionTerms[2]).getObject();
+		if (split[0].equals("move")) {
 			indices = new int[2];
 		} else {
 			indices = new int[1];
@@ -230,7 +206,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Convert the blocks to indices
 		Integer[] stateArray = worldState.getState();
 		for (int i = 0; i < indices.length; i++) {
-			indices[i] = (blocks[i].getName().charAt(0)) - ('a');
+			indices[i] = (split[i + 1].charAt(0)) - ('a');
 			// In order to do either action, both blocks must be free
 			for (int j = 0; j < worldState.length; j++) {
 				newState[j] = stateArray[j];
@@ -258,14 +234,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The number of blocks.
 	 * @return The blocks array.
 	 */
-	private ConstantTerm[] createBlocks(int numBlocks) {
-		ConstantTerm[] blocks = new ConstantTerm[numBlocks];
-		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
-
+	private Block[] createBlocks(int numBlocks) {
+		Block[] blocks = new Block[numBlocks];
 		for (int i = 0; i < numBlocks; i++) {
 			String name = (char) ('a' + i) + "";
-			blocks[i] = factory
-					.createConstantTerm(new Block(name), Block.class);
+			blocks[i] = new Block(name);
 		}
 
 		return blocks;
@@ -280,7 +253,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The goal state.
 	 * @return The newly initialised blocks world state.
 	 */
-	private BlocksState initialiseWorld(int numBlocks, Rule goalState) {
+	private BlocksState initialiseWorld(int numBlocks, String goalState) {
 		Integer[] worldState = new Integer[numBlocks];
 		int[] contourState = new int[numBlocks];
 		Random random = new Random();
@@ -304,18 +277,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Check this isn't the goal state
-		stateKB_ = formState(worldState);
-		if (isGoal(stateKB_, goalState))
+		formState(worldState);
+		if (isGoal(rete_, goalState))
 			return initialiseWorld(numBlocks, goalState);
 		else
 			return new BlocksState(worldState);
-	}
-	
-	
-	private Rete formStateRete(Integer[] worldState) {
-		Rete stateKB = new Rete();
-		
-		return null;
 	}
 
 	/**
@@ -323,101 +289,56 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * 
 	 * @param worldState
 	 *            The state of the world in int form.
-	 * @return The knowledge base representing the world.
 	 */
-	private KnowledgeBase formState(Integer[] worldState) {
-		KnowledgeBase stateKB = new org.mandarax.reference.KnowledgeBase();
-		List<ClauseSet> backgroundClauses = StateSpec.getInstance()
-				.getBackgroundKnowledge().getClauseSets();
-		for (ClauseSet background : backgroundClauses)
-			stateKB.add(background);
+	private void formState(Integer[] worldState) {
+		try {
+			// Clear the old state
+			rete_.reset();
 
-		LogicFactory factory = PolicyGenerator.getInstance().getLogicFactory();
+			// Scanning through, making predicates (On, OnFloor, and Highest)
+			int[] heightMap = new int[worldState.length];
+			int maxHeight = 0;
+			List<Block> highestBlocks = new ArrayList<Block>();
+			for (int i = 0; i < worldState.length; i++) {
+				// On the floor
+				if (worldState[i] == 0) {
+					rete_.eval("(assert (onFloor " + blocks_[i].getName()
+							+ "))");
+				} else {
+					// On another block
+					rete_.eval("(assert (on " + blocks_[i].getName() + " "
+							+ blocks_[worldState[i] - 1].getName() + "))");
+				}
 
-		// Stating everything is clear until covered
-		List<Integer> clearBlocks = new ArrayList<Integer>();
-		for (int i = 0; i < worldState.length; i++) {
-			clearBlocks.add(i);
-		}
+				// Finding the heights
+				int blockHeight = heightMap[i];
+				if (blockHeight == 0) {
+					blockHeight = recurseHeight(i, heightMap, worldState);
+				}
+				if (blockHeight > maxHeight) {
+					maxHeight = blockHeight;
+					highestBlocks.clear();
+				}
+				if (blockHeight == maxHeight) {
+					highestBlocks.add(blocks_[i]);
+				}
 
-		// Add the state information for fulfilling goals
-		Object[] stateArray = { worldState, 1 };
-		BlocksWorldState state = new BlocksWorldState(stateArray);
-		Term currentState = factory.createConstantTerm(state, State.class);
-
-		// Scanning through, making predicates
-		// Height values
-		Integer maxHeight = 0;
-		int[] heightMap = new int[worldState.length];
-		List<ConstantTerm> highestBlocks = new ArrayList<ConstantTerm>();
-		
-		List<Prerequisite> preds = new ArrayList<Prerequisite>();
-		for (int i = 0; i < worldState.length; i++) {
-			// On the floor
-			if (worldState[i] == 0) {
-				Term[] terms = new Term[2];
-				terms[0] = currentState;
-				terms[1] = blocks_[i];
-				StateSpec.addContains(preds, StateSpec.getInstance()
-						.getGuidedPredicate("onFloor").factify(factory, terms,
-								false, false, null, null));
-			} else {
-				// On another block
-				Term[] terms = new Term[3];
-				terms[0] = currentState;
-				terms[1] = blocks_[i];
-				terms[2] = blocks_[worldState[i] - 1];
-				StateSpec.addContains(preds, StateSpec.getInstance()
-						.getGuidedPredicate("on").factify(factory, terms,
-								false, false, null, null));
-
-				// The other block is not clear
-				clearBlocks.remove((new Integer(worldState[i] - 1)));
+				// Assert the blocks
+				rete_.eval("(assert (block " + blocks_[i].getName() + "))");
 			}
 
-			// Finding the heights
-			int blockHeight = heightMap[i];
-			if (blockHeight == 0) {
-				blockHeight = recurseHeight(i, heightMap, worldState);
+			// Add the highest block/s
+			for (Block block : highestBlocks) {
+				rete_.eval("(assert (highest " + block.getName() + "))");
 			}
-			if (blockHeight > maxHeight) {
-				maxHeight = blockHeight;
-				highestBlocks.clear();
-			}
-			if (blockHeight == maxHeight) {
-				highestBlocks.add(blocks_[i]);
-			}
-		}
 
-		// Note the clear blocks
-		for (Integer blockInd : clearBlocks) {
-			Term[] terms = new Term[2];
-			terms[0] = currentState;
-			terms[1] = blocks_[blockInd];
-			StateSpec.addContains(preds, StateSpec.getInstance()
-					.getGuidedPredicate("clear").factify(factory, terms, false,
-							false, null, null));
-		}
-		
-		// Add the highest block/s
-		for (ConstantTerm block : highestBlocks) {
-			Term[] terms = new Term[2];
-			terms[0] = currentState;
-			terms[1] = block;
-			StateSpec.addContains(preds, StateSpec.getInstance()
-					.getGuidedPredicate("highest").factify(factory, terms, false,
-							false, null, null));
-		}
+			rete_.run();
 
-		// Adding the prereqs
-		for (Prerequisite preq : preds) {
-			stateKB.add(preq);
+			// Adding the valid actions
+			StateSpec.getInstance().insertValidActions(rete_);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-
-		// Adding the valid actions
-		StateSpec.getInstance().insertValidActions(stateKB);
-
-		return stateKB;
 	}
 
 	/**
@@ -464,8 +385,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Run the policy through the environment until goal is satisfied.
 		PolicyAgent optimalAgent = new PolicyAgent();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
-		optimalAgent.agent_message("Policy");
 		optimalAgent.agent_message("Optimal");
+		optimalAgent.agent_message("Policy");
 		Action act = optimalAgent.agent_start(formObs_Start());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = null;
@@ -482,7 +403,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Return the state to normal
 		state_ = initialState;
-		stateKB_ = formState(state_.getState());
+		formState(state_.getState());
 		optimalMap_.put(state_, steps_);
 		return steps_;
 	}

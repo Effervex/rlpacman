@@ -4,6 +4,11 @@ import static org.junit.Assert.*;
 
 import java.util.*;
 
+import jess.Fact;
+import jess.QueryResult;
+import jess.Rete;
+import jess.ValueVector;
+
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.junit.Before;
@@ -24,48 +29,7 @@ public class BlocksWorldStateSpecTest {
 	public void setUp() throws Exception {
 		BasicConfigurator.configure();
 		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
-		spec_ = StateSpec.initInstance("blocksWorld.BlocksWorld", LogicFactory
-				.getDefaultFactory());
-	}
-
-	@Test
-	public void testInitialise() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialiseTypePredicates() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialisePredicates() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialiseActions() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialiseGoalState() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialiseOptimalPolicy() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitialiseBackgroundKnowledge() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testAddConstant() {
-		fail("Not yet implemented");
+		spec_ = StateSpec.initInstance("blocksWorld.BlocksWorld");
 	}
 
 	@Test
@@ -73,7 +37,7 @@ public class BlocksWorldStateSpecTest {
 		// Basic variable test
 		String rule = spec_.parseRule("(clear ?X) => (moveFloor ?X)");
 		String body = rule.split("=>")[0];
-		int condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		int condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		String head = rule.split("=>")[1];
 		// 2 assertions in the body: clear, and block
 		assertEquals(condCount, 2);
@@ -85,7 +49,7 @@ public class BlocksWorldStateSpecTest {
 		// Test for a constant
 		rule = spec_.parseRule("(clear a) => (moveFloor a)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 2 assertions in the body: clear, and block, with a constant
 		// variable
@@ -98,7 +62,7 @@ public class BlocksWorldStateSpecTest {
 		// Test for constants (no inequals)
 		rule = spec_.parseRule("(clear a) (clear b) => (moveFloor a)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 4 assertions in the body: 2 clears, and 2 blocks, without an
 		// inequality test
@@ -113,7 +77,7 @@ public class BlocksWorldStateSpecTest {
 		// Multiple conditions, one term
 		rule = spec_.parseRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 3 assertions in the body: clear, highest, and a single block
 		assertEquals(condCount, 3);
@@ -126,7 +90,7 @@ public class BlocksWorldStateSpecTest {
 		// Multiple conditions, two terms
 		rule = spec_.parseRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
@@ -143,7 +107,7 @@ public class BlocksWorldStateSpecTest {
 		// Variables and constants
 		rule = spec_.parseRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
@@ -163,7 +127,7 @@ public class BlocksWorldStateSpecTest {
 		// Test anonymous variable
 		rule = spec_.parseRule("(clear ?X) (on ?X _) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
@@ -181,7 +145,7 @@ public class BlocksWorldStateSpecTest {
 		rule = spec_
 				.parseRule("(clear ?X) (on ?X _) (on ?Y _) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
@@ -204,7 +168,7 @@ public class BlocksWorldStateSpecTest {
 		// Test type predicate
 		rule = spec_.parseRule("(block ?X) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		assertEquals(condCount, 1);
 		assertTrue(body.contains("(block ?X)"));
@@ -213,7 +177,7 @@ public class BlocksWorldStateSpecTest {
 		// Test inequal type predicates
 		rule = spec_.parseRule("(block ?X) (block ?Y) => (move ?X ?Y)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		assertEquals(condCount, 3);
 		assertTrue(body.contains("(block ?X)"));
@@ -224,7 +188,7 @@ public class BlocksWorldStateSpecTest {
 		// Test existing type predicate
 		rule = spec_.parseRule("(clear ?X) (block ?X) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\) ", ".").length();
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		assertEquals(condCount, 2);
 		assertTrue(body.contains("(block ?X)"));
@@ -233,108 +197,8 @@ public class BlocksWorldStateSpecTest {
 	}
 
 	@Test
-	public void testGetPredicates() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetActions() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetGoalState() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetOptimalPolicy() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetBackgroundKnowledge() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetConstants() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetTypePredicate() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testIsTypePredicate() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetGuidedPredicate() {
-		fail("Not yet implemented");
-	}
-
-	@Test
 	public void testToString() {
 		assertEquals("StateSpec", spec_.toString());
-	}
-
-	@Test
-	public void testCreateDefinedPredicate() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testCreateTied() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testCreateTiedAndFree() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInsertState() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetTerminalFact() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetStateTerm() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetSpecTerm() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetInequalityPredicate() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testAddContains() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testGetInstance() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testInitInstance() {
-		fail("Not yet implemented");
 	}
 
 	@Test
@@ -353,24 +217,96 @@ public class BlocksWorldStateSpecTest {
 				+ "(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		assertTrue(result.equals("(clear ?X) (clear ?Y) => (move ?X ?Y)"));
 
-		result = spec_
-				.encodeRule("(block a) => (moveFloor a)");
+		result = spec_.encodeRule("(block a) => (moveFloor a)");
 		assertTrue(result.equals("(block a) => (moveFloor a)"));
 	}
 
 	@Test
-	public void testLightenFact() {
-		fail("Not yet implemented");
-	}
+	public void testInsertValidActions() throws Exception {
+		Rete state = spec_.getRete();
 
+		// Set up the query to find the facts
+		state.eval("(defquery listActions (" + StateSpec.VALID_ACTIONS
+				+ " (move $?X) (moveFloor $?Y)))");
+
+		// Empty case
+		spec_.insertValidActions(state);
+		state.eval("(facts)");
+		QueryResult result = state.runQueryStar("listActions",
+				new ValueVector());
+		assertTrue(result.next());
+		String moveResult = result.get("X").toString();
+		assertEquals("", moveResult);
+		String moveFloorResult = result.get("Y").toString();
+		assertEquals("", moveFloorResult);
+		state.reset();
+
+		// Simple move case
+		state.eval("(assert (clear a))");
+		state.eval("(assert (clear b))");
+		spec_.insertValidActions(state);
+		state.eval("(facts)");
+		result = state.runQueryStar("listActions", new ValueVector());
+		assertTrue(result.next());
+		moveResult = result.get("X").toString();
+		assertTrue(moveResult.contains("\"a b\""));
+		assertTrue(moveResult.contains("\"b a\""));
+		moveFloorResult = result.get("Y").toString();
+		assertEquals("", result.get("Y").toString());
+		state.reset();
+
+		// Simple moveFloor case
+		state.eval("(assert (clear v))");
+		state.eval("(assert (on v y))");
+		spec_.insertValidActions(state);
+		state.eval("(facts)");
+		result = state.runQueryStar("listActions", new ValueVector());
+		assertTrue(result.next());
+		moveResult = result.get("X").toString();
+		assertEquals("", result.get("X").toString());
+		moveFloorResult = result.get("Y").toString();
+		assertEquals("\"v\"", result.get("Y").toString());
+		state.reset();
+
+		// Complex both case
+		state.eval("(assert (clear d))");
+		state.eval("(assert (clear e))");
+		state.eval("(assert (clear c))");
+		state.eval("(assert (on e b))");
+		state.eval("(assert (on d a))");
+		state.eval("(assert (onFloor c))");
+		spec_.insertValidActions(state);
+		state.eval("(facts)");
+		result = state.runQueryStar("listActions", new ValueVector());
+		assertTrue(result.next());
+		moveResult = result.get("X").toString();
+		assertTrue(moveResult.contains("\"d e\""));
+		assertTrue(moveResult.contains("\"d c\""));
+		assertTrue(moveResult.contains("\"e d\""));
+		assertTrue(moveResult.contains("\"e c\""));
+		assertTrue(moveResult.contains("\"c d\""));
+		assertTrue(moveResult.contains("\"c e\""));
+		moveFloorResult = result.get("Y").toString();
+		assertTrue(moveFloorResult.contains("\"d\""));
+		assertTrue(moveFloorResult.contains("\"e\""));
+	}
+	
 	@Test
-	public void testAddKBFact() {
-		fail("Not yet implemented");
+	public void testSplitFact() {
+		// Basic
+		String[] result = StateSpec.splitFact("(clear a)");
+		assertArrayEquals(new String[] {"clear", "a"}, result);
+		
+		// More complex
+		result = StateSpec.splitFact("(on a b)");
+		assertArrayEquals(new String[] {"on", "a", "b"}, result);
+		
+		// No parentheses
+		result = StateSpec.splitFact("clear a");
+		assertArrayEquals(new String[] {"clear", "a"}, result);
+		
+		// Module declaration
+		result = StateSpec.splitFact("(MAIN::clear a)");
+		assertArrayEquals(new String[] {"clear", "a"}, result);
 	}
-
-	@Test
-	public void testInequal() {
-		fail("Not yet implemented");
-	}
-
 }
