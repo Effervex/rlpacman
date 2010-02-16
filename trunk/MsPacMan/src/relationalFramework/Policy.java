@@ -9,16 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.InferenceEngine;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.Query;
-import org.mandarax.kernel.Replacement;
-import org.mandarax.kernel.ResultSet;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.Term;
-import org.mandarax.kernel.VariableTerm;
-import org.mandarax.util.LogicFactorySupport;
+import jess.QueryResult;
+import jess.Rete;
+import jess.ValueVector;
 
 /**
  * This class represents a policy that the agent can use.
@@ -28,6 +21,8 @@ import org.mandarax.util.LogicFactorySupport;
 public class Policy {
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = '#';
+	public static final String POLICY_RULE = "polRule";
+	public static final String OPTIMAL_RULE = "optimal";
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<GuidedRule> policyRules_;
 	/** The triggered rules in the policy */
@@ -42,6 +37,24 @@ public class Policy {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
+	}
+
+	/**
+	 * Creates the queries the policy uses to check if it's rules are firing.
+	 * 
+	 * @param rete
+	 *            The rete object to add the queries to.
+	 */
+	public void createQueries(Rete rete, boolean optimal) {
+		try {
+			for (int i = 0; i < policyRules_.size(); i++) {
+				String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
+				rete.eval("(defquery " + prefix + i + " ("
+						+ policyRules_.get(i).getConditions() + "))");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -71,7 +84,8 @@ public class Policy {
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
-			buffer.append(StateSpec.encodeRule(rule.toString()) + "\n");
+			buffer.append(StateSpec.getInstance().encodeRule(rule.toString())
+					+ "\n");
 		}
 		return buffer.toString();
 	}
@@ -86,76 +100,60 @@ public class Policy {
 	 *            The current actions.
 	 * @param actionsReturned
 	 *            The number of actions to be returned.
+	 * @param optimal
+	 *            If the policy is an optimal test one.
 	 */
-	public void evaluatePolicy(KnowledgeBase state, ActionSwitch actionSwitch,
-			int actionsReturned) {
-		// Logic constructs
-		LogicFactorySupport factorySupport = new LogicFactorySupport(
-				PolicyGenerator.getInstance().getLogicFactory());
-		InferenceEngine ie = PolicyGenerator.getInstance().getInferenceEngine();
-
+	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
+			int actionsReturned, boolean optimal) {
 		// A table for already completed requests
-		Map<RuleCondition, ResultSet> resultTable = new HashMap<RuleCondition, ResultSet>();
+		Map<String, QueryResult> resultTable = new HashMap<String, QueryResult>();
 
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
 		Iterator<GuidedRule> iter = policyRules_.iterator();
+		int ruleNumber = 0;
 		while ((actionsFound < actionsReturned) && (iter.hasNext())) {
 			GuidedRule gr = iter.next();
-			Rule rule = gr.getRule();
+			String conditions = gr.getConditions();
 
 			// Setting up the necessary variables
-			RuleCondition ruleConds = new RuleCondition(rule.getBody());
-			ResultSet results = resultTable.get(ruleConds);
+			QueryResult results = resultTable.get(conditions);
 
 			// Find the result set
 			// TODO Evaluate rules in a step-wise fashion, to infer how much of
 			// a rule fires
 			try {
 				if (results == null) {
-					Fact[] ruleConditions = ruleConds.getFactArray();
-
 					// Forming the query
-					Query query = factorySupport.query(ruleConditions, rule
-							.toString());
-
-					results = ie.query(query, state, InferenceEngine.ONE,
-							InferenceEngine.BUBBLE_EXCEPTIONS);
-					resultTable.put(ruleConds, results);
+					String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
+					results = state.runQueryStar(prefix + ruleNumber,
+							new ValueVector());
+					resultTable.put(conditions, results);
 				}
 
 				// If there is at least one result
 				if (results.next()) {
 					triggeredRules_.add(gr);
-					Fact action = null;
 					// For each possible replacement
 					do {
-						Map<Term, Term> replacementMap = results.getResults();
-						Collection<Replacement> replacements = new ArrayList<Replacement>();
-						// Find the replacements for the variable terms
-						// in the action
-						for (Term var : rule.getHead().getTerms()) {
-							if (var instanceof VariableTerm) {
-								replacements.add(new Replacement(var,
-										replacementMap.get(var)));
-							} else {
-								replacements.add(new Replacement(var, var));
-							}
-						}
+						// Get the rule action, without brackets
+						String[] split = StateSpec.splitFact(gr.getAction());
+						StringBuffer actBuffer = new StringBuffer("("
+								+ split[0]);
 
 						// TODO Check that the action is within the valid action
 						// set
-						// Apply the replacements and add the fact to
-						// the set
-						Fact groundAction = rule.getHead().applyToFact(
-								replacements);
-						// If the action is ground
-						action = groundAction;
-					} while (results.next());
 
-					// Use the found action set as a result.
-					actionSwitch.switchOn(action, actionsFound);
-					actionsFound++;
+						for (int i = 1; i < split.length; i++) {
+							actBuffer.append(" "
+									+ results.getSymbol(split[i].substring(1)));
+						}
+						actBuffer.append(")");
+						
+						// Use the found action set as a result.
+						actionSwitch.switchOn(actBuffer.toString(), actionsFound);
+						actionsFound++;
+					} while (results.next());
 				}
 				results.close();
 			} catch (Exception e) {
@@ -169,7 +167,8 @@ public class Policy {
 			List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
 					.triggerCovering(state);
 			policyRules_.addAll(coveredRules);
-			evaluatePolicy(state, actionSwitch, actionsReturned);
+			createQueries(state, false);
+			evaluatePolicy(state, actionSwitch, actionsReturned, optimal);
 		}
 	}
 }

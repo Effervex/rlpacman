@@ -12,14 +12,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.mandarax.kernel.ClauseSet;
-import org.mandarax.kernel.ConstantTerm;
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Predicate;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.Term;
+import jess.Fact;
+import jess.Rete;
+import jess.Value;
+import jess.ValueVector;
 
 /**
  * A class which deals specifically with covering rules from a state.
@@ -33,24 +29,11 @@ public class Covering {
 	private static final int MAX_UNIFICATION_INACTIVITY = 3;
 	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 10;
 
-	/** The logic factory for the experiment. */
-	private LogicFactory factory_;
-
 	/** The pre-goal state, for use in covering specialisations. */
-	private List<Fact> preGoalState_;
+	private List<String> preGoalState_;
 
 	/** The last time since the pre-goal state changed. */
 	private int preGoalUnificationInactivity_ = 0;
-
-	/**
-	 * Covering constructor.
-	 * 
-	 * @param factory
-	 *            The logic factory for the experiment.
-	 */
-	public Covering(LogicFactory factory) {
-		factory_ = factory;
-	}
 
 	/**
 	 * Covers a state by creating a rule for every action type present in the
@@ -60,21 +43,18 @@ public class Covering {
 	 *            The state of the environment, containing the valid actions.
 	 * @return A list of guided rules, one for each action type.
 	 */
-	public List<GuidedRule> coverState(KnowledgeBase state) {
-		// Find the relevant conditions for each term
-		MultiMap<Term, Fact> relevantConditions = new MultiMap<Term, Fact>();
+	public List<GuidedRule> coverState(Rete state) throws Exception {
+		// The relevant facts which contain the key term
+		MultiMap<String, Fact> relevantConditions = new MultiMap<String, Fact>();
 		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
 
 		// Maintain a mapping for each action, to be used in unification between
 		// actions
 		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
 
-		// Arrange the actions in a heuristical order such that unification
-		// should be most effective.
-		@SuppressWarnings("unchecked")
-		MultiMap<Predicate, Fact> validActions = arrangeActions((Set<Fact>) ((ConstantTerm) actionFact
-				.getTerms()[0]).getObject());
-		for (Predicate action : validActions.keySet()) {
+		// A multimap with the action predicate as key and args as values.
+		MultiMap<String, String> validActions = arrangeActions(actionFact);
+		for (String action : validActions.keySet()) {
 			GuidedRule actionRule = unifyActionRules(validActions.get(action),
 					relevantConditions, action);
 			generalActions.add(actionRule);
@@ -94,7 +74,7 @@ public class Covering {
 	 * @return A list of newly specialised rules, where each is more specialised
 	 *         than the general rule but still match the state.
 	 */
-	public List<GuidedRule> specialiseRule(GuidedRule rule, KnowledgeBase state) {
+	public List<GuidedRule> specialiseRule(GuidedRule rule, Rete state) {
 		// TODO Specialise rule to a state
 		return null;
 	}
@@ -124,14 +104,12 @@ public class Covering {
 	 * @return True if the state was last active at most
 	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
 	 */
-	public boolean formPreGoalState(KnowledgeBase state, Fact action) {
+	public boolean formPreGoalState(Rete state, String action) {
 		// If the preGoal state hasn't changed for
 		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
 		// again, it's probably already at minimum.
 		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY) {
-			// Get the list of clause sets, turn them all into facts, and unify
-			// them
-			List<ClauseSet> clauseSets = state.getClauseSets();
+
 			// TODO Form the pre goal state in a general form.
 			return true;
 		}
@@ -141,7 +119,7 @@ public class Covering {
 	/**
 	 * Unifies action rules together into one general all-covering rule.
 	 * 
-	 * @param actionsList
+	 * @param argsList
 	 *            A heuristically sorted list of actions for a single predicate.
 	 * @param relevantConditions
 	 *            The relevant conditions for each term in the state.
@@ -149,39 +127,36 @@ public class Covering {
 	 *            The action predicate spawning this rule.
 	 * @return A Rule representing a general action.
 	 */
-	private GuidedRule unifyActionRules(List<Fact> actionsList,
-			MultiMap<Term, Fact> relevantConditions, Predicate actionPred) {
+	private GuidedRule unifyActionRules(List<String> argsList,
+			MultiMap<String, Fact> relevantConditions, String actionPred) {
 		// The general rule for the action
 		Collection<String> generalRule = null;
 		Collection<String> stringTerms = new HashSet<String>();
 		String actionString = formatAction(actionPred, stringTerms);
 
 		int lastChanged = 0;
-		Iterator<Fact> actionIter = actionsList.iterator();
+		Iterator<String> argIter = argsList.iterator();
 		// Do until:
 		// 1) We have no actions left to look at
 		// 2) Or the general rule isn't minimal
 		boolean isMinimal = false;
-		while ((actionIter.hasNext()) && (!isMinimal)) {
-			Fact action = actionIter.next();
+		while ((argIter.hasNext()) && (!isMinimal)) {
+			String arg = argIter.next();
 			List<Fact> actionFacts = new ArrayList<Fact>();
 
-			Term[] actionTerms = action.getTerms();
+			String[] terms = arg.split(" ");
 			// Find the facts containing the same (useful) terms in the action
-			for (int i = 0; i < actionTerms.length; i++) {
-				Term term = actionTerms[i];
-				if (StateSpec.isUsefulTerm((ConstantTerm) term, factory_)) {
-					List<Fact> termFacts = relevantConditions.get(term);
-					for (Fact termFact : termFacts) {
-						if (!actionFacts.contains(termFact))
-							actionFacts.add(termFact);
-					}
+			for (int i = 0; i < terms.length; i++) {
+				List<Fact> termFacts = relevantConditions.get(terms[i]);
+				for (Fact termFact : termFacts) {
+					if (!actionFacts.contains(termFact))
+						actionFacts.add(termFact);
 				}
 			}
 
 			// Inversely substitute the terms for variables (in string form)
 			Collection<String> inverseSubbed = inverselySubstitute(actionFacts,
-					actionTerms);
+					terms);
 
 			// Unify with other action rules of the same action
 			if (generalRule == null) {
@@ -200,7 +175,7 @@ public class Covering {
 
 		// Use the unified rules to create new rules
 		String joinedRule = joinRule(generalRule, actionString);
-		GuidedRule rule = new GuidedRule(joinedRule, isMinimal, false);
+		GuidedRule rule = new GuidedRule(joinedRule, isMinimal, false, null);
 		return rule;
 	}
 
@@ -259,12 +234,8 @@ public class Covering {
 	 */
 	public String joinRule(Collection<String> conditions, String action) {
 		StringBuffer buffer = new StringBuffer();
-		boolean first = true;
 		for (String condition : conditions) {
-			if (!first)
-				buffer.append(StateSpec.AND + " ");
 			buffer.append(condition + " ");
-			first = false;
 		}
 
 		buffer.append(StateSpec.INFERS_ACTION + " " + action);
@@ -272,7 +243,9 @@ public class Covering {
 	}
 
 	/**
-	 * Formats the action into a variable action string.
+	 * Formats the action into a variable action string. So (move a b) becomes
+	 * (move ?X ?Y), and the actionTerms simply note which terms are in the
+	 * action.
 	 * 
 	 * @param actionPred
 	 *            The action predicate being formatted.
@@ -280,24 +253,16 @@ public class Covering {
 	 *            The terms present in the action to be filled.
 	 * @return A string version of the predicate, with variable terms.
 	 */
-	public String formatAction(Predicate actionPred,
-			Collection<String> actionTerms) {
+	public String formatAction(String actionPred, Collection<String> actionTerms) {
 		StringBuffer buffer = new StringBuffer();
 
 		// Formatting the action
-		buffer.append(actionPred.getName() + "(");
-		int i = 0;
-		boolean first = true;
-		for (Class structure : actionPred.getStructure()) {
-			if (StateSpec.isUsefulClass(structure, factory_)) {
-				if (!first)
-					buffer.append(",");
-				String term = getVariableTermString(i);
-				actionTerms.add(term);
-				buffer.append(term);
-				i++;
-				first = false;
-			}
+		buffer.append("(" + actionPred);
+		for (int i = 0; i < StateSpec.getInstance().getActions()
+				.get(actionPred).size(); i++) {
+			String term = getVariableTermString(i);
+			actionTerms.add(term);
+			buffer.append(" " + term);
 		}
 		buffer.append(")");
 		return buffer.toString();
@@ -314,35 +279,34 @@ public class Covering {
 	 * @return A collection of the facts in inversely substituted string format.
 	 */
 	private Collection<String> inverselySubstitute(List<Fact> actionFacts,
-			Term[] actionTerms) {
+			String[] actionTerms) {
 		// Building the mapping from necessary constants to variables
 		Map<String, String> termMapping = new HashMap<String, String>();
 		int i = 0;
-		for (Term term : actionTerms) {
-			ConstantTerm constantTerm = (ConstantTerm) term;
-			if (StateSpec.isUsefulTerm(constantTerm, factory_)) {
-				termMapping.put(
-						getConstantTermString(constantTerm.getObject()),
-						getVariableTermString(i));
-				i++;
-			}
+		for (String term : actionTerms) {
+			termMapping.put(term,
+					getVariableTermString(i));
+			i++;
 		}
 
 		Collection<String> substitution = new ArrayList<String>();
 		// Applying the mapping to each condition, making unnecessary terms into
 		// anonymous terms.
 		for (Fact fact : actionFacts) {
-			String factString = StateSpec.lightenFact(fact);
-			// Replace all constant terms in the action with matching variables
-			for (String actionTerm : termMapping.keySet()) {
-				factString = factString.replaceAll(Pattern.quote(actionTerm),
-						termMapping.get(actionTerm));
+			String[] factSplit = StateSpec.splitFact(fact.toString());
+			// Replace all constant terms in the action with matching variables or anonymous variables
+			for (int j = 1; j < factSplit.length; j++) {
+				String replacementTerm = termMapping.get(factSplit[j]);
+				if (replacementTerm != null)
+					factSplit[j] = replacementTerm;
+				else
+					factSplit[j] = StateSpec.ANONYMOUS + "";
 			}
 
-			// Replace all other terms with anonymous string.
-			factString = factString.replaceAll("\\[.+?\\]", StateSpec.ANONYMOUS
-					+ "");
-			substitution.add(factString);
+			// Reform the fact and add it back
+			String reformedFact = StateSpec.reformFact(factSplit);
+			if (!substitution.contains(reformedFact))
+				substitution.add(reformedFact);
 		}
 		return substitution;
 	}
@@ -356,29 +320,38 @@ public class Covering {
 	 * 
 	 * @param validActions
 	 *            The set of valid actions.
-	 * @return A multimap of each action predicate, containing the heuristically
-	 *         ordered actions.
+	 * @return A multimap of each action predicate, with the action as key and
+	 *         the args as values, containing the heuristically ordered actions.
 	 */
-	private MultiMap<Predicate, Fact> arrangeActions(Set<Fact> validActions) {
-		// Initialise a map for each action predicate
-		MultiMap<Predicate, Fact> actionsMap = new MultiMap<Predicate, Fact>();
-		MultiMap<Predicate, Set<Term>> usedTermsMap = new MultiMap<Predicate, Set<Term>>();
+	private MultiMap<String, String> arrangeActions(Fact validActions)
+			throws Exception {
+		// Initialise a map for each action predicate (move {"a b" "b c"...})
+		MultiMap<String, String> actionsMap = new MultiMap<String, String>();
+		// A multimap which deals with each argument (move {{a,b,c} {b,e,d}})
+		MultiMap<String, Set<String>> usedTermsMap = new MultiMap<String, Set<String>>();
 
-		MultiMap<Predicate, Fact> notUsedMap = new MultiMap<Predicate, Fact>();
+		// A multimap recording similar actions (move {"a b" "a c"...})
+		MultiMap<String, String> notUsedMap = new MultiMap<String, String>();
 		// For each action
-		for (Fact action : validActions) {
-			Predicate actionPred = action.getPredicate();
-			if (isDissimilarAction(action, usedTermsMap)) {
-				actionsMap.put(actionPred, action);
-			} else {
-				notUsedMap.put(actionPred, action);
+		for (String action : StateSpec.getInstance().getActions().keySet()) {
+			// TODO May have to provide context
+			ValueVector args = validActions.getSlotValue(action)
+					.listValue(null);
+			// Run through the valid args for the action
+			for (int i = 0; i < args.size(); i++) {
+				String arg = args.get(i).stringValue(null);
+				if (isDissimilarAction(arg, action, usedTermsMap)) {
+					actionsMap.put(action, arg);
+				} else {
+					notUsedMap.put(action, arg);
+				}
 			}
 		}
 
 		// If we have some actions not used (likely, then shuffle the ordering
 		// and add them to the end of the actions map.
 		if (!notUsedMap.isEmpty()) {
-			for (List<Fact> notUsed : notUsedMap.valuesLists()) {
+			for (List<String> notUsed : notUsedMap.valuesLists()) {
 				Collections.shuffle(notUsed);
 			}
 			actionsMap.putAll(notUsedMap);
@@ -392,37 +365,36 @@ public class Covering {
 	 * measured by which terms have already been seen in their appropriate
 	 * predicate slots.
 	 * 
+	 * @param arg
+	 *            The arguments to the action "a b".
 	 * @param action
-	 *            The action being checked.
+	 *            The action name.
 	 * @param usedTermsMap
 	 *            The already used terms mapping.
 	 * @return True if the action is dissimilar, false otherwise.
 	 */
-	private boolean isDissimilarAction(Fact action,
-			MultiMap<Predicate, Set<Term>> usedTermsMap) {
-		Term[] terms = action.getTerms();
-		Predicate actionPred = action.getPredicate();
+	private boolean isDissimilarAction(String arg, String action,
+			MultiMap<String, Set<String>> usedTermsMap) {
+		String[] terms = arg.split(" ");
 		// Run through each term
 		for (int i = 0; i < terms.length; i++) {
 			// Checking if the term set already exists
-			Set<Term> usedTerms = usedTermsMap.getIndex(actionPred, i);
+			Set<String> usedTerms = usedTermsMap.getIndex(action, i);
 			if (usedTerms == null) {
-				usedTerms = new HashSet<Term>();
-				usedTermsMap.put(actionPred, usedTerms);
+				usedTerms = new HashSet<String>();
+				usedTermsMap.put(action, usedTerms);
 			}
 
-			ConstantTerm term = (ConstantTerm) terms[i];
 			// If the term has already been used (but isn't a state or state
 			// spec term), return false
-			if ((usedTerms.contains(term))
-					&& (StateSpec.getInstance().isUsefulTerm(term, factory_)))
+			if (usedTerms.contains(terms[i]))
 				return false;
 		}
 
 		// If the terms have not been used before, add them all to their
 		// appropriate sets.
 		for (int i = 0; i < terms.length; i++) {
-			usedTermsMap.getIndex(actionPred, i).add(terms[i]);
+			usedTermsMap.getIndex(action, i).add(terms[i]);
 		}
 
 		return true;
@@ -435,54 +407,29 @@ public class Covering {
 	 * 
 	 * @param state
 	 *            The state containing the conditions.
-	 * @return A mapping of conditions with terms as the key. Ignores type,
-	 *         inequal, action facts and state and state spec terms.
+	 * @param relevantConditions
+	 *            The relevant conditions mapping to be filled.
+	 * @return The action fact.
 	 */
-	private Fact compileRelevantConditionMap(KnowledgeBase state,
-			MultiMap<Term, Fact> relevantConditions) {
+	@SuppressWarnings("unchecked")
+	private Fact compileRelevantConditionMap(Rete state,
+			MultiMap<String, Fact> relevantConditions) {
 		Fact actionFact = null;
 
-		List<ClauseSet> clauseSets = state.getClauseSets();
-		for (ClauseSet cs : clauseSets) {
-			// If the clause is a fact, use it
-			if (cs instanceof Fact) {
-				Fact stateFact = (Fact) cs;
-				// Ignore the type, inequal and actions pred
-				if (StateSpec.getInstance().isUsefulPredicate(
-						stateFact.getPredicate()))
-					extractTerms(stateFact, relevantConditions);
+		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
+			Fact stateFact = factIter.next();
+			// Ignore the type, inequal and actions pred
+			String[] split = StateSpec.splitFact(stateFact.toString());
+			if (StateSpec.getInstance().isUsefulPredicate(split[0])) {
+				for (int i = 1; i < split.length; i++) {
+					relevantConditions.putContains(split[i], stateFact);
+				}
 				// Find the action fact
-				else if (stateFact.getPredicate().equals(
-						StateSpec.getValidActionsPredicate()))
-					actionFact = stateFact;
-			}
-
-			// TODO If the clause is a rule, use the rule to find background
-			// clause facts.
+			} else if (split[0].equals(StateSpec.VALID_ACTIONS))
+				actionFact = stateFact;
 		}
 
 		return actionFact;
-	}
-
-	/**
-	 * Extracts the terms from a fact and adds them to an appropriate position
-	 * within the conditionMap.
-	 * 
-	 * @param stateFact
-	 *            The fact being examined.
-	 * @param conditionMap
-	 *            The condition map to add to.
-	 */
-	private void extractTerms(Fact stateFact, MultiMap<Term, Fact> conditionMap) {
-		Term[] terms = stateFact.getTerms();
-		for (Term term : terms) {
-			// Ignore the state and state spec terms
-			if (StateSpec.getInstance().isUsefulTerm((ConstantTerm) term,
-					factory_)) {
-				// Add to map, if not already there
-				conditionMap.putContains(term, stateFact);
-			}
-		}
 	}
 
 	/**
@@ -490,7 +437,7 @@ public class Covering {
 	 * 
 	 * @return The pre-goal state, in the form of a list of facts.
 	 */
-	public List<Fact> getPreGoalState() {
+	public List<String> getPreGoalState() {
 		return preGoalState_;
 	}
 
@@ -505,7 +452,7 @@ public class Covering {
 	public static String getVariableTermString(int i) {
 		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
 				% (MODULO_CHAR - FIRST_CHAR));
-		return "<" + variable + ">";
+		return "?" + variable;
 	}
 
 	public static String getConstantTermString(Object obj) {

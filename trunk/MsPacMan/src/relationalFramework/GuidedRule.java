@@ -63,6 +63,14 @@ public class GuidedRule {
 	public Slot getSlot() {
 		return slot_;
 	}
+	
+	public String getConditions() {
+		return ruleConditions_;
+	}
+	
+	public String getAction() {
+		return ruleAction_;
+	}
 
 	public void setSlot(Slot slot) {
 		slot_ = slot;

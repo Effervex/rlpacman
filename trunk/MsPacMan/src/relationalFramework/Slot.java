@@ -1,7 +1,5 @@
 package relationalFramework;
 
-import org.mandarax.kernel.Predicate;
-
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
  * within and any other pertinent information.
@@ -16,7 +14,7 @@ public class Slot {
 	private ProbabilityDistribution<GuidedRule> backupGenerator_;
 
 	/** The action which all rules within lead to. */
-	private Predicate action_;
+	private String action_;
 
 	/** If this slot is fixed. */
 	private boolean fixed_ = false;
@@ -27,7 +25,7 @@ public class Slot {
 	 * @param action
 	 *            The action the slot rules lead to.
 	 */
-	public Slot(Predicate action) {
+	public Slot(String action) {
 		action_ = action;
 		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>();
 	}
@@ -79,7 +77,7 @@ public class Slot {
 	 * 
 	 * @return The action the slot covers.
 	 */
-	public Predicate getAction() {
+	public String getAction() {
 		return action_;
 	}
 

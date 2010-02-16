@@ -11,19 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.mandarax.kernel.ClauseSet;
-import org.mandarax.kernel.ConstantTerm;
-import org.mandarax.kernel.Fact;
-import org.mandarax.kernel.InferenceEngine;
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Predicate;
-import org.mandarax.kernel.Replacement;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.Term;
-import org.mandarax.kernel.VariableTerm;
-import org.mandarax.kernel.meta.JConstructor;
-import org.mandarax.reference.DefaultInferenceEngine;
+import jess.Rete;
 
 /**
  * A class for the generation of policies. The number of slots and the rules
@@ -36,25 +24,13 @@ public class PolicyGenerator {
 	private ProbabilityDistribution<Slot> policyGenerator_;
 
 	/** The actions set the generator was initialised with. */
-	private Collection<GuidedPredicate> actionSet_;
+	private MultiMap<String, Class> actionSet_;
 
 	/** If the generator is currently frozen. */
 	private boolean frozen_ = false;
 
 	/** The instance. */
 	private static PolicyGenerator instance_;
-
-	/** The single logic factory. */
-	private LogicFactory factory_;
-
-	/** The single inference engine. */
-	private InferenceEngine inferenceEngine_;
-
-	/** The cross-entropy generators for the conditions within the rules. */
-	private Collection<GuidedPredicate> conditionGenerator_;
-
-	/** The cross-entropy generators for the actions within the rules. */
-	private Collection<GuidedPredicate> actionGenerator_;
 
 	/** The class prefix for the experiment. */
 	private String classPrefix_;
@@ -63,7 +39,7 @@ public class PolicyGenerator {
 	private Covering covering_;
 
 	/** The maximally general rules for each action. */
-	private Map<Predicate, GuidedRule> maximallyGeneralRules_;
+	private Map<String, GuidedRule> maximallyGeneralRules_;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -72,31 +48,13 @@ public class PolicyGenerator {
 	 *            The class prefix for the environment.
 	 */
 	public PolicyGenerator(String classPrefix) {
-		factory_ = LogicFactory.getDefaultFactory();
-		inferenceEngine_ = new DefaultInferenceEngine();
-		StateSpec.initInstance(classPrefix, factory_);
+		StateSpec.initInstance(classPrefix);
 		actionSet_ = StateSpec.getInstance().getActions();
 		classPrefix_ = classPrefix;
-		conditionGenerator_ = formConditions();
-		actionGenerator_ = formActions();
-		covering_ = new Covering(factory_);
-		maximallyGeneralRules_ = new HashMap<Predicate, GuidedRule>();
+		covering_ = new Covering();
+		maximallyGeneralRules_ = new HashMap<String, GuidedRule>();
 
 		resetGenerator();
-	}
-
-	/**
-	 * A private constructor for creating a rule base from file.
-	 * 
-	 * @param classPrefix
-	 *            The class prefix for the environment.
-	 * @param ruleBaseFile
-	 *            The file from which to load the rules.
-	 */
-	private ProbabilityDistribution<Slot> loadRuleBase(String classPrefix,
-			File ruleBaseFile) {
-		return RuleFileManager.loadRulesFromFile(ruleBaseFile,
-				conditionGenerator_, actionGenerator_);
 	}
 
 	/**
@@ -108,65 +66,6 @@ public class PolicyGenerator {
 	 */
 	public void loadGenerators(File input) {
 		RuleFileManager.loadGenerators(input, policyGenerator_);
-	}
-
-	/**
-	 * Creates all possible conditions from within the StateSpec.
-	 * 
-	 * @return The conditions generator.
-	 */
-	private ProbabilityDistribution<GuidedPredicate> formConditions() {
-		// Extracting the information from the StateSpec
-		StateSpec ss = StateSpec.getInstance();
-		KnowledgeBase bk = ss.getBackgroundKnowledge();
-		ProbabilityDistribution<GuidedPredicate> obsGenerator = new ProbabilityDistribution<GuidedPredicate>();
-
-		// Adding all the possible conditions
-		List<GuidedPredicate> observationPreds = ss.getPredicates();
-		// The number of base observation predicates + the empty predicate
-		double baseWeight = 1.0 / (observationPreds.size());
-		for (GuidedPredicate pred : observationPreds) {
-			Collection<GuidedPredicate> loosePredicates = pred
-					.createAllLooseInstantiations(bk, factory_,
-							inferenceEngine_);
-			double thisWeight = baseWeight
-					/ (Math.max(1, loosePredicates.size()));
-			for (GuidedPredicate loosePred : loosePredicates) {
-				obsGenerator.add(loosePred, thisWeight);
-			}
-		}
-		if (!obsGenerator.sumsToOne())
-			obsGenerator.normaliseProbs();
-		return obsGenerator;
-	}
-
-	/**
-	 * Creates all possible actions from within the StateSpec.
-	 * 
-	 * @return The actions generator.
-	 */
-	private ProbabilityDistribution<GuidedPredicate> formActions() {
-		// Extracting the information from the StateSpec
-		StateSpec ss = StateSpec.getInstance();
-		KnowledgeBase bk = ss.getBackgroundKnowledge();
-		ProbabilityDistribution<GuidedPredicate> actGenerator = new ProbabilityDistribution<GuidedPredicate>();
-
-		List<GuidedPredicate> actionPreds = ss.getActions();
-		double actionWeight = 1.0 / actionPreds.size();
-		// Adding the actions
-		for (GuidedPredicate act : actionPreds) {
-			Collection<GuidedPredicate> looseActions = act
-					.createAllLooseInstantiations(bk, factory_,
-							inferenceEngine_);
-			double thisWeight = actionWeight
-					/ (Math.max(1, looseActions.size()));
-			for (GuidedPredicate looseAct : looseActions) {
-				actGenerator.add(looseAct, thisWeight);
-			}
-		}
-		if (!actGenerator.sumsToOne())
-			actGenerator.normaliseProbs();
-		return actGenerator;
 	}
 
 	/**
@@ -208,27 +107,28 @@ public class PolicyGenerator {
 	 *            actions to take.
 	 * @return The list of covered rules, one for each action type.
 	 */
-	public List<GuidedRule> triggerCovering(KnowledgeBase state) {
+	public List<GuidedRule> triggerCovering(Rete state) {
 		System.out.println("<COVERING TRIGGERED:>");
 
-		List<GuidedRule> covered = covering_.coverState(state);
+		List<GuidedRule> covered = null;
+		try {
+			covered = covering_.coverState(state);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		// Add remaining information to rules.
 		for (GuidedRule coveredRule : covered) {
-			ArrayList<GuidedPredicate> rulePreds = inferGuidedPreds(coveredRule
-					.getRule());
-			GuidedPredicate action = rulePreds.remove(rulePreds.size() - 1);
-			Slot slot = findSlot(action.getPredicate());
+			String action = StateSpec.splitFact(coveredRule.getAction())[0];
+			Slot slot = findSlot(action);
 			coveredRule.setSlot(slot);
-			coveredRule.setConditions(rulePreds);
-			coveredRule.setAction(action);
 
 			// Adding the rule to the slot
 			slot.addNewRule(coveredRule);
 
 			// If the rule is maximally general, be sure to store it
 			if (coveredRule.isMaximallyGeneral())
-				maximallyGeneralRules_.put(action.getPredicate(), coveredRule);
+				maximallyGeneralRules_.put(action, coveredRule);
 		}
 
 		Collections.shuffle(covered);
@@ -244,12 +144,12 @@ public class PolicyGenerator {
 	 * @param actions
 	 *            The final action(s) taken by the agent.
 	 */
-	public void formPreGoalState(KnowledgeBase preGoalState, Fact[] actions) {
+	public void formPreGoalState(Rete preGoalState, String[] actions) {
 		// If the state has settled and is probably at minimum, trigger
 		// mutation.
 		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
 			// For each maximally general rule
-			for (Predicate action : maximallyGeneralRules_.keySet()) {
+			for (String action : maximallyGeneralRules_.keySet()) {
 				GuidedRule general = maximallyGeneralRules_.get(action);
 				List<GuidedRule> mutants = covering_
 						.specialiseToPreGoal(general);
@@ -280,7 +180,7 @@ public class PolicyGenerator {
 	 *            The action predicate.
 	 * @return The slot representing rules for that slot.
 	 */
-	private Slot findSlot(Predicate action) {
+	private Slot findSlot(String action) {
 		for (Slot slot : policyGenerator_) {
 			if ((slot.getAction().equals(action)) && (!slot.isFixed()))
 				return slot;
@@ -312,8 +212,8 @@ public class PolicyGenerator {
 	 */
 	public void resetGenerator() {
 		policyGenerator_ = new ProbabilityDistribution<Slot>();
-		for (GuidedPredicate action : actionSet_) {
-			policyGenerator_.add(new Slot(action.getPredicate()));
+		for (String action : actionSet_.keySet()) {
+			policyGenerator_.add(new Slot(action));
 		}
 
 		policyGenerator_.normaliseProbs();
@@ -353,65 +253,6 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Infers GuidedPredicates from a rule - how it was composed.
-	 * 
-	 * @param rule
-	 *            The rule being inferred.
-	 * @return The guided predicates used to make up the rule, with the action
-	 *         predicate at the end.
-	 */
-	public ArrayList<GuidedPredicate> inferGuidedPreds(Rule rule) {
-		ArrayList<GuidedPredicate> guidedPreds = new ArrayList<GuidedPredicate>();
-		List<Fact> prereqs = rule.getBody();
-
-		boolean firstPred = true;
-		Collection<Term> usedVariables = new HashSet<Term>();
-		for (int f = 0; f <= prereqs.size(); f++) {
-			Fact fact = (f < prereqs.size()) ? prereqs.get(f) : rule.getHead();
-
-			int offset = (fact.getPredicate() instanceof JConstructor) ? 1 : 0;
-			GuidedPredicate structure = StateSpec.getInstance()
-					.getGuidedPredicate(fact.getPredicate().getName());
-
-			if (structure != null) {
-				// Creating the pred terms to define the predicate
-				PredTerm[] predTerms = new PredTerm[structure.getPredValues().length];
-
-				for (int i = 0; i < predTerms.length; i++) {
-					Term matcher = fact.getTerms()[i + offset];
-
-					// If we're dealing with a variable term, it can be TIED
-					// or FREE
-					if (matcher.isVariable()) {
-						VariableTerm varMatcher = (VariableTerm) matcher;
-						// If we're at the first predicate, or we've seen
-						// the term before, it is tied.
-						if ((firstPred) || (usedVariables.contains(matcher))) {
-							predTerms[i] = new PredTerm(varMatcher.getName(),
-									varMatcher.getType(), PredTerm.TIED);
-						} else {
-							// It is a newly occurring free variable
-							predTerms[i] = new PredTerm(varMatcher.getName(),
-									varMatcher.getType(), PredTerm.FREE);
-						}
-
-						usedVariables.add(matcher);
-					} else {
-						// Otherwise, we're dealing with a constant
-						predTerms[i] = new PredTerm(((ConstantTerm) matcher)
-								.getObject());
-					}
-				}
-				guidedPreds.add(new GuidedPredicate(fact.getPredicate(),
-						predTerms));
-				firstPred = false;
-			}
-		}
-
-		return guidedPreds;
-	}
-
-	/**
 	 * Gets the rule base instance.
 	 * 
 	 * @return The rule base instance or null if not yet initialised.
@@ -444,15 +285,7 @@ public class PolicyGenerator {
 	 */
 	public static void initInstance(String classPrefix, File ruleBaseFile) {
 		instance_ = new PolicyGenerator(classPrefix);
-		instance_.loadRuleBase(classPrefix, ruleBaseFile);
-	}
-
-	public InferenceEngine getInferenceEngine() {
-		return inferenceEngine_;
-	}
-
-	public LogicFactory getLogicFactory() {
-		return factory_;
+		// instance_.loadRuleBase(classPrefix, ruleBaseFile);
 	}
 
 	public String getClassPrefix() {
