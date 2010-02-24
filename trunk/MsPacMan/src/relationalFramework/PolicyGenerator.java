@@ -40,7 +40,13 @@ public class PolicyGenerator {
 	private Covering covering_;
 
 	/** The maximally general rules for each action. */
-	private Map<String, GuidedRule> maximallyGeneralRules_;
+	private MultiMap<String, GuidedRule> lggRules_;
+
+	/**
+	 * The covered rules which are not yet LGG. Items in this list are mutually
+	 * exclusive from the lggRules list.
+	 */
+	private MultiMap<String, GuidedRule> nonLGGCoveredRules_;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -52,8 +58,9 @@ public class PolicyGenerator {
 		StateSpec.initInstance(classPrefix);
 		actionSet_ = StateSpec.getInstance().getActions();
 		classPrefix_ = classPrefix;
+		nonLGGCoveredRules_ = new MultiMap<String, GuidedRule>();
 		covering_ = new Covering();
-		maximallyGeneralRules_ = new HashMap<String, GuidedRule>();
+		lggRules_ = new MultiMap<String, GuidedRule>();
 
 		resetGenerator();
 	}
@@ -66,7 +73,8 @@ public class PolicyGenerator {
 	 *            The generator file.
 	 */
 	public void loadGenerators(File input) {
-		RuleFileManager.loadGenerators(input, policyGenerator_);
+		policyGenerator_ = RuleFileManager.loadGenerators(input);
+		policyGenerator_.normaliseProbs();
 	}
 
 	/**
@@ -106,30 +114,50 @@ public class PolicyGenerator {
 	 * @param state
 	 *            The observations of the current state, including the valid
 	 *            actions to take.
+	 * @param createNewRules
+	 *            Whether the covering algorithm should create new rules or only
+	 *            refine existing one.
 	 * @return The list of covered rules, one for each action type.
 	 */
-	public List<GuidedRule> triggerCovering(Rete state) {
-		System.out.println("<COVERING TRIGGERED:>");
+	public List<GuidedRule> triggerCovering(Rete state, boolean createNewRules) {
+		if (createNewRules)
+			System.out.println("<COVERING TRIGGERED:>");
 
 		List<GuidedRule> covered = null;
 		try {
-			covered = covering_.coverState(state);
+			covered = covering_.coverState(state, nonLGGCoveredRules_,
+					createNewRules);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		// Add remaining information to rules.
 		for (GuidedRule coveredRule : covered) {
+			if (coveredRule.isRecentlyModified()) {
+				if (createNewRules)
+					System.out.println("COVERED RULE: " + coveredRule);
+				else
+					System.out.println("REFINED RULE: " + coveredRule);
+			}
 			String action = StateSpec.splitFact(coveredRule.getAction())[0];
-			Slot slot = findSlot(action);
-			coveredRule.setSlot(slot);
+			if (coveredRule.getSlot() == null) {
+				Slot slot = findSlot(action);
+				coveredRule.setSlot(slot);
 
-			// Adding the rule to the slot
-			slot.addNewRule(coveredRule);
+				// Adding the rule to the slot
+				slot.addNewRule(coveredRule);
+			}
 
-			// If the rule is maximally general, be sure to store it
-			if (coveredRule.isMaximallyGeneral())
-				maximallyGeneralRules_.put(action, coveredRule);
+			// If the rule is maximally general, mutate and store it
+			if (coveredRule.isLGG()) {
+				nonLGGCoveredRules_.get(action).remove(coveredRule);
+				lggRules_.put(action, coveredRule);
+				System.out.println("LGG RULE FOUND: " + coveredRule);
+
+				// Mutate
+			} else if (createNewRules) {
+				nonLGGCoveredRules_.put(action, coveredRule);
+			}
 		}
 
 		Collections.shuffle(covered);
@@ -150,8 +178,7 @@ public class PolicyGenerator {
 		// mutation.
 		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
 			// For each maximally general rule
-			for (String action : maximallyGeneralRules_.keySet()) {
-				GuidedRule general = maximallyGeneralRules_.get(action);
+			for (GuidedRule general : lggRules_.values()) {
 				List<GuidedRule> mutants = covering_
 						.specialiseToPreGoal(general);
 				mutants.add(general);
@@ -217,6 +244,8 @@ public class PolicyGenerator {
 			policyGenerator_.add(new Slot(action));
 		}
 
+		nonLGGCoveredRules_.clear();
+		lggRules_.clear();
 		policyGenerator_.normaliseProbs();
 	}
 

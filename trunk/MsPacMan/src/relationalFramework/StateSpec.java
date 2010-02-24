@@ -1,15 +1,12 @@
 package relationalFramework;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +23,7 @@ import jess.ValueVector;
 public abstract class StateSpec {
 	public static final String INFERS_ACTION = "=>";
 
-	public static final char ANONYMOUS = '_';
+	public static final char ANONYMOUS = '?';
 
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
@@ -34,11 +31,10 @@ public abstract class StateSpec {
 
 	public static final String GOAL_QUERY = "isGoal";
 
+	public static final String POLICY_QUERY_PREFIX = "polRule";
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
-
-	/** The rete rulebase. */
-	private Rete ruleBase_;
 
 	/** The prerequisites of the rules and their structure. */
 	private MultiMap<String, Class> predicates_;
@@ -72,6 +68,12 @@ public abstract class StateSpec {
 
 	/** A RegExp for filtering out unnecessary facts from a rule. */
 	private String unnecessaries_;
+
+	/** The mapping for rules to queries in the Rete object. */
+	private Map<GuidedRule, String> queryNames_;
+
+	/** The count value for the query names. */
+	private int queryCount_;
 
 	/**
 	 * The constructor for a state specification.
@@ -135,6 +137,9 @@ public abstract class StateSpec {
 
 			// Initialise the optimal policy
 			optimalPolicy_ = initialiseOptimalPolicy();
+
+			queryNames_ = new HashMap<GuidedRule, String>();
+			queryCount_ = 0;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -173,7 +178,7 @@ public abstract class StateSpec {
 		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
 		for (String type : types)
 			buffer.append("|(\\(" + type + " .+?\\))");
-		buffer.append(") ");
+		buffer.append(")( |$)");
 		return buffer.toString();
 	}
 
@@ -265,7 +270,7 @@ public abstract class StateSpec {
 		}
 
 		// Inequals tests
-		buffer.append(stringRule.createInequalsTests());
+		buffer.append(createInequalsTests(stringRule.terms_));
 
 		// Type preds
 		for (String[] typeFact : stringRule.getTypeConditions()) {
@@ -303,7 +308,7 @@ public abstract class StateSpec {
 			Pattern p = null;
 			if (i == 0) {
 				p = Pattern.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)|(?:"
-						+ ANONYMOUS + ")))*)\\)");
+						+ Pattern.quote(ANONYMOUS + "") + ")))*)\\)");
 			} else {
 				p = Pattern
 						.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)))*)\\)");
@@ -430,6 +435,49 @@ public abstract class StateSpec {
 		return facts;
 	}
 
+	/**
+	 * Creates the inequals tests from the terms stored. Note anonymous
+	 * terms are special in that they aren't inequal to one-another.
+	 * 
+	 * @return The string for detailing inequality '(test (<> ?X a b ?Y
+	 *         ?_0)) (test (<> ?Y a ...))'
+	 */
+	public static String createInequalsTests(List<String> terms) {
+		StringBuffer buffer = new StringBuffer();
+		// Run through each term
+		List<String> constants = new ArrayList<String>();
+		for (int i = 0; i < terms.size(); i++) {
+			// If the term is a variable, assert an inequals
+			if (terms.get(i).charAt(0) == '?') {
+				boolean isValid = false;
+				StringBuffer subBuffer = new StringBuffer();
+				// The base term
+				subBuffer.append("(test (<> " + terms.get(i));
+				// The constants already seen
+				for (String constant : constants) {
+					subBuffer.append(" " + constant);
+					isValid = true;
+				}
+
+				// Later terms seen
+				for (int j = i + 1; j < terms.size(); j++) {
+					subBuffer.append(" " + terms.get(j));
+					isValid = true;
+				}
+
+				subBuffer.append(")) ");
+
+				// If the expression is valid, add it
+				if (isValid)
+					buffer.append(subBuffer);
+			} else {
+				// Add the constant to the list of constants
+				constants.add(terms.get(i));
+			}
+		}
+		return buffer.toString();
+	}
+
 	public MultiMap<String, Class> getPredicates() {
 		return predicates_;
 	}
@@ -493,6 +541,29 @@ public abstract class StateSpec {
 		if (predicate.equals(VALID_ACTIONS))
 			return false;
 		return true;
+	}
+
+	/**
+	 * Gets or creates a rule query for a guided rule.
+	 * 
+	 * @param gr
+	 *            The guided rule associated with a query.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(GuidedRule gr) {
+		String result = queryNames_.get(gr);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				rete_.eval("(defquery " + result + " "
+						+ gr.getStringConditions() + ")");
+				queryNames_.put(gr, result);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return result;
 	}
 
 	@Override
@@ -563,6 +634,15 @@ public abstract class StateSpec {
 		return instance_;
 	}
 
+	public static void reinitInstance() {
+		try {
+			instance_.rete_.clear();
+			instance_.initialise();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	/**
 	 * A class for storing string rule information and organising it properly.
 	 * 
@@ -573,7 +653,6 @@ public abstract class StateSpec {
 		private List<String[]> typeConditions_;
 		private String[] action_;
 		private List<String> terms_;
-		private int anonVariables = 0;
 
 		public StringRule() {
 			mainConditions_ = new ArrayList<String[]>();
@@ -591,9 +670,6 @@ public abstract class StateSpec {
 		 *            the args as later elements.
 		 */
 		public void addCondition(String[] fact) {
-			// Convert anonymous symbols to variables
-			convertAnonymous(fact);
-
 			// If the condition is a main predicate
 			if (predicates_.keySet().contains(fact[0])) {
 				mainConditions_.add(fact);
@@ -603,19 +679,6 @@ public abstract class StateSpec {
 				// Type predicate
 				addTerms(fact);
 				addTypeConds(fact);
-			}
-		}
-
-		/**
-		 * Converts any anonymous symbols to numbered variables.
-		 * 
-		 * @param fact
-		 *            The fact being converted.
-		 */
-		private void convertAnonymous(String[] fact) {
-			for (int i = 1; i < fact.length; i++) {
-				if (fact[i].equals(ANONYMOUS + ""))
-					fact[i] = "?";
 			}
 		}
 
@@ -656,49 +719,6 @@ public abstract class StateSpec {
 					addContainsArray(typeConditions_, typePred);
 				}
 			}
-		}
-
-		/**
-		 * Creates the inequals tests from the terms stored. Note anonymous
-		 * terms are special in that they aren't inequal to one-another.
-		 * 
-		 * @return The string for detailing inequality '(test (<> ?X a b ?Y
-		 *         ?_0)) (test (<> ?Y a ...))'
-		 */
-		public String createInequalsTests() {
-			StringBuffer buffer = new StringBuffer();
-			// Run through each term
-			List<String> constants = new ArrayList<String>();
-			for (int i = 0; i < terms_.size(); i++) {
-				// If the term is a variable, assert an inequals
-				if (terms_.get(i).charAt(0) == '?') {
-					boolean isValid = false;
-					StringBuffer subBuffer = new StringBuffer();
-					// The base term
-					subBuffer.append("(test (<> " + terms_.get(i));
-					// The constants already seen
-					for (String constant : constants) {
-						subBuffer.append(" " + constant);
-						isValid = true;
-					}
-
-					// Later terms seen
-					for (int j = i + 1; j < terms_.size(); j++) {
-						subBuffer.append(" " + terms_.get(j));
-						isValid = true;
-					}
-
-					subBuffer.append(")) ");
-
-					// If the expression is valid, add it
-					if (isValid)
-						buffer.append(subBuffer);
-				} else {
-					// Add the constant to the list of constants
-					constants.add(terms_.get(i));
-				}
-			}
-			return buffer.toString();
 		}
 
 		public String[] getAction() {

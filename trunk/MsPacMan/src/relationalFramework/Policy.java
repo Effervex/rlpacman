@@ -2,11 +2,9 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import jess.QueryResult;
@@ -21,8 +19,6 @@ import jess.ValueVector;
 public class Policy {
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = '#';
-	public static final String POLICY_RULE = "polRule";
-	public static final String OPTIMAL_RULE = "optimal";
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<GuidedRule> policyRules_;
 	/** The triggered rules in the policy */
@@ -37,24 +33,6 @@ public class Policy {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
-	}
-
-	/**
-	 * Creates the queries the policy uses to check if it's rules are firing.
-	 * 
-	 * @param rete
-	 *            The rete object to add the queries to.
-	 */
-	public void createQueries(Rete rete, boolean optimal) {
-		try {
-			for (int i = 0; i < policyRules_.size(); i++) {
-				String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
-				rete.eval("(defquery " + prefix + i + " "
-						+ policyRules_.get(i).getConditions() + ")");
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
 	}
 
 	/**
@@ -102,9 +80,10 @@ public class Policy {
 	 *            The number of actions to be returned.
 	 * @param optimal
 	 *            If the policy is an optimal test one.
+	 * @param alreadyCovered TODO
 	 */
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
-			int actionsReturned, boolean optimal) {
+			int actionsReturned, boolean optimal, boolean alreadyCovered) {
 
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
@@ -112,15 +91,14 @@ public class Policy {
 		int ruleNumber = 0;
 		while ((actionsFound < actionsReturned) && (iter.hasNext())) {
 			GuidedRule gr = iter.next();
-			String conditions = gr.getConditions();
 
 			// Find the result set
 			// TODO Evaluate rules in a step-wise fashion, to infer how much of
 			// a rule fires
 			try {
 				// Forming the query
-				String prefix = (optimal) ? OPTIMAL_RULE : POLICY_RULE;
-				QueryResult results = state.runQueryStar(prefix + ruleNumber,
+				String query = StateSpec.getInstance().getRuleQuery(gr);
+				QueryResult results = state.runQueryStar(query,
 						new ValueVector());
 
 				// If there is at least one result
@@ -137,8 +115,11 @@ public class Policy {
 						// set
 
 						for (int i = 1; i < split.length; i++) {
-							actBuffer.append(" "
-									+ results.getSymbol(split[i].substring(1)));
+							String value = split[i];
+							if (value.charAt(0) == '?')
+								value = results
+										.getSymbol(split[i].substring(1));
+							actBuffer.append(" " + value);
 						}
 						actBuffer.append(")");
 
@@ -160,10 +141,15 @@ public class Policy {
 		// for each action.
 		if (actionsFound < actionsReturned) {
 			List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
-					.triggerCovering(state);
-			policyRules_.addAll(coveredRules);
-			createQueries(state, false);
-			evaluatePolicy(state, actionSwitch, actionsReturned, optimal);
+					.triggerCovering(state, true);
+			// Add any new rules to the policy
+			for (GuidedRule gr : coveredRules) {
+				if (!policyRules_.contains(gr))
+					policyRules_.add(gr);
+			}
+			evaluatePolicy(state, actionSwitch, actionsReturned, optimal, true);
+		} else if (!alreadyCovered && !optimal) {
+			PolicyGenerator.getInstance().triggerCovering(state, false);
 		}
 	}
 }

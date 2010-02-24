@@ -261,11 +261,12 @@ public class CrossEntropyExperiment {
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
 			float[] episodePerformances = new float[episodes_ + 1];
-			//episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
+			// episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
 				// Forming a population of solutions
-				SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
+				List<PolicyValue> pvs = new ArrayList<PolicyValue>(population_);
+				int expProg = 0;
 				// TODO Even this population value can change. Blocks World is
 				// showing good results even with populations of 10. Perhaps
 				// this could be equal to the policy size * 10?
@@ -292,17 +293,20 @@ public class CrossEntropyExperiment {
 						bestPolicy = thisPolicy;
 
 					// Give an ETA
-					estimateETA(experimentStart_, t * population_ + i + 1, run,
+					expProg = t * population_ + i + 1;
+					estimateETA(experimentStart_, expProg, expProg, run,
 							episodes_ * population_, runs, "experiment");
 				}
 
+				Collections.sort(pvs);
 				// Update the weights for all distributions using only the elite
 				// samples
 				updateWeights(pvs.iterator(), (int) Math.ceil(population_
 						* SELECTION_RATIO));
 
 				// Test the agent and record the performances
-				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs);
+				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs,
+						expProg);
 
 				// Save the results at each episode
 				try {
@@ -318,6 +322,9 @@ public class CrossEntropyExperiment {
 				}
 			}
 
+			// Flushing the rete object.
+			StateSpec.reinitInstance();
+			
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();
 		}
@@ -347,7 +354,8 @@ public class CrossEntropyExperiment {
 	 *            The total number of runs to complete.
 	 * @return The average performance of the agent.
 	 */
-	private float testAgent(int episode, int maxSteps, int run, int runs) {
+	private float testAgent(int episode, int maxSteps, int run, int runs,
+			int expProg) {
 		long testStart = System.currentTimeMillis();
 		System.out.println();
 		System.out.println("Beginning testing for episode " + episode + ".");
@@ -373,7 +381,8 @@ public class CrossEntropyExperiment {
 			System.out.println(score / AVERAGE_ITERATIONS + "\n");
 
 			System.out.println("For episode test: " + episode);
-			estimateETA(testStart, i + 1, run, TEST_ITERATIONS, runs, "test");
+			estimateETA(testStart, i + 1, expProg, run, TEST_ITERATIONS, runs,
+					"test");
 			System.out.println();
 		}
 		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
@@ -425,15 +434,18 @@ public class CrossEntropyExperiment {
 	 * @param runs
 	 *            The total number of runs.
 	 */
-	private void estimateETA(long timeStart, int currentProg, int run,
-			int totalProg, int runs, String stringType) {
+	private void estimateETA(long timeStart, int currentProg, int expProg,
+			int run, int totalProg, int runs, String stringType) {
 		long elapsedTime = System.currentTimeMillis() - timeStart;
 		double percent = (currentProg * 1.0) / totalProg;
-		double totalPercent = (currentProg * 1.0 + run * totalProg)
+		double totalPercent = (expProg * 1.0 + run * totalProg)
 				/ (totalProg * runs);
 
 		DecimalFormat formatter = new DecimalFormat("#0.000");
-		String percentStr = formatter.format(100 * percent) + "% run complete.";
+		String percentStr = formatter.format(100 * percent) + "% " + stringType
+				+ " run complete.";
+
+		System.out.println(percentStr);
 		String totalPercentStr = formatter.format(100 * totalPercent) + "% "
 				+ stringType + " complete.";
 		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
@@ -443,9 +455,7 @@ public class CrossEntropyExperiment {
 		String remaining = "Remaining: " + remainingTime / (1000 * 60 * 60)
 				+ ":" + (remainingTime / (1000 * 60)) % 60 + ":"
 				+ (remainingTime / 1000) % 60;
-		System.out.println(percentStr);
 		System.out.println(totalPercentStr + " " + elapsed + ", " + remaining);
-		System.out.println();
 	}
 
 	/**
@@ -582,8 +592,7 @@ public class CrossEntropyExperiment {
 
 	/**
 	 * Counts the rules from the elite samples and stores their frequencies and
-	 * total score.
-	 * TODO Fix this up
+	 * total score. TODO Fix this up
 	 * 
 	 * @param iter
 	 *            The iterator through the samples.
@@ -603,9 +612,9 @@ public class CrossEntropyExperiment {
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Collection<GuidedRule> polRules = eliteSolution.getFiringRules();
+			Collection<GuidedRule> firingRules = eliteSolution.getFiringRules();
 			// TODO Ensure this is performing correctly.
-			for (GuidedRule rule : polRules) {
+			for (GuidedRule rule : firingRules) {
 				// Slot counts
 				Slot ruleSlot = rule.getSlot();
 				Integer count = slotCounts.get(ruleSlot);
@@ -614,7 +623,7 @@ public class CrossEntropyExperiment {
 				slotCounts.put(ruleSlot, count + 1);
 
 				// Rule counts
-				count = ruleCounts.get(ruleSlot);
+				count = ruleCounts.get(rule);
 				if (count == null)
 					count = 0;
 				ruleCounts.put(rule, count + 1);
@@ -715,6 +724,11 @@ public class CrossEntropyExperiment {
 		@Override
 		public int hashCode() {
 			return (int) (value_ * policy_.hashCode());
+		}
+
+		@Override
+		public String toString() {
+			return "Policy Value: " + value_;
 		}
 	}
 }
