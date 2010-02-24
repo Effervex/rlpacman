@@ -134,11 +134,10 @@ public class RuleFileManager {
 		FileWriter wr = new FileWriter(output);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		buf.write(policyGenerator.generatorString(ELEMENT_DELIMITER) + "\n");
-
 		// For each of the rule generators
-		for (Slot slot : policyGenerator) {
-			buf.write(slot.getGenerator().generatorString(ELEMENT_DELIMITER)
+		for (int i = 0; i < policyGenerator.size(); i++) {
+			buf.write("(" + policyGenerator.getElement(i).toParsableString()
+					+ ")" + ELEMENT_DELIMITER + policyGenerator.getProb(i)
 					+ "\n");
 		}
 
@@ -147,7 +146,8 @@ public class RuleFileManager {
 	}
 
 	/**
-	 * Saves a frozen, human readable version of the generators out
+	 * Saves a human readable version of the generators out to file. Typically
+	 * the generators are frozen before this method is called.
 	 * 
 	 * @param output
 	 *            The file to output the human readable generators to.
@@ -158,6 +158,8 @@ public class RuleFileManager {
 
 		FileWriter wr = new FileWriter(output);
 		BufferedWriter buf = new BufferedWriter(wr);
+
+		buf.write("A typical policy:\n");
 
 		// Go through each slot, writing out those that fire
 		ArrayList<Slot> probs = policyGenerator.getOrderedElements();
@@ -182,32 +184,35 @@ public class RuleFileManager {
 	 * 
 	 * @param file
 	 *            The file to load from.
-	 * @param policyGenerator
-	 *            The policy generator to load to.
-	 * @throws Exception
-	 *             Should something go awry.
+	 * @return The policy generator to load to.
 	 */
-	public static void loadGenerators(File input,
-			ProbabilityDistribution<Slot> policyGenerator) {
-		// TODO Modify this method
+	public static ProbabilityDistribution<Slot> loadGenerators(File input) {
+		ProbabilityDistribution<Slot> dist = new ProbabilityDistribution<Slot>();
 		try {
 			FileReader reader = new FileReader(input);
 			BufferedReader buf = new BufferedReader(reader);
 
 			// Parse the slots
-			String[] split = buf.readLine().split(ELEMENT_DELIMITER);
-			for (int i = 0; i < split.length; i++) {
-				policyGenerator.set(i, Double.parseDouble(split[i]));
-			}
+			String in = null;
+			while ((in = buf.readLine()) != null) {
+				// Get the slot string, ignoring the () brackets
+				String slotString = in
+						.substring(1, in.lastIndexOf(ELEMENT_DELIMITER) - 1);
+				Slot slot = Slot.parseSlotString(slotString);
+				Double prob = Double.parseDouble(in.substring(in
+						.lastIndexOf(ELEMENT_DELIMITER) + 1));
 
-			// Parse the rules
-			// RuleBase.getInstance().readGenerators(buf);
+				// Parse the rules
+				dist.add(slot, prob);
+			}
 
 			buf.close();
 			reader.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		return dist;
 	}
 
 }

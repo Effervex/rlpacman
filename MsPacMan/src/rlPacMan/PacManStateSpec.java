@@ -10,17 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.mandarax.kernel.KnowledgeBase;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Predicate;
-import org.mandarax.kernel.Prerequisite;
-import org.mandarax.kernel.Rule;
-import org.mandarax.kernel.SimplePredicate;
-import org.mandarax.kernel.Term;
-
-import relationalFramework.GuidedPredicate;
+import relationalFramework.MultiMap;
 import relationalFramework.Policy;
-import relationalFramework.PredTerm;
 import relationalFramework.State;
 import relationalFramework.StateSpec;
 
@@ -31,29 +22,28 @@ import relationalFramework.StateSpec;
  */
 public class PacManStateSpec extends StateSpec {
 	@Override
-	protected Map<Class, GuidedPredicate> initialiseTypePredicateTemplates() {
-		Map<Class, GuidedPredicate> typeMap = new HashMap<Class, GuidedPredicate>();
-		// Simply load the arrays with names and classes and loop through.
-		Class[] typeClasses = { Player.class, Dot.class, PowerDot.class,
-				Ghost.class, Fruit.class, JunctionPoint.class, PacPoint.class,
-				State.class };
-		String[] predNames = { "pacman", "dot", "powerdot", "ghost", "fruit",
-				"junction", "location", "state" };
-
-		// Creating each type predicate
-		for (int pred = 0; pred < typeClasses.length; pred++) {
-			typeMap.put(typeClasses[pred], createTypeGuidedPredicate(
-					predNames[pred], typeClasses[pred]));
-		}
+	protected Map<Class, String> initialiseTypePredicateTemplates() {
+		Map<Class, String> typeMap = new HashMap<Class, String>();
+		
+		typeMap.put(Player.class, "pacman");
+		typeMap.put(Dot.class, "dot");
+		typeMap.put(PowerDot.class, "powerDot");
+		typeMap.put(Ghost.class, "ghost");
+		typeMap.put(Fruit.class, "fruit");
+		typeMap.put(JunctionPoint.class, "junction");
+		typeMap.put(PacPoint.class, "location");
+		
 		return typeMap;
 	}
 
 	@Override
-	protected List<GuidedPredicate> initialisePredicateTemplates() {
-		List<GuidedPredicate> predicates = new ArrayList<GuidedPredicate>();
+	protected MultiMap<String, Class> initialisePredicateTemplates() {
+		MultiMap<String, Class> predicate = new MultiMap<String, Class>();
 
 		try {
 			// NEAREST DOT
+			List<Class> structure = new ArrayList<Class>();
+			structure.add(Dot.class, )
 			predicates.add(pacPointPredicate("Dot", new Integer[] { 1, 1, 3, 6,
 					12, 99 }, Dot.class, "proximalDot"));
 
@@ -181,66 +171,6 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		return kb;
-	}
-
-	/**
-	 * Method for creating predicates relating to direct value comparisons.
-	 * 
-	 * @param vals
-	 *            The values to compare against.
-	 * @param methodName
-	 *            The name of the method/predicate.
-	 * @return A DefinedPredicate of the above information.
-	 * @throws NoSuchMethodException
-	 *             If the method doesn't exist.
-	 */
-	private GuidedPredicate valuePredicate(Double[] vals, String methodName)
-			throws NoSuchMethodException {
-		// Defining the predicate values
-		PredTerm[][] predValues = new PredTerm[2][];
-		predValues[0] = createTied("State", State.class);
-		predValues[1] = PredTerm.createValueArray(vals);
-
-		// Defining the predicate
-		Class[] predicateStructure = new Class[2];
-		predicateStructure[0] = State.class;
-		predicateStructure[1] = Double.class;
-		return createDefinedPredicate(PacManStateSpec.class,
-				predicateStructure, predValues, methodName);
-	}
-
-	/**
-	 * Method for creating predicates relating to the distance between Pacman
-	 * and a point on the map.
-	 * 
-	 * @param secondParamName
-	 *            The name of the second free parameter.
-	 * @param distanceVals
-	 *            The constant distance values for comparison.
-	 * @param secondClass
-	 *            The class of the second free parameter.
-	 * @param methodName
-	 *            The name of the method/predicate.
-	 * @return A DefinedPredicate of the above information.
-	 * @throws NoSuchMethodException
-	 *             If the method does not exist.
-	 */
-	private GuidedPredicate pacPointPredicate(String secondParamName,
-			Integer[] distanceVals, Class secondClass, String methodName)
-			throws NoSuchMethodException {
-		// Defining the predicate values
-		PredTerm[][] predValues = new PredTerm[3][];
-		predValues[0] = createTied("State", State.class);
-		predValues[1] = createTiedAndFree(secondParamName, secondClass);
-		predValues[2] = PredTerm.createValueArray(distanceVals);
-
-		// Defining the predicate
-		Class[] predicateStructure = new Class[3];
-		predicateStructure[0] = State.class;
-		predicateStructure[1] = secondClass;
-		predicateStructure[2] = Integer.class;
-		return createDefinedPredicate(PacManStateSpec.class,
-				predicateStructure, predValues, methodName);
 	}
 
 	// // // // // THE PREDICATE METHODS // // // // //

@@ -14,7 +14,6 @@ import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.Rete;
-import jess.Value;
 import jess.ValueVector;
 
 /**
@@ -26,8 +25,8 @@ public class Covering {
 	private static final char STARTING_CHAR = 'X';
 	private static final char MODULO_CHAR = 'Z' + 1;
 	private static final char FIRST_CHAR = 'A';
-	private static final int MAX_UNIFICATION_INACTIVITY = 3;
 	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 10;
+	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
 
 	/** The pre-goal state, for use in covering specialisations. */
 	private List<String> preGoalState_;
@@ -36,14 +35,31 @@ public class Covering {
 	private int preGoalUnificationInactivity_ = 0;
 
 	/**
+	 * If this coverer should be creating new rules or just refining existing
+	 * ones.
+	 */
+	private boolean createNewRules_;
+
+	/**
 	 * Covers a state by creating a rule for every action type present in the
 	 * valid actions for the state.
 	 * 
 	 * @param state
 	 *            The state of the environment, containing the valid actions.
+	 * @param nonLGGCoveredRules
+	 *            A starting point for the rules, if any exist.
+	 * @param createNewRules
+	 *            If this should cover new rules.
 	 * @return A list of guided rules, one for each action type.
 	 */
-	public List<GuidedRule> coverState(Rete state) throws Exception {
+	public List<GuidedRule> coverState(Rete state,
+			MultiMap<String, GuidedRule> nonLGGCoveredRules,
+			boolean createNewRules) throws Exception {
+		// If we're not creating new rules and the nonLGGs are empty, return
+		if (!createNewRules && nonLGGCoveredRules.isEmpty())
+			return EMPTY_LIST;
+		createNewRules_ = createNewRules;
+
 		// The relevant facts which contain the key term
 		MultiMap<String, Fact> relevantConditions = new MultiMap<String, Fact>();
 		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
@@ -55,9 +71,16 @@ public class Covering {
 		// A multimap with the action predicate as key and args as values.
 		MultiMap<String, String> validActions = arrangeActions(actionFact);
 		for (String action : validActions.keySet()) {
-			GuidedRule actionRule = unifyActionRules(validActions.get(action),
-					relevantConditions, action);
-			generalActions.add(actionRule);
+			// Format any previous rules into a list of strings
+			List<GuidedRule> previousRules = nonLGGCoveredRules.get(action);
+			if (previousRules == null)
+				previousRules = new ArrayList<GuidedRule>();
+
+			// Cover the state, using the previous rules and/or newly created
+			// rules
+			List<GuidedRule> actionRules = unifyActionRules(validActions
+					.get(action), relevantConditions, action, previousRules);
+			generalActions.addAll(actionRules);
 		}
 
 		return generalActions;
@@ -112,8 +135,12 @@ public class Covering {
 
 			// TODO Form the pre goal state in a general form.
 			return true;
+		} else {
+			// Unify the state
+			
+			
+			return false;
 		}
-		return false;
 	}
 
 	/**
@@ -125,22 +152,25 @@ public class Covering {
 	 *            The relevant conditions for each term in the state.
 	 * @param actionPred
 	 *            The action predicate spawning this rule.
+	 * @param previousRules
+	 *            A pre-existing list of rules that each need to be generalised.
+	 *            Note the rules are exclusive from one-another.
 	 * @return A Rule representing a general action.
 	 */
-	private GuidedRule unifyActionRules(List<String> argsList,
-			MultiMap<String, Fact> relevantConditions, String actionPred) {
-		// The general rule for the action
-		Collection<String> generalRule = null;
-		Collection<String> stringTerms = new HashSet<String>();
-		String actionString = formatAction(actionPred, stringTerms);
+	private List<GuidedRule> unifyActionRules(List<String> argsList,
+			MultiMap<String, Fact> relevantConditions, String actionPred,
+			List<GuidedRule> previousRules) {
+		// The terms in the action
+		String actionString = formatAction(actionPred);
 
-		int lastChanged = 0;
 		Iterator<String> argIter = argsList.iterator();
 		// Do until:
 		// 1) We have no actions left to look at
-		// 2) Or the general rule isn't minimal
-		boolean isMinimal = false;
-		while ((argIter.hasNext()) && (!isMinimal)) {
+		// 2) Every rule is not yet minimal
+		Set<GuidedRule> minimalRules = null;
+		while ((argIter.hasNext())
+				&& ((minimalRules == null) || (minimalRules.size() < previousRules
+						.size()))) {
 			String arg = argIter.next();
 			List<Fact> actionFacts = new ArrayList<Fact>();
 
@@ -155,105 +185,68 @@ public class Covering {
 			}
 
 			// Inversely substitute the terms for variables (in string form)
-			Collection<String> inverseSubbed = inverselySubstitute(actionFacts,
-					terms);
+			GuidedRule inverseSubbed = inverselySubstitute(actionFacts, terms,
+					actionString);
 
-			// Unify with other action rules of the same action
-			if (generalRule == null) {
-				generalRule = inverseSubbed;
+			if (minimalRules == null)
+				minimalRules = new HashSet<GuidedRule>();
+
+			// Unify with the previous rules, unless it causes the rule to
+			// become invalid
+			if (previousRules.isEmpty()) {
+				// Only create new rules if necessary.
+				if (createNewRules_) {
+					previousRules.add(inverseSubbed);
+					if (inverseSubbed.isLGG())
+						minimalRules.add(inverseSubbed);
+				}
 			} else {
-				// Unify the rules through a simply retainment operation.
-				boolean changed = generalRule.retainAll(inverseSubbed);
-				if (changed)
-					lastChanged = 0;
-				else
-					lastChanged++;
-			}
+				// Unify with each rule in the previous rule/s
+				boolean createNewRule = true;
+				for (int i = 0; i < previousRules.size(); i++) {
+					GuidedRule prev = previousRules.get(i);
 
-			isMinimal = isMinimal(generalRule, stringTerms);
-		}
+					// If something changes, make checks
+					int result = prev.intersect(inverseSubbed);
+					if (result == 1) {
+						// The rule is minimal
+						minimalRules.add(prev);
+						createNewRule = false;
+					} else if (result == 0) {
+						// The rule isn't minimal (but it changed)
+						createNewRule = false;
+					}
+				}
 
-		// Use the unified rules to create new rules
-		String joinedRule = StateSpec.getInstance().parseRule(joinRule(generalRule, actionString));
-		GuidedRule rule = new GuidedRule(joinedRule, isMinimal, false, null);
-		return rule;
-	}
-
-	/**
-	 * Checks if a rule is minimal (only enough conditions to satisfy the
-	 * action).
-	 * 
-	 * @param conditions
-	 *            The conditions of the rule being checked.
-	 * @param terms
-	 *            The terms in the action.
-	 * @return True if the rule is minimal, false otherwise.
-	 */
-	public boolean isMinimal(Collection<String> conditions,
-			Collection<String> terms) {
-		if (conditions == null)
-			return false;
-		if (conditions.isEmpty()) {
-			System.err.println("Conditions have been over-shrunk: "
-					+ conditions + ", " + terms);
-			return false;
-		}
-
-		terms = new HashSet<String>(terms);
-
-		// Run through the conditions, ensuring each one has at least one unique
-		// term seen in the action.
-		for (String condition : conditions) {
-			boolean contains = false;
-
-			// Check if any of the terms are in the condition
-			for (Iterator<String> i = terms.iterator(); i.hasNext();) {
-				String term = i.next();
-				if (condition.contains(term)) {
-					i.remove();
-					contains = true;
+				// If all rules became invalid, we need a new rule
+				if (createNewRule) {
+					// Only create new rules if necessary.
+					if (createNewRules_) {
+						previousRules.add(inverseSubbed);
+						if (inverseSubbed.isLGG())
+							minimalRules.add(inverseSubbed);
+					}
 				}
 			}
-			// If no term is in the condition, return false
-			if (!contains)
-				return false;
 		}
 
-		return true;
-	}
-
-	/**
-	 * A simple method for joining a collection of condition fact strings and an
-	 * action together into a rule.
-	 * 
-	 * @param conditions
-	 *            The condition strings of the rule.
-	 * @param actionPred
-	 *            The action the conditions lead to.
-	 * @return A rule string made by joining the conditions to the action.
-	 */
-	public String joinRule(Collection<String> conditions, String action) {
-		StringBuffer buffer = new StringBuffer();
-		for (String condition : conditions) {
-			buffer.append(condition + " ");
+		// Return the old, possibly modified rules and any new ones.
+		for (GuidedRule prev : previousRules) {
+			prev.expandConditions();
+			prev.incrementStatesCovered();
 		}
-
-		buffer.append(StateSpec.INFERS_ACTION + " " + action);
-		return buffer.toString();
+		return previousRules;
 	}
 
 	/**
 	 * Formats the action into a variable action string. So (move a b) becomes
-	 * (move ?X ?Y), and the actionTerms simply note which terms are in the
-	 * action.
+	 * (move ?X ?Y).
 	 * 
 	 * @param actionPred
 	 *            The action predicate being formatted.
-	 * @param actionTerms
-	 *            The terms present in the action to be filled.
 	 * @return A string version of the predicate, with variable terms.
 	 */
-	public String formatAction(String actionPred, Collection<String> actionTerms) {
+	public String formatAction(String actionPred) {
 		StringBuffer buffer = new StringBuffer();
 
 		// Formatting the action
@@ -261,7 +254,6 @@ public class Covering {
 		for (int i = 0; i < StateSpec.getInstance().getActions()
 				.get(actionPred).size(); i++) {
 			String term = getVariableTermString(i);
-			actionTerms.add(term);
 			buffer.append(" " + term);
 		}
 		buffer.append(")");
@@ -276,16 +268,17 @@ public class Covering {
 	 *            The facts relating to this action.
 	 * @param actionTerms
 	 *            The terms of the action.
+	 * @param actionString
+	 *            The action this rule leads to.
 	 * @return A collection of the facts in inversely substituted string format.
 	 */
-	private Collection<String> inverselySubstitute(List<Fact> actionFacts,
-			String[] actionTerms) {
+	private GuidedRule inverselySubstitute(List<Fact> actionFacts,
+			String[] actionTerms, String actionString) {
 		// Building the mapping from necessary constants to variables
 		Map<String, String> termMapping = new HashMap<String, String>();
 		int i = 0;
 		for (String term : actionTerms) {
-			termMapping.put(term,
-					getVariableTermString(i));
+			termMapping.put(term, getVariableTermString(i));
 			i++;
 		}
 
@@ -294,13 +287,14 @@ public class Covering {
 		// anonymous terms.
 		for (Fact fact : actionFacts) {
 			String[] factSplit = StateSpec.splitFact(fact.toString());
-			// Replace all constant terms in the action with matching variables or anonymous variables
+			// Replace all constant terms in the action with matching variables
+			// or anonymous variables
 			for (int j = 1; j < factSplit.length; j++) {
 				String replacementTerm = termMapping.get(factSplit[j]);
 				if (replacementTerm != null)
 					factSplit[j] = replacementTerm;
 				else
-					factSplit[j] = StateSpec.ANONYMOUS + "";
+					factSplit[j] = "?";
 			}
 
 			// Reform the fact and add it back
@@ -308,7 +302,7 @@ public class Covering {
 			if (!substitution.contains(reformedFact))
 				substitution.add(reformedFact);
 		}
-		return substitution;
+		return new GuidedRule(substitution, actionString);
 	}
 
 	/**

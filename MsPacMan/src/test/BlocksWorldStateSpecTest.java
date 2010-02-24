@@ -2,9 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import java.util.*;
-
-import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -13,11 +10,6 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
-import org.mandarax.kernel.LogicFactory;
-import org.mandarax.kernel.Rule;
-import org.mandarax.reference.DefaultLogicFactory;
-
-import blocksWorld.Block;
 
 import relationalFramework.StateSpec;
 
@@ -30,6 +22,18 @@ public class BlocksWorldStateSpecTest {
 		BasicConfigurator.configure();
 		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		spec_ = StateSpec.initInstance("blocksWorld.BlocksWorld");
+	}
+
+	@Test
+	public void testReinitInstance() {
+		try {
+			spec_.getRete().eval("(assert (on a b))");
+			spec_.getRete().eval("(facts)");
+			StateSpec.reinitInstance();
+			spec_.getRete().eval("(facts)");
+		} catch (Exception e) {
+			fail("Exception occured.");
+		}
 	}
 
 	@Test
@@ -125,7 +129,7 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(head.contains("(moveFloor ?X)"));
 
 		// Test anonymous variable
-		rule = spec_.parseRule("(clear ?X) (on ?X _) => (moveFloor ?X)");
+		rule = spec_.parseRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
 		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
@@ -140,13 +144,13 @@ public class BlocksWorldStateSpecTest {
 
 		// Test anonymous variables
 		rule = spec_
-				.parseRule("(clear ?X) (on ?X _) (on ?Y _) => (moveFloor ?X)");
+				.parseRule("(clear ?X) (on ?X ?) (on ?Y ?) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
 		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
-		// Note no inequals between _1 and _2
+		// Note no inequals between ?1 and ?2
 		assertEquals(condCount, 6);
 		assertTrue(body.contains("(clear ?X)"));
 		assertTrue(body.contains("(block ?X)"));
@@ -187,6 +191,21 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(block ?X)"));
 		assertTrue(body.contains("(clear ?X)"));
 		assertTrue(head.contains("(moveFloor ?X)"));
+		
+		// Test inequals parsing
+		rule = spec_.parseRule("(clear ?X) (clear ?Y) (test (<> ?X ?Y)) (block ?X) (block ?Y) => (move ?X ?Y)");
+		body = rule.split("=>")[0];
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
+		head = rule.split("=>")[1];
+		assertEquals(condCount, 5);
+		assertTrue(body.contains("(clear ?X)"));
+		assertTrue(body.contains("(clear ?Y)"));
+		assertTrue(body.contains("(test (<> ?X ?Y))"));
+		assertTrue(body.contains("(block ?X)"));
+		assertTrue(body.contains("(block ?Y)"));
+		assertTrue(head.contains("(move ?X ?Y)"));
+		assertTrue(body.indexOf("clear") < body.indexOf("test"));
+		assertTrue(body.indexOf("test") < body.indexOf("block"));
 	}
 
 	@Test
@@ -283,23 +302,23 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(moveFloorResult.contains("\"d\""));
 		assertTrue(moveFloorResult.contains("\"e\""));
 	}
-	
+
 	@Test
 	public void testSplitFact() {
 		// Basic
 		String[] result = StateSpec.splitFact("(clear a)");
-		assertArrayEquals(new String[] {"clear", "a"}, result);
-		
+		assertArrayEquals(new String[] { "clear", "a" }, result);
+
 		// More complex
 		result = StateSpec.splitFact("(on a b)");
-		assertArrayEquals(new String[] {"on", "a", "b"}, result);
-		
+		assertArrayEquals(new String[] { "on", "a", "b" }, result);
+
 		// No parentheses
 		result = StateSpec.splitFact("clear a");
-		assertArrayEquals(new String[] {"clear", "a"}, result);
-		
+		assertArrayEquals(new String[] { "clear", "a" }, result);
+
 		// Module declaration
 		result = StateSpec.splitFact("(MAIN::clear a)");
-		assertArrayEquals(new String[] {"clear", "a"}, result);
+		assertArrayEquals(new String[] { "clear", "a" }, result);
 	}
 }

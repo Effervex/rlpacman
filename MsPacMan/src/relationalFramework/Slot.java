@@ -1,5 +1,8 @@
 package relationalFramework;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
  * within and any other pertinent information.
@@ -7,6 +10,8 @@ package relationalFramework;
  * @author Samuel J. Sarjant
  */
 public class Slot {
+	private static final String ELEMENT_DELIMITER = ":";
+
 	/** The rule generator within the slot. */
 	private ProbabilityDistribution<GuidedRule> ruleGenerator_;
 
@@ -45,6 +50,17 @@ public class Slot {
 			ruleGenerator_.add(guidedRule, averageProb);
 			ruleGenerator_.normaliseProbs();
 		}
+	}
+
+	/**
+	 * Adds a new rule to the slot with an average probability of being
+	 * selected.
+	 * 
+	 * @param guidedRule
+	 *            The rule being added.
+	 */
+	private void addNewRule(GuidedRule guidedRule, double prob) {
+		ruleGenerator_.add(guidedRule, prob);
 	}
 
 	/**
@@ -90,6 +106,14 @@ public class Slot {
 		return fixed_;
 	}
 
+	/**
+	 * Fixes the slot in place.
+	 */
+	public void fixSlot() {
+		fixed_ = true;
+		// TODO Fix the slot in place by creating a single rule for it
+	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if ((obj != null) && (obj instanceof Slot)) {
@@ -116,5 +140,63 @@ public class Slot {
 		String result = (fixed_) ? "FIXED " : "";
 		return result + "Slot (" + action_.toString() + "):\n"
 				+ ruleGenerator_.toString();
+	}
+
+	/**
+	 * Converts this slot into a parsable string format.
+	 * 
+	 * @return This slot in string format.
+	 */
+	public String toParsableString() {
+		StringBuffer buffer = new StringBuffer();
+		if (fixed_)
+			buffer.append("FIXED" + ELEMENT_DELIMITER);
+		buffer.append(action_ + "{");
+		for (int i = 0; i < ruleGenerator_.size(); i++) {
+			if (ruleGenerator_.getProb(i) > 0)
+				buffer.append("(" + ruleGenerator_.getElement(i)
+						+ ELEMENT_DELIMITER + ruleGenerator_.getProb(i) + ")");
+		}
+		buffer.append("}");
+		return buffer.toString();
+	}
+
+	/**
+	 * Parses a slot from a parsable slot string.
+	 * 
+	 * @param slotString
+	 *            The string detailing the slot.
+	 * @return A new slot, which can be formatted into the same input string.
+	 */
+	public static Slot parseSlotString(String slotString) {
+		int index = 0;
+		// Checking if slot is fixed
+		boolean fixed = false;
+		int fixIndex = "FIXED".length() + ELEMENT_DELIMITER.length();
+		if (slotString.substring(0, fixIndex).equals(
+				"FIXED" + ELEMENT_DELIMITER)) {
+			fixed = true;
+			index = fixIndex;
+		}
+
+		// Finding the slot action
+		int bracketIndex = slotString.indexOf('{');
+		String action = slotString.substring(index, bracketIndex);
+		Slot slot = new Slot(action);
+
+		// Parsing the rules and adding them
+		// Group 1 is the rule, group 2 is the prob
+		Pattern p = Pattern.compile("\\((.+? => .+?):([0-9.]+)\\)");
+		Matcher m = p.matcher(slotString.substring(bracketIndex + 1));
+		while (m.find()) {
+			GuidedRule guidedRule = new GuidedRule(m.group(1), slot);
+			double prob = Double.parseDouble(m.group(2));
+			slot.addNewRule(guidedRule, prob);
+		}
+		
+		if (fixed)
+			slot.fixSlot();
+		
+		return slot;
 	}
 }

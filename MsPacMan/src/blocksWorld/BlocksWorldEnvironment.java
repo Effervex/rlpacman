@@ -16,12 +16,10 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyAgent;
 import relationalFramework.PolicyGenerator;
-import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 /**
@@ -30,8 +28,11 @@ import relationalFramework.StateSpec;
  * @author Sam Sarjant
  */
 public class BlocksWorldEnvironment implements EnvironmentInterface {
-	/** The constant for extending the episode. */
+	/** The constant for multiplying the number of steps the agent can take. */
 	public static final int STEP_CONSTANT = 2;
+
+	/** The minimal reward the agent can receive. */
+	private static final float MINIMAL_REWARD = -10;
 
 	/** The number of blocks. Default 5. */
 	private int numBlocks_ = 5;
@@ -63,7 +64,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public String env_init() {
-		rete_ = StateSpec.getInstance().getRete();
 		// Assign the blocks
 		blocks_ = createBlocks(numBlocks_);
 		return null;
@@ -95,14 +95,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public Observation env_start() {
+		rete_ = StateSpec.getInstance().getRete();
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-//		System.out.println("\t\t\tOptimal test: "
-//				+ Arrays.toString(state_.getState()));
+		// System.out.println("\t\t\tOptimal test: "
+		// + Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-//		System.out
-//				.println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+		// System.out
+		// .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -129,12 +130,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-//		if (action != null)
-//			System.out.println("\t\t\t" + action + "   ->   "
-//					+ Arrays.toString(newState.getState()));
-//		else
-//			System.out.println("\t\t\tNo action chosen.");
+		// if (action != null)
+		// System.out.println("\t\t\t" + action + "   ->   "
+		// + Arrays.toString(newState.getState()));
+		// else
+		// System.out.println("\t\t\tNo action chosen.");
 
+		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// If our new state is different, update observations
@@ -144,16 +146,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		} else {
 			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
 					: 0;
-			return new Reward_observation_terminal(-numBlocks_ * STEP_CONSTANT
-					+ excess, new Observation(), true);
+			return new Reward_observation_terminal(MINIMAL_REWARD
+					+ (excess * -MINIMAL_REWARD) / nonOptimalSteps,
+					new Observation(), true);
 		}
 
 		steps_++;
 		ObjectObservations.getInstance().predicateKB = rete_;
 
-		double reward = (steps_ <= optimalSteps_) ? 0
-				: ((-numBlocks_ * STEP_CONSTANT * 1.0) / (numBlocks_
-						* STEP_CONSTANT - optimalSteps_));
+		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
+				/ nonOptimalSteps;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isGoal(rete_, StateSpec.getInstance()
 						.getGoalState()));
@@ -283,7 +285,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				contourState.set(index, new Double(block));
 			}
 		}
-		
+
 		// Check this isn't the goal state
 		formState(worldState);
 		if (isGoal(rete_, goalState))
@@ -385,7 +387,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Check it hasn't already solved the state
 		if (optimalMap_.containsKey(state_)) {
 			// System.out.println("\t\t\tAlready calculated ("
-			//		+ optimalMap_.get(state_) + ")");
+			// + optimalMap_.get(state_) + ")");
 			return optimalMap_.get(state_);
 		}
 

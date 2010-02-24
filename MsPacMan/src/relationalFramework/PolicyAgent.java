@@ -1,7 +1,6 @@
 package relationalFramework;
 
 import java.util.Collection;
-import java.util.List;
 
 import jess.Fact;
 import jess.Rete;
@@ -56,7 +55,6 @@ public class PolicyAgent implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
-			policy_.createQueries(StateSpec.getInstance().getRete(), optimal_);
 		} else if (arg0.equals("Optimal")) {
 			optimal_ = true;
 		}
@@ -98,7 +96,7 @@ public class PolicyAgent implements AgentInterface {
 		actionsModule_.switchOffAll();
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
-				.getNumActions(), optimal_);
+				.getNumActions(), optimal_, false);
 
 		// Save the previous state (if not an optimal agent).
 		if (!optimal_)
