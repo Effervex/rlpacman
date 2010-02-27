@@ -121,7 +121,7 @@ public class PolicyGenerator {
 	 */
 	public List<GuidedRule> triggerCovering(Rete state, boolean createNewRules) {
 		if (createNewRules)
-			System.out.println("<COVERING TRIGGERED:>");
+			System.out.println("\t<COVERING TRIGGERED:>");
 
 		List<GuidedRule> covered = null;
 		try {
@@ -135,9 +135,9 @@ public class PolicyGenerator {
 		for (GuidedRule coveredRule : covered) {
 			if (coveredRule.isRecentlyModified()) {
 				if (createNewRules)
-					System.out.println("COVERED RULE: " + coveredRule);
+					System.out.println("\tCOVERED RULE: " + coveredRule);
 				else
-					System.out.println("REFINED RULE: " + coveredRule);
+					System.out.println("\tREFINED RULE: " + coveredRule);
 			}
 			String action = StateSpec.splitFact(coveredRule.getAction())[0];
 			if (coveredRule.getSlot() == null) {
@@ -152,7 +152,7 @@ public class PolicyGenerator {
 			if (coveredRule.isLGG()) {
 				nonLGGCoveredRules_.get(action).remove(coveredRule);
 				lggRules_.put(action, coveredRule);
-				System.out.println("LGG RULE FOUND: " + coveredRule);
+				System.out.println("\tLGG RULE FOUND: " + coveredRule);
 
 				// Mutate
 			} else if (createNewRules) {

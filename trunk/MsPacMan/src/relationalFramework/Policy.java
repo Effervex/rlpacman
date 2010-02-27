@@ -80,7 +80,9 @@ public class Policy {
 	 *            The number of actions to be returned.
 	 * @param optimal
 	 *            If the policy is an optimal test one.
-	 * @param alreadyCovered TODO
+	 * @param alreadyCovered
+	 *            If the policy has already covered this iteration (due to
+	 *            recursive calls).
 	 */
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered) {

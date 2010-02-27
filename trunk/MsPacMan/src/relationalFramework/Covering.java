@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,8 +10,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.Rete;
@@ -28,8 +27,17 @@ public class Covering {
 	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 10;
 	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
 
-	/** The pre-goal state, for use in covering specialisations. */
-	private List<String> preGoalState_;
+	/**
+	 * The pre-goal state for each action predicate, for use in covering
+	 * specialisations.
+	 */
+	private Map<String, List<String>> preGoalState_;
+
+	/**
+	 * The final action terms, either constants or variables for each action
+	 * predicate.
+	 */
+	private Map<String, List<String>> preGoalActionTerms_;
 
 	/** The last time since the pre-goal state changed. */
 	private int preGoalUnificationInactivity_ = 0;
@@ -39,6 +47,10 @@ public class Covering {
 	 * ones.
 	 */
 	private boolean createNewRules_;
+
+	public Covering() {
+		clearPreGoalState();
+	}
 
 	/**
 	 * Covers a state by creating a rule for every action type present in the
@@ -132,15 +144,292 @@ public class Covering {
 		// MAX_STATE_UNIFICATION_INACTIVITY steps, don't bother unifying it
 		// again, it's probably already at minimum.
 		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY) {
+			// Inversely substitute the old pregoal state
+			String[] actionSplit = StateSpec.splitFact(action);
+			String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
+					actionSplit.length);
+			// The actions become constants if possible
+			List<String> newStateTerms = new ArrayList<String>();
+			for (String actionTerm : actionTerms)
+				newStateTerms.add(actionTerm);
+			Collection<String> preGoalStringState = inverselySubstitute(
+					preGoalState, actionTerms, newStateTerms);
+			removeUselessFacts(preGoalStringState);
 
-			// TODO Form the pre goal state in a general form.
+			// Unify with the old state
+			List<String> oldPreGoalState = preGoalState_.get(actionSplit[0]);
+			if (oldPreGoalState == null) {
+				preGoalState_.put(actionSplit[0],
+						(List<String>) preGoalStringState);
+				preGoalActionTerms_.put(actionSplit[0], newStateTerms);
+			} else {
+				// Unify the two states and check if it has changed at all.
+				int result = unifyStates(preGoalState_.get(actionSplit[0]),
+						preGoalStringState, preGoalActionTerms_
+								.get(actionSplit[0]), newStateTerms);
+
+				// If the states unified, reset the counter, otherwise
+				// increment.
+				// Hopefully there aren't any errors.
+				if (result == 1)
+					preGoalUnificationInactivity_ = 0;
+				else if (result == 0)
+					preGoalUnificationInactivity_++;
+				else if (result == -1)
+					throw new RuntimeException(
+							"Pre-goal states did not unify: "
+									+ preGoalState_.get(actionSplit[0]) + ", "
+									+ preGoalStringState);
+			}
 			return true;
-		} else {
-			// Unify the state
-			
-			
-			return false;
 		}
+		return false;
+	}
+
+	/**
+	 * Removes the useless facts from the pre-goal state. Useless facts are
+	 * validActions pred, initial-fact and fully anonymous facts.
+	 * 
+	 * @param preGoalStringState
+	 *            The state to remove useless facts from.
+	 */
+	private void removeUselessFacts(Collection<String> preGoalStringState) {
+		for (Iterator<String> iter = preGoalStringState.iterator(); iter.hasNext(); ) {
+			String fact = iter.next();
+			if (fact.matches("\\(" + StateSpec.VALID_ACTIONS + " .+"))
+				iter.remove();
+			else if (fact.equals("(initial-fact)"))
+				iter.remove();
+			else {
+				String[] split = StateSpec.splitFact(fact);
+				boolean anonymous = true;
+				for (int i = 1; i < split.length; i++) {
+					if (!split[i].equals("?")) {
+						anonymous = false;
+						break;
+					}
+				}
+				
+				if (anonymous)
+					iter.remove();
+			}
+		}
+	}
+
+	/**
+	 * Unifies two states together. This is more than simply a retainAll
+	 * operation, as it can also generalise constants into variables during the
+	 * unification process. This process does not keep useless facts around
+	 * (facts using only anonymous terms).
+	 * 
+	 * @param oldState
+	 *            The old state to be unified with. This may be modified.
+	 * @param newState
+	 *            The new state being unified with.
+	 * @param oldTerms
+	 *            The terms for the actions on the old state. Should be for the
+	 *            same action as newTerms. This may be modified.
+	 * @param newTerms
+	 *            The terms for the actions on the new state. Should be for the
+	 *            same action as oldTerms.
+	 * @return 1 if the old state changed from the unification, 0 if the state
+	 *         remained the same, -1 if the states did not unify and returned
+	 *         the empty set.
+	 */
+	public int unifyStates(List<String> oldState, Collection<String> newState,
+			List<String> oldTerms, List<String> newTerms) {
+		boolean hasChanged = false;
+
+		// If the terms don't match up, create a replacement map
+		Map<String, String> oldReplacementMap = new HashMap<String, String>();
+		Map<String, String> newReplacementMap = new HashMap<String, String>();
+		for (int i = 0; i < oldTerms.size(); i++) {
+			// If this index of terms don't match up
+			String oldTerm = oldTerms.get(i);
+			String newTerm = newTerms.get(i);
+			if (!oldTerm.equals(newTerm)) {
+				boolean bothVariables = true;
+				String variable = getVariableTermString(i);
+				// Replace old term if necessary
+				if (oldTerm.charAt(0) != '?') {
+					oldReplacementMap.put(oldTerm, variable);
+					// hasChanged = true;
+					bothVariables = false;
+				}
+				if (newTerm.charAt(0) != '?') {
+					newReplacementMap.put(newTerm, variable);
+					bothVariables = false;
+				}
+
+				// Check that both slots aren't inequal variables
+				if (bothVariables) {
+					return -1;
+				}
+			}
+		}
+
+		// For each item in the old state, see if it is present in the new state
+		List<String> oldStateRepl = new ArrayList<String>();
+		for (String oldStateFact : oldState) {
+			String modFact = unifyFact(oldStateFact, newState,
+					oldReplacementMap, newReplacementMap, oldTerms);
+
+			// Check for a change
+			if (!oldStateFact.equals(modFact))
+				hasChanged = true;
+
+			if (modFact != null)
+				oldStateRepl.add(modFact);
+		}
+
+		// Replace the oldState
+		if (!oldStateRepl.isEmpty()) {
+			oldState.clear();
+			oldState.addAll(oldStateRepl);
+		}
+
+		// Determine the return code.
+		if (oldStateRepl.isEmpty())
+			return -1;
+		else if (hasChanged)
+			return 1;
+		else
+			return 0;
+	}
+
+	/**
+	 * Unifies a single fact by searching for the term itself or a generalised
+	 * form of the term within a collection. The search is special because it
+	 * can generalise terms to anonymous terms if necessary for unification.
+	 * 
+	 * @param fact
+	 *            The fact being searched for in the unity collection.
+	 * @param unityFacts
+	 *            The collection of facts to search through for unification.
+	 * @param factReplacementMap
+	 *            The replacement map to apply to the fact.
+	 * @param unityReplacementMap
+	 *            The replacement map to apply to the unity collection.
+	 * @param factTerms
+	 *            The terms of the action. To be modified, depending on the
+	 *            resultant string.
+	 * @return The unified version of the fact (possibly more general than the
+	 *         input fact) or null if no unification.
+	 */
+	private String unifyFact(String fact, Collection<String> unityFacts,
+			Map<String, String> factReplacementMap,
+			Map<String, String> unityReplacementMap, List<String> factTerms) {
+		// Split the fact up and apply the replacements
+		String[] factSplit = StateSpec.splitFact(fact);
+
+		// Maintain a check on what is the best unification (should better ones
+		// be present)
+		String[] bestUnified = null;
+		int generalisation = 0;
+		List<String> bestTerms = null;
+		// Check against each item in the unity state,
+		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
+			String[] unitySplit = StateSpec.splitFact(iter.next());
+
+			// Check it if the same fact
+			if (factSplit[0].equals(unitySplit[0])) {
+				String[] unification = new String[factSplit.length];
+				List<String> thisTerms = new ArrayList<String>(factTerms);
+				int thisGeneralness = 0;
+				boolean notAnonymous = false;
+
+				// Unify each term
+				for (int i = 1; i < factSplit.length; i++) {
+					// If either are anonymous, the unification must be
+					// anonymous
+					if (factSplit[i].equals(StateSpec.ANONYMOUS)
+							|| unitySplit.equals(StateSpec.ANONYMOUS)) {
+						unification[i] = StateSpec.ANONYMOUS;
+						// If the fact was not originally anonymous, increment
+						// generalisation
+						if (factSplit[i].equals(StateSpec.ANONYMOUS))
+							thisGeneralness++;
+					} else if (factSplit[i].equals(unitySplit[i])
+							&& equalReplacements(factReplacementMap
+									.get(factSplit[i]), unityReplacementMap
+									.get(unitySplit[i]))) {
+						// If the two are the same term (not anonymous) and
+						// their replacements match up, use that
+						unification[i] = factSplit[i];
+						notAnonymous = true;
+					} else {
+						// Apply replacement operators
+						// Use the unification array to hold a temp value
+						if (factReplacementMap.containsKey(factSplit[i])) {
+							unification[i] = factReplacementMap
+									.get(factSplit[i]);
+							Collections.replaceAll(thisTerms, factSplit[i],
+									unification[i]);
+						} else
+							unification[i] = factSplit[i];
+
+						if (unityReplacementMap.containsKey(unitySplit[i]))
+							unitySplit[i] = unityReplacementMap
+									.get(unitySplit[i]);
+
+						// If the replaced values are equal, use them
+						if (unitySplit[i].equals(unification[i])) {
+							thisGeneralness++;
+							notAnonymous = true;
+						} else {
+							// Failing that simply use an anonymous variable
+							unification[i] = StateSpec.ANONYMOUS;
+							thisGeneralness++;
+						}
+					}
+				}
+
+				// Store if:
+				// 1. The fact is not fully anonymous
+				// 2. The fact is less general than the current best
+				if (notAnonymous
+						&& ((bestUnified == null) || (thisGeneralness < generalisation))) {
+					bestUnified = unification;
+					bestTerms = thisTerms;
+					generalisation = thisGeneralness;
+				}
+			}
+		}
+
+		if (bestUnified == null)
+			return null;
+
+		// Setting the fact terms
+		factTerms.clear();
+		factTerms.addAll(bestTerms);
+		bestUnified[0] = factSplit[0];
+		return StateSpec.reformFact(bestUnified);
+	}
+
+	/**
+	 * Simple equality method for comparing two possibly null strings.
+	 * 
+	 * @param string
+	 *            String 1.
+	 * @param string2
+	 *            String 2.
+	 * @return True if either strings are null, or if both are equal.
+	 */
+	private boolean equalReplacements(String string, String string2) {
+		if ((string == null) || (string2 == null))
+			return true;
+		if (!string.equals(string2))
+			return false;
+		return true;
+	}
+
+	/**
+	 * Clears the pregoal state.
+	 */
+	public void clearPreGoalState() {
+		preGoalState_ = new HashMap<String, List<String>>();
+		preGoalActionTerms_ = new HashMap<String, List<String>>();
+		preGoalUnificationInactivity_ = 0;
 	}
 
 	/**
@@ -185,8 +474,9 @@ public class Covering {
 			}
 
 			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = inverselySubstitute(actionFacts, terms,
-					actionString);
+			GuidedRule inverseSubbed = new GuidedRule(
+					inverselySubstitute(actionFacts, terms, StateSpec
+							.getInstance().getConstants()), actionString);
 
 			if (minimalRules == null)
 				minimalRules = new HashSet<GuidedRule>();
@@ -206,13 +496,23 @@ public class Covering {
 				for (int i = 0; i < previousRules.size(); i++) {
 					GuidedRule prev = previousRules.get(i);
 
-					// If something changes, make checks
-					int result = prev.intersect(inverseSubbed);
-					if (result == 1) {
+					// Unify the prev rule and the inverse subbed rule
+					List<String> ruleConditions = prev.getConditions(true);
+					List<String> ruleTerms = prev.getActionTerms();
+					int changed = unifyStates(ruleConditions, inverseSubbed
+							.getConditions(false), ruleTerms, inverseSubbed
+							.getActionTerms());
+
+					if (changed == 1) {
+						prev.setConditions(ruleConditions);
+						prev.setActionTerms(ruleTerms);
+					}
+
+					if (prev.isLGG()) {
 						// The rule is minimal
 						minimalRules.add(prev);
 						createNewRule = false;
-					} else if (result == 0) {
+					} else {
 						// The rule isn't minimal (but it changed)
 						createNewRule = false;
 					}
@@ -268,12 +568,12 @@ public class Covering {
 	 *            The facts relating to this action.
 	 * @param actionTerms
 	 *            The terms of the action.
-	 * @param actionString
-	 *            The action this rule leads to.
+	 * @param constants
+	 *            The constants to not generalise.
 	 * @return A collection of the facts in inversely substituted string format.
 	 */
-	private GuidedRule inverselySubstitute(List<Fact> actionFacts,
-			String[] actionTerms, String actionString) {
+	public Collection<String> inverselySubstitute(Collection<Fact> actionFacts,
+			String[] actionTerms, List<String> constants) {
 		// Building the mapping from necessary constants to variables
 		Map<String, String> termMapping = new HashMap<String, String>();
 		int i = 0;
@@ -290,11 +590,14 @@ public class Covering {
 			// Replace all constant terms in the action with matching variables
 			// or anonymous variables
 			for (int j = 1; j < factSplit.length; j++) {
-				String replacementTerm = termMapping.get(factSplit[j]);
-				if (replacementTerm != null)
-					factSplit[j] = replacementTerm;
-				else
-					factSplit[j] = "?";
+				// If the term isn't a constant, replace it with a variable
+				if (!constants.contains(factSplit[j])) {
+					String replacementTerm = termMapping.get(factSplit[j]);
+					if (replacementTerm != null)
+						factSplit[j] = replacementTerm;
+					else
+						factSplit[j] = "?";
+				}
 			}
 
 			// Reform the fact and add it back
@@ -302,7 +605,7 @@ public class Covering {
 			if (!substitution.contains(reformedFact))
 				substitution.add(reformedFact);
 		}
-		return new GuidedRule(substitution, actionString);
+		return substitution;
 	}
 
 	/**
@@ -428,10 +731,24 @@ public class Covering {
 	/**
 	 * Gets the pre-goal general state, seen by the agent.
 	 * 
+	 * @param action
+	 *            The pre-goal action.
 	 * @return The pre-goal state, in the form of a list of facts.
 	 */
-	public List<String> getPreGoalState() {
-		return preGoalState_;
+	public List<String> getPreGoalState(String action) {
+		return preGoalState_.get(action);
+	}
+
+	/**
+	 * Gets the pre-goal action (either using constants, or using variables).
+	 * 
+	 * @param action
+	 *            The pre-goal action. If using constants, can be used to create
+	 *            a 'perfect' rule.
+	 * @return The pre-goal action.
+	 */
+	public List<String> getPreGoalAction(String action) {
+		return preGoalActionTerms_.get(action);
 	}
 
 	/**

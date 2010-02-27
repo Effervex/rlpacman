@@ -20,16 +20,16 @@ public class GuidedRule {
 	 * The rule has to see 5 states without changing to be considered
 	 * artificially LGG.
 	 */
-	private static final int SETTLED_RULE_STATES = 5;
+	private static final int SETTLED_RULE_STATES = 50;
 
 	/** The conditions of the rule. */
 	private List<String> ruleConditions_;
 
 	/** The guided predicate that defined the action. */
-	private final String ruleAction_;
+	private String ruleAction_;
 
 	/** The terms present in the action. */
-	private final List<String> actionTerms_;
+	private List<String> actionTerms_;
 
 	/** The slot this rule was generated from. */
 	private Slot slot_;
@@ -45,7 +45,7 @@ public class GuidedRule {
 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
-	
+
 	/** If this rule is assured to be without inequals preds. */
 	private boolean withoutInequals_ = false;
 
@@ -142,37 +142,6 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Intersects the conditions of this guided rule with another, assuming they
-	 * are of the same action.
-	 * 
-	 * @param otherRule
-	 *            The other rule to intersect with.
-	 * @return 1 if the intersection is LGG, 0 if not, and -1 if the condition
-	 *         is invalid for the action (so the original rule reverts).
-	 */
-	public int intersect(GuidedRule otherRule) {
-		// Check the rules are of the same action.
-		if (ruleAction_.equals(otherRule.ruleAction_)) {
-			List<String> backup = new ArrayList<String>(ruleConditions_);
-
-			// Remove inequality preds
-			removeInequals();
-			boolean changed = ruleConditions_
-					.retainAll(otherRule.ruleConditions_);
-
-			int result = determineLGGStatus();
-			// Restore backup if rule is invalid
-			if (result == -1)
-				ruleConditions_ = backup;
-			else if (changed)
-				// Reset the states seen
-				statesSeen_ = 0;
-			return result;
-		}
-		return -1;
-	}
-
-	/**
 	 * Remove inequality preds
 	 */
 	private void removeInequals() {
@@ -204,10 +173,10 @@ public class GuidedRule {
 	 * @return 1 if the rule is minimal, 0 if not minimal, and -1 if invalid
 	 *         (too few conditions).
 	 */
-	private int determineLGGStatus() {
-		if (ruleConditions_.isEmpty()) {
+	private int determineLGGStatus(List<String> conditions) {
+		if (conditions.isEmpty()) {
 			System.err.println("Conditions have been over-shrunk: "
-					+ ruleConditions_ + ", " + ruleAction_);
+					+ conditions + ", " + ruleAction_);
 			return -1;
 		}
 
@@ -215,7 +184,7 @@ public class GuidedRule {
 
 		// Run through the conditions, ensuring each one has at least one unique
 		// term seen in the action.
-		for (String condition : ruleConditions_) {
+		for (String condition : conditions) {
 			boolean contains = false;
 
 			// Check if any of the terms are in the condition
@@ -245,8 +214,42 @@ public class GuidedRule {
 		return slot_;
 	}
 
-	public List<String> getConditions() {
-		return ruleConditions_;
+	/**
+	 * Gets the conditions, with or without inequality predicates.
+	 * 
+	 * @param withoutInequals
+	 *            Whether to exclude inequal preds or not.
+	 * @return The conditions, with or without inequal predicates.
+	 */
+	public List<String> getConditions(boolean withoutInequals) {
+		if (withoutInequals)
+			removeInequals();
+		return new ArrayList<String>(ruleConditions_);
+	}
+
+	/**
+	 * Sets the conditions of this guided rule, if the conditions are valid.
+	 * 
+	 * @param conditions
+	 *            The conditions for the guided rule.
+	 * @return True if the newly set conditions are valid.
+	 */
+	public boolean setConditions(List<String> conditions) {
+		// If the conditions are the same, return true.
+		if (conditions.equals(ruleConditions_)) {
+			return true;
+		}
+
+		int result = determineLGGStatus(conditions);
+		// If the rule is invalid, return false.
+		if (result == -1) {
+			return false;
+		}
+
+		// Reset the states seen, as the rule has changed.
+		statesSeen_ = 0;
+		ruleConditions_ = conditions;
+		return true;
 	}
 
 	public String getStringConditions() {
@@ -258,6 +261,27 @@ public class GuidedRule {
 
 	public String getAction() {
 		return ruleAction_;
+	}
+
+	public List<String> getActionTerms() {
+		return new ArrayList<String>(actionTerms_);
+	}
+
+	/**
+	 * Sets the new action terms, and modifies the action if necessary.
+	 * 
+	 * @param terms
+	 *            The new action terms.
+	 */
+	public void setActionTerms(List<String> terms) {
+		if (!terms.equals(actionTerms_)) {
+			actionTerms_ = terms;
+			String[] modified = StateSpec.splitFact(ruleAction_);
+			for (int i = 1; i < modified.length; i++) {
+				modified[i] = actionTerms_.get(i - 1);
+			}
+			ruleAction_ = StateSpec.reformFact(modified);
+		}
 	}
 
 	public void setSlot(Slot slot) {

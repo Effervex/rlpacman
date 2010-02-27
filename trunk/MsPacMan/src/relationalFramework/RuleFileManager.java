@@ -119,8 +119,7 @@ public class RuleFileManager {
 	}
 
 	/**
-	 * Saves the generators/distributions to file. TODO Modify this method to
-	 * save the generators in a more dynamic format.
+	 * Saves the generators/distributions to file.
 	 * 
 	 * @param output
 	 *            The file to output the generator to.
