@@ -23,7 +23,7 @@ import jess.ValueVector;
 public abstract class StateSpec {
 	public static final String INFERS_ACTION = "=>";
 
-	public static final char ANONYMOUS = '?';
+	public static final String ANONYMOUS = "?";
 
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
@@ -308,7 +308,7 @@ public abstract class StateSpec {
 			Pattern p = null;
 			if (i == 0) {
 				p = Pattern.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)|(?:"
-						+ Pattern.quote(ANONYMOUS + "") + ")))*)\\)");
+						+ Pattern.quote(ANONYMOUS) + ")))*)\\)");
 			} else {
 				p = Pattern
 						.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)))*)\\)");
@@ -505,6 +505,15 @@ public abstract class StateSpec {
 
 	public List<String> getConstants() {
 		return constants_;
+	}
+
+	/**
+	 * This should really only be used by the test class.
+	 * 
+	 * @param constants The constants set in the state.
+	 */
+	public void setConstants(List<String> constants) {
+		constants_ = constants;
 	}
 
 	public Rete getRete() {
