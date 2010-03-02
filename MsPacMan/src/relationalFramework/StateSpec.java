@@ -436,11 +436,11 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates the inequals tests from the terms stored. Note anonymous
-	 * terms are special in that they aren't inequal to one-another.
+	 * Creates the inequals tests from the terms stored. Note anonymous terms
+	 * are special in that they aren't inequal to one-another.
 	 * 
-	 * @return The string for detailing inequality '(test (<> ?X a b ?Y
-	 *         ?_0)) (test (<> ?Y a ...))'
+	 * @return The string for detailing inequality '(test (<> ?X a b ?Y ?_0))
+	 *         (test (<> ?Y a ...))'
 	 */
 	public static String createInequalsTests(List<String> terms) {
 		StringBuffer buffer = new StringBuffer();
@@ -510,7 +510,8 @@ public abstract class StateSpec {
 	/**
 	 * This should really only be used by the test class.
 	 * 
-	 * @param constants The constants set in the state.
+	 * @param constants
+	 *            The constants set in the state.
 	 */
 	public void setConstants(List<String> constants) {
 		constants_ = constants;
@@ -528,6 +529,25 @@ public abstract class StateSpec {
 	 */
 	public String getTypePredicate(Class key) {
 		return typePredicates_.get(key);
+	}
+
+	/**
+	 * Gets the type predicate using a predicate as the key and an arg index.
+	 * 
+	 * @param predicate
+	 *            The name of the predicate.
+	 * @param argIndex
+	 *            The index of the argument for the term.
+	 * @return The appropriate type predicate for the term.
+	 */
+	public String getTypePredicate(String predicate, int argIndex) {
+		if (isTypePredicate(predicate))
+			return predicate;
+
+		List<Class> classes = getPredicates().get(predicate);
+		if (classes != null)
+			return getTypePredicate(classes.get(argIndex));
+		return null;
 	}
 
 	public boolean isTypePredicate(String predicate) {
@@ -571,7 +591,7 @@ public abstract class StateSpec {
 				e.printStackTrace();
 			}
 		}
-		
+
 		return result;
 	}
 

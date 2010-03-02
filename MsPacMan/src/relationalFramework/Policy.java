@@ -106,6 +106,8 @@ public class Policy {
 				// If there is at least one result
 				if (results.next()) {
 					triggeredRules_.add(gr);
+					List<String> actionsList = new ArrayList<String>();
+
 					// For each possible replacement
 					do {
 						// Get the rule action, without brackets
@@ -126,11 +128,18 @@ public class Policy {
 						actBuffer.append(")");
 
 						// Use the found action set as a result.
-						actionSwitch.switchOn(actBuffer.toString(),
+						actionsList.add(actBuffer.toString());
+					} while (results.next());
+
+					// Switch on as many random actions as required.
+					while (!actionsList.isEmpty()
+							&& (actionsFound < actionsReturned)) {
+						actionSwitch.switchOn(actionsList
+								.remove(PolicyGenerator.random_
+										.nextInt(actionsList.size())),
 								actionsFound);
 						actionsFound++;
-					} while ((actionsFound < actionsReturned)
-							&& (results.next()));
+					}
 				}
 				results.close();
 			} catch (Exception e) {

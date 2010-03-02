@@ -168,42 +168,65 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Determines the LGG status of this rule
+	 * Determines the LGG status of this rule. Also has the option of removing
+	 * unnecessary rules as it runs through the rules.
 	 * 
+	 * @param removeUnnecessaryFacts
+	 *            If, during the sweep through the rules, unnecessary rules
+	 *            should be removed.
 	 * @return 1 if the rule is minimal, 0 if not minimal, and -1 if invalid
 	 *         (too few conditions).
 	 */
-	private int determineLGGStatus(List<String> conditions) {
+	private int determineLGGStatus(List<String> conditions,
+			boolean removeUnnecessaryFacts) {
 		if (conditions.isEmpty()) {
 			System.err.println("Conditions have been over-shrunk: "
 					+ conditions + ", " + ruleAction_);
 			return -1;
 		}
 
-		Set<String> terms = new HashSet<String>(actionTerms_);
+		Set<String> usedTerms = new HashSet<String>();
 
 		// Run through the conditions, ensuring each one has at least one unique
 		// term seen in the action.
-		for (String condition : conditions) {
+		boolean notLGG = false;
+		for (Iterator<String> iter = conditions.iterator(); iter.hasNext();) {
+			String condition = iter.next();
+
 			boolean contains = false;
 
 			// Check if any of the terms are in the condition
-			for (Iterator<String> i = terms.iterator(); i.hasNext();) {
-				String term = i.next();
+			boolean containsAny = false;
+			for (String term : actionTerms_) {
+				// If the condition contains a term
 				if (condition.contains(term)) {
-					i.remove();
-					contains = true;
+					// If the term hasn't already been used, keep it
+					if (!usedTerms.contains(term)) {
+						usedTerms.add(term);
+						contains = true;
+					}
+					containsAny = true;
 				}
 			}
-			// If no term is in the condition, return false
-			if (!contains) {
-				lgg_ = false;
-				return 0;
+
+			// Removing unnecessary terms
+			if (!containsAny && removeUnnecessaryFacts) {
+				iter.remove();
+			} else {
+				// If no term is in the condition, return false
+				if (!contains) {
+					lgg_ = false;
+					notLGG = true;
+				}
 			}
 		}
 
+		// If terms occur multiple times, the rule isn't LGG
+		if (notLGG)
+			return 0;
+
 		// If there are terms remaining, the condition is invalid
-		if (!terms.isEmpty())
+		if (usedTerms.size() < actionTerms_.size())
 			return -1;
 
 		lgg_ = true;
@@ -232,21 +255,26 @@ public class GuidedRule {
 	 * 
 	 * @param conditions
 	 *            The conditions for the guided rule.
+	 * @param removeUnnecessaryFacts
+	 *            If, during the setting process, facts not containing any of
+	 *            the action terms should be removed.
 	 * @return True if the newly set conditions are valid.
 	 */
-	public boolean setConditions(List<String> conditions) {
+	public boolean setConditions(List<String> conditions,
+			boolean removeUnnecessaryFacts) {
 		// If the conditions are the same, return true.
 		if (conditions.equals(ruleConditions_)) {
 			return true;
 		}
 
-		int result = determineLGGStatus(conditions);
+		int result = determineLGGStatus(conditions, removeUnnecessaryFacts);
 		// If the rule is invalid, return false.
 		if (result == -1) {
 			return false;
 		}
 
 		// Reset the states seen, as the rule has changed.
+		hasSpawned_ = false;
 		statesSeen_ = 0;
 		ruleConditions_ = conditions;
 		return true;
@@ -297,6 +325,14 @@ public class GuidedRule {
 
 	public boolean isMutant() {
 		return mutant_;
+	}
+
+	public void setSpawned(boolean spawned) {
+		hasSpawned_ = spawned;
+	}
+	
+	public boolean hasSpawned() {
+		return hasSpawned_;
 	}
 
 	/**

@@ -281,6 +281,11 @@ public class CrossEntropyExperiment {
 					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 						RLGlue.RL_episode(maxSteps);
 						score += RLGlue.RL_return();
+						try {
+							Thread.sleep(1000);
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
 					}
 					score /= AVERAGE_ITERATIONS;
 					System.out.println(score);
@@ -324,7 +329,7 @@ public class CrossEntropyExperiment {
 
 			// Flushing the rete object.
 			StateSpec.reinitInstance();
-			
+
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();
 		}
