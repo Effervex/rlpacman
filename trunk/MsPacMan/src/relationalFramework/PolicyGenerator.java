@@ -1,15 +1,12 @@
 package relationalFramework;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Random;
 
 import jess.Fact;
 import jess.Rete;
@@ -47,6 +44,9 @@ public class PolicyGenerator {
 	 * exclusive from the lggRules list.
 	 */
 	private MultiMap<String, GuidedRule> nonLGGCoveredRules_;
+	
+	/** The random number generator. */
+	public static Random random_ = new Random();
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -154,14 +154,52 @@ public class PolicyGenerator {
 				lggRules_.put(action, coveredRule);
 				System.out.println("\tLGG RULE FOUND: " + coveredRule);
 
-				// Mutate
+				// Mutate unless already mutated
+				if (!covering_.isPreGoalSettled()) {
+					mutateRule(coveredRule, false);
+				}
 			} else if (createNewRules) {
 				nonLGGCoveredRules_.put(action, coveredRule);
 			}
 		}
 
-		Collections.shuffle(covered);
+		Collections.shuffle(covered, random_);
 		return covered;
+	}
+
+	/**
+	 * Mutates a rule and creates and adds children to the slots.
+	 * 
+	 * @param baseRule
+	 *            The rule to mutate.
+	 * @param settledPreGoal
+	 *            If the pre-goal has settled.
+	 */
+	private void mutateRule(GuidedRule baseRule, boolean settledPreGoal) {
+		// If the base rule hasn't already spawned pre-goal mutants
+		if (!baseRule.hasSpawned()) {
+			List<GuidedRule> mutants = covering_.specialiseToPreGoal(baseRule);
+			// If the pre-goal has settled, make permanent mutants
+			if (settledPreGoal) {
+				baseRule.setSpawned(true);
+
+				// Retain these more general mutant children
+				Slot ruleSlot = baseRule.getSlot();
+
+				// Just a check. Can probably remove this
+				// Ensure all mutants are in the distribution
+				for (GuidedRule mutant : mutants) {
+					if (!baseRule.getSlot().getGenerator().contains(mutant)) {
+						System.err.println("Seems a mutant "
+								+ "exists in the minimal set "
+								+ "not in the more specific set.");
+						throw new RuntimeException();
+					}
+				}
+			} else {
+				System.err.println("Need to deal with this. mutateRule()");
+			}
+		}
 	}
 
 	/**
@@ -174,29 +212,18 @@ public class PolicyGenerator {
 	 *            The final action(s) taken by the agent.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState, String[] actions) {
+		System.out.println("\tFORMING PRE-GOAL STATE:");
 		// If the state has settled and is probably at minimum, trigger
 		// mutation.
 		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
 			// For each maximally general rule
 			for (GuidedRule general : lggRules_.values()) {
-				List<GuidedRule> mutants = covering_
-						.specialiseToPreGoal(general);
-				mutants.add(general);
-
-				// Retain these mutant children
-				general.getSlot().getGenerator().retainAll(mutants);
-
-				// Just a check. Can probably remove this
-				// Ensure all mutants are in the distribution
-				for (GuidedRule mutant : mutants) {
-					if (!general.getSlot().getGenerator().contains(mutant)) {
-						System.err
-								.println("Seems a mutant exists in the minimal set not in the more specific set.");
-						throw new RuntimeException();
-					}
-				}
+				mutateRule(general, true);
 			}
 		}
+		
+		System.out.println("\tmove: " + covering_.getPreGoalState("move"));
+		System.out.println("\tmoveFloor: " + covering_.getPreGoalState("moveFloor"));
 	}
 
 	/**

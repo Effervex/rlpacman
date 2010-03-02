@@ -102,8 +102,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// System.out.println("\t\t\tOptimal test: "
 		// + Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-		// System.out
-		// .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+		 System.out
+		 .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
 		steps_ = 0;
 
 		return formObs_Start();
@@ -130,11 +130,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-		// if (action != null)
-		// System.out.println("\t\t\t" + action + "   ->   "
-		// + Arrays.toString(newState.getState()));
-		// else
-		// System.out.println("\t\t\tNo action chosen.");
+		 if (action != null)
+		 System.out.println("\t\t\t" + action + "   ->   "
+		 + Arrays.toString(newState.getState()));
+		 else
+		 System.out.println("\t\t\tNo action chosen.");
 
 		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
 		Observation obs = new Observation();
@@ -200,7 +200,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		Integer[] newState = new Integer[worldState.length];
 
-		String[] split = action.split(" ");
+		String[] split = StateSpec.splitFact(action);
 
 		// Finding the block objects
 		int[] indices = null;
@@ -261,10 +261,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The newly initialised blocks world state.
 	 */
 	private BlocksState initialiseWorld(int numBlocks, String goalState) {
+		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
 		contourState.add(0d);
-		Random random = new Random();
 		List<Integer> blocksLeft = new ArrayList<Integer>();
 		for (int i = 1; i <= numBlocks; i++) {
 			blocksLeft.add(i);
