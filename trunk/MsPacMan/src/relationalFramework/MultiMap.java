@@ -128,7 +128,7 @@ public class MultiMap<K, V> {
 	 * 
 	 * @return True if the multimap is empty.
 	 */
-	public boolean isEmpty() {
+	public boolean isKeysEmpty() {
 		return innerMap_.isEmpty();
 	}
 

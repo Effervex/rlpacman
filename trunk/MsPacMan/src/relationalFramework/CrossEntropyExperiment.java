@@ -281,11 +281,11 @@ public class CrossEntropyExperiment {
 					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 						RLGlue.RL_episode(maxSteps);
 						score += RLGlue.RL_return();
-						try {
-							Thread.sleep(1000);
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
+//						try {
+//							Thread.sleep(1000);
+//						} catch (Exception e) {
+//							e.printStackTrace();
+//						}
 					}
 					score /= AVERAGE_ITERATIONS;
 					System.out.println(score);

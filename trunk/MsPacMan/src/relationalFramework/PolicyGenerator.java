@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -44,7 +45,10 @@ public class PolicyGenerator {
 	 * exclusive from the lggRules list.
 	 */
 	private MultiMap<String, GuidedRule> nonLGGCoveredRules_;
-	
+
+	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
+	private MultiMap<String, GuidedRule> mutatedRules_;
+
 	/** The random number generator. */
 	public static Random random_ = new Random();
 
@@ -61,6 +65,7 @@ public class PolicyGenerator {
 		nonLGGCoveredRules_ = new MultiMap<String, GuidedRule>();
 		covering_ = new Covering();
 		lggRules_ = new MultiMap<String, GuidedRule>();
+		mutatedRules_ = new MultiMap<String, GuidedRule>();
 
 		resetGenerator();
 	}
@@ -142,7 +147,6 @@ public class PolicyGenerator {
 			String action = StateSpec.splitFact(coveredRule.getAction())[0];
 			if (coveredRule.getSlot() == null) {
 				Slot slot = findSlot(action);
-				coveredRule.setSlot(slot);
 
 				// Adding the rule to the slot
 				slot.addNewRule(coveredRule);
@@ -179,25 +183,34 @@ public class PolicyGenerator {
 		// If the base rule hasn't already spawned pre-goal mutants
 		if (!baseRule.hasSpawned()) {
 			List<GuidedRule> mutants = covering_.specialiseToPreGoal(baseRule);
-			// If the pre-goal has settled, make permanent mutants
+
+			Slot ruleSlot = baseRule.getSlot();
+
+			// If the slot has settled, remove any mutants not present in
+			// the permanent mutant set
 			if (settledPreGoal) {
 				baseRule.setSpawned(true);
-
-				// Retain these more general mutant children
-				Slot ruleSlot = baseRule.getSlot();
-
-				// Just a check. Can probably remove this
-				// Ensure all mutants are in the distribution
-				for (GuidedRule mutant : mutants) {
-					if (!baseRule.getSlot().getGenerator().contains(mutant)) {
-						System.err.println("Seems a mutant "
-								+ "exists in the minimal set "
-								+ "not in the more specific set.");
-						throw new RuntimeException();
+				if (!mutants.isEmpty()) {
+					// Run through the rules in the slot, removing any mutants
+					// not in the permanent mutant set.
+					List<GuidedRule> removables = new ArrayList<GuidedRule>();
+					for (GuidedRule gr : ruleSlot.getGenerator()) {
+						if (gr.isMutant() && !mutants.contains(gr))
+							removables.add(gr);
 					}
+					if (ruleSlot.getGenerator().removeAll(removables))
+						ruleSlot.getGenerator().normaliseProbs();
 				}
-			} else {
-				System.err.println("Need to deal with this. mutateRule()");
+			}
+
+			// Add all mutants to the ruleSlot
+			for (GuidedRule gr : mutants) {
+				// Only add if not already in there
+				if (!ruleSlot.contains(gr)) {
+					ruleSlot.addNewRule(gr);
+				}
+
+				mutatedRules_.putContains(ruleSlot.getAction(), gr);
 			}
 		}
 	}
@@ -212,18 +225,30 @@ public class PolicyGenerator {
 	 *            The final action(s) taken by the agent.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState, String[] actions) {
-		System.out.println("\tFORMING PRE-GOAL STATE:");
 		// If the state has settled and is probably at minimum, trigger
 		// mutation.
 		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
+			System.out.println("\tSETTLED PRE-GOAL STATE:");
 			// For each maximally general rule
 			for (GuidedRule general : lggRules_.values()) {
 				mutateRule(general, true);
 			}
+		} else {
+			System.out.println("\tFORMING PRE-GOAL STATE:");
 		}
-		
+
 		System.out.println("\tmove: " + covering_.getPreGoalState("move"));
-		System.out.println("\tmoveFloor: " + covering_.getPreGoalState("moveFloor"));
+		System.out.println("\tmoveFloor: "
+				+ covering_.getPreGoalState("moveFloor"));
+	}
+
+	/**
+	 * If the pre-goal state exists.
+	 * 
+	 * @return True if the state exists, false otherwise.
+	 */
+	public boolean hasPreGoal() {
+		return covering_.hasPreGoal();
 	}
 
 	/**
@@ -273,6 +298,7 @@ public class PolicyGenerator {
 
 		nonLGGCoveredRules_.clear();
 		lggRules_.clear();
+		mutatedRules_.clear();
 		policyGenerator_.normaliseProbs();
 	}
 

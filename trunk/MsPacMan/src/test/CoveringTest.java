@@ -4,7 +4,6 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 import jess.Fact;
@@ -36,7 +35,7 @@ public class CoveringTest {
 		// No constants
 		List<String> constants = new ArrayList<String>();
 		StateSpec.getInstance().setConstants(constants);
-		
+
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -61,8 +60,8 @@ public class CoveringTest {
 			System.out.println(gr);
 			if (gr.getAction().contains("moveFloor")) {
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(3, condCount);
 				assertFalse(gr.getConditions(false).contains("(highest ?X)"));
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
@@ -72,8 +71,8 @@ public class CoveringTest {
 				assertEquals("(moveFloor ?X)", gr.getAction());
 			} else {
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(2, condCount);
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
 				assertTrue(gr.getConditions(false).contains("(clear ?Y)"));
@@ -131,8 +130,8 @@ public class CoveringTest {
 			System.out.println(gr);
 			if (gr.getAction().contains("moveFloor")) {
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(4, condCount);
 				assertTrue(gr.getConditions(false).contains("(highest ?X)"));
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
@@ -142,8 +141,8 @@ public class CoveringTest {
 				assertEquals("(moveFloor ?X)", gr.getAction());
 			} else {
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(2, condCount);
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
 				assertTrue(gr.getConditions(false).contains("(clear ?Y)"));
@@ -156,15 +155,16 @@ public class CoveringTest {
 				assertEquals("(move ?X ?Y)", gr.getAction());
 			}
 		}
-		
+
 		// Test the rule refinement flag.
-		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(), false);
+		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(),
+				false);
 		assertTrue(rules.isEmpty());
-		
+
 		// Consecutive covering (w/ constants)
 		constants.add("a");
 		constants.add("b");
-		
+
 		state.reset();
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (onFloor e))");
@@ -179,8 +179,9 @@ public class CoveringTest {
 		state.eval("(assert (highest d))");
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
-		
-		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(), true);
+
+		rules = sut_
+				.coverState(state, new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		existingRules.clear();
 		for (GuidedRule gr : rules) {
@@ -194,8 +195,8 @@ public class CoveringTest {
 				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
 				assertEquals("(moveFloor ?X)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(6, condCount);
 				existingRules.put("moveFloor", gr);
 			} else {
@@ -212,13 +213,13 @@ public class CoveringTest {
 				assertFalse(gr.getConditions(false).contains("(highest ?Y)"));
 				assertEquals("(move ?X ?Y)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(2, condCount);
 				existingRules.put("move", gr);
 			}
 		}
-		
+
 		state.reset();
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (onFloor e))");
@@ -233,7 +234,7 @@ public class CoveringTest {
 		state.eval("(assert (highest b))");
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
-		
+
 		rules = sut_.coverState(state, existingRules, true);
 		assertEquals(2, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
@@ -249,8 +250,8 @@ public class CoveringTest {
 				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
 				assertEquals("(moveFloor ?X)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(5, condCount);
 			} else {
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
@@ -266,12 +267,12 @@ public class CoveringTest {
 				assertFalse(gr.getConditions(false).contains("(highest ?Y)"));
 				assertEquals("(move ?X ?Y)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(2, condCount);
 			}
 		}
-		
+
 		// Constants covering
 		state.reset();
 		state.eval("(assert (onFloor c))");
@@ -287,8 +288,9 @@ public class CoveringTest {
 		state.eval("(assert (highest b))");
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
-		
-		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(), true);
+
+		rules = sut_
+				.coverState(state, new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
@@ -300,8 +302,8 @@ public class CoveringTest {
 				assertTrue(gr.getConditions(false).contains("(above b ?)"));
 				assertEquals("(moveFloor b)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(5, condCount);
 			} else {
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
@@ -314,33 +316,34 @@ public class CoveringTest {
 				assertFalse(gr.getConditions(false).contains("(highest ?Y)"));
 				assertEquals("(move ?X ?Y)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(
-						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)", ".")
-						.length();
+						gr.getStringConditions()).replaceAll("\\(.+?\\)( |$)",
+						".").length();
 				assertEquals(2, condCount);
 			}
 		}
 	}
-	
+
 	@Test
 	public void testInverselySubstitute() throws Exception {
 		// Ensuring we have no constants
 		List<String> constants = new ArrayList<String>();
-		
+
 		// Basic substitution
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		String[] actionTerms = {"a"};
-		Collection<String> result = sut_.inverselySubstitute(facts, actionTerms, constants);
+		String[] actionTerms = { "a" };
+		Collection<String> result = sut_.inverselySubstitute(facts,
+				actionTerms, constants);
 		assertEquals(result.size(), 1);
 		assertTrue(result.contains("(clear ?X)"));
-		
+
 		// Substitution of an unknown variable
 		actionTerms[0] = "b";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
 		assertEquals(result.size(), 1);
 		assertTrue(result.contains("(clear ?)"));
-		
+
 		// Only return one anonymous fact if there is more than one
 		state.eval("(assert (clear b))");
 		state.eval("(assert (clear c))");
@@ -350,7 +353,7 @@ public class CoveringTest {
 		assertEquals(result.size(), 2);
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
-		
+
 		// Swap over many facts
 		state.eval("(assert (on a d))");
 		state.eval("(assert (on b e))");
@@ -364,7 +367,7 @@ public class CoveringTest {
 		assertTrue(result.contains("(on ?X ?)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
-		
+
 		// Multiple action terms
 		actionTerms = new String[2];
 		actionTerms[0] = "a";
@@ -377,36 +380,38 @@ public class CoveringTest {
 		assertTrue(result.contains("(on ?X ?)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?Y)"));
-		
+
 		// Testing constants
 		constants.add("a");
 		actionTerms = new String[1];
 		actionTerms[0] = "a";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 5);
+		assertEquals(result.size(), 6);
 		assertTrue(result.contains("(clear a)"));
+		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on a ?)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
-		
+
 		actionTerms[0] = "b";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 6);
+		assertEquals(result.size(), 7);
 		assertTrue(result.contains("(clear a)"));
+		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on a ?)"));
 		assertTrue(result.contains("(on ?X ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
 	}
-	
+
 	@Test
 	public void testFormPreGoalState() throws Exception {
 		// Ensuring we have no constants
 		List<String> constants = new ArrayList<String>();
 		StateSpec.getInstance().setConstants(constants);
-		
+
 		// Basic covering
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
@@ -414,9 +419,10 @@ public class CoveringTest {
 		boolean result = sut_.formPreGoalState(facts, "(moveFloor a)");
 		assertTrue(result);
 		List<String> preGoal = sut_.getPreGoalState("moveFloor");
-		assertEquals(preGoal.size(), 1);
+		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear a)"));
-		
+		assertTrue(preGoal.contains("(block a)"));
+
 		// Generalisation (same predicate and action)
 		state.reset();
 		state.eval("(assert (clear b))");
@@ -424,9 +430,10 @@ public class CoveringTest {
 		result = sut_.formPreGoalState(facts, "(moveFloor b)");
 		assertTrue(result);
 		preGoal = sut_.getPreGoalState("moveFloor");
-		assertEquals(preGoal.size(), 1);
+		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear ?X)"));
-		
+		assertTrue(preGoal.contains("(block ?X)"));
+
 		// Generalising test (different predicates, same action)
 		sut_.clearPreGoalState();
 		state.reset();
@@ -458,7 +465,7 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(highest a)"));
 		assertTrue(preGoal.contains("(above a ?)"));
 		assertTrue(preGoal.contains("(above b ?)"));
-		
+
 		state.reset();
 		state.eval("(assert (block a))");
 		state.eval("(assert (block b))");
@@ -485,7 +492,7 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(block b)"));
 		assertTrue(preGoal.contains("(on b ?)"));
 		assertTrue(preGoal.contains("(above b ?)"));
-		
+
 		// Generalising the action
 		result = sut_.formPreGoalState(facts, "(move b a)");
 		assertTrue(result);
@@ -497,7 +504,7 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(block ?X)"));
 		assertTrue(preGoal.contains("(block ?Y)"));
 	}
-	
+
 	@Test
 	public void testUnifyStates() {
 		// No change unification
@@ -514,7 +521,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// No change with constants
 		oldState.clear();
 		oldState.add("(clear a)");
@@ -529,7 +536,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear a)"));
 		assertTrue(oldTerms.contains("a"));
-		
+
 		// Basic removal of preds unification
 		oldState.clear();
 		oldState.add("(clear ?X)");
@@ -548,7 +555,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Simple unification
 		oldState.clear();
 		oldState.add("(clear ?X)");
@@ -571,7 +578,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(clear ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Absorption
 		oldState.clear();
 		oldState.add("(clear ?X)");
@@ -586,7 +593,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Generalisation
 		oldState.clear();
 		oldState.add("(clear a)");
@@ -601,7 +608,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Mutual generalisation
 		oldState.clear();
 		oldState.add("(clear a)");
@@ -616,7 +623,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Two terms
 		oldState.clear();
 		oldState.add("(on a b)");
@@ -634,7 +641,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Two terms in differing order
 		oldState.clear();
 		oldState.add("(on a b)");
@@ -650,7 +657,7 @@ public class CoveringTest {
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(on a b)"));
-		
+
 		// Two terms with two aligned preds
 		oldState.clear();
 		oldState.add("(on a b)");
@@ -670,7 +677,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Two terms with two misaligned preds
 		oldState.clear();
 		oldState.add("(on a b)");
@@ -690,7 +697,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Generalisation to anonymous
 		oldState.clear();
 		oldState.add("(clear ?X)");
@@ -704,7 +711,7 @@ public class CoveringTest {
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
-		
+
 		// Constant and variable case
 		oldState.clear();
 		oldState.add("(on a ?X)");
@@ -719,7 +726,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(on ? ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		
+
 		// Tough case
 		oldState.clear();
 		oldState.add("(on a ?Y)");
@@ -737,7 +744,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ? ?Y)"));
 		assertTrue(oldTerms.contains("a"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Tough case 2
 		oldState.clear();
 		oldState.add("(on ?X a)");
@@ -755,7 +762,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ? ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Tough case 3
 		oldState.clear();
 		oldState.add("(on a ?Y)");
@@ -773,7 +780,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on a ?)"));
 		assertTrue(oldTerms.contains("a"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Early generalisation test
 		oldState.clear();
 		oldState.add("(on a ?Y)");
@@ -792,7 +799,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on a ?Y)"));
 		assertTrue(oldTerms.contains("a"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Unnecessary replacement avoidance
 		oldState.clear();
 		oldState.add("(on a ?Y)");
@@ -811,7 +818,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on a ?Y)"));
 		assertTrue(oldTerms.contains("a"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Using the same fact for unification
 		oldState.clear();
 		oldState.add("(on a ?Y)");
@@ -831,7 +838,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Left with constant predicate
 		oldState.clear();
 		oldState.add("(on ?X b)");
@@ -855,7 +862,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(clear ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));
-		
+
 		// Un-unifiable
 		oldState.clear();
 		oldState.add("(clear ?X)");
@@ -869,5 +876,215 @@ public class CoveringTest {
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
+		
+		// Proper unification
+		oldState.clear();
+		oldState.add("(on a ?Y)");
+		oldState.add("(on a b)");
+		oldState.add("(clear a)");
+		newState.clear();
+		newState.add("(on a b)");
+		newState.add("(on a c)");
+		newState.add("(clear a)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		oldTerms.add("?Y");
+		newTerms.clear();
+		newTerms.add("a");
+		newTerms.add("b");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(3, oldState.size());
+		assertTrue(oldState.contains("(on a ?Y)"));
+		assertTrue(oldState.contains("(on a b)"));
+		assertTrue(oldState.contains("(clear a)"));
+		
+		// Improper unification
+		oldState.clear();
+		oldState.add("(on a ?Y)");
+		oldState.add("(on a b)");
+		oldState.add("(clear a)");
+		newState.clear();
+		newState.add("(on a b)");
+		newState.add("(clear a)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		oldTerms.add("?Y");
+		newTerms.clear();
+		newTerms.add("a");
+		newTerms.add("b");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(3, oldState.size());
+		assertTrue(oldState.contains("(on a ?Y)"));
+		assertTrue(oldState.contains("(on a b)"));
+		assertTrue(oldState.contains("(clear a)"));
+	}
+
+	@Test
+	public void testSpecialiseToPreGoal() {
+		// Basic stack test
+		List<String> pregoal = new ArrayList<String>();
+		pregoal.add("(onFloor ?X)");
+		pregoal.add("(clear ?X)");
+		pregoal.add("(block ?X)");
+		pregoal.add("(on ?Y ?)");
+		pregoal.add("(clear ?Y)");
+		pregoal.add("(block ?Y)");
+		sut_.setPreGoal("(move ?X ?Y)", pregoal);
+
+		GuidedRule rule = new GuidedRule(
+				"(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rule.expandConditions();
+		assertEquals(5, rule.getConditions(false).size());
+		List<GuidedRule> results = sut_.specialiseToPreGoal(rule);
+		assertEquals(2, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", false,
+				true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", false, true,
+				null)));
+
+		// Full covering
+		rule = new GuidedRule(
+				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(1, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (onFloor ?X) (on ?Y ?) => (move ?X ?Y)",
+				false, true, null)));
+
+		// Empty case
+		pregoal.clear();
+		pregoal.add("(clear ?X)");
+		pregoal.add("(block ?X)");
+		pregoal.add("(clear ?Y)");
+		pregoal.add("(block ?Y)");
+		sut_.setPreGoal("(move ?X ?Y)", pregoal);
+
+		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(0, results.size());
+
+		// Empty case 2
+		rule = new GuidedRule("(on ?X ?) (clear ?X) => (moveFloor ?X)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(0, results.size());
+
+		// Specialisation to constant
+		pregoal.clear();
+		pregoal.add("(clear a)");
+		pregoal.add("(block a)");
+		pregoal.add("(clear b)");
+		pregoal.add("(block b)");
+		sut_.setPreGoal("(move a b)", pregoal);
+
+		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(2, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(clear a) (clear ?Y) => (move a ?Y)", false, true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear b) => (move ?X b)", false, true, null)));
+
+		// Using constants for general rule addition
+		pregoal.clear();
+		pregoal.add("(onFloor a)");
+		pregoal.add("(clear a)");
+		pregoal.add("(block a)");
+		pregoal.add("(on b ?)");
+		pregoal.add("(clear b)");
+		pregoal.add("(block b)");
+		sut_.setPreGoal("(move a b)", pregoal);
+
+		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(4, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", false,
+				true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", false, true,
+				null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear a) (clear ?Y) => (move a ?Y)", false, true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear b) => (move ?X b)", false, true, null)));
+
+		// Inner predicate specialisation
+		pregoal.clear();
+		pregoal.add("(on ?X a)");
+		pregoal.add("(on ?Y b)");
+		sut_.setPreGoal("(move ?X ?Y)", pregoal);
+
+		rule = new GuidedRule("(on ?X ?) (on ?Y ?) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(2, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(on ?X a) (on ?Y ?) => (move ?X ?Y)", false, true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(on ?X ?) (on ?Y b) => (move ?X ?Y)", false, true, null)));
+
+		// Adding constant facts
+		pregoal.clear();
+		pregoal.add("(onFloor a)");
+		pregoal.add("(clear ?X)");
+		pregoal.add("(block ?X)");
+		pregoal.add("(on b ?)");
+		pregoal.add("(clear ?Y)");
+		pregoal.add("(block ?Y)");
+		sut_.setPreGoal("(move ?X ?Y)", pregoal);
+
+		rule = new GuidedRule(
+				"(clear ?X) (onFloor ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(2, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (onFloor a) => (move ?X ?Y)", false,
+				true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(clear ?X) (clear ?Y) (on b ?) => (move ?X ?Y)", false, true,
+				null)));
+		
+		// Constant substitution 2
+		pregoal.clear();
+		pregoal.add("(on a b)");
+		pregoal.add("(clear a)");
+		sut_.setPreGoal("(move a b)", pregoal);
+
+		rule = new GuidedRule(
+				"(on ?X ?Y) (clear ?X) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(1, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(on a ?Y) (clear a) => (move a ?Y)", false, true,
+				null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(on ?X b) (clear ?X) => (move ?X b)", false, true,
+				null)));
+
+		// Invalid constant swapping
+		pregoal.clear();
+		pregoal.add("(on a b)");
+		pregoal.add("(clear a)");
+		sut_.setPreGoal("(move a b)", pregoal);
+
+		rule = new GuidedRule(
+				"(on ?X ?Y) (clear ?X) (highest ?X) => (move ?X ?Y)");
+		rule.expandConditions();
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(1, results.size());
+		assertTrue(results.contains(new GuidedRule(
+				"(on ?X b) (clear ?X) (highest ?X) => (move ?X b)", false, true,
+				null)));
 	}
 }

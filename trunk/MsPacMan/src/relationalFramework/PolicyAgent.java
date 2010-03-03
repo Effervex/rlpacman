@@ -99,8 +99,7 @@ public class PolicyAgent implements AgentInterface {
 				.getNumActions(), optimal_, false);
 
 		// Save the previous state (if not an optimal agent).
-		if (!optimal_)
-			prevState_ = StateSpec.extractFacts(state);
+		prevState_ = StateSpec.extractFacts(state);
 
 		// Return the actions.
 		return actionsModule_.getPrioritisedActions();

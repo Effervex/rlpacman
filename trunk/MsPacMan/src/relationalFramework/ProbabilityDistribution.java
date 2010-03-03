@@ -525,7 +525,11 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	// @Override
 	public boolean removeAll(Collection<?> arg0) {
-		return false;
+		boolean changed = false;
+		for (Object obj : arg0) {
+			changed |= remove(obj);
+		}
+		return changed;
 	}
 
 	@Override
