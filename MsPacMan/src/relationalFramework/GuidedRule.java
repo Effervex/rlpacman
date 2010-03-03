@@ -71,11 +71,13 @@ public class GuidedRule {
 	 *            The conditions for the rule.
 	 * @param action
 	 *            The actions for the rule.
+	 * @param mutant TODO
 	 */
-	public GuidedRule(Collection<String> conditions, String action) {
+	public GuidedRule(Collection<String> conditions, String action, boolean mutant) {
 		ruleConditions_ = new ArrayList<String>(conditions);
 		ruleAction_ = action;
 		actionTerms_ = findTerms(ruleAction_);
+		mutant_ = mutant;
 		slot_ = null;
 	}
 
@@ -165,6 +167,14 @@ public class GuidedRule {
 		ruleConditions_ = splitConditions(StateSpec.getInstance().parseRule(
 				toString()).split(StateSpec.INFERS_ACTION)[0]);
 		withoutInequals_ = false;
+	}
+
+	/**
+	 * Checks if inequals is present (i.e. rule is fully expanded.)
+	 */
+	public void checkInequals() {
+		if (withoutInequals_)
+			expandConditions();
 	}
 
 	/**
@@ -296,6 +306,15 @@ public class GuidedRule {
 	}
 
 	/**
+	 * Gets the action predicate.
+	 * 
+	 * @return The action predicate for the action.
+	 */
+	public String getActionPredicate() {
+		return StateSpec.splitFact(ruleAction_)[0];
+	}
+
+	/**
 	 * Sets the new action terms, and modifies the action if necessary.
 	 * 
 	 * @param terms
@@ -330,7 +349,7 @@ public class GuidedRule {
 	public void setSpawned(boolean spawned) {
 		hasSpawned_ = spawned;
 	}
-	
+
 	public boolean hasSpawned() {
 		return hasSpawned_;
 	}
@@ -396,7 +415,11 @@ public class GuidedRule {
 		if (ruleConditions_ == null) {
 			if (other.ruleConditions_ != null)
 				return false;
-		} else if (!ruleConditions_.equals(other.ruleConditions_))
+		} else if (other.ruleConditions_ == null)
+			return false;
+		else if (!ruleConditions_.containsAll(other.ruleConditions_))
+			return false;
+		else if (!other.ruleConditions_.containsAll(ruleConditions_))
 			return false;
 		return true;
 	}

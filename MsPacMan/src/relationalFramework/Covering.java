@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.Rete;
@@ -68,7 +69,7 @@ public class Covering {
 			MultiMap<String, GuidedRule> nonLGGCoveredRules,
 			boolean createNewRules) throws Exception {
 		// If we're not creating new rules and the nonLGGs are empty, return
-		if (!createNewRules && nonLGGCoveredRules.isEmpty())
+		if (!createNewRules && nonLGGCoveredRules.allValuesEmpty())
 			return EMPTY_LIST;
 		createNewRules_ = createNewRules;
 
@@ -99,22 +100,6 @@ public class Covering {
 		}
 
 		return generalActions;
-	}
-
-	/**
-	 * Specialises a rule to match the state (ideally in a minimal way). There
-	 * can be multiple specialisations.
-	 * 
-	 * @param rule
-	 *            The general rule to be specialised.
-	 * @param state
-	 *            The state used as a specialisation.
-	 * @return A list of newly specialised rules, where each is more specialised
-	 *         than the general rule but still match the state.
-	 */
-	public List<GuidedRule> specialiseRule(GuidedRule rule, Rete state) {
-		// TODO Specialise rule to a state
-		return null;
 	}
 
 	/**
@@ -409,7 +394,7 @@ public class Covering {
 			// Inversely substitute the terms for variables (in string form)
 			GuidedRule inverseSubbed = new GuidedRule(inverselySubstitute(
 					actionFacts, terms, constants), StateSpec
-					.reformFact(action));
+					.reformFact(action), false);
 
 			if (minimalRules == null)
 				minimalRules = new HashSet<GuidedRule>();
@@ -514,7 +499,7 @@ public class Covering {
 					typePred[0] = StateSpec.getInstance().getTypePredicate(
 							factSplit[0], j - 1);
 					typePred[1] = factSplit[j];
-					
+
 					String formedType = StateSpec.reformFact(typePred);
 					if (!substitution.contains(formedType))
 						substitution.add(formedType);
@@ -567,7 +552,7 @@ public class Covering {
 
 		// If we have some actions not used (likely, then shuffle the ordering
 		// and add them to the end of the actions map.
-		if (!notUsedMap.isEmpty()) {
+		if (!notUsedMap.isKeysEmpty()) {
 			for (List<String> notUsed : notUsedMap.valuesLists()) {
 				Collections.shuffle(notUsed);
 			}
@@ -658,8 +643,85 @@ public class Covering {
 	 *         pre-goal state.
 	 */
 	public List<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
-		// TODO Specialise rule to pre-goal state
-		return null;
+		List<GuidedRule> mutants = new ArrayList<GuidedRule>();
+
+		// Get a single fact or variable specialisation from the pre goal for
+		// each mutation
+		String actionPred = rule.getActionPredicate();
+		List<String> preGoalState = preGoalState_.get(actionPred);
+
+		// If we have a pre goal state
+		if (preGoalState != null) {
+			List<String> ruleConditions = rule.getConditions(true);
+
+			// Form a replacement terms map.
+			Map<String, String> replacementTerms = new HashMap<String, String>();
+			List<String> ruleTerms = rule.getActionTerms();
+			List<String> preGoalTerms = preGoalActionTerms_.get(actionPred);
+			for (int i = 0; i < preGoalTerms.size(); i++) {
+				if (!preGoalTerms.get(i).equals(ruleTerms.get(i)))
+					replacementTerms.put(preGoalTerms.get(i), ruleTerms.get(i));
+			}
+
+			// Run through each fact in the pre-goal state, using any relevant
+			// ones for mutations.
+			for (String preGoalFact : preGoalState) {
+				// Replace pre-goal action terms with local rule terms
+				for (String replaceKey : replacementTerms.keySet()) {
+					preGoalFact = preGoalFact.replaceAll(" "
+							+ Pattern.quote(replaceKey) + "(?=( |\\)))",
+							" " + replacementTerms.get(replaceKey));
+				}
+
+				// If the fact isn't in the rule, we have a mutation
+				if (!ruleConditions.contains(preGoalFact)) {
+					List<String> mutatedConditions = new ArrayList<String>(
+							ruleConditions);
+					mutatedConditions.add(preGoalFact);
+					GuidedRule mutant = new GuidedRule(mutatedConditions, rule
+							.getAction(), true);
+					mutant.expandConditions();
+					mutants.add(mutant);
+				}
+			}
+
+			
+			
+			// Checking for constant specialisations
+			MultiMap<String, String> replacementMutants = new MultiMap<String, String>();
+			for (String cond : ruleConditions) {
+				for (String replaceKey : replacementTerms.keySet()) {
+					String action = rule.getAction().replaceAll(
+							" "
+									+ Pattern.quote(replacementTerms
+											.get(replaceKey)) + "(?=( |\\)))",
+							" " + replaceKey);
+					String repCond = cond.replaceAll(" "
+							+ Pattern.quote(replacementTerms.get(replaceKey))
+							+ "(?=( |\\)))", " " + replaceKey);
+					replacementMutants.putContains(action, repCond);
+				}
+			}
+			
+			// For every action in the replacement mutants
+			for (String action : replacementMutants.keySet()) {
+				List<String> conditions = replacementMutants.get(action);
+				String[] actionSplit = StateSpec.splitFact(action);
+				List<String> actionList = new ArrayList<String>();
+				for (int i = 1; i < actionSplit.length; i++)
+					actionList.add(actionSplit[i]);
+				
+				// If the unification fits (no change), then the replacement works
+				if (unifyStates(conditions, preGoalState, actionList, preGoalTerms) == 0) {
+					GuidedRule mutant = new GuidedRule(conditions, action, true);
+					mutant.expandConditions();
+					mutants.add(mutant);
+				}
+			}
+		}
+
+		rule.checkInequals();
+		return mutants;
 	}
 
 	/**
@@ -729,6 +791,24 @@ public class Covering {
 	}
 
 	/**
+	 * Sets the pre-goal state to the arguments given. Should just be used for
+	 * testing.
+	 * 
+	 * @param action
+	 *            The full action in least general terms.
+	 * @param preGoal
+	 *            The state itself.
+	 */
+	public void setPreGoal(String action, List<String> preGoal) {
+		String[] split = StateSpec.splitFact(action);
+		preGoalState_.put(split[0], preGoal);
+		List<String> terms = new ArrayList<String>();
+		for (int i = 1; i < split.length; i++)
+			terms.add(split[i]);
+		preGoalActionTerms_.put(split[0], terms);
+	}
+
+	/**
 	 * If the pre-goal state has settled to a stable state.
 	 * 
 	 * @return True if the state has settled, false otherwise.
@@ -778,5 +858,16 @@ public class Covering {
 
 	public static String getConstantTermString(Object obj) {
 		return "[" + obj + "]";
+	}
+
+	/**
+	 * If a pre-goal has been initialised.
+	 * 
+	 * @return True if there is a pre-goal, false otherwise.
+	 */
+	public boolean hasPreGoal() {
+		if (preGoalState_.isEmpty())
+			return false;
+		return true;
 	}
 }

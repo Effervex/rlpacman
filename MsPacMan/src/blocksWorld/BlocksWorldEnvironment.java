@@ -399,17 +399,19 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		optimalAgent.agent_message("Policy");
 		Action act = optimalAgent.agent_start(formObs_Start());
 		// Loop until the task is complete
-		Reward_observation_terminal rot = null;
+		Reward_observation_terminal rot = env_step(act);
 		while ((rot == null) || (!rot.isTerminal())) {
-			rot = env_step(act);
-
 			// Check if the optimal policy has already seen this state
 			if (optimalMap_.containsKey(state_)) {
 				steps_ += optimalMap_.get(state_);
 				break;
 			}
 			optimalAgent.agent_step(rot.r, rot.o);
+			rot = env_step(act);
 		}
+		
+		if (!PolicyGenerator.getInstance().hasPreGoal())
+			optimalAgent.agent_end(0);
 
 		// Return the state to normal
 		state_ = initialState;

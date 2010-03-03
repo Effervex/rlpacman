@@ -46,10 +46,11 @@ public class Slot {
 		if (ruleGenerator_.isEmpty())
 			ruleGenerator_.add(guidedRule, 1);
 		else {
-			double averageProb = 1 / ruleGenerator_.size();
+			double averageProb = 1.0 / ruleGenerator_.size();
 			ruleGenerator_.add(guidedRule, averageProb);
 			ruleGenerator_.normaliseProbs();
 		}
+		guidedRule.setSlot(this);
 	}
 
 	/**
@@ -61,6 +62,16 @@ public class Slot {
 	 */
 	private void addNewRule(GuidedRule guidedRule, double prob) {
 		ruleGenerator_.add(guidedRule, prob);
+	}
+
+	/**
+	 * Checks if this slot contains a rule within it's generator.
+	 * 
+	 * @param gr The rule being checked for.
+	 * @return True if the rule is within the slot, false otherwise.
+	 */
+	public boolean contains(GuidedRule gr) {
+		return ruleGenerator_.contains(gr);
 	}
 
 	/**
