@@ -41,16 +41,20 @@ public class Slot {
 	 * 
 	 * @param guidedRule
 	 *            The rule being added.
+	 * @param duplicates
+	 *            If addition allows duplicates
 	 */
-	public void addNewRule(GuidedRule guidedRule) {
-		if (ruleGenerator_.isEmpty())
-			ruleGenerator_.add(guidedRule, 1);
-		else {
-			double averageProb = 1.0 / ruleGenerator_.size();
-			ruleGenerator_.add(guidedRule, averageProb);
-			ruleGenerator_.normaliseProbs();
+	public void addNewRule(GuidedRule guidedRule, boolean duplicates) {
+		if (duplicates || !ruleGenerator_.contains(guidedRule)) {
+			if (ruleGenerator_.isEmpty())
+				ruleGenerator_.add(guidedRule, 1);
+			else {
+				double averageProb = 1.0 / ruleGenerator_.size();
+				ruleGenerator_.add(guidedRule, averageProb);
+				ruleGenerator_.normaliseProbs();
+			}
+			guidedRule.setSlot(this);
 		}
-		guidedRule.setSlot(this);
 	}
 
 	/**
@@ -67,7 +71,8 @@ public class Slot {
 	/**
 	 * Checks if this slot contains a rule within it's generator.
 	 * 
-	 * @param gr The rule being checked for.
+	 * @param gr
+	 *            The rule being checked for.
 	 * @return True if the rule is within the slot, false otherwise.
 	 */
 	public boolean contains(GuidedRule gr) {
@@ -204,10 +209,10 @@ public class Slot {
 			double prob = Double.parseDouble(m.group(2));
 			slot.addNewRule(guidedRule, prob);
 		}
-		
+
 		if (fixed)
 			slot.fixSlot();
-		
+
 		return slot;
 	}
 }

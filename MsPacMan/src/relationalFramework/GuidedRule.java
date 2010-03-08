@@ -382,9 +382,6 @@ public class GuidedRule {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + (hasSpawned_ ? 1231 : 1237);
-		result = prime * result + (lgg_ ? 1231 : 1237);
-		result = prime * result + (mutant_ ? 1231 : 1237);
 		result = prime * result
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		result = prime * result
@@ -401,12 +398,6 @@ public class GuidedRule {
 		if (getClass() != obj.getClass())
 			return false;
 		GuidedRule other = (GuidedRule) obj;
-		if (hasSpawned_ != other.hasSpawned_)
-			return false;
-		if (lgg_ != other.lgg_)
-			return false;
-		if (mutant_ != other.mutant_)
-			return false;
 		if (ruleAction_ == null) {
 			if (other.ruleAction_ != null)
 				return false;

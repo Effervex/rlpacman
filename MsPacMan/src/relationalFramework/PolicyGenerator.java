@@ -100,6 +100,7 @@ public class PolicyGenerator {
 		// Sample each slot from the policy with removal, forming a
 		// deterministic policy.
 		ProbabilityDistribution<Slot> removalDist = policyGenerator_.clone();
+		List<GuidedRule> lggRules = new ArrayList<GuidedRule>();
 		for (int i = 0; i < policyGenerator_.size(); i++) {
 			// If frozen, use from list, else sample with removal.
 			Slot slot = (!frozen_) ? removalDist.sampleWithRemoval() : iter
@@ -107,7 +108,19 @@ public class PolicyGenerator {
 			GuidedRule gr = slot.getGenerator().sample();
 			if (gr != null)
 				policy.addRule(gr);
+
+			// Get the lgg rule for this slot
+			if (lggRules_.containsKey(slot.getAction()))
+				lggRules.addAll(lggRules_.get(slot.getAction()));
 		}
+
+		// Append the general rules as well (if they aren't already in there) to
+		// ensure unnecessary covering isn't triggered.
+		for (GuidedRule lggRule : lggRules) {
+			if (!policy.contains(lggRule))
+				policy.addRule(lggRule);
+		}
+
 		return policy;
 	}
 
@@ -125,50 +138,54 @@ public class PolicyGenerator {
 	 * @return The list of covered rules, one for each action type.
 	 */
 	public List<GuidedRule> triggerCovering(Rete state, boolean createNewRules) {
-		if (createNewRules)
-			System.out.println("\t<COVERING TRIGGERED:>");
+		if (!frozen_) {
+			if (createNewRules)
+				System.out.println("\t<COVERING TRIGGERED:>");
 
-		List<GuidedRule> covered = null;
-		try {
-			covered = covering_.coverState(state, nonLGGCoveredRules_,
-					createNewRules);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		// Add remaining information to rules.
-		for (GuidedRule coveredRule : covered) {
-			if (coveredRule.isRecentlyModified()) {
-				if (createNewRules)
-					System.out.println("\tCOVERED RULE: " + coveredRule);
-				else
-					System.out.println("\tREFINED RULE: " + coveredRule);
-			}
-			String action = StateSpec.splitFact(coveredRule.getAction())[0];
-			if (coveredRule.getSlot() == null) {
-				Slot slot = findSlot(action);
-
-				// Adding the rule to the slot
-				slot.addNewRule(coveredRule);
+			List<GuidedRule> covered = null;
+			try {
+				covered = covering_.coverState(state, nonLGGCoveredRules_,
+						createNewRules);
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 
-			// If the rule is maximally general, mutate and store it
-			if (coveredRule.isLGG()) {
-				nonLGGCoveredRules_.get(action).remove(coveredRule);
-				lggRules_.put(action, coveredRule);
-				System.out.println("\tLGG RULE FOUND: " + coveredRule);
-
-				// Mutate unless already mutated
-				if (!covering_.isPreGoalSettled()) {
-					mutateRule(coveredRule, false);
+			// Add remaining information to rules.
+			for (GuidedRule coveredRule : covered) {
+				if (coveredRule.isRecentlyModified()) {
+					if (createNewRules)
+						System.out.println("\tCOVERED RULE: " + coveredRule);
+					else
+						System.out.println("\tREFINED RULE: " + coveredRule);
 				}
-			} else if (createNewRules) {
-				nonLGGCoveredRules_.put(action, coveredRule);
-			}
-		}
+				String actionPred = StateSpec
+						.splitFact(coveredRule.getAction())[0];
+				if (coveredRule.getSlot() == null) {
+					Slot slot = findSlot(actionPred);
 
-		Collections.shuffle(covered, random_);
-		return covered;
+					// Adding the rule to the slot
+					slot.addNewRule(coveredRule, false);
+				}
+
+				// If the rule is maximally general, mutate and store it
+				if (coveredRule.isLGG()) {
+					nonLGGCoveredRules_.get(actionPred).remove(coveredRule);
+					lggRules_.put(actionPred, coveredRule);
+					System.out.println("\tLGG RULE FOUND: " + coveredRule);
+
+					// Mutate unless already mutated
+					if (!covering_.isPreGoalSettled(actionPred)) {
+						mutateRule(coveredRule, false);
+					}
+				} else if (createNewRules) {
+					nonLGGCoveredRules_.put(actionPred, coveredRule);
+				}
+			}
+
+			Collections.shuffle(covered, random_);
+			return covered;
+		}
+		return null;
 	}
 
 	/**
@@ -182,15 +199,18 @@ public class PolicyGenerator {
 	private void mutateRule(GuidedRule baseRule, boolean settledPreGoal) {
 		// If the base rule hasn't already spawned pre-goal mutants
 		if (!baseRule.hasSpawned()) {
-			List<GuidedRule> mutants = covering_.specialiseToPreGoal(baseRule);
+			Collection<GuidedRule> mutants = covering_
+					.specialiseToPreGoal(baseRule);
 
 			Slot ruleSlot = baseRule.getSlot();
+			String actionPred = baseRule.getActionPredicate();
 
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (settledPreGoal) {
 				baseRule.setSpawned(true);
-				if (!mutants.isEmpty()) {
+				if (!mutants.isEmpty()
+						&& (mutatedRules_.get(actionPred) != null)) {
 					// Run through the rules in the slot, removing any mutants
 					// not in the permanent mutant set.
 					List<GuidedRule> removables = new ArrayList<GuidedRule>();
@@ -200,6 +220,7 @@ public class PolicyGenerator {
 					}
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
+					mutatedRules_.get(actionPred).removeAll(removables);
 				}
 			}
 
@@ -207,7 +228,7 @@ public class PolicyGenerator {
 			for (GuidedRule gr : mutants) {
 				// Only add if not already in there
 				if (!ruleSlot.contains(gr)) {
-					ruleSlot.addNewRule(gr);
+					ruleSlot.addNewRule(gr, false);
 				}
 
 				mutatedRules_.putContains(ruleSlot.getAction(), gr);
@@ -225,21 +246,31 @@ public class PolicyGenerator {
 	 *            The final action(s) taken by the agent.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState, String[] actions) {
-		// If the state has settled and is probably at minimum, trigger
-		// mutation.
-		if (!covering_.formPreGoalState(preGoalState, actions[0])) {
-			System.out.println("\tSETTLED PRE-GOAL STATE:");
-			// For each maximally general rule
-			for (GuidedRule general : lggRules_.values()) {
-				mutateRule(general, true);
+		if (!frozen_) {
+			// If the state has settled and is probably at minimum, trigger
+			// mutation.
+			Collection<String> settledGoals = covering_.formPreGoalState(
+					preGoalState, actions[0]);
+			String actionPred = StateSpec.splitFact(actions[0])[0];
+			if (!settledGoals.isEmpty()) {
+				System.out.println("\tSETTLED PRE-GOAL STATE " + "("
+						+ actionPred + "):");
+				// For each maximally general rule
+				for (String settledAction : settledGoals) {
+					if (lggRules_.containsKey(settledAction))
+						for (GuidedRule general : lggRules_.get(settledAction))
+							mutateRule(general, true);
+				}
+			} else {
+				System.out.println("\tFORMING PRE-GOAL STATE " + "("
+						+ actionPred + "):");
 			}
-		} else {
-			System.out.println("\tFORMING PRE-GOAL STATE:");
-		}
 
-		System.out.println("\tmove: " + covering_.getPreGoalState("move"));
-		System.out.println("\tmoveFloor: "
-				+ covering_.getPreGoalState("moveFloor"));
+			for (String action : StateSpec.getInstance().getActions().keySet()) {
+				System.out.println(action + ": "
+						+ covering_.getPreGoalState(action));
+			}
+		}
 	}
 
 	/**
@@ -333,6 +364,14 @@ public class PolicyGenerator {
 			slot.getGenerator().updateDistribution(numSamples, ruleCounts,
 					stepSize);
 		}
+	}
+
+	/**
+	 * Operations to run after the distributions have been updated. This
+	 * includes further mutation of useful rules.
+	 */
+	public void postUpdateOperations() {
+		// Mutate the rules further
 	}
 
 	/**

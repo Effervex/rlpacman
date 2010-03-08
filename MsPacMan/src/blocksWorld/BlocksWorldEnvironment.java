@@ -2,11 +2,13 @@ package blocksWorld;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -102,9 +104,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// System.out.println("\t\t\tOptimal test: "
 		// + Arrays.toString(state_.getState()));
 		optimalSteps_ = optimalSteps();
-		 System.out
-		 .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
-		steps_ = 0;
+//		 System.out
+//		 .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
+//		steps_ = 0;
 
 		return formObs_Start();
 	}
@@ -130,11 +132,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-		 if (action != null)
-		 System.out.println("\t\t\t" + action + "   ->   "
-		 + Arrays.toString(newState.getState()));
-		 else
-		 System.out.println("\t\t\tNo action chosen.");
+//		 if (action != null)
+//		 System.out.println("\t\t\t" + action + "   ->   "
+//		 + Arrays.toString(newState.getState()));
+//		 else
+//		 System.out.println("\t\t\tNo action chosen.");
 
 		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
 		Observation obs = new Observation();

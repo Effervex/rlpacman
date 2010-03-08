@@ -45,7 +45,7 @@ public class RuleFileManager {
 			for (Slot slot : policyGenerator) {
 				// For each of the rules
 				for (GuidedRule r : slot.getGenerator()) {
-					bf.write(StateSpec.getInstance().encodeRule(r.toString())
+					bf.write(StateSpec.getInstance().encodeRule(r)
 							+ RULE_DELIMITER);
 				}
 				bf.write("\n");
@@ -167,8 +167,8 @@ public class RuleFileManager {
 			boolean single = true;
 			for (GuidedRule rule : slot.getGenerator().getNonZero()) {
 				if (!single)
-					buf.write("/ ");
-				buf.write(StateSpec.getInstance().encodeRule(rule.toString()));
+					buf.write(" / ");
+				buf.write(StateSpec.getInstance().encodeRule(rule));
 				single = false;
 			}
 			buf.write("\n");

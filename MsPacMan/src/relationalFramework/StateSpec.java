@@ -33,6 +33,8 @@ public abstract class StateSpec {
 
 	public static final String POLICY_QUERY_PREFIX = "polRule";
 
+	private static final String ACTION_TERM_REPL = "__TYPE__";
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -108,6 +110,13 @@ public abstract class StateSpec {
 			rete_.eval(actBuf.toString());
 			actionNum_ = initialiseActionsPerStep();
 
+			// Initialise the background knowledge rules
+			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
+			for (String ruleNames : backgroundRules.keySet()) {
+				rete_.eval("(defrule " + ruleNames + " "
+						+ backgroundRules.get(ruleNames) + ")");
+			}
+
 			// Initialise the goal state rules
 			constants_ = new ArrayList<String>();
 			goalState_ = initialiseGoalState(constants_);
@@ -116,13 +125,6 @@ public abstract class StateSpec {
 					+ " => (assert (goal (goalMet TRUE))))");
 			// Initialise the goal checking query
 			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
-
-			// Initialise the background knowledge rules
-			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
-			for (String ruleNames : backgroundRules.keySet()) {
-				rete_.eval("(defrule " + ruleNames + " "
-						+ backgroundRules.get(ruleNames) + ")");
-			}
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
@@ -177,7 +179,7 @@ public abstract class StateSpec {
 	private String formUnnecessaryString(Collection<String> types) {
 		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
 		for (String type : types)
-			buffer.append("|(\\(" + type + " .+?\\))");
+			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
 		buffer.append(")( |$)");
 		return buffer.toString();
 	}
@@ -343,11 +345,35 @@ public abstract class StateSpec {
 	 *            The rule begin output.
 	 * @return A light, parsable representation of the rule.
 	 */
-	public final String encodeRule(String rule) {
-		String replacement = rule.replaceAll(unnecessaries_, "");
+	public final String encodeRule(GuidedRule rule) {
+		String ruleSpecificUnnecessaries = formRuleSpecificRegexp(rule
+				.getActionTerms());
+		String replacement = rule.toString().replaceAll(
+				ruleSpecificUnnecessaries, "");
 		if (replacement.split(INFERS_ACTION)[0].isEmpty())
-			return rule;
+			return rule.toString();
 		return replacement;
+	}
+
+	/**
+	 * Forms the unnecessaries regexp replacement string to only replace
+	 * unnecessary type facts that are present in the action.
+	 * 
+	 * @param terms
+	 *            The action terms of the rule.
+	 * @return A regexp modified to match the rule.
+	 */
+	private String formRuleSpecificRegexp(List<String> terms) {
+		StringBuffer actionRepl = new StringBuffer("(");
+		boolean first = true;
+		for (String term : terms) {
+			if (!first)
+				actionRepl.append("|");
+			actionRepl.append("(" + Pattern.quote(term) + ")");
+			first = false;
+		}
+		actionRepl.append(")");
+		return unnecessaries_.replace(ACTION_TERM_REPL, actionRepl.toString());
 	}
 
 	/**
