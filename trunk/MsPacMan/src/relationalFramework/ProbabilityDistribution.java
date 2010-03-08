@@ -360,8 +360,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			}
 
 			// Normalise the probabilities
-			if (!sumsToOne())
-				normaliseProbs();
+			normaliseProbs();
 		}
 	}
 
@@ -486,12 +485,23 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	// @Override
 	public boolean contains(Object arg0) {
-		return false;
+		if (arg0 == null)
+			return false;
+		T arg02 = (T) arg0;
+		if (indexOf(arg02) == -1)
+			return false;
+		return true;
 	}
 
 	// @Override
 	public boolean containsAll(Collection<?> arg0) {
-		return false;
+		if (arg0 == null)
+			return false;
+		for (Object obj : arg0) {
+			if (!contains(obj))
+				return false;
+		}
+		return true;
 	}
 
 	// @Override

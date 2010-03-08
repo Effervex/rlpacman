@@ -11,6 +11,7 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
+import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 
 public class BlocksWorldStateSpecTest {
@@ -216,20 +217,20 @@ public class BlocksWorldStateSpecTest {
 	@Test
 	public void testEncodeRule() {
 		String result = spec_
-				.encodeRule("(block a) (clear a) => (moveFloor a)");
+				.encodeRule(new GuidedRule("(block a) (clear a) => (moveFloor a)"));
 		assertTrue(result.equals("(clear a) => (moveFloor a)"));
 
-		result = spec_.encodeRule("(block a) (block b) (on a b) => (move a b)");
+		result = spec_.encodeRule(new GuidedRule("(block a) (block b) (on a b) => (move a b)"));
 		assertTrue(result.equals("(on a b) => (move a b)"));
 
-		result = spec_.encodeRule("(block ?X) (clear ?X) => (moveFloor ?X)");
+		result = spec_.encodeRule(new GuidedRule("(block ?X) (clear ?X) => (moveFloor ?X)"));
 		assertTrue(result.equals("(clear ?X) => (moveFloor ?X)"));
 
-		result = spec_.encodeRule("(block ?X) (block ?Y) (test (<> ?X ?Y)) "
-				+ "(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		result = spec_.encodeRule(new GuidedRule("(block ?X) (block ?Y) (test (<> ?X ?Y)) "
+				+ "(clear ?X) (clear ?Y) => (move ?X ?Y)"));
 		assertTrue(result.equals("(clear ?X) (clear ?Y) => (move ?X ?Y)"));
 
-		result = spec_.encodeRule("(block a) => (moveFloor a)");
+		result = spec_.encodeRule(new GuidedRule("(block a) => (moveFloor a)"));
 		assertTrue(result.equals("(block a) => (moveFloor a)"));
 	}
 

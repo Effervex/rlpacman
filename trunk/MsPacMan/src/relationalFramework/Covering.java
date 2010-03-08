@@ -32,16 +32,7 @@ public class Covering {
 	 * The pre-goal state for each action predicate, for use in covering
 	 * specialisations.
 	 */
-	private Map<String, List<String>> preGoalState_;
-
-	/**
-	 * The final action terms, either constants or variables for each action
-	 * predicate.
-	 */
-	private Map<String, List<String>> preGoalActionTerms_;
-
-	/** The last time since the pre-goal state changed. */
-	private int preGoalUnificationInactivity_ = 0;
+	private Map<String, PreGoalInformation> preGoals_;
 
 	/**
 	 * If this coverer should be creating new rules or just refining existing
@@ -642,86 +633,235 @@ public class Covering {
 	 * @return All single-step mutations the rule can take towards matching the
 	 *         pre-goal state.
 	 */
-	public List<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
-		List<GuidedRule> mutants = new ArrayList<GuidedRule>();
+	public Collection<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 
 		// Get a single fact or variable specialisation from the pre goal for
 		// each mutation
 		String actionPred = rule.getActionPredicate();
-		List<String> preGoalState = preGoalState_.get(actionPred);
+		PreGoalInformation preGoal = preGoals_.get(actionPred);
 
 		// If we have a pre goal state
-		if (preGoalState != null) {
+		if (preGoal != null) {
+			List<String> preGoalState = preGoal.getState();
 			List<String> ruleConditions = rule.getConditions(true);
 
 			// Form a replacement terms map.
 			Map<String, String> replacementTerms = new HashMap<String, String>();
+			Map<String, String> reverseReplacementTerms = new HashMap<String, String>();
 			List<String> ruleTerms = rule.getActionTerms();
-			List<String> preGoalTerms = preGoalActionTerms_.get(actionPred);
+			List<String> preGoalTerms = preGoal.getActionTerms();
 			for (int i = 0; i < preGoalTerms.size(); i++) {
-				if (!preGoalTerms.get(i).equals(ruleTerms.get(i)))
+				if (!preGoalTerms.get(i).equals(ruleTerms.get(i))) {
 					replacementTerms.put(preGoalTerms.get(i), ruleTerms.get(i));
+					// Only reverse replace if the term is a variable
+					if (ruleTerms.get(i).charAt(0) == '?')
+						reverseReplacementTerms.put(ruleTerms.get(i),
+								preGoalTerms.get(i));
+				}
 			}
 
-			// Run through each fact in the pre-goal state, using any relevant
-			// ones for mutations.
+			// Algorithm detail:
+			// 1. Run through each fact in the pre-goal
+			// 2. Run through each cond in the rule conditions
+			// 3. If the fact pred isn't in the cond preds, add it, replacing
+			// pre-goal terms with rule terms
+			// 4a. If the fact pred matches the rule pred, try replacing all
+			// occurrences of each cond term with the fact term in every cond
+			// 4b. If the new cond is valid (through unification), keep it and
+			// note that the replacement has occured
+			// 5a. If the cond term is ? and the preds match, use the fact term
+			// 5b. If the cond term is a variable, the preds match and the fact
+			// term isn't part of the action, use the fact term.
+
+			// 1. Run through each fact in the pre-goal
 			for (String preGoalFact : preGoalState) {
-				// Replace pre-goal action terms with local rule terms
-				for (String replaceKey : replacementTerms.keySet()) {
-					preGoalFact = preGoalFact.replaceAll(" "
-							+ Pattern.quote(replaceKey) + "(?=( |\\)))",
-							" " + replacementTerms.get(replaceKey));
+				String[] preGoalSplit = StateSpec.splitFact(preGoalFact);
+				boolean hasPred = false;
+
+				// 2. Run through each cond in the rule conditions
+				for (String cond : ruleConditions) {
+					String[] condSplit = StateSpec.splitFact(cond);
+
+					hasPred |= factMutation(rule.getAction(), mutants,
+							actionPred, preGoalState, ruleConditions,
+							replacementTerms, reverseReplacementTerms,
+							ruleTerms, preGoalTerms, preGoalSplit, cond,
+							condSplit);
 				}
 
-				// If the fact isn't in the rule, we have a mutation
-				if (!ruleConditions.contains(preGoalFact)) {
-					List<String> mutatedConditions = new ArrayList<String>(
-							ruleConditions);
-					mutatedConditions.add(preGoalFact);
-					GuidedRule mutant = new GuidedRule(mutatedConditions, rule
-							.getAction(), true);
-					mutant.expandConditions();
-					mutants.add(mutant);
-				}
-			}
+				// 3. If the fact pred isn't in the cond preds, add it,
+				// replacing pre-goal terms with rule terms
+				if (!hasPred) {
+					// Replace pre-goal action terms with local rule terms
+					for (String replaceKey : replacementTerms.keySet()) {
+						preGoalFact = preGoalFact.replaceAll(" "
+								+ Pattern.quote(replaceKey) + "(?=( |\\)))",
+								" " + replacementTerms.get(replaceKey));
+					}
 
-			
-			
-			// Checking for constant specialisations
-			MultiMap<String, String> replacementMutants = new MultiMap<String, String>();
-			for (String cond : ruleConditions) {
-				for (String replaceKey : replacementTerms.keySet()) {
-					String action = rule.getAction().replaceAll(
-							" "
-									+ Pattern.quote(replacementTerms
-											.get(replaceKey)) + "(?=( |\\)))",
-							" " + replaceKey);
-					String repCond = cond.replaceAll(" "
-							+ Pattern.quote(replacementTerms.get(replaceKey))
-							+ "(?=( |\\)))", " " + replaceKey);
-					replacementMutants.putContains(action, repCond);
-				}
-			}
-			
-			// For every action in the replacement mutants
-			for (String action : replacementMutants.keySet()) {
-				List<String> conditions = replacementMutants.get(action);
-				String[] actionSplit = StateSpec.splitFact(action);
-				List<String> actionList = new ArrayList<String>();
-				for (int i = 1; i < actionSplit.length; i++)
-					actionList.add(actionSplit[i]);
-				
-				// If the unification fits (no change), then the replacement works
-				if (unifyStates(conditions, preGoalState, actionList, preGoalTerms) == 0) {
-					GuidedRule mutant = new GuidedRule(conditions, action, true);
-					mutant.expandConditions();
-					mutants.add(mutant);
+					// If the fact isn't in the rule, we have a mutation
+					if (!ruleConditions.contains(preGoalFact)) {
+						List<String> mutatedConditions = new ArrayList<String>(
+								ruleConditions);
+						mutatedConditions.add(preGoalFact);
+						GuidedRule mutant = new GuidedRule(mutatedConditions,
+								rule.getAction(), true);
+						mutant.expandConditions();
+						mutants.add(mutant);
+					}
 				}
 			}
 		}
 
 		rule.checkInequals();
 		return mutants;
+	}
+
+	/**
+	 * Individual mutation of facts method. This method creates mutations tjhat
+	 * operate on the very facts themselves, by swapping fact terms for other
+	 * terms. This method was automatically extracted, so it's a bit messy with
+	 * its arguments.
+	 * 
+	 * @param ruleAction
+	 *            The rule's action.
+	 * @param mutants
+	 *            The collection of mutants to add to.
+	 * @param actionPred
+	 *            The action predicate for the rule.
+	 * @param preGoalState
+	 *            The pre-goal state being mutated towards.
+	 * @param ruleConditions
+	 *            The rule's conditions.
+	 * @param replacementTerms
+	 *            The terms to replace in the pre-goal.
+	 * @param reverseReplacementTerms
+	 *            The terms to replace in the conditions (modifiable).
+	 * @param ruleTerms
+	 *            The terms used in the rule's action.
+	 * @param preGoalTerms
+	 *            The terms used in the pre-goal's action.
+	 * @param preGoalSplit
+	 *            The current fact's split form.
+	 * @param cond
+	 *            The current rule condition being looked at.
+	 * @param condSplit
+	 *            The split form of the cond.
+	 * @return True if the cond and pre-goal fact match.
+	 */
+	private boolean factMutation(String ruleAction, Set<GuidedRule> mutants,
+			String actionPred, List<String> preGoalState,
+			List<String> ruleConditions, Map<String, String> replacementTerms,
+			Map<String, String> reverseReplacementTerms,
+			List<String> ruleTerms, List<String> preGoalTerms,
+			String[] preGoalSplit, String cond, String[] condSplit) {
+		// 4a. If the fact pred matches the rule pred, try replacing all
+		// occurrences of each cond term with the fact term in every cond
+		boolean hasPred = false;
+		if (condSplit[0].equals(preGoalSplit[0])) {
+			hasPred = true;
+
+			// Run through each term
+			boolean ceaseMutation = false;
+			for (int i = 1; i < condSplit.length; i++) {
+				String replacedTerm = (replacementTerms
+						.containsKey(preGoalSplit[i])) ? replacementTerms
+						.get(preGoalSplit[i]) : preGoalSplit[i];
+
+				// 5. Replacing variable terms
+				if (condSplit[i].charAt(0) == '?') {
+					// The pregoal term is not anonymous
+					if (!ceaseMutation
+							&& !preGoalSplit[i].equals(StateSpec.ANONYMOUS)) {
+						// 5a. If the cond term is ? and the preds match, use
+						// the fact term
+						boolean continueCreation = true;
+						// If the condition is anonymous, replace it with any
+						// term
+						if (condSplit[i].equals(StateSpec.ANONYMOUS))
+							condSplit[i] = replacedTerm;
+						// Otherwise, a variable can be replaced with a
+						// non-action constant
+						else if (!preGoalTerms.contains(preGoalSplit[i]))
+							condSplit[i] = preGoalSplit[i];
+						// Otherwise, we're looking at two non-mutatable
+						// actions.
+						else {
+							continueCreation = false;
+							// If the actions are different, cease mutation
+							if (!condSplit[i].equals(replacedTerm))
+								ceaseMutation = true;
+						}
+
+						if (continueCreation) {
+							// Create the mutant
+							String newCond = StateSpec.reformFact(condSplit);
+							List<String> mutatedConditions = new ArrayList<String>(
+									ruleConditions);
+							mutatedConditions.set(mutatedConditions
+									.indexOf(cond), newCond);
+							GuidedRule mutant = new GuidedRule(
+									mutatedConditions, ruleAction, true);
+							mutant.expandConditions();
+							mutants.add(mutant);
+
+							// Revert the cond split back
+							condSplit[i] = StateSpec.ANONYMOUS;
+						}
+					}
+				} else if (!condSplit[i].equals(replacedTerm)) {
+					// If the terms don't match up, then the entire fact won't,
+					// so skip it.
+					break;
+				}
+
+				// If we haven't looked at a replacement yet
+				if (reverseReplacementTerms.containsKey(condSplit[i])) {
+					List<String> replacementConds = new ArrayList<String>(
+							ruleConditions.size());
+					for (String condition : ruleConditions) {
+						// Replace variables
+						String replCond = condition
+								.replaceAll(" " + Pattern.quote(condSplit[i])
+										+ "(?=( |\\)))", " "
+										+ reverseReplacementTerms
+												.get(condSplit[i]));
+						replacementConds.add(replCond);
+					}
+
+					// Replacing the actions
+					List<String> replActionTerms = new ArrayList<String>(
+							ruleTerms);
+					replActionTerms.set(replActionTerms.indexOf(condSplit[i]),
+							reverseReplacementTerms.get(condSplit[i]));
+
+					// 4b. If the new cond is valid (through unification), keep
+					// it and note that the replacement has occurred
+					if (unifyStates(replacementConds, preGoalState,
+							replActionTerms, preGoalTerms) == 0) {
+						// Reforming the action
+						String[] replActionArray = new String[replActionTerms
+								.size() + 1];
+						replActionArray[0] = actionPred;
+						for (int j = 0; j < replActionTerms.size(); j++)
+							replActionArray[j + 1] = replActionTerms.get(j);
+						String action = StateSpec.reformFact(replActionArray);
+
+						// Adding the mutated rule
+						GuidedRule mutant = new GuidedRule(replacementConds,
+								action, true);
+						mutant.expandConditions();
+						mutants.add(mutant);
+					}
+
+					// Whatever the outcome, remove the reverse replacement as
+					// it has already been tested.
+					reverseReplacementTerms.remove(condSplit[i]);
+				}
+			}
+		}
+		return hasPred;
 	}
 
 	/**
@@ -733,61 +873,69 @@ public class Covering {
 	 *            The pre-goal state seen by the agent.
 	 * @param action
 	 *            The final action taken by the agent.
-	 * @return True if the state was last active at most
-	 *         MAX_STATE_UNIFICATION_INACTIVITY steps ago.
+	 * @return A collection of actions which have settled pre-goals.
 	 */
-	public boolean formPreGoalState(Collection<Fact> preGoalState, String action) {
+	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
+			String action) {
 		// If the state isn't yet settled, try unification
-		if (!isPreGoalSettled()) {
+		if (!isPreGoalSettled(action)) {
 			// Inversely substitute the old pregoal state
 			String[] actionSplit = StateSpec.splitFact(action);
 			String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
 					actionSplit.length);
 			// The actions become constants if possible
+			List<String> constants = new ArrayList<String>(StateSpec
+					.getInstance().getConstants());
 			List<String> newStateTerms = new ArrayList<String>();
-			for (String actionTerm : actionTerms)
+			for (String actionTerm : actionTerms) {
 				newStateTerms.add(actionTerm);
+				if (!constants.contains(actionTerm))
+					constants.add(actionTerm);
+			}
 			Collection<String> preGoalStringState = inverselySubstitute(
-					preGoalState, actionTerms, newStateTerms);
+					preGoalState, actionTerms, constants);
 			removeUselessFacts(preGoalStringState);
 
 			// Unify with the old state
-			List<String> oldPreGoalState = preGoalState_.get(actionSplit[0]);
-			if (oldPreGoalState == null) {
-				preGoalState_.put(actionSplit[0],
-						(List<String>) preGoalStringState);
-				preGoalActionTerms_.put(actionSplit[0], newStateTerms);
+			PreGoalInformation oldPreGoal = preGoals_.get(actionSplit[0]);
+			if (oldPreGoal == null) {
+				preGoals_.put(actionSplit[0], new PreGoalInformation(
+						actionSplit[0], (List<String>) preGoalStringState,
+						newStateTerms));
 			} else {
 				// Unify the two states and check if it has changed at all.
-				int result = unifyStates(preGoalState_.get(actionSplit[0]),
-						preGoalStringState, preGoalActionTerms_
-								.get(actionSplit[0]), newStateTerms);
+				PreGoalInformation preGoal = preGoals_.get(actionSplit[0]);
+				int result = unifyStates(preGoal.getState(),
+						preGoalStringState, preGoal.getActionTerms(),
+						newStateTerms);
 
 				// If the states unified, reset the counter, otherwise
 				// increment.
 				// Hopefully there aren't any errors.
 				if (result == 1)
-					preGoalUnificationInactivity_ = 0;
+					preGoal.resetInactivity();
 				else if (result == 0)
-					preGoalUnificationInactivity_++;
+					preGoal.incrementInactivity();
 				else if (result == -1)
 					throw new RuntimeException(
-							"Pre-goal states did not unify: "
-									+ preGoalState_.get(actionSplit[0]) + ", "
+							"Pre-goal states did not unify: " + preGoal + ", "
 									+ preGoalStringState);
 			}
-			return true;
 		}
-		return false;
+
+		Collection<String> settled = new ArrayList<String>();
+		for (String preGoalAction : preGoals_.keySet()) {
+			if (isPreGoalSettled(preGoalAction))
+				settled.add(preGoalAction);
+		}
+		return settled;
 	}
 
 	/**
 	 * Clears the pregoal state.
 	 */
 	public void clearPreGoalState() {
-		preGoalState_ = new HashMap<String, List<String>>();
-		preGoalActionTerms_ = new HashMap<String, List<String>>();
-		preGoalUnificationInactivity_ = 0;
+		preGoals_ = new HashMap<String, PreGoalInformation>();
 	}
 
 	/**
@@ -801,11 +949,11 @@ public class Covering {
 	 */
 	public void setPreGoal(String action, List<String> preGoal) {
 		String[] split = StateSpec.splitFact(action);
-		preGoalState_.put(split[0], preGoal);
 		List<String> terms = new ArrayList<String>();
 		for (int i = 1; i < split.length; i++)
 			terms.add(split[i]);
-		preGoalActionTerms_.put(split[0], terms);
+		preGoals_.put(split[0],
+				new PreGoalInformation(split[0], preGoal, terms));
 	}
 
 	/**
@@ -813,10 +961,10 @@ public class Covering {
 	 * 
 	 * @return True if the state has settled, false otherwise.
 	 */
-	public boolean isPreGoalSettled() {
-		if (preGoalUnificationInactivity_ < MAX_STATE_UNIFICATION_INACTIVITY)
-			return false;
-		return true;
+	public boolean isPreGoalSettled(String action) {
+		if (preGoals_.containsKey(action) && preGoals_.get(action).isSettled())
+			return true;
+		return false;
 	}
 
 	/**
@@ -827,7 +975,9 @@ public class Covering {
 	 * @return The pre-goal state, in the form of a list of facts.
 	 */
 	public List<String> getPreGoalState(String action) {
-		return preGoalState_.get(action);
+		if (preGoals_.get(action) == null)
+			return null;
+		return preGoals_.get(action).getState();
 	}
 
 	/**
@@ -839,7 +989,7 @@ public class Covering {
 	 * @return The pre-goal action.
 	 */
 	public List<String> getPreGoalAction(String action) {
-		return preGoalActionTerms_.get(action);
+		return preGoals_.get(action).getActionTerms();
 	}
 
 	/**
@@ -866,8 +1016,62 @@ public class Covering {
 	 * @return True if there is a pre-goal, false otherwise.
 	 */
 	public boolean hasPreGoal() {
-		if (preGoalState_.isEmpty())
+		if (preGoals_.isEmpty())
 			return false;
 		return true;
+	}
+
+	/**
+	 * A basic object for holding pre-goal state information for an action.
+	 * 
+	 * @author Samuel J. Sarjant
+	 */
+	private class PreGoalInformation {
+		private String actionPred_;
+		private List<String> state_;
+		private List<String> actionTerms_;
+		private int inactivity_ = 0;
+
+		public PreGoalInformation(String actionPred) {
+			actionPred_ = actionPred;
+		}
+
+		public PreGoalInformation(String actionPred, List<String> state,
+				List<String> actionTerms) {
+			actionPred_ = actionPred;
+			state_ = state;
+			actionTerms_ = actionTerms;
+		}
+
+		public int incrementInactivity() {
+			inactivity_++;
+			return inactivity_;
+		}
+
+		public void resetInactivity() {
+			inactivity_ = 0;
+		}
+
+		public boolean isSettled() {
+			if (inactivity_ < MAX_STATE_UNIFICATION_INACTIVITY)
+				return false;
+			return true;
+		}
+
+		public List<String> getState() {
+			return state_;
+		}
+
+		public void setState(List<String> state) {
+			state_ = state;
+		}
+
+		public List<String> getActionTerms() {
+			return actionTerms_;
+		}
+
+		public void setActionTerms(List<String> actionTerms) {
+			actionTerms_ = actionTerms;
+		}
 	}
 }

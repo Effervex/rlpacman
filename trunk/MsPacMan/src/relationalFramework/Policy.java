@@ -47,6 +47,16 @@ public class Policy {
 	}
 
 	/**
+	 * If the policy contains a rule.
+	 * 
+	 * @param rule The rule being checked.
+	 * @return True if the rule is within the policy, false otherwise.
+	 */
+	public boolean contains(GuidedRule rule) {
+		return policyRules_.contains(rule);
+	}
+
+	/**
 	 * Gets the rules that fired from this policy.
 	 * 
 	 * @return The rules that fired in this policy
@@ -62,7 +72,7 @@ public class Policy {
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
-			buffer.append(StateSpec.getInstance().encodeRule(rule.toString())
+			buffer.append(StateSpec.getInstance().encodeRule(rule)
 					+ "\n");
 		}
 		return buffer.toString();
