@@ -55,7 +55,8 @@ public class CrossEntropyExperiment {
 	 * @param argumentFile
 	 *            The file containing the arguments.
 	 */
-	public CrossEntropyExperiment(File argumentFile) {
+	public CrossEntropyExperiment(String[] args) {
+		File argumentFile = new File(args[0]);
 		BasicConfigurator.configure();
 		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 
@@ -78,25 +79,28 @@ public class CrossEntropyExperiment {
 		}
 
 		// Choose the correct constructor to initialise the values.
-		String[] args = new String[argsList.size()];
-		argsList.toArray(args);
-		if (args.length == 7) {
+		String[] args2 = new String[argsList.size()];
+		argsList.toArray(args2);
+		if (args2.length == 7) {
 			try {
 				// Random rules
-				Integer.parseInt(args[3]);
-				initialise(args[0], Integer.parseInt(args[1]), Integer
-						.parseInt(args[2]), Integer.parseInt(args[3]), args[4],
-						args[5], args[6]);
+				Integer.parseInt(args2[3]);
+				initialise(args2[0], Integer.parseInt(args2[1]), Integer
+						.parseInt(args2[2]), Integer.parseInt(args2[3]), args2[4],
+						args2[5], args2[6]);
 			} catch (Exception e) {
 				// Rules from file
-				initialise(args[0], Integer.parseInt(args[1]), Integer
-						.parseInt(args[2]), args[3], args[4], args[5], args[6]);
+				initialise(args2[0], Integer.parseInt(args2[1]), Integer
+						.parseInt(args2[2]), args2[3], args2[4], args2[5], args2[6]);
 			}
-		} else if (args.length == 9) {
-			initialise(args[0], Integer.parseInt(args[1]), Integer
-					.parseInt(args[2]), args[3], args[5], args[6], args[7],
-					args[8]);
+		} else if (args2.length == 9) {
+			initialise(args2[0], Integer.parseInt(args2[1]), Integer
+					.parseInt(args2[2]), args2[3], args2[5], args2[6], args2[7],
+					args2[8]);
 		}
+		
+		if ((args.length > 1) && (args[1].equals("-d")))
+			PolicyGenerator.debugMode_ = true;
 	}
 
 	/**
@@ -308,9 +312,6 @@ public class CrossEntropyExperiment {
 				// samples
 				updateWeights(pvs.iterator(), (int) Math.ceil(population_
 						* SELECTION_RATIO));
-				
-				// Run the post update operations
-				policyGenerator_.postUpdateOperations();
 
 				// Test the agent and record the performances
 				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs,
@@ -328,6 +329,9 @@ public class CrossEntropyExperiment {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+				
+				// Run the post update operations
+				policyGenerator_.postUpdateOperations();
 			}
 
 			// Flushing the rete object.
@@ -646,8 +650,7 @@ public class CrossEntropyExperiment {
 	 *            the arguments for the program.
 	 */
 	public static void main(String[] args) {
-		CrossEntropyExperiment theExperiment = new CrossEntropyExperiment(
-				new File(args[0]));
+		CrossEntropyExperiment theExperiment = new CrossEntropyExperiment(args);
 
 		theExperiment.runExperiment(10);
 		System.exit(0);

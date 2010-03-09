@@ -40,8 +40,8 @@ public class Covering {
 	 */
 	private boolean createNewRules_;
 
-	public Covering() {
-		clearPreGoalState();
+	public Covering(int numActions) {
+		clearPreGoalState(numActions);
 	}
 
 	/**
@@ -771,6 +771,7 @@ public class Covering {
 
 				// 5. Replacing variable terms
 				if (condSplit[i].charAt(0) == '?') {
+					String backup = condSplit[i];
 					// The pregoal term is not anonymous
 					if (!ceaseMutation
 							&& !preGoalSplit[i].equals(StateSpec.ANONYMOUS)) {
@@ -797,17 +798,19 @@ public class Covering {
 						if (continueCreation) {
 							// Create the mutant
 							String newCond = StateSpec.reformFact(condSplit);
-							List<String> mutatedConditions = new ArrayList<String>(
-									ruleConditions);
-							mutatedConditions.set(mutatedConditions
-									.indexOf(cond), newCond);
-							GuidedRule mutant = new GuidedRule(
-									mutatedConditions, ruleAction, true);
-							mutant.expandConditions();
-							mutants.add(mutant);
+							if (!ruleConditions.contains(newCond)) {
+								List<String> mutatedConditions = new ArrayList<String>(
+										ruleConditions);
+								mutatedConditions.set(mutatedConditions
+										.indexOf(cond), newCond);
+								GuidedRule mutant = new GuidedRule(
+										mutatedConditions, ruleAction, true);
+								mutant.expandConditions();
+								mutants.add(mutant);
+							}
 
 							// Revert the cond split back
-							condSplit[i] = StateSpec.ANONYMOUS;
+							condSplit[i] = backup;
 						}
 					}
 				} else if (!condSplit[i].equals(replacedTerm)) {
@@ -934,8 +937,8 @@ public class Covering {
 	/**
 	 * Clears the pregoal state.
 	 */
-	public void clearPreGoalState() {
-		preGoals_ = new HashMap<String, PreGoalInformation>();
+	public void clearPreGoalState(int numActions) {
+		preGoals_ = new HashMap<String, PreGoalInformation>(numActions);
 	}
 
 	/**
