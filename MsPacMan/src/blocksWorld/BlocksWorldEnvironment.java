@@ -101,12 +101,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-		// System.out.println("\t\t\tOptimal test: "
-		// + Arrays.toString(state_.getState()));
+		if (PolicyGenerator.debugMode_) {
+			System.out.println("\t\t\tOptimal test: "
+					+ Arrays.toString(state_.getState()));
+		}
 		optimalSteps_ = optimalSteps();
-//		 System.out
-//		 .println("\t\t\tAgent: " + Arrays.toString(state_.getState()));
-//		steps_ = 0;
+		if (PolicyGenerator.debugMode_) {
+			System.out.println("\t\t\tAgent: "
+					+ Arrays.toString(state_.getState()));
+			steps_ = 0;
+		}
 
 		return formObs_Start();
 	}
@@ -132,11 +136,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-//		 if (action != null)
-//		 System.out.println("\t\t\t" + action + "   ->   "
-//		 + Arrays.toString(newState.getState()));
-//		 else
-//		 System.out.println("\t\t\tNo action chosen.");
+		if (PolicyGenerator.debugMode_) {
+			if (action != null)
+				System.out.println("\t\t\t" + action + "   ->   "
+						+ Arrays.toString(newState.getState()));
+			else
+				System.out.println("\t\t\tNo action chosen.");
+		}
 
 		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
 		Observation obs = new Observation();
@@ -411,7 +417,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			optimalAgent.agent_step(rot.r, rot.o);
 			rot = env_step(act);
 		}
-		
+
 		if (!PolicyGenerator.getInstance().hasPreGoal())
 			optimalAgent.agent_end(0);
 
