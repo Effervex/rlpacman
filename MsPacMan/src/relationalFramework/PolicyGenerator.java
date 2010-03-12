@@ -50,7 +50,7 @@ public class PolicyGenerator {
 	private MultiMap<String, GuidedRule> mutatedRules_;
 
 	/** The random number generator. */
-	public static Random random_ = new Random();
+	public static Random random_ = new Random(0);
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -165,6 +165,7 @@ public class PolicyGenerator {
 						try {
 							System.out.println("Press Enter to continue.");
 							System.in.read();
+							System.in.read();
 						} catch (Exception e) {
 							e.printStackTrace();
 						}
@@ -188,7 +189,7 @@ public class PolicyGenerator {
 
 					// Mutate unless already mutated
 					if (!covering_.isPreGoalSettled(actionPred)) {
-						mutateRule(coveredRule, false);
+						mutateRule(coveredRule, coveredRule.getSlot(), false);
 					}
 				} else if (createNewRules) {
 					nonLGGCoveredRules_.put(actionPred, coveredRule);
@@ -211,7 +212,8 @@ public class PolicyGenerator {
 	 * @param settledPreGoal
 	 *            If the pre-goal has settled.
 	 */
-	private void mutateRule(GuidedRule baseRule, boolean settledPreGoal) {
+	private void mutateRule(GuidedRule baseRule, Slot ruleSlot,
+			boolean settledPreGoal) {
 		// If the base rule hasn't already spawned pre-goal mutants
 		if (!baseRule.hasSpawned()) {
 
@@ -219,11 +221,13 @@ public class PolicyGenerator {
 				try {
 					System.out.println("\tMUTATING " + baseRule);
 					System.out.println("PRE-GOAL: ");
-					for (String action : StateSpec.getInstance().getActions().keySet()) {
+					for (String action : StateSpec.getInstance().getActions()
+							.keySet()) {
 						System.out.println(action + ": "
 								+ covering_.getPreGoalState(action));
 					}
 					System.out.println("Press Enter to continue.");
+					System.in.read();
 					System.in.read();
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -233,7 +237,6 @@ public class PolicyGenerator {
 			Collection<GuidedRule> mutants = covering_
 					.specialiseToPreGoal(baseRule);
 
-			Slot ruleSlot = baseRule.getSlot();
 			String actionPred = baseRule.getActionPredicate();
 
 			// If the slot has settled, remove any mutants not present in
@@ -251,11 +254,14 @@ public class PolicyGenerator {
 					for (GuidedRule gr : ruleSlot.getGenerator()) {
 						if (gr.isMutant() && !mutants.contains(gr)) {
 							removables.add(gr);
-							
+
 							if (debugMode_) {
 								try {
-									System.out.println("\tREMOVING MUTANT: " + gr);
-									System.out.println("Press Enter to continue.");
+									System.out.println("\tREMOVING MUTANT: "
+											+ gr);
+									System.out
+											.println("Press Enter to continue.");
+									System.in.read();
 									System.in.read();
 								} catch (Exception e) {
 									e.printStackTrace();
@@ -280,6 +286,7 @@ public class PolicyGenerator {
 					try {
 						System.out.println("\tADDED/EXISTING MUTANT: " + gr);
 						System.out.println("Press Enter to continue.");
+						System.in.read();
 						System.in.read();
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -314,7 +321,7 @@ public class PolicyGenerator {
 				for (String settledAction : settledGoals) {
 					if (lggRules_.containsKey(settledAction))
 						for (GuidedRule general : lggRules_.get(settledAction))
-							mutateRule(general, true);
+							mutateRule(general, general.getSlot(), true);
 				}
 			} else {
 				System.out.println("\tFORMING PRE-GOAL STATE " + "("
@@ -429,14 +436,15 @@ public class PolicyGenerator {
 		// Mutate the rules further
 		if (debugMode_) {
 			try {
-			System.out.println("\tPERFORMING POST-UPDATE OPERATIONS");
-			System.out.println("Press Enter to continue.");
-			System.in.read();
+				System.out.println("\tPERFORMING POST-UPDATE OPERATIONS");
+				System.out.println("Press Enter to continue.");
+				System.in.read();
+				System.in.read();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-		
+
 		// For each slot, run N mutations (where N = slot.size()) on the sampled
 		// N rules (so basically only mutate the top rules).
 		for (Slot slot : policyGenerator_) {
@@ -447,7 +455,19 @@ public class PolicyGenerator {
 			for (int i = 0; i < slotSize; i++) {
 				GuidedRule rule = slotRules.sample();
 				// Create definite mutants
-				mutateRule(rule, true);
+				mutateRule(rule, slot, true);
+			}
+		}
+
+		// Mutate the rules further
+		if (debugMode_) {
+			try {
+				System.out.println(policyGenerator_);
+				System.out.println("Press Enter to continue.");
+				System.in.read();
+				System.in.read();
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 	}
