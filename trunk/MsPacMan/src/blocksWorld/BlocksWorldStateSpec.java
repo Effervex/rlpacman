@@ -68,7 +68,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		goal_ = "onab";
+		goal_ = "clearA";
 
 		// On(a,b) goal
 		if (goal_.equals("onab")) {

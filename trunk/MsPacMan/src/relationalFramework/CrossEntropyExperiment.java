@@ -252,8 +252,8 @@ public class CrossEntropyExperiment {
 
 		// Initialise the environment/agent
 		RLGlue.RL_init();
+		RLGlue.RL_env_message("26");
 		int maxSteps = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
-		RLGlue.RL_env_message("10");
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		PolicyValue bestPolicy = null;
@@ -264,8 +264,7 @@ public class CrossEntropyExperiment {
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < runs; run++) {
-			float[] episodePerformances = new float[episodes_ + 1];
-			// episodePerformances[0] = testAgent(-1, maxSteps, run, runs);
+			float[] episodePerformances = new float[episodes_];
 			// The outer loop, for refinement episode by episode
 			for (int t = 0; t < episodes_; t++) {
 				// Forming a population of solutions
@@ -314,7 +313,7 @@ public class CrossEntropyExperiment {
 						* SELECTION_RATIO));
 
 				// Test the agent and record the performances
-				episodePerformances[t + 1] = testAgent(t, maxSteps, run, runs,
+				episodePerformances[t] = testAgent(t, maxSteps, run, runs,
 						expProg);
 
 				// Save the results at each episode

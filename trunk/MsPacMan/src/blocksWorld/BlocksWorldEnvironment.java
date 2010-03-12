@@ -1,5 +1,6 @@
 package blocksWorld;
 
+import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -57,6 +58,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	/** The optimal number of steps. */
 	private int optimalSteps_;
 
+	/** If we're running an optimal agent. */
+	private boolean optimal_ = false;
+
 	// @Override
 	public void env_cleanup() {
 		rete_ = null;
@@ -101,14 +105,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
-		if (PolicyGenerator.debugMode_) {
-			System.out.println("\t\t\tOptimal test: "
-					+ Arrays.toString(state_.getState()));
-		}
+		// if (PolicyGenerator.debugMode_) {
+		// System.out.println("\tOptimal test:\n"
+		// + state_);
+		// }
 		optimalSteps_ = optimalSteps();
 		if (PolicyGenerator.debugMode_) {
-			System.out.println("\t\t\tAgent: "
-					+ Arrays.toString(state_.getState()));
+			System.out.println("\tAgent:\n" + state_);
 			steps_ = 0;
 		}
 
@@ -136,10 +139,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		BlocksState newState = actOnAction(action, state_);
-		if (PolicyGenerator.debugMode_) {
+		if (PolicyGenerator.debugMode_ && !optimal_) {
 			if (action != null)
-				System.out.println("\t\t\t" + action + "   ->   "
-						+ Arrays.toString(newState.getState()));
+				System.out.println("\t" + action + " ->\n" + newState);
 			else
 				System.out.println("\t\t\tNo action chosen.");
 		}
@@ -399,6 +401,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			return optimalMap_.get(state_);
 		}
 
+		optimal_ = true;
 		BlocksState initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
 		PolicyAgent optimalAgent = new PolicyAgent();
@@ -425,6 +428,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		state_ = initialState;
 		formState(state_.getState());
 		optimalMap_.put(state_, steps_);
+		optimal_ = false;
 		return steps_;
 	}
 
@@ -476,7 +480,73 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		@Override
 		public String toString() {
-			return Arrays.toString(intState_);
+			// The last column of the blocksChars denotes if there is a block in
+			// the row.
+			char[][] blocksChars = new char[numBlocks_ + 1][numBlocks_];
+			Map<Integer, Point> posMap = new HashMap<Integer, Point>();
+			int column = 0;
+			int i = 0;
+			while (posMap.size() < numBlocks_) {
+				column = recursiveBuild(i, intState_, column, posMap,
+						blocksChars);
+				i++;
+			}
+
+			// Print the char map
+			StringBuffer buffer = new StringBuffer();
+			for (int y = numBlocks_ - 1; y >= 0; y--) {
+				if (blocksChars[numBlocks_][y] == '+') {
+					buffer.append("\t\t");
+					for (int x = 0; x < column; x++) {
+						if (blocksChars[x][y] == 0)
+							buffer.append("   ");
+						else
+							buffer.append("[" + blocksChars[x][y] + "]");
+					}
+					
+					if (y != 0)
+						buffer.append("\n");
+				}
+			}
+			return buffer.toString();
+		}
+
+		/**
+		 * Builds the blocks state recursively.
+		 * 
+		 * @param currBlock
+		 *            The current block index.
+		 * @param blocks
+		 *            The locations of the blocks, in block index form.
+		 * @param column
+		 *            The first empty column
+		 * @param posMap
+		 *            The position mapping for each block.
+		 * @param blocksChars
+		 *            The output character map, with an extra column for
+		 *            denoting if a row has any blocks in it.
+		 * @return The new value of column (same or + 1).
+		 */
+		private int recursiveBuild(int currBlock, Integer[] blocks, int column,
+				Map<Integer, Point> posMap, char[][] blocksChars) {
+			if (!posMap.containsKey(currBlock)) {
+				if (blocks[currBlock] == 0) {
+					posMap.put(currBlock, new Point(column, 0));
+					blocksChars[column][0] = (char) ('a' + currBlock);
+					blocksChars[blocks.length][0] = '+';
+					column++;
+				} else {
+					int underBlock = blocks[currBlock] - 1;
+					column = recursiveBuild(underBlock, blocks, column, posMap,
+							blocksChars);
+					Point pos = new Point(posMap.get(underBlock));
+					pos.y++;
+					posMap.put(currBlock, pos);
+					blocksChars[pos.x][pos.y] = (char) ('a' + currBlock);
+					blocksChars[blocks.length][pos.y] = '+';
+				}
+			}
+			return column;
 		}
 	}
 }
