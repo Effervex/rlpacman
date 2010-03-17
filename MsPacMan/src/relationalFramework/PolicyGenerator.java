@@ -345,6 +345,33 @@ public class PolicyGenerator {
 	}
 
 	/**
+	 * Checks if the state has settled. This means that the pre-goal has settled
+	 * and there are no non-LGG rules.
+	 * 
+	 * @return True if the generator values are settled, false otherwise.
+	 */
+	public boolean isSettled() {
+		// Must have at least one pre-goal
+		if (!hasPreGoal())
+			return false;
+		// All pre-goals must be settled (or null)
+		for (String action : actionSet_.keySet()) {
+			if ((covering_.getPreGoalState(action) != null)
+					&& !covering_.isPreGoalSettled(action))
+				return false;
+		}
+
+		// Rules need to have been created at one point
+		if (nonLGGCoveredRules_.isKeysEmpty())
+			return false;
+		// There should be no rules under the nonLGGRules
+		if (!nonLGGCoveredRules_.allValuesEmpty()) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	 * Finds the slot for the action given, as each slot has an action assigned
 	 * to it. Some slots may be fixed,a nd not allow new rules, in which case
 	 * another slot of the same action will be available to add to.

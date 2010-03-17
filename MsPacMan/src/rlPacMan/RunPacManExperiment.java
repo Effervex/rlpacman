@@ -2,14 +2,14 @@ package rlPacMan;
 
 import org.rlcommunity.rlglue.codec.*;
 
-import relationalFramework.CrossEntropyExperiment;
-import relationalFramework.PolicyAgent;
+import relationalFramework.LearningController;
+import relationalFramework.PolicyActor;
 
 
 public class RunPacManExperiment {
 	public static void main(String[] args) {
 		// Create the Agent
-		AgentInterface theAgent = new PolicyAgent();
+		AgentInterface theAgent = new PolicyActor();
 
 		// Create the Environment
 		EnvironmentInterface theEnvironment = new PacManEnvironment();
@@ -24,7 +24,7 @@ public class RunPacManExperiment {
 		// Environment will run
 		// locally, without sockets.
 		//PacManExperiment.main(args);
-		CrossEntropyExperiment.main(args);
+		LearningController.main(args);
 		System.out.println("RunMinesSarsaExperimentNoSockets Complete");
 	}
 }

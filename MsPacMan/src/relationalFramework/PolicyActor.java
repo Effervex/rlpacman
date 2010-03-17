@@ -15,7 +15,7 @@ import org.rlcommunity.rlglue.codec.types.Observation;
  * 
  * @author Sam Sarjant
  */
-public class PolicyAgent implements AgentInterface {
+public class PolicyActor implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
 
