@@ -347,15 +347,15 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 * @param stepSize
 	 *            The step size for the update.
 	 */
-	public void updateDistribution(double numSamples, Map<T, Integer> counts,
+	public void updateDistribution(double numSamples, Map<T, Double> counts,
 			double stepSize) {
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
 			for (ItemProb ip : itemProbs_) {
 				// Update every element within the distribution
-				Integer itemCount = counts.get(ip.element_);
+				Double itemCount = counts.get(ip.element_);
 				if (itemCount == null)
-					itemCount = 0;
+					itemCount = 0d;
 				updateElement(ip, numSamples, itemCount, stepSize);
 			}
 
@@ -374,8 +374,8 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 * @param stepSize
 	 *            The step size for the update.
 	 */
-	public void updateElement(ItemProb element, double numSamples, int count,
-			double stepSize) {
+	public void updateElement(ItemProb element, double numSamples,
+			double count, double stepSize) {
 		// Calculate the new ratio.
 		double ratio = count / numSamples;
 		// Update the value
@@ -546,18 +546,18 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	public boolean retainAll(Collection<?> collection) {
 		if (collection == null)
 			throw new NullPointerException();
-		
+
 		int size = itemProbs_.size();
 		for (Iterator<ItemProb> iter = itemProbs_.iterator(); iter.hasNext();) {
 			ItemProb element = iter.next();
 			if (!collection.contains(element.element_))
 				itemProbs_.remove(element);
 		}
-		
+
 		// If the sizes haven't changed, return false.
 		if (size == itemProbs_.size())
 			return false;
-		
+
 		normaliseProbs();
 		return true;
 	}

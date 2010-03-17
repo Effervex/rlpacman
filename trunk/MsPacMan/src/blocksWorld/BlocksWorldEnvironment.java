@@ -87,6 +87,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
+		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
+			StateSpec.reinitInstance(arg0.substring(5));
+		}
 		try {
 			numBlocks_ = Integer.parseInt(arg0);
 			// Assign the blocks

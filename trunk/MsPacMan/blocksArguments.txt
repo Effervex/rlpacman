@@ -4,4 +4,4 @@ blocksWorld.BlocksWorld
 bestBlocksPolicy.txt
 generatorBlocksOutput.txt
 blocksPerformance.txt
-26
+26,"goal clearA"
