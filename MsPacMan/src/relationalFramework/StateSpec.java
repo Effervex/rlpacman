@@ -699,6 +699,21 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Reinits the instance with a set goal.
+	 * 
+	 * @param goalString The new goal string.
+	 */
+	public static void reinitInstance(String goalString) {
+		try {
+			instance_.rete_.clear();
+			instance_.goal_ = goalString;
+			instance_.initialise();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
 	 * A class for storing string rule information and organising it properly.
 	 * 
 	 * @author Samuel J. Sarjant

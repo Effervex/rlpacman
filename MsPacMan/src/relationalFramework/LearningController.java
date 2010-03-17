@@ -49,6 +49,8 @@ public class LearningController {
 	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
+	/** The minimum value for weight updating. */
+	private static final double MIN_UPDATE = 0.1;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The extra arguments to message the environment. */
@@ -85,7 +87,7 @@ public class LearningController {
 			Pattern p = Pattern.compile("((\".+?\")|\\w+)");
 			Matcher m = p.matcher(extraArgs);
 			while (m.find())
-				extraArgsList.add(m.group());
+				extraArgsList.add(m.group().replaceAll("\"", ""));
 
 			bf.close();
 			reader.close();
@@ -222,8 +224,8 @@ public class LearningController {
 				Collections.sort(pvs);
 				// Update the weights for all distributions using only the elite
 				// samples
-				updateWeights(pvs.iterator(), (int) Math.ceil(population
-						* SELECTION_RATIO));
+				updateWeights(pvs, (int) Math
+						.ceil(population * SELECTION_RATIO));
 
 				// Test the agent and record the performances
 				episodePerformances[t] = testAgent(t, maxSteps_, run,
@@ -356,21 +358,72 @@ public class LearningController {
 	}
 
 	/**
-	 * Checks the files for pre-existing versions so runs do not have to be
-	 * re-run.
+	 * Updates the weights in the probability distributions according to their
+	 * frequency within the 'elite' samples.
 	 * 
-	 * @return The run number that the files stopped at.
+	 * @param iter
+	 *            The iterator over the samples.
+	 * @param numElite
+	 *            The number of samples to form the 'elite' samples.
 	 */
-	private int checkFiles() {
-		// Check the performance files
-		int run = -1;
-		File tempPerf = null;
-		do {
-			run++;
-			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
-					+ run);
-		} while (tempPerf.exists());
-		return run;
+	private void updateWeights(List<PolicyValue> sortedPolicies, int numElite) {
+		// Keep count of the rules seen (and slots used)
+		Map<Slot, Double> slotCounts = new HashMap<Slot, Double>();
+		Map<GuidedRule, Double> ruleCounts = new HashMap<GuidedRule, Double>();
+		countRules(sortedPolicies.subList(0, numElite), slotCounts, ruleCounts);
+
+		// Apply the weights to the distributions
+		policyGenerator_.updateDistributions(numElite, slotCounts, ruleCounts,
+				STEP_SIZE);
+	}
+
+	/**
+	 * Counts the rules from the elite samples and stores their frequencies and
+	 * total score.
+	 * 
+	 * @param elites
+	 *            The elite samples to iterate through.
+	 * @param slotCounts
+	 *            The counts for the slots
+	 * @param ruleCounts
+	 *            The counts for the individual rules.
+	 * @return The average value of the elite samples.
+	 */
+	private void countRules(List<PolicyValue> elites,
+			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts) {
+		boolean usingWeightedCounts = false;
+		double gradient = 0;
+		double offset = 1;
+		if (usingWeightedCounts) {
+			gradient = (1 - MIN_UPDATE)
+					/ (elites.get(0).getValue() - elites.get(elites.size() - 1)
+							.getValue());
+			offset = 1 - gradient * elites.get(0).getValue();
+		}
+
+		// Only selecting the top elite samples
+		for (PolicyValue pv : elites) {
+			Policy eliteSolution = pv.getPolicy();
+
+			// Count the occurrences of rules and slots in the policy
+			Collection<GuidedRule> firingRules = eliteSolution.getFiringRules();
+			for (GuidedRule rule : firingRules) {
+				double weight = pv.getValue() * gradient + offset;
+
+				// Slot counts
+				Slot ruleSlot = rule.getSlot();
+				Double count = slotCounts.get(ruleSlot);
+				if (count == null)
+					count = 0d;
+				slotCounts.put(ruleSlot, count + weight);
+
+				// Rule counts
+				count = ruleCounts.get(rule);
+				if (count == null)
+					count = 0d;
+				ruleCounts.put(rule, count + weight);
+			}
+		}
 	}
 
 	/**
@@ -454,6 +507,24 @@ public class LearningController {
 	}
 
 	/**
+	 * Checks the files for pre-existing versions so runs do not have to be
+	 * re-run.
+	 * 
+	 * @return The run number that the files stopped at.
+	 */
+	private int checkFiles() {
+		// Check the performance files
+		int run = -1;
+		File tempPerf = null;
+		do {
+			run++;
+			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
+					+ run);
+		} while (tempPerf.exists());
+		return run;
+	}
+
+	/**
 	 * Compiles the performance files togetrher into a single file, detailing
 	 * the average, min and max performances.
 	 * 
@@ -522,67 +593,6 @@ public class LearningController {
 	 */
 	private void combineGenerators(int runs) throws Exception {
 		// TODO Combine generators in a modular fashion
-	}
-
-	/**
-	 * Updates the weights in the probability distributions according to their
-	 * frequency within the 'elite' samples.
-	 * 
-	 * @param iter
-	 *            The iterator over the samples.
-	 * @param numElite
-	 *            The number of samples to form the 'elite' samples.
-	 */
-	private void updateWeights(Iterator<PolicyValue> iter, int numElite) {
-		// Keep count of the rules seen (and slots used)
-		Map<Slot, Integer> slotCounts = new HashMap<Slot, Integer>();
-		Map<GuidedRule, Integer> ruleCounts = new HashMap<GuidedRule, Integer>();
-		countRules(iter, numElite, slotCounts, ruleCounts);
-
-		// Apply the weights to the distributions
-		policyGenerator_.updateDistributions(numElite, slotCounts, ruleCounts,
-				STEP_SIZE);
-	}
-
-	/**
-	 * Counts the rules from the elite samples and stores their frequencies and
-	 * total score. TODO Fix this up
-	 * 
-	 * @param iter
-	 *            The iterator through the samples.
-	 * @param numElite
-	 *            The number of elite samples to iterate through.
-	 * @param slotCounts
-	 *            The counts for the slots
-	 * @param ruleCounts
-	 *            The counts for the individual rules.
-	 * @return The average value of the elite samples.
-	 */
-	private void countRules(Iterator<PolicyValue> iter, int numElite,
-			Map<Slot, Integer> slotCounts, Map<GuidedRule, Integer> ruleCounts) {
-		// Only selecting the top elite samples
-		for (int k = 0; k < numElite; k++) {
-			PolicyValue pv = iter.next();
-			Policy eliteSolution = pv.getPolicy();
-
-			// Count the occurrences of rules and slots in the policy
-			Collection<GuidedRule> firingRules = eliteSolution.getFiringRules();
-			// TODO Ensure this is performing correctly.
-			for (GuidedRule rule : firingRules) {
-				// Slot counts
-				Slot ruleSlot = rule.getSlot();
-				Integer count = slotCounts.get(ruleSlot);
-				if (count == null)
-					count = 0;
-				slotCounts.put(ruleSlot, count + 1);
-
-				// Rule counts
-				count = ruleCounts.get(rule);
-				if (count == null)
-					count = 0;
-				ruleCounts.put(rule, count + 1);
-			}
-		}
 	}
 
 	/**

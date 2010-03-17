@@ -50,7 +50,7 @@ public class PolicyGenerator {
 	private MultiMap<String, GuidedRule> mutatedRules_;
 
 	/** The random number generator. */
-	public static Random random_ = new Random(0);
+	public static Random random_ = new Random();
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -314,18 +314,21 @@ public class PolicyGenerator {
 			Collection<String> settledGoals = covering_.formPreGoalState(
 					preGoalState, actions[0]);
 			String actionPred = StateSpec.splitFact(actions[0])[0];
-			if (!settledGoals.isEmpty()) {
+			if (settledGoals.contains(actionPred))
 				System.out.println("\tSETTLED PRE-GOAL STATE " + "("
 						+ actionPred + "):");
+			else
+				System.out.println("\tFORMING PRE-GOAL STATE " + "("
+						+ actionPred + "):");
+			
+			// Check if we have LGG rules to mutate
+			if (!settledGoals.isEmpty()) {			
 				// For each maximally general rule
 				for (String settledAction : settledGoals) {
 					if (lggRules_.containsKey(settledAction))
 						for (GuidedRule general : lggRules_.get(settledAction))
 							mutateRule(general, general.getSlot(), true);
 				}
-			} else {
-				System.out.println("\tFORMING PRE-GOAL STATE " + "("
-						+ actionPred + "):");
 			}
 
 			for (String action : StateSpec.getInstance().getActions().keySet()) {
@@ -444,7 +447,7 @@ public class PolicyGenerator {
 	 *            The step size update parameter.
 	 */
 	public void updateDistributions(int numSamples,
-			Map<Slot, Integer> slotCounts, Map<GuidedRule, Integer> ruleCounts,
+			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts,
 			double stepSize) {
 		// Update the slot distribution
 		policyGenerator_.updateDistribution(numSamples, slotCounts, stepSize);
