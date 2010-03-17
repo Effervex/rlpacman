@@ -965,8 +965,11 @@ public class Covering {
 	 * @return True if the state has settled, false otherwise.
 	 */
 	public boolean isPreGoalSettled(String action) {
-		if (preGoals_.containsKey(action) && preGoals_.get(action).isSettled())
-			return true;
+		// If the pre-goal isn't empty and is settled, return true
+		if (preGoals_.containsKey(action)) {
+			if (preGoals_.get(action).isSettled())
+				return true;
+		}
 		return false;
 	}
 

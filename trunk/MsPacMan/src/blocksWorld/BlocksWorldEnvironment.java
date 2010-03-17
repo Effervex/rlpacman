@@ -21,7 +21,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
-import relationalFramework.PolicyAgent;
+import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
@@ -404,7 +404,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		optimal_ = true;
 		BlocksState initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
-		PolicyAgent optimalAgent = new PolicyAgent();
+		PolicyActor optimalAgent = new PolicyActor();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
 		optimalAgent.agent_message("Policy");
