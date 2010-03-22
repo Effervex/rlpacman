@@ -477,12 +477,15 @@ public class PolicyGenerator {
 		// N rules (so basically only mutate the top rules).
 		for (Slot slot : policyGenerator_) {
 			// Get the slot information before making mutations
-			int slotSize = slot.getGenerator().size();
 			ProbabilityDistribution<GuidedRule> slotRules = slot.getGenerator()
 					.clone();
+			int slotSize = slot.getGenerator().size();
+			slotRules.normaliseProbs();
 			for (int i = 0; i < slotSize; i++) {
 				GuidedRule rule = slotRules.sample();
 				// Create definite mutants
+				if (rule == null)
+					System.out.println("Problem...");
 				mutateRule(rule, slot, true);
 			}
 		}

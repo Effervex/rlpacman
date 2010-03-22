@@ -57,6 +57,8 @@ public class LearningController {
 	private String[] extraArgs_;
 	/** The maximum number of steps the agent can take. */
 	private int maxSteps_;
+	/** If we're using weighted elite samples. */
+	private boolean weightedElites_ = false;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -391,10 +393,9 @@ public class LearningController {
 	 */
 	private void countRules(List<PolicyValue> elites,
 			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts) {
-		boolean usingWeightedCounts = false;
 		double gradient = 0;
 		double offset = 1;
-		if (usingWeightedCounts) {
+		if (weightedElites_) {
 			gradient = (1 - MIN_UPDATE)
 					/ (elites.get(0).getValue() - elites.get(elites.size() - 1)
 							.getValue());
