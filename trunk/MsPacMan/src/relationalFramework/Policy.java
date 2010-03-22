@@ -60,6 +60,8 @@ public class Policy {
 	 * Checks if a rule contains constant facts which can be achieved using
 	 * modules. If so, the rules are loaded and internally added to the policy.
 	 * 
+	 * TODO Ensure that the modules call other modules recursively (on calling clear)
+	 * 
 	 * @param rule
 	 *            The rule being checked.
 	 */
