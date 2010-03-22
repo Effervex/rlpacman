@@ -2,9 +2,11 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import jess.QueryResult;
@@ -36,20 +38,62 @@ public class Policy {
 	}
 
 	/**
-	 * Adds a rule to the policy, with it's placement affected
+	 * Adds a rule to the policy, adding necessary modular rules if the rule
+	 * contains constant facts.
 	 * 
 	 * @param rule
 	 *            The rule to be added.
+	 * @param checkModular
+	 *            If we're checking for modular facts.
 	 */
-	public void addRule(GuidedRule rule) {
-		if (!policyRules_.contains(rule))
+	public void addRule(GuidedRule rule, boolean checkModular) {
+		if (!policyRules_.contains(rule)) {
+			// Check if the rule contains constant facts that could invoke
+			// modular rules.
+			if (checkModular)
+				checkModular(rule);
 			policyRules_.add(rule);
+		}
+	}
+
+	/**
+	 * Checks if a rule contains constant facts which can be achieved using
+	 * modules. If so, the rules are loaded and internally added to the policy.
+	 * 
+	 * @param rule
+	 *            The rule being checked.
+	 */
+	private void checkModular(GuidedRule rule) {
+		List<String> conditions = rule.getConditions(false);
+		for (String cond : conditions) {
+			// If the condition doesn't contain any variables and isn't a type
+			// predicate, trigger module loading.
+			String[] condSplit = StateSpec.splitFact(cond);
+			if (!cond.contains(" ?")
+					&& !StateSpec.getInstance().isTypePredicate(condSplit[0])) {
+				Module module = Module.loadModule(StateSpec.getInstance()
+						.getEnvironmentName(), condSplit[0]);
+				// If the module exists
+				if (module != null) {
+					// Put the parameters into an arraylist
+					ArrayList<String> parameters = new ArrayList<String>();
+					for (int i = 1; i < condSplit.length; i++)
+						parameters.add(condSplit[i]);
+
+					// Add the module rules.
+					for (GuidedRule gr : module.getModuleRules()) {
+						policyRules_.add(gr.setParameters(parameters));
+					}
+				}
+			}
+		}
 	}
 
 	/**
 	 * If the policy contains a rule.
 	 * 
-	 * @param rule The rule being checked.
+	 * @param rule
+	 *            The rule being checked.
 	 * @return True if the rule is within the policy, false otherwise.
 	 */
 	public boolean contains(GuidedRule rule) {
@@ -72,8 +116,11 @@ public class Policy {
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
-			buffer.append(StateSpec.getInstance().encodeRule(rule)
-					+ "\n");
+			if (rule.getQueryParameters() == null) {
+				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
+			} else {
+				buffer.append("MODULAR: " + StateSpec.getInstance().encodeRule(rule) + "\n");
+			}
 		}
 		return buffer.toString();
 	}
@@ -110,12 +157,19 @@ public class Policy {
 			try {
 				// Forming the query
 				String query = StateSpec.getInstance().getRuleQuery(gr);
-				QueryResult results = state.runQueryStar(query,
-						new ValueVector());
+				// If there are parameters, insert them here
+				ValueVector vv = new ValueVector();
+				if (gr.getParameters() != null) {
+					for (String param : gr.getParameters())
+						vv.add(param);
+				}
+				QueryResult results = state.runQueryStar(query, vv);
 
 				// If there is at least one result
 				if (results.next()) {
-					triggeredRules_.add(gr);
+					// Only add non-modular rules
+					if (gr.getQueryParameters() == null)
+						triggeredRules_.add(gr);
 					List<String> actionsList = new ArrayList<String>();
 
 					// For each possible replacement

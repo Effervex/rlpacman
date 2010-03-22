@@ -236,7 +236,7 @@ public class LearningController {
 					File tempGen = new File(TEMP_FOLDER + "/"
 							+ generatorFile_.getName() + run);
 					tempGen.createNewFile();
-					RuleFileManager.saveGenerators(tempGen);
+					PolicyGenerator.saveGenerators(tempGen);
 					saveBestPolicy(bestPolicy);
 					// Output the episode averages
 					savePerformance(episodePerformances, run);
@@ -348,7 +348,7 @@ public class LearningController {
 			File output = new File(TEMP_FOLDER + "/"
 					+ humanGeneratorFile_.getName() + run);
 			output.createNewFile();
-			RuleFileManager.saveHumanGenerators(output);
+			PolicyGenerator.saveHumanGenerators(output);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

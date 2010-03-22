@@ -49,6 +49,12 @@ public class GuidedRule {
 	/** If this rule is assured to be without inequals preds. */
 	private boolean withoutInequals_ = false;
 
+	/** The query parameters associated with this rule. */
+	private ArrayList<String> queryParams_;
+
+	/** The actual parameters given for this rule. */
+	private ArrayList<String> parameters_;
+
 	/**
 	 * A constructor taking the bare minimum for a guided rule.
 	 * 
@@ -71,9 +77,11 @@ public class GuidedRule {
 	 *            The conditions for the rule.
 	 * @param action
 	 *            The actions for the rule.
-	 * @param mutant TODO
+	 * @param mutant
+	 *            If this rule is a mutant rule.
 	 */
-	public GuidedRule(Collection<String> conditions, String action, boolean mutant) {
+	public GuidedRule(Collection<String> conditions, String action,
+			boolean mutant) {
 		ruleConditions_ = new ArrayList<String>(conditions);
 		ruleAction_ = action;
 		actionTerms_ = findTerms(ruleAction_);
@@ -110,6 +118,34 @@ public class GuidedRule {
 		lgg_ = maxGeneral;
 		mutant_ = mutant;
 		slot_ = slot;
+	}
+
+	/**
+	 * Creates a rule which is part of a parameterised query.
+	 * 
+	 * @param ruleString
+	 *            The rule string.
+	 * @param queryParams
+	 *            The parameters used in the query.
+	 */
+	public GuidedRule(String ruleString, ArrayList<String> queryParams) {
+		this(ruleString);
+		queryParams_ = queryParams;
+	}
+
+	/**
+	 * Sets the parameters for a cloned GuidedRule.
+	 * 
+	 * @param parameters
+	 *            The parameters to set.
+	 * @return A new rule, the same as this, but with parameters set.
+	 */
+	public GuidedRule setParameters(ArrayList<String> parameters) {
+		GuidedRule paramed = new GuidedRule(ruleConditions_, ruleAction_,
+				mutant_);
+		paramed.queryParams_ = queryParams_;
+		paramed.parameters_ = parameters;
+		return paramed;
 	}
 
 	/**
@@ -305,6 +341,14 @@ public class GuidedRule {
 		return new ArrayList<String>(actionTerms_);
 	}
 
+	public ArrayList<String> getQueryParameters() {
+		return queryParams_;
+	}
+	
+	public ArrayList<String> getParameters() {
+		return parameters_;
+	}
+
 	/**
 	 * Gets the action predicate.
 	 * 
@@ -386,6 +430,8 @@ public class GuidedRule {
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		result = prime * result
 				+ ((ruleConditions_ == null) ? 0 : ruleConditions_.hashCode());
+		result = prime * result
+				+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
 		return result;
 	}
 
@@ -411,6 +457,11 @@ public class GuidedRule {
 		else if (!ruleConditions_.containsAll(other.ruleConditions_))
 			return false;
 		else if (!other.ruleConditions_.containsAll(ruleConditions_))
+			return false;
+		if (queryParams_ == null) {
+			if (other.queryParams_ != null)
+				return false;
+		} else if (!queryParams_.equals(other.queryParams_))
 			return false;
 		return true;
 	}

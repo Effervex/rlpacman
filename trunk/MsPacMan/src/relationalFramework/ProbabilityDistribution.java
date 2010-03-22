@@ -236,34 +236,6 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	/**
-	 * Gets the N best items from this distribution, as determined by their
-	 * weight. The distribution must be no smaller than N (preferable 3N, in
-	 * conjunction with the other method).
-	 * 
-	 * @param size
-	 *            The number of items to get.
-	 * @return A list of the best items in the distribution.
-	 */
-	public ArrayList<T> getNBest(int size) {
-		// Sort the values
-		ArrayList<ItemProb> ips = new ArrayList<ItemProb>(itemProbs_);
-		Collections.sort(ips);
-
-		ArrayList<T> elites = new ArrayList<T>();
-		Iterator<ItemProb> iter = ips.iterator();
-		// Skip through the first X-N items in the list.
-		int i = 0;
-		for (; i < ips.size() - size; i++) {
-			iter.next();
-		}
-		// Getting the highest N values.
-		for (; i < ips.size(); i++) {
-			elites.add(iter.next().getItem());
-		}
-		return elites;
-	}
-
-	/**
 	 * Gets the elements of this distribution in an ordered list, from most
 	 * likely to least.
 	 * 
