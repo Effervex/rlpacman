@@ -49,7 +49,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			if (val < tally)
 				return current.getItem();
 		} while ((tally < 1) && (iter.hasNext()));
-		return null;
+		return itemProbs_.get(0).getItem();
 	}
 
 	/**
