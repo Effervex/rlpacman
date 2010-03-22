@@ -207,6 +207,19 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(head.contains("(move ?X ?Y)"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
+		
+		// Testing module syntax
+		rule = spec_.parseRule("(above ?X ?*a*) (clear ?X) => (moveFloor ?X)");
+		body = rule.split("=>")[0];
+		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
+		head = rule.split("=>")[1];
+		assertTrue(body.contains("(block ?X)"));
+		assertTrue(body.contains("(block ?*a*)"));
+		assertTrue(body.contains("(above ?X ?*a*)"));
+		assertTrue(body.contains("(clear ?X)"));
+		assertTrue(body.contains("(test (<> ?X ?*a*))"));
+		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(condCount, 5);
 	}
 
 	@Test

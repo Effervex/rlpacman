@@ -38,6 +38,9 @@ public abstract class StateSpec {
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
+	/** The environment package name. */
+	private String environment_;
+
 	/** The prerequisites of the rules and their structure. */
 	private MultiMap<String, Class> predicates_;
 
@@ -83,6 +86,8 @@ public abstract class StateSpec {
 	private final void initialise() {
 		try {
 			rete_ = new Rete();
+
+			environment_ = this.getClass().getPackage().getName();
 
 			// Type predicates
 			typePredicates_ = initialiseTypePredicateTemplates();
@@ -309,11 +314,12 @@ public abstract class StateSpec {
 			// '(move b ?X)' '(cool)' '(on ?X _)'
 			Pattern p = null;
 			if (i == 0) {
-				p = Pattern.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)|(?:"
-						+ Pattern.quote(ANONYMOUS) + ")))*)\\)");
+				p = Pattern
+						.compile("\\((\\w+)((?: (?:(?:[\\w$*=+/<>_#.]+)|(?:\\?[\\w-_*:]+)|(?:"
+								+ Pattern.quote(ANONYMOUS) + ")))*)\\)");
 			} else {
 				p = Pattern
-						.compile("\\((\\w+)((?: (?:(?:\\w+)|(?:\\?\\w+)))*)\\)");
+						.compile("\\((\\w+)((?: (?:(?:[\\w$*=+/<>_#.]+)|(?:\\?[\\w-_*:]+)|(?:\\?)))*)\\)");
 			}
 
 			Matcher m = p.matcher(predicate);
@@ -352,6 +358,18 @@ public abstract class StateSpec {
 				ruleSpecificUnnecessaries, "");
 		if (replacement.split(INFERS_ACTION)[0].isEmpty())
 			return rule.toString();
+
+		// If there are parameters, swap them in
+		ArrayList<String> parameters = rule.getParameters();
+		if (parameters != null) {
+			ArrayList<String> queryParameters = rule.getQueryParameters();
+			for (int i = 0; i < parameters.size(); i++) {
+				String temp = " " + Pattern.quote(queryParameters.get(i))
+						+ "(?=( |\\)))";
+				replacement = replacement.replaceAll(temp, " "
+						+ parameters.get(i));
+			}
+		}
 		return replacement;
 	}
 
@@ -504,6 +522,10 @@ public abstract class StateSpec {
 		return buffer.toString();
 	}
 
+	public String getEnvironmentName() {
+		return environment_;
+	}
+
 	public MultiMap<String, Class> getPredicates() {
 		return predicates_;
 	}
@@ -610,8 +632,22 @@ public abstract class StateSpec {
 		if (result == null) {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
-				rete_.eval("(defquery " + result + " "
-						+ gr.getStringConditions() + ")");
+				// If the rule has parameters, declare them as variables.
+				if (gr.getQueryParameters() == null) {
+					rete_.eval("(defquery " + result + " "
+							+ gr.getStringConditions() + ")");
+				} else {
+					StringBuffer declares = new StringBuffer(
+							"(declare (variables");
+					for (String param : gr.getQueryParameters()) {
+						declares.append(" " + param);
+					}
+					declares.append("))");
+
+					rete_.eval("(defquery " + result + " "
+							+ declares.toString() + " "
+							+ gr.getStringConditions() + ")");
+				}
 				queryNames_.put(gr, result);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -701,7 +737,8 @@ public abstract class StateSpec {
 	/**
 	 * Reinits the instance with a set goal.
 	 * 
-	 * @param goalString The new goal string.
+	 * @param goalString
+	 *            The new goal string.
 	 */
 	public static void reinitInstance(String goalString) {
 		try {
