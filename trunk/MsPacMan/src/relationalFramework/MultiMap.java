@@ -181,7 +181,8 @@ public class MultiMap<K, V> {
 		List<V> resultantCollection = initialiseGetList(key);
 
 		// Adding the values
-		resultantCollection.add(value);
+		if (value != null)
+			resultantCollection.add(value);
 
 		return resultantCollection;
 	}

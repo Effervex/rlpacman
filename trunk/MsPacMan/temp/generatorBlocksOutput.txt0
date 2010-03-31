@@ -1,0 +1,2 @@
+(moveFloor{((on ?X ?) (clear ?X) (above ?X ?) (block ?X) => (moveFloor ?X):1.0)}),0.08000000000000002
+(move{((clear ?X) (clear ?Y) (test (<> ?X ?Y)) (block ?X) (block ?Y) => (move ?X ?Y):0.04000000000000001)((clear ?X) (clear b) (test (<> ?X b)) (block ?X) (block b) => (move ?X b):0.136)((clear a) (clear ?Y) (test (<> ?Y a)) (block a) (block ?Y) => (move a ?Y):0.124)((clear a) (clear b) (block a) (block b) => (move a b):0.7)}),0.92

@@ -25,7 +25,7 @@ public class Covering {
 	private static final char STARTING_CHAR = 'X';
 	private static final char MODULO_CHAR = 'Z' + 1;
 	private static final char FIRST_CHAR = 'A';
-	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 10;
+	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 50;
 	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
 
 	/**
@@ -344,7 +344,7 @@ public class Covering {
 	 *            A pre-existing list of rules that each need to be generalised.
 	 *            Note the rules are exclusive from one-another.
 	 * @param constants
-	 *            TODO
+	 *            The constants to maintain in rules.
 	 * @return A Rule representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
@@ -876,10 +876,12 @@ public class Covering {
 	 *            The pre-goal state seen by the agent.
 	 * @param action
 	 *            The final action taken by the agent.
+	 * @param constants
+	 *            The list of constants used in forming the pre-goal state.
 	 * @return A collection of actions which have settled pre-goals.
 	 */
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			String action) {
+			String action, List<String> constants) {
 		// If the state isn't yet settled, try unification
 		if (!isPreGoalSettled(action)) {
 			// Inversely substitute the old pregoal state
@@ -887,8 +889,7 @@ public class Covering {
 			String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
 					actionSplit.length);
 			// The actions become constants if possible
-			List<String> constants = new ArrayList<String>(StateSpec
-					.getInstance().getConstants());
+			constants = new ArrayList<String>(constants);
 			List<String> newStateTerms = new ArrayList<String>();
 			for (String actionTerm : actionTerms) {
 				newStateTerms.add(actionTerm);
@@ -903,8 +904,7 @@ public class Covering {
 			PreGoalInformation oldPreGoal = preGoals_.get(actionSplit[0]);
 			if (oldPreGoal == null) {
 				preGoals_.put(actionSplit[0], new PreGoalInformation(
-						actionSplit[0], (List<String>) preGoalStringState,
-						newStateTerms));
+						(List<String>) preGoalStringState, newStateTerms));
 			} else {
 				// Unify the two states and check if it has changed at all.
 				PreGoalInformation preGoal = preGoals_.get(actionSplit[0]);
@@ -955,8 +955,7 @@ public class Covering {
 		List<String> terms = new ArrayList<String>();
 		for (int i = 1; i < split.length; i++)
 			terms.add(split[i]);
-		preGoals_.put(split[0],
-				new PreGoalInformation(split[0], preGoal, terms));
+		preGoals_.put(split[0], new PreGoalInformation(preGoal, terms));
 	}
 
 	/**
@@ -1033,18 +1032,11 @@ public class Covering {
 	 * @author Samuel J. Sarjant
 	 */
 	private class PreGoalInformation {
-		private String actionPred_;
 		private List<String> state_;
 		private List<String> actionTerms_;
 		private int inactivity_ = 0;
 
-		public PreGoalInformation(String actionPred) {
-			actionPred_ = actionPred;
-		}
-
-		public PreGoalInformation(String actionPred, List<String> state,
-				List<String> actionTerms) {
-			actionPred_ = actionPred;
+		public PreGoalInformation(List<String> state, List<String> actionTerms) {
 			state_ = state;
 			actionTerms_ = actionTerms;
 		}
@@ -1068,16 +1060,8 @@ public class Covering {
 			return state_;
 		}
 
-		public void setState(List<String> state) {
-			state_ = state;
-		}
-
 		public List<String> getActionTerms() {
 			return actionTerms_;
-		}
-
-		public void setActionTerms(List<String> actionTerms) {
-			actionTerms_ = actionTerms;
 		}
 	}
 }

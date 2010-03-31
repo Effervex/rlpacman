@@ -60,8 +60,6 @@ public class Policy {
 	 * Checks if a rule contains constant facts which can be achieved using
 	 * modules. If so, the rules are loaded and internally added to the policy.
 	 * 
-	 * TODO Ensure that the modules call other modules recursively (on calling clear)
-	 * 
 	 * @param rule
 	 *            The rule being checked.
 	 */
@@ -71,24 +69,60 @@ public class Policy {
 			// If the condition doesn't contain any variables and isn't a type
 			// predicate, trigger module loading.
 			String[] condSplit = StateSpec.splitFact(cond);
-			if (!cond.contains(" ?")
-					&& !StateSpec.getInstance().isTypePredicate(condSplit[0])) {
+			if (isModularisable(condSplit, rule.getQueryParameters())) {
 				Module module = Module.loadModule(StateSpec.getInstance()
 						.getEnvironmentName(), condSplit[0]);
 				// If the module exists
 				if (module != null) {
 					// Put the parameters into an arraylist
 					ArrayList<String> parameters = new ArrayList<String>();
-					for (int i = 1; i < condSplit.length; i++)
-						parameters.add(condSplit[i]);
+					for (int i = 1; i < condSplit.length; i++) {
+						// May need to replace parameters if modular is
+						// recursive
+						if (rule.getParameters() != null) {
+							parameters.add(rule
+									.getReplacementParameter(condSplit[i]));
+						} else {
+							parameters.add(condSplit[i]);
+						}
+					}
 
 					// Add the module rules.
 					for (GuidedRule gr : module.getModuleRules()) {
-						policyRules_.add(gr.setParameters(parameters));
+						GuidedRule modularRule = gr.setParameters(parameters);
+						checkModular(modularRule);
+						policyRules_.add(modularRule);
 					}
 				}
 			}
 		}
+	}
+
+	/**
+	 * Small function for determining if a condition is modularisable.
+	 * 
+	 * @param condSplit
+	 *            The condition split up.
+	 * @param queryParams
+	 *            The query parameters for the rule, if any.
+	 * @return True if the condition is modularisable (is a constant or
+	 *         parameterised constant).
+	 */
+	private boolean isModularisable(String[] condSplit, List<String> queryParams) {
+		// Ignore type predicates
+		if (StateSpec.getInstance().isTypePredicate(condSplit[0]))
+			return false;
+
+		for (int i = 1; i < condSplit.length; i++) {
+			// If we're looking at a variable
+			if (condSplit[i].contains("?")) {
+				// It may be a parameter, else return false.
+				if ((queryParams == null)
+						|| (!queryParams.contains(condSplit[i])))
+					return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -111,6 +145,27 @@ public class Policy {
 		return triggeredRules_;
 	}
 
+	/**
+	 * Gets the rules that this policy is made up of.
+	 * 
+	 * @return The rule for the policy.
+	 */
+	public Collection<GuidedRule> getPolicyRules() {
+		return policyRules_;
+	}
+
+	/**
+	 * Apply arguments to any parameterised rules contained within this policy.
+	 * 
+	 * @param arguments
+	 *            The arguments to apply to the parameters.
+	 */
+	public void parameterArgs(ValueVector arguments) {
+		for (GuidedRule gr : policyRules_) {
+			gr.setTempParameters(arguments);
+		}
+	}
+
 	@Override
 	public String toString() {
 		if (policyRules_.isEmpty())
@@ -121,7 +176,8 @@ public class Policy {
 			if (rule.getQueryParameters() == null) {
 				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
 			} else {
-				buffer.append("MODULAR: " + StateSpec.getInstance().encodeRule(rule) + "\n");
+				buffer.append("MODULAR: "
+						+ StateSpec.getInstance().encodeRule(rule) + "\n");
 			}
 		}
 		return buffer.toString();
@@ -149,7 +205,6 @@ public class Policy {
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
 		Iterator<GuidedRule> iter = policyRules_.iterator();
-		int ruleNumber = 0;
 		while ((actionsFound < actionsReturned) && (iter.hasNext())) {
 			GuidedRule gr = iter.next();
 
@@ -159,10 +214,15 @@ public class Policy {
 			try {
 				// Forming the query
 				String query = StateSpec.getInstance().getRuleQuery(gr);
-				// If there are parameters, insert them here
+				// If there are parameters, temp or concrete, insert them here
 				ValueVector vv = new ValueVector();
-				if (gr.getParameters() != null) {
-					for (String param : gr.getParameters())
+				if ((gr.getParameters() != null)
+						|| (gr.getTempParameters() != null)) {
+					// Find which param type and add to ValueVector 
+					List<String> params = gr.getParameters();
+					if (params == null)
+						params = gr.getTempParameters();
+					for (String param : params)
 						vv.add(param);
 				}
 				QueryResult results = state.runQueryStar(query, vv);
@@ -211,7 +271,6 @@ public class Policy {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			ruleNumber++;
 		}
 
 		// If the policy didn't generate enough rules, cover a set of new rules
