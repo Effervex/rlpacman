@@ -2,12 +2,16 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import jess.ValueVector;
 
 /**
  * A class that keeps track of the guided predicates that make up the rule
@@ -50,10 +54,13 @@ public class GuidedRule {
 	private boolean withoutInequals_ = false;
 
 	/** The query parameters associated with this rule. */
-	private ArrayList<String> queryParams_;
+	private List<String> queryParams_;
 
 	/** The actual parameters given for this rule. */
-	private ArrayList<String> parameters_;
+	private List<String> parameters_;
+
+	/** Temporary parameter swapping, if necessary. */
+	private List<String> tempParameters_;
 
 	/**
 	 * A constructor taking the bare minimum for a guided rule.
@@ -128,7 +135,7 @@ public class GuidedRule {
 	 * @param queryParams
 	 *            The parameters used in the query.
 	 */
-	public GuidedRule(String ruleString, ArrayList<String> queryParams) {
+	public GuidedRule(String ruleString, List<String> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
 	}
@@ -140,12 +147,38 @@ public class GuidedRule {
 	 *            The parameters to set.
 	 * @return A new rule, the same as this, but with parameters set.
 	 */
-	public GuidedRule setParameters(ArrayList<String> parameters) {
+	public GuidedRule setParameters(List<String> parameters) {
 		GuidedRule paramed = new GuidedRule(ruleConditions_, ruleAction_,
 				mutant_);
 		paramed.queryParams_ = queryParams_;
 		paramed.parameters_ = parameters;
 		return paramed;
+	}
+
+	/**
+	 * Sets temporary parameter replacements for any parameterisable terms
+	 * within. The temp parameters don't affect the rule itself, just the
+	 * evaluation, so rule updating will not be affected.
+	 * 
+	 * @param arguments
+	 *            The arguments being set.
+	 */
+	public void setTempParameters(ValueVector arguments) {
+		if (arguments == null) {
+			tempParameters_ = null;
+			return;
+		}
+
+		try {
+			if (tempParameters_ == null)
+				tempParameters_ = new ArrayList<String>();
+
+			for (int i = 0; i < arguments.size(); i++) {
+				tempParameters_.add(arguments.get(i).stringValue(null));
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -328,9 +361,18 @@ public class GuidedRule {
 
 	public String getStringConditions() {
 		StringBuffer buffer = new StringBuffer();
-		for (String cond : ruleConditions_)
+		for (String cond : ruleConditions_) {
 			buffer.append(cond + " ");
-		return buffer.toString();
+		}
+
+		String result = buffer.toString();
+		// if (tempParameters_ != null) {
+		// for (String tempParam : tempParameters_.keySet()) {
+		// result = result.replaceAll(" " + Pattern.quote(tempParam)
+		// + "(?=( |\\)))", " " + tempParameters_.get(tempParam));
+		// }
+		// }
+		return result;
 	}
 
 	public String getAction() {
@@ -341,12 +383,30 @@ public class GuidedRule {
 		return new ArrayList<String>(actionTerms_);
 	}
 
-	public ArrayList<String> getQueryParameters() {
+	public List<String> getQueryParameters() {
 		return queryParams_;
 	}
-	
-	public ArrayList<String> getParameters() {
+
+	public List<String> getParameters() {
 		return parameters_;
+	}
+
+	public List<String> getTempParameters() {
+		return tempParameters_;
+	}
+
+	/**
+	 * Gets the parameter replacement for the query parameter if one exists.
+	 * 
+	 * @param queryParam
+	 *            The query parameter to replace.
+	 * @return The replacement parameter or the original variable if none given.
+	 */
+	public String getReplacementParameter(String queryParam) {
+		if (parameters_ == null)
+			return queryParam;
+
+		return parameters_.get(queryParams_.indexOf(queryParam));
 	}
 
 	/**
@@ -381,8 +441,10 @@ public class GuidedRule {
 
 	public boolean isLGG() {
 		// If the rule has seen enough states, assume it is LGG
-		if (statesSeen_ > SETTLED_RULE_STATES)
+		if (statesSeen_ > SETTLED_RULE_STATES) {
+			lgg_ = true;
 			return true;
+		}
 		return lgg_;
 	}
 
@@ -417,6 +479,23 @@ public class GuidedRule {
 		return false;
 	}
 
+	/**
+	 * Clone this rule.
+	 * 
+	 * @return A clone of this rule.
+	 */
+	public Object clone() {
+		GuidedRule clone = new GuidedRule(ruleConditions_, ruleAction_, mutant_);
+		clone.hasSpawned_ = hasSpawned_;
+		clone.lgg_ = lgg_;
+		clone.withoutInequals_ = withoutInequals_;
+		if (queryParams_ != null)
+			clone.queryParams_ = new ArrayList<String>(queryParams_);
+		if (parameters_ != null)
+			clone.parameters_ = new ArrayList<String>(parameters_);
+		return clone;
+	}
+
 	@Override
 	public String toString() {
 		return getStringConditions() + "=> " + ruleAction_;
@@ -432,6 +511,8 @@ public class GuidedRule {
 				+ ((ruleConditions_ == null) ? 0 : ruleConditions_.hashCode());
 		result = prime * result
 				+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
+		result = prime * result
+				+ ((parameters_ == null) ? 0 : parameters_.hashCode());
 		return result;
 	}
 
@@ -462,6 +543,11 @@ public class GuidedRule {
 			if (other.queryParams_ != null)
 				return false;
 		} else if (!queryParams_.equals(other.queryParams_))
+			return false;
+		if (parameters_ == null) {
+			if (other.parameters_ != null)
+				return false;
+		} else if (!parameters_.equals(other.parameters_))
 			return false;
 		return true;
 	}

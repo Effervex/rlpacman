@@ -360,9 +360,9 @@ public abstract class StateSpec {
 			return rule.toString();
 
 		// If there are parameters, swap them in
-		ArrayList<String> parameters = rule.getParameters();
+		List<String> parameters = rule.getParameters();
 		if (parameters != null) {
-			ArrayList<String> queryParameters = rule.getQueryParameters();
+			List<String> queryParameters = rule.getQueryParameters();
 			for (int i = 0; i < parameters.size(); i++) {
 				String temp = " " + Pattern.quote(queryParameters.get(i))
 						+ "(?=( |\\)))";
@@ -617,6 +617,8 @@ public abstract class StateSpec {
 			return false;
 		if (predicate.equals(VALID_ACTIONS))
 			return false;
+		if (predicate.equals("initial-fact"))
+			return false;
 		return true;
 	}
 
@@ -633,14 +635,24 @@ public abstract class StateSpec {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() == null) {
+				if ((gr.getQueryParameters() == null)
+						&& (gr.getTempParameters() == null)) {
 					rete_.eval("(defquery " + result + " "
 							+ gr.getStringConditions() + ")");
 				} else {
 					StringBuffer declares = new StringBuffer(
 							"(declare (variables");
-					for (String param : gr.getQueryParameters()) {
-						declares.append(" " + param);
+					// TODO A temporary solution. Need to mix the temp and
+					// regular parameters elegantly.
+					if (gr.getQueryParameters() != null) {
+						for (String param : gr.getQueryParameters()) {
+							declares.append(" " + param);
+						}
+					} else {
+						for (int i = 0; i < gr.getTempParameters().size(); i++) {
+							declares.append(" "
+									+ Module.createModuleParameter(i));
+						}
 					}
 					declares.append("))");
 
@@ -672,7 +684,7 @@ public abstract class StateSpec {
 	 *            The rete object being asserted to.
 	 * @return The name of the fact template.
 	 */
-	protected String defineTemplate(String factName, Rete rete) {
+	public String defineTemplate(String factName, Rete rete) {
 		try {
 			rete
 					.eval("(deftemplate " + factName

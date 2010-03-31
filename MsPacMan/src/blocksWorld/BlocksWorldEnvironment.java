@@ -3,13 +3,11 @@ package blocksWorld;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -424,8 +422,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			rot = env_step(act);
 		}
 
+		// TODO Change this when dealing with internal goals
 		if (!PolicyGenerator.getInstance().hasPreGoal())
-			optimalAgent.agent_end(0);
+			optimalAgent.agent_message("formPreGoal");
 
 		// Return the state to normal
 		state_ = initialState;

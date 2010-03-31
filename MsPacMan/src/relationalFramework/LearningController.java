@@ -37,20 +37,20 @@ public class LearningController {
 	/** The folder to store the temp files. */
 	private static final File TEMP_FOLDER = new File("temp/");
 
-	/** The policy generator for the experiment. */
-	private PolicyGenerator policyGenerator_;
 	/** The number of episodes to run. */
-	private int episodes_;
+	private int maxEpisodes_;
 	/** The number of times to repeat the experiment. */
 	private int repetitions_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 100;
+	private static final double POPULATION_CONSTANT = 10;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double SELECTION_RATIO = 0.05;
+	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
 	/** The minimum value for weight updating. */
 	private static final double MIN_UPDATE = 0.1;
+	/** The internal prefix for messages to the agent regarding internal goal. */
+	public static final String INTERNAL_PREFIX = "internal";
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The extra arguments to message the environment. */
@@ -58,7 +58,7 @@ public class LearningController {
 	/** The maximum number of steps the agent can take. */
 	private int maxSteps_;
 	/** If we're using weighted elite samples. */
-	private boolean weightedElites_ = false;
+	private boolean weightedElites_ = true;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -129,7 +129,7 @@ public class LearningController {
 			int episodeCount, String policyFile, String generatorFile,
 			String performanceFile, String[] extraArgs) {
 		repetitions_ = repetitions;
-		episodes_ = episodeCount;
+		maxEpisodes_ = episodeCount;
 
 		// Create the output files if necessary
 		policyFile_ = new File(policyFile);
@@ -151,9 +151,8 @@ public class LearningController {
 		}
 		extraArgs_ = extraArgs;
 
-		// Load the generators from the input file
-		PolicyGenerator.initInstance(environmentClass);
-		policyGenerator_ = PolicyGenerator.getInstance();
+		// Initialise the state spec.
+		StateSpec.initInstance(environmentClass);
 	}
 
 	/**
@@ -173,88 +172,16 @@ public class LearningController {
 		maxSteps_ = Integer.parseInt(RLGlue.RL_env_message("maxSteps"));
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
-		PolicyValue bestPolicy = null;
-
 		// Determine the initial run (as previous runs may have already been
 		// done in a previous experiment)
 		int run = checkFiles();
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < repetitions_; run++) {
-			// Run the preliminary action discovery phase, only starting real
-			// optimisation once pre-goal has settled and LGG rules for each
-			// action have been found.
-			preliminaryProcessing();
+			// Initialise a new policy generator.
+			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
 
-			// The outer loop, for refinement episode by episode
-			float[] episodePerformances = new float[episodes_];
-			for (int t = 0; t < episodes_; t++) {
-				// Determine the dynamic population, based on rule-base size
-				int population = determinePopulation();
-
-				// Forming a population of solutions
-				List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
-				int expProg = 0;
-				for (int i = 0; i < population; i++) {
-					Policy pol = policyGenerator_.generatePolicy();
-					System.out.println(pol);
-					// Send the agent a generated policy
-					ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-					RLGlue.RL_agent_message("Policy");
-
-					float score = 0;
-					for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-						RLGlue.RL_episode(maxSteps_);
-						score += RLGlue.RL_return();
-					}
-					score /= AVERAGE_ITERATIONS;
-					System.out.println(score);
-
-					PolicyValue thisPolicy = new PolicyValue(pol, score);
-					pvs.add(thisPolicy);
-					// Storing the best policy
-					if ((bestPolicy == null)
-							|| (thisPolicy.getValue() > bestPolicy.getValue()))
-						bestPolicy = thisPolicy;
-
-					// Give an ETA
-					expProg = t * population + i + 1;
-					estimateETA(experimentStart_, expProg, expProg, run,
-							episodes_ * population, repetitions_, "experiment");
-				}
-
-				Collections.sort(pvs);
-				// Update the weights for all distributions using only the elite
-				// samples
-				updateWeights(pvs, (int) Math
-						.ceil(population * SELECTION_RATIO));
-
-				// Test the agent and record the performances
-				episodePerformances[t] = testAgent(t, maxSteps_, run,
-						repetitions_, expProg);
-
-				// Save the results at each episode
-				try {
-					File tempGen = new File(TEMP_FOLDER + "/"
-							+ generatorFile_.getName() + run);
-					tempGen.createNewFile();
-					PolicyGenerator.saveGenerators(tempGen);
-					saveBestPolicy(bestPolicy);
-					// Output the episode averages
-					savePerformance(episodePerformances, run);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-
-				// Run the post update operations
-				policyGenerator_.postUpdateOperations();
-			}
-
-			// Flushing the rete object.
-			StateSpec.reinitInstance();
-
-			// Resetting experiment values
-			PolicyGenerator.getInstance().resetGenerator();
+			developPolicy(localPolicy);
 		}
 
 		RLGlue.RL_cleanup();
@@ -268,6 +195,163 @@ public class LearningController {
 	}
 
 	/**
+	 * The policy optimisation loop, which runs through the environment until
+	 * the agent has developed a reasonable converged policy.
+	 * 
+	 * @param localPolicy
+	 *            The local policy to develop.
+	 */
+	private void developPolicy(PolicyGenerator localPolicy) {
+		// TODO Sort out the ETA
+		int run = 0;
+
+		PolicyValue bestPolicy = null;
+
+		// Run the preliminary action discovery phase, only starting real
+		// optimisation once pre-goal has settled and LGG rules for each
+		// action have been found.
+		preliminaryProcessing();
+
+		// The outer loop, for refinement episode by episode
+		ArrayList<Float> episodePerformances = new ArrayList<Float>();
+		int t = 0;
+		while ((t < maxEpisodes_) && (!localPolicy.isConverged())) {
+			// Check if the agent needs to drop into learning a module
+			checkForModularLearning(localPolicy);
+
+			// Determine the dynamic population, based on rule-base size
+			int population = determinePopulation();
+
+			// Forming a population of solutions
+			List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
+			int expProg = 0;
+			for (int i = 0; i < population; i++) {
+				Policy pol = localPolicy.generatePolicy();
+				System.out.println(pol);
+				// Send the agent a generated policy
+				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
+				RLGlue.RL_agent_message("Policy");
+
+				float score = 0;
+				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+					RLGlue.RL_episode(maxSteps_);
+					if (localPolicy.isModuleGenerator())
+						score += Double.parseDouble(RLGlue.RL_agent_message("internalReward"));
+					else
+						score += RLGlue.RL_return();
+				}
+				score /= AVERAGE_ITERATIONS;
+				System.out.println(score);
+
+				pol.parameterArgs(null);
+				PolicyValue thisPolicy = new PolicyValue(pol, score);
+				pvs.add(thisPolicy);
+				// Storing the best policy
+				if ((bestPolicy == null)
+						|| (thisPolicy.getValue() > bestPolicy.getValue()))
+					bestPolicy = thisPolicy;
+
+				// Give an ETA
+				expProg = t * population + i + 1;
+				estimateETA(experimentStart_, expProg, expProg, run,
+						maxEpisodes_ * population, repetitions_, "experiment");
+			}
+
+			Collections.sort(pvs);
+			// Update the weights for all distributions using only the elite
+			// samples
+			updateWeights(pvs, (int) Math.ceil(population * SELECTION_RATIO));
+
+			// Test the agent and record the performances
+			episodePerformances.add(testAgent(t, maxSteps_, run, repetitions_,
+					expProg));
+
+			// Save the results at each episode
+			try {
+				File tempGen = new File(TEMP_FOLDER + "/"
+						+ generatorFile_.getName() + run);
+				tempGen.createNewFile();
+				PolicyGenerator.saveGenerators(tempGen);
+				saveBestPolicy(bestPolicy);
+				// Output the episode averages
+				savePerformance(episodePerformances, run);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+			// Run the post update operations
+			localPolicy.postUpdateOperations();
+		}
+
+		// Flushing the rete object.
+		StateSpec.reinitInstance();
+
+		// Resetting experiment values
+		PolicyGenerator.getInstance().resetGenerator();
+	}
+
+	/**
+	 * Checks for modular learning - if the agent needs to learn a module as an
+	 * internal goal.
+	 * 
+	 * @param policyGenerator
+	 *            The policy generator.
+	 */
+	private void checkForModularLearning(PolicyGenerator policyGenerator) {
+		// Run through each rule in the policy generator, noting which ones
+		// require module learning.
+		Collection<String> modularFacts = policyGenerator.getConstantFacts();
+
+		// Check if we have a module file for each.
+		for (Iterator<String> factIter = modularFacts.iterator(); factIter
+				.hasNext();) {
+			String pred = factIter.next();
+			if (Module.moduleExists(StateSpec.getInstance()
+					.getEnvironmentName(), pred)) {
+				factIter.remove();
+			}
+		}
+
+		// We should be left with whatever modules do not yet exist
+		if (!modularFacts.isEmpty()) {
+			// Commence learning of the module
+			for (String internalGoal : modularFacts) {
+				// TODO Modularisation
+				if (PolicyGenerator.debugMode_) {
+					try {
+						System.out.println("\n\n\n------LEARNING MODULE: " + internalGoal
+							+ "------\n\n\n");
+						System.out.println("Press Enter to continue.");
+						System.in.read();
+						System.in.read();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+
+				// Set the internal goal
+				String oldInternalGoal = RLGlue
+						.RL_agent_message(INTERNAL_PREFIX + " " + internalGoal);
+
+				// Begin development
+				PolicyGenerator modularGenerator = PolicyGenerator
+						.newInstance(policyGenerator);
+				developPolicy(modularGenerator);
+
+				// Unset the internal goal
+				if (oldInternalGoal == null)
+					RLGlue.RL_agent_message(INTERNAL_PREFIX + " ");
+				else
+					RLGlue.RL_agent_message(INTERNAL_PREFIX + " "
+							+ oldInternalGoal);
+			}
+
+			// Ensure to reset the policy generator
+			PolicyGenerator.setInstance(policyGenerator);
+		}
+	}
+
+	/**
 	 * Determines the population of rules to use for optimisation.
 	 * 
 	 * @return A population of rules, large enough to reasonably test most
@@ -276,7 +360,7 @@ public class LearningController {
 	private int determinePopulation() {
 		// Currently just using 10 * the largest slot
 		int largestSlot = 0;
-		for (Slot slot : policyGenerator_.getGenerator()) {
+		for (Slot slot : PolicyGenerator.getInstance().getGenerator()) {
 			largestSlot = Math.max(largestSlot, slot.getGenerator().size());
 		}
 		return (int) (POPULATION_CONSTANT * largestSlot);
@@ -287,8 +371,8 @@ public class LearningController {
 	 * rules have all been found.
 	 */
 	private void preliminaryProcessing() {
-		while (!policyGenerator_.isSettled()) {
-			Policy pol = policyGenerator_.generatePolicy();
+		while (!PolicyGenerator.getInstance().isSettled()) {
+			Policy pol = PolicyGenerator.getInstance().generatePolicy();
 			System.out.println(pol);
 			// Send the agent a generated policy
 			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -312,7 +396,7 @@ public class LearningController {
 	 *            The total number of runs to complete.
 	 * @return The average performance of the agent.
 	 */
-	private float testAgent(int episode, int maxSteps, int run, int runs,
+	public float testAgent(int episode, int maxSteps, int run, int runs,
 			int expProg) {
 		long testStart = System.currentTimeMillis();
 		System.out.println();
@@ -324,7 +408,7 @@ public class LearningController {
 		// Run the agent through several test iterations, resampling the agent
 		// at each step
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
-			Policy pol = policyGenerator_.generatePolicy();
+			Policy pol = PolicyGenerator.getInstance().generatePolicy();
 			System.out.println(pol);
 			// Send the agent a generated policy
 			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -375,8 +459,8 @@ public class LearningController {
 		countRules(sortedPolicies.subList(0, numElite), slotCounts, ruleCounts);
 
 		// Apply the weights to the distributions
-		policyGenerator_.updateDistributions(numElite, slotCounts, ruleCounts,
-				STEP_SIZE);
+		PolicyGenerator.getInstance().updateDistributions(numElite, slotCounts,
+				ruleCounts, STEP_SIZE);
 	}
 
 	/**
@@ -489,7 +573,7 @@ public class LearningController {
 	 * @param episodeAverage
 	 *            The saved episode average performances.
 	 */
-	private void savePerformance(float[] episodeAverage, int run)
+	private void savePerformance(ArrayList<Float> episodeAverage, int run)
 			throws Exception {
 		File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
 				+ run);
@@ -498,9 +582,9 @@ public class LearningController {
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		System.out.println("Average episode elite scores:");
-		for (int e = 0; e < episodeAverage.length; e++) {
-			buf.write(episodeAverage[e] + "\n");
-			System.out.println(episodeAverage[e]);
+		for (float perf : episodeAverage) {
+			buf.write(perf + "\n");
+			System.out.println(perf);
 		}
 
 		buf.close();
@@ -533,7 +617,7 @@ public class LearningController {
 	 *            The number of runs involved in the experiment.
 	 */
 	private void compilePerformanceAverage(int runs) throws Exception {
-		double[][] performances = new double[episodes_][runs];
+		double[][] performances = new double[maxEpisodes_][runs];
 		float min = Float.MAX_VALUE;
 		int minIndex = -1;
 		float max = -Float.MAX_VALUE;
@@ -546,7 +630,7 @@ public class LearningController {
 
 			// For every value within the performance file
 			float sum = 0;
-			for (int e = 0; e < episodes_; e++) {
+			for (int e = 0; e < maxEpisodes_; e++) {
 				float val = Float.parseFloat(buf.readLine());
 				performances[e][i] = val;
 				sum += val;

@@ -59,7 +59,7 @@ public class Module {
 		ArrayList<String> oldTerms = new ArrayList<String>();
 		for (int i = 1; i < splitGoal.length; i++) {
 			oldTerms.add(splitGoal[i]);
-			parameterTerms_.add("?_MOD_" + (char) ('a' + i - 1));
+			parameterTerms_.add(createModuleParameter(i - 1));
 		}
 
 		moduleRules_ = new ArrayList<GuidedRule>();
@@ -145,7 +145,7 @@ public class Module {
 
 				bf.close();
 				reader.close();
-				
+
 				Module module = new Module(predicate, parameters, rules);
 				loadedModules_.put(predicate, module);
 				return module;
@@ -156,6 +156,45 @@ public class Module {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	/**
+	 * Function to check if a module exists.
+	 * 
+	 * @param packageName
+	 *            The name of the environment.
+	 * @param predicate
+	 *            The predicate name (module to load).
+	 * @return True, if it module exists, else false.
+	 */
+	public static boolean moduleExists(String environmentName, String predicate) {
+		// Checks to skip loading.
+		if (nonExistantModules_.contains(predicate))
+			return false;
+		if (loadedModules_.containsKey(predicate))
+			return true;
+
+		File modLocation = new File(MODULE_DIR + File.separatorChar
+				+ environmentName + File.separatorChar + predicate
+				+ MODULE_SUFFIX);
+
+		// If the module file exists, load it up.
+		if (modLocation.exists()) {
+			return true;
+		}
+		
+		nonExistantModules_.add(predicate);
+		return false;
+	}
+
+	/**
+	 * Creates a module parameter.
+	 * 
+	 * @param paramIndex The index of the parameter.
+	 * @return The name of the parameter.
+	 */
+	public static String createModuleParameter(int paramIndex) {
+		return "?_MOD_" + (char) ('a' + paramIndex);
 	}
 
 	/**
@@ -196,7 +235,7 @@ public class Module {
 	public ArrayList<String> getParameterTerms() {
 		return parameterTerms_;
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer("(" + modulePredicate_);

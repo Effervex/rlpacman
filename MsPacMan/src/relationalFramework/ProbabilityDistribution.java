@@ -318,9 +318,12 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 *            The counts of each of the elements.
 	 * @param stepSize
 	 *            The step size for the update.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
 	 */
-	public void updateDistribution(double numSamples, Map<T, Double> counts,
+	public double updateDistribution(double numSamples, Map<T, Double> counts,
 			double stepSize) {
+		double absoluteChange = 0;
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
 			for (ItemProb ip : itemProbs_) {
@@ -328,12 +331,14 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 				Double itemCount = counts.get(ip.element_);
 				if (itemCount == null)
 					itemCount = 0d;
-				updateElement(ip, numSamples, itemCount, stepSize);
+				absoluteChange += Math.abs(updateElement(ip, numSamples, itemCount, stepSize));
 			}
 
 			// Normalise the probabilities
 			normaliseProbs();
 		}
+
+		return absoluteChange;
 	}
 
 	/**
@@ -345,16 +350,20 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 *            The count for this element.
 	 * @param stepSize
 	 *            The step size for the update.
+	 * @return The value of the change in the probability.
 	 */
-	public void updateElement(ItemProb element, double numSamples,
+	public double updateElement(ItemProb element, double numSamples,
 			double count, double stepSize) {
+		double oldValue = element.getProbability();
 		// Calculate the new ratio.
 		double ratio = count / numSamples;
 		// Update the value
 		double newValue = stepSize * ratio + (1 - stepSize)
-				* element.getProbability();
+				* oldValue;
 		// Set the new value.
 		element.setProbability(newValue);
+		
+		return newValue - oldValue;
 	}
 
 	/**

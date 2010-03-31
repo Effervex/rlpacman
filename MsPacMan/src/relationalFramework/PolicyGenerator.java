@@ -8,6 +8,7 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class PolicyGenerator {
 	private ProbabilityDistribution<Slot> policyGenerator_;
 
 	/** The actions set the generator was initialised with. */
+	@SuppressWarnings("unchecked")
 	private MultiMap<String, Class> actionSet_;
 
 	/** If the generator is currently frozen. */
@@ -34,9 +36,6 @@ public class PolicyGenerator {
 
 	/** The instance. */
 	private static PolicyGenerator instance_;
-
-	/** The class prefix for the experiment. */
-	private String classPrefix_;
 
 	/** The covering object. */
 	private Covering covering_;
@@ -53,8 +52,17 @@ public class PolicyGenerator {
 	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
 	private MultiMap<String, GuidedRule> mutatedRules_;
 
+	/**
+	 * The last amount of difference in distribution probabilities from the
+	 * update.
+	 */
+	private double updateDifference_;
+
+	/** If this policy generator is being used for learning a module. */
+	private boolean moduleGenerator_;
+
 	/** The random number generator. */
-	public static Random random_ = new Random();
+	public static Random random_ = new Random(0);
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -66,19 +74,21 @@ public class PolicyGenerator {
 	public static final String RULE_DELIMITER = "@";
 
 	/**
-	 * The constructor for creating a new Policy Generator.
-	 * 
-	 * @param classPrefix
-	 *            The class prefix for the environment.
+	 * The maximum amount of change between the slots before it is considered
+	 * converged.
 	 */
-	public PolicyGenerator(String classPrefix) {
-		StateSpec.initInstance(classPrefix);
+	private static final double CONVERGED = 0.05;
+
+	/**
+	 * The constructor for creating a new Policy Generator.
+	 */
+	public PolicyGenerator() {
 		actionSet_ = StateSpec.getInstance().getActions();
-		classPrefix_ = classPrefix;
 		nonLGGCoveredRules_ = new MultiMap<String, GuidedRule>();
 		covering_ = new Covering(actionSet_.size());
 		lggRules_ = new MultiMap<String, GuidedRule>();
 		mutatedRules_ = new MultiMap<String, GuidedRule>();
+		updateDifference_ = Double.MAX_VALUE;
 
 		resetGenerator();
 	}
@@ -236,7 +246,7 @@ public class PolicyGenerator {
 					.specialiseToPreGoal(baseRule);
 
 			String actionPred = baseRule.getActionPredicate();
-
+			// TODO Mutate at every step of forming pre-goal, removing old mutants
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (settledPreGoal) {
@@ -304,20 +314,29 @@ public class PolicyGenerator {
 	 *            The pre-goal state seen by the agent.
 	 * @param actions
 	 *            The final action(s) taken by the agent.
+	 * @param constants
+	 *            The constants used in the pre-goal formation.
 	 */
-	public void formPreGoalState(Collection<Fact> preGoalState, String[] actions) {
+	public void formPreGoalState(Collection<Fact> preGoalState,
+			String[] actions, List<String> constants) {
 		if (!frozen_) {
 			// If the state has settled and is probably at minimum, trigger
 			// mutation.
 			Collection<String> settledGoals = covering_.formPreGoalState(
-					preGoalState, actions[0]);
+					preGoalState, actions[0], constants);
 			String actionPred = StateSpec.splitFact(actions[0])[0];
-			if (settledGoals.contains(actionPred))
-				System.out.println("\tSETTLED PRE-GOAL STATE " + "("
-						+ actionPred + "):");
-			else
-				System.out.println("\tFORMING PRE-GOAL STATE " + "("
-						+ actionPred + "):");
+			if (debugMode_) {
+				try {
+					if (settledGoals.contains(actionPred))
+						System.out.println("\tSETTLED PRE-GOAL STATE " + "("
+								+ actionPred + "):");
+					else
+						System.out.println("\tFORMING PRE-GOAL STATE " + "("
+								+ actionPred + "):");
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
 
 			// Check if we have LGG rules to mutate
 			if (!settledGoals.isEmpty()) {
@@ -329,10 +348,16 @@ public class PolicyGenerator {
 				}
 			}
 
-			for (String action : StateSpec.getInstance().getActions().keySet()) {
-				System.out.println(action + ": "
-						+ covering_.getPreGoalState(action));
-			}
+			if (debugMode_) {
+				try {
+					for (String action : StateSpec.getInstance().getActions().keySet()) {
+						System.out.println(action + ": "
+								+ covering_.getPreGoalState(action));
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}		
 		}
 	}
 
@@ -424,6 +449,18 @@ public class PolicyGenerator {
 	}
 
 	/**
+	 * If the slots and rules within are converged to stability.
+	 * 
+	 * @return True if the generator is converged, false otherwise.
+	 */
+	public boolean isConverged() {
+		if (updateDifference_ < CONVERGED) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Normalises the distributions.
 	 */
 	public void normaliseDistributions() {
@@ -448,11 +485,12 @@ public class PolicyGenerator {
 			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts,
 			double stepSize) {
 		// Update the slot distribution
-		policyGenerator_.updateDistribution(numSamples, slotCounts, stepSize);
+		updateDifference_ = policyGenerator_.updateDistribution(numSamples,
+				slotCounts, stepSize);
 
 		for (Slot slot : policyGenerator_) {
-			slot.getGenerator().updateDistribution(numSamples, ruleCounts,
-					stepSize);
+			updateDifference_ += slot.getGenerator().updateDistribution(
+					numSamples, ruleCounts, stepSize);
 		}
 	}
 
@@ -504,6 +542,34 @@ public class PolicyGenerator {
 	}
 
 	/**
+	 * Gets the predicates for every rule fact which is a constant fact.
+	 * 
+	 * @return A collection of predicates, each of which is involved in a rule
+	 *         where the predicate has only constant terms.
+	 */
+	public Collection<String> getConstantFacts() {
+		Collection<String> constantFacts = new HashSet<String>();
+
+		// Run through each slot and rule for conditions that only use constant
+		// terms.
+		for (Slot slot : policyGenerator_) {
+			for (GuidedRule gr : slot.getGenerator()) {
+				for (String cond : gr.getConditions(false)) {
+					String[] condSplit = StateSpec.splitFact(cond);
+					// If the condition contains no variables and isn't a type
+					// predicate, we can use it
+					if (!cond.contains(" ?")
+							&& !StateSpec.getInstance().isTypePredicate(
+									condSplit[0])) {
+						constantFacts.add(condSplit[0]);
+					}
+				}
+			}
+		}
+		return constantFacts;
+	}
+
+	/**
 	 * Gets the rule base instance.
 	 * 
 	 * @return The rule base instance or null if not yet initialised.
@@ -513,22 +579,75 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Initialises the instance as a set of random rule bases.
+	 * Initialises the instance as a new policy generator.
+	 * 
+	 * @return The new PolicyGenerator.
 	 */
-	public static void initInstance(String classPrefix) {
-		instance_ = new PolicyGenerator(classPrefix);
+	public static PolicyGenerator newInstance() {
+		instance_ = new PolicyGenerator();
+		instance_.moduleGenerator_ = false;
+		return instance_;
 	}
 
-	public String getClassPrefix() {
-		return classPrefix_;
+	/**
+	 * Initialises the instance as a new policy generator which uses information
+	 * from the old generator.
+	 * 
+	 * @param policyGenerator
+	 *            The policy generator containing the old LGG rules.
+	 * @return The new PolicyGenerator.
+	 */
+	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator) {
+		instance_ = new PolicyGenerator();
+		instance_.addLGGRules(policyGenerator.lggRules_);
+		instance_.moduleGenerator_ = true;
+		return instance_;
+	}
+
+	/**
+	 * Sets the instance to a particular generator.
+	 * 
+	 * @param generator
+	 *            The PolicyGenerator instance.
+	 */
+	public static void setInstance(PolicyGenerator generator) {
+		instance_ = generator;
 	}
 
 	public boolean isFrozen() {
 		return frozen_;
 	}
+	
+	public boolean isModuleGenerator() {
+		return moduleGenerator_;
+	}
 
 	public ProbabilityDistribution<Slot> getGenerator() {
 		return policyGenerator_;
+	}
+
+	/**
+	 * Adds LGG rules to this generator.
+	 * 
+	 * @param lggRules
+	 *            The lgg rules (found previously).
+	 */
+	public void addLGGRules(MultiMap<String, GuidedRule> lggRules) {
+		lggRules_ = new MultiMap<String, GuidedRule>();
+		for (String action : lggRules.keySet()) {
+			// Adding the lgg rules to the slots
+			Slot slot = findSlot(action);
+			for (GuidedRule rule : lggRules.get(action)) {
+				rule = (GuidedRule) rule.clone();
+				rule.setSpawned(false);
+				slot.addNewRule(rule, false);
+				lggRules_.put(action, rule);
+			}
+
+			// Adding the actions to the non-LGG, to show that non-LGG rules
+			// have already been considered.
+			nonLGGCoveredRules_.put(action, null);
+		}
 	}
 
 	@Override

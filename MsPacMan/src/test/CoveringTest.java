@@ -8,6 +8,7 @@ import java.util.List;
 
 import jess.Fact;
 import jess.Rete;
+import jess.ValueVector;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
@@ -420,7 +421,7 @@ public class CoveringTest {
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor a)");
+		sut_.formPreGoalState(facts, "(moveFloor a)", StateSpec.getInstance().getConstants());
 		List<String> preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear a)"));
@@ -430,7 +431,7 @@ public class CoveringTest {
 		state.reset();
 		state.eval("(assert (clear b))");
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor b)");
+		sut_.formPreGoalState(facts, "(moveFloor b)", StateSpec.getInstance().getConstants());
 		preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear ?X)"));
@@ -453,7 +454,7 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)");
+		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance().getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
 		assertEquals(9, preGoal.size());
@@ -482,7 +483,7 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)");
+		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance().getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(6, preGoal.size());
@@ -494,7 +495,7 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(above b ?)"));
 
 		// Generalising the action
-		sut_.formPreGoalState(facts, "(move b a)");
+		sut_.formPreGoalState(facts, "(move b a)", StateSpec.getInstance().getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(4, preGoal.size());
