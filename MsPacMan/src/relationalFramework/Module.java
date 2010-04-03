@@ -1,14 +1,18 @@
 package relationalFramework;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import jess.ValueVector;
 
 /**
  * A class representing a loaded module. Modules typically have parameterisable
@@ -51,7 +55,7 @@ public class Module {
 	 * @param slotDistribution
 	 *            The state of the distribution for the agent.
 	 */
-	public Module(String moduleGoal,
+	private Module(String moduleGoal,
 			ProbabilityDistribution<Slot> slotDistribution) {
 		String[] splitGoal = StateSpec.splitFact(moduleGoal);
 		modulePredicate_ = splitGoal[0];
@@ -65,12 +69,11 @@ public class Module {
 		moduleRules_ = new ArrayList<GuidedRule>();
 		ArrayList<Slot> orderedSlots = slotDistribution.getOrderedElements();
 		for (Slot slot : orderedSlots) {
-			String rule = slot.getGenerator().getOrderedElements().get(0)
-					.toString();
+			GuidedRule rule = slot.getGenerator().getOrderedElements().get(0);
+			rule.setAsLoadedModuleRule();
 
 			// Replace the constants with parameters
-			moduleRules_.add(new GuidedRule(parameteriseRule(rule, oldTerms),
-					parameterTerms_));
+			moduleRules_.add(rule);
 		}
 	}
 
@@ -159,6 +162,57 @@ public class Module {
 	}
 
 	/**
+	 * Saves a module to file by taking the state of the policy generator and
+	 * saving the necessary details about it.
+	 * 
+	 * @param internalGoal
+	 *            The goal the module works towards.
+	 * @param environment
+	 *            The environment the module exists within.
+	 * @param generator
+	 *            The policy generator which solves the goal.
+	 */
+	public static void saveModule(String internalGoal, String environment,
+			ProbabilityDistribution<Slot> generator) {
+		Module newModule = new Module(internalGoal, generator);
+		nonExistantModules_.remove(internalGoal);
+		loadedModules_.put(internalGoal, newModule);
+
+		try {
+			File modLocation = new File(MODULE_DIR + File.separatorChar
+					+ environment + File.separatorChar + internalGoal
+					+ MODULE_SUFFIX);
+			if (modLocation.createNewFile()) {
+
+				FileWriter writer = new FileWriter(modLocation);
+				BufferedWriter bf = new BufferedWriter(writer);
+
+				bf.write("(declare (variables");
+				for (int i = 0; i < StateSpec.getInstance().getPredicates()
+						.get(internalGoal).size(); i++) {
+					bf.write(" " + createModuleParameter(i));
+				}
+				bf.write("))");
+				
+				// Writing the rules
+				for (GuidedRule gr : newModule.moduleRules_) {
+					ValueVector vv = null;
+					gr.setParameters(vv);
+					bf.write("\n" + StateSpec.getInstance().encodeRule(gr));
+				}
+
+				bf.close();
+				writer.close();
+			} else {
+				System.err.println("Module file exists! Saving to temp file.");
+				saveModule(internalGoal + "temp", environment, generator);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
 	 * Function to check if a module exists.
 	 * 
 	 * @param packageName
@@ -182,7 +236,7 @@ public class Module {
 		if (modLocation.exists()) {
 			return true;
 		}
-		
+
 		nonExistantModules_.add(predicate);
 		return false;
 	}
@@ -190,7 +244,8 @@ public class Module {
 	/**
 	 * Creates a module parameter.
 	 * 
-	 * @param paramIndex The index of the parameter.
+	 * @param paramIndex
+	 *            The index of the parameter.
 	 * @return The name of the parameter.
 	 */
 	public static String createModuleParameter(int paramIndex) {

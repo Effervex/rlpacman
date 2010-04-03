@@ -42,9 +42,9 @@ public class LearningController {
 	/** The number of times to repeat the experiment. */
 	private int repetitions_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 10;
+	private static final double POPULATION_CONSTANT = 50;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double SELECTION_RATIO = 0.1;
+	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
 	/** The minimum value for weight updating. */
@@ -182,6 +182,12 @@ public class LearningController {
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
 
 			developPolicy(localPolicy);
+
+			// Flushing the rete object.
+			StateSpec.reinitInstance();
+
+			// Resetting experiment values
+			PolicyGenerator.getInstance().resetGenerator();
 		}
 
 		RLGlue.RL_cleanup();
@@ -236,7 +242,8 @@ public class LearningController {
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 					RLGlue.RL_episode(maxSteps_);
 					if (localPolicy.isModuleGenerator())
-						score += Double.parseDouble(RLGlue.RL_agent_message("internalReward"));
+						score += Double.parseDouble(RLGlue
+								.RL_agent_message("internalReward"));
 					else
 						score += RLGlue.RL_return();
 				}
@@ -281,13 +288,9 @@ public class LearningController {
 
 			// Run the post update operations
 			localPolicy.postUpdateOperations();
+
+			t++;
 		}
-
-		// Flushing the rete object.
-		StateSpec.reinitInstance();
-
-		// Resetting experiment values
-		PolicyGenerator.getInstance().resetGenerator();
 	}
 
 	/**
@@ -319,8 +322,8 @@ public class LearningController {
 				// TODO Modularisation
 				if (PolicyGenerator.debugMode_) {
 					try {
-						System.out.println("\n\n\n------LEARNING MODULE: " + internalGoal
-							+ "------\n\n\n");
+						System.out.println("\n\n\n------LEARNING MODULE: "
+								+ internalGoal + "------\n\n\n");
 						System.out.println("Press Enter to continue.");
 						System.in.read();
 						System.in.read();
@@ -337,6 +340,10 @@ public class LearningController {
 				PolicyGenerator modularGenerator = PolicyGenerator
 						.newInstance(policyGenerator);
 				developPolicy(modularGenerator);
+
+				// Save the module
+				Module.saveModule(internalGoal, StateSpec.getInstance()
+						.getEnvironmentName(), modularGenerator.getGenerator());
 
 				// Unset the internal goal
 				if (oldInternalGoal == null)
@@ -417,9 +424,14 @@ public class LearningController {
 			double score = 0;
 			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 				RLGlue.RL_episode(maxSteps);
-				score += RLGlue.RL_return();
+				if (PolicyGenerator.getInstance().isModuleGenerator())
+					score += Double.parseDouble(RLGlue
+							.RL_agent_message("internalReward"));
+				else
+					score += RLGlue.RL_return();
 			}
 			averageScore += score;
+			pol.parameterArgs(null);
 			System.out.println(score / AVERAGE_ITERATIONS + "\n");
 
 			System.out.println("For episode test: " + episode);
@@ -480,9 +492,10 @@ public class LearningController {
 		double gradient = 0;
 		double offset = 1;
 		if (weightedElites_) {
-			gradient = (1 - MIN_UPDATE)
-					/ (elites.get(0).getValue() - elites.get(elites.size() - 1)
-							.getValue());
+			double diffValues = (elites.get(0).getValue() - elites.get(
+					elites.size() - 1).getValue());
+			if (diffValues != 0)
+				gradient = (1 - MIN_UPDATE) / diffValues;
 			offset = 1 - gradient * elites.get(0).getValue();
 		}
 

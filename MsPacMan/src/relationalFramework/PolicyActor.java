@@ -108,8 +108,12 @@ public class PolicyActor implements AgentInterface {
 			String oldGoal = goalPredicate_;
 			goalPredicate_ = arg0.substring(LearningController.INTERNAL_PREFIX
 					.length() + 1);
-			if (goalPredicate_.isEmpty())
+			if (goalPredicate_.isEmpty()) {
 				goalPredicate_ = null;
+			}
+			
+			internalGoal_ = null;
+			possibleGoals_.clear();
 			return oldGoal;
 		}
 		return null;
@@ -196,9 +200,13 @@ public class PolicyActor implements AgentInterface {
 	 */
 	private String[] chooseAction(Rete state, Collection<Fact> stateFacts) {
 		actionsModule_.switchOffAll();
+		
+		boolean noteTriggered = true;
+		if ((internalGoal_ != null) && (internalGoalMet_))
+			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
 		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
-				.getNumActions(), optimal_, false);
+				.getNumActions(), optimal_, false, noteTriggered);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;

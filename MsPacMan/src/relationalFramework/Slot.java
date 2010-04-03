@@ -58,8 +58,7 @@ public class Slot {
 	}
 
 	/**
-	 * Adds a new rule to the slot with an average probability of being
-	 * selected.
+	 * Adds a new rule to the slot with an given probability of being selected.
 	 * 
 	 * @param guidedRule
 	 *            The rule being added.
