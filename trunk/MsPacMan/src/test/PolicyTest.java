@@ -54,8 +54,8 @@ public class PolicyTest {
 		GuidedRule modRule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
 		List<String> params = new ArrayList<String>();
 		params.add("a");
-		GuidedRule temp = modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(temp));
+		modRule.setParameters(params);
+		assertTrue(pol.getPolicyRules().contains(modRule));
 		
 		// Check the on module exists
 		if (Module.loadModule("blocksWorld", "on") == null)
@@ -74,12 +74,12 @@ public class PolicyTest {
 		modRule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
 		params = new ArrayList<String>();
 		params.add("a");
-		temp = modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(temp));
+		modRule.setParameters(params);
+		assertTrue(pol.getPolicyRules().contains(modRule));
 		params.clear();
 		params.add("b");
-		temp = modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(temp));
+		modRule.setParameters(params);
+		assertTrue(pol.getPolicyRules().contains(modRule));
 		// On rule
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
@@ -88,8 +88,8 @@ public class PolicyTest {
 		params = new ArrayList<String>();
 		params.add("a");
 		params.add("b");
-		temp = modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(temp));
+		modRule.setParameters(params);
+		assertTrue(pol.getPolicyRules().contains(modRule));
 	}
 
 	@Test

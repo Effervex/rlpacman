@@ -89,9 +89,9 @@ public class Policy {
 
 					// Add the module rules.
 					for (GuidedRule gr : module.getModuleRules()) {
-						GuidedRule modularRule = gr.setParameters(parameters);
-						checkModular(modularRule);
-						policyRules_.add(modularRule);
+						gr.setParameters(parameters);
+						checkModular(gr);
+						policyRules_.add(gr);
 					}
 				}
 			}
@@ -162,7 +162,7 @@ public class Policy {
 	 */
 	public void parameterArgs(ValueVector arguments) {
 		for (GuidedRule gr : policyRules_) {
-			gr.setTempParameters(arguments);
+			gr.setParameters(arguments);
 		}
 	}
 
@@ -173,7 +173,7 @@ public class Policy {
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
-			if (rule.getQueryParameters() == null) {
+			if (!rule.isLoadedModuleRule()) {
 				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
 			} else {
 				buffer.append("MODULAR: "
@@ -198,9 +198,13 @@ public class Policy {
 	 * @param alreadyCovered
 	 *            If the policy has already covered this iteration (due to
 	 *            recursive calls).
+	 * @param noteTriggered
+	 *            If this policy is noting the rules fired as triggered. Usually
+	 *            deactivated after agent has found internal goal.
 	 */
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
-			int actionsReturned, boolean optimal, boolean alreadyCovered) {
+			int actionsReturned, boolean optimal, boolean alreadyCovered,
+			boolean noteTriggered) {
 
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
@@ -216,21 +220,16 @@ public class Policy {
 				String query = StateSpec.getInstance().getRuleQuery(gr);
 				// If there are parameters, temp or concrete, insert them here
 				ValueVector vv = new ValueVector();
-				if ((gr.getParameters() != null)
-						|| (gr.getTempParameters() != null)) {
-					// Find which param type and add to ValueVector 
-					List<String> params = gr.getParameters();
-					if (params == null)
-						params = gr.getTempParameters();
-					for (String param : params)
+				if (gr.getParameters() != null) {
+					for (String param : gr.getParameters())
 						vv.add(param);
 				}
 				QueryResult results = state.runQueryStar(query, vv);
 
 				// If there is at least one result
 				if (results.next()) {
-					// Only add non-modular rules
-					if (gr.getQueryParameters() == null)
+					// Only add non-modular rules if we're noting rules.
+					if (!gr.isLoadedModuleRule() && noteTriggered)
 						triggeredRules_.add(gr);
 					List<String> actionsList = new ArrayList<String>();
 
@@ -283,7 +282,8 @@ public class Policy {
 				if (!policyRules_.contains(gr))
 					policyRules_.add(gr);
 			}
-			evaluatePolicy(state, actionSwitch, actionsReturned, optimal, true);
+			evaluatePolicy(state, actionSwitch, actionsReturned, optimal, true,
+					noteTriggered);
 		} else if (!alreadyCovered && !optimal) {
 			PolicyGenerator.getInstance().triggerCovering(state, false);
 		}

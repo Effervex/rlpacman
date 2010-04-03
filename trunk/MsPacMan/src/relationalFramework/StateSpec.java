@@ -635,24 +635,15 @@ public abstract class StateSpec {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
-				if ((gr.getQueryParameters() == null)
-						&& (gr.getTempParameters() == null)) {
+				if (gr.getQueryParameters() == null) {
 					rete_.eval("(defquery " + result + " "
 							+ gr.getStringConditions() + ")");
 				} else {
 					StringBuffer declares = new StringBuffer(
 							"(declare (variables");
-					// TODO A temporary solution. Need to mix the temp and
-					// regular parameters elegantly.
-					if (gr.getQueryParameters() != null) {
-						for (String param : gr.getQueryParameters()) {
-							declares.append(" " + param);
-						}
-					} else {
-						for (int i = 0; i < gr.getTempParameters().size(); i++) {
-							declares.append(" "
-									+ Module.createModuleParameter(i));
-						}
+					
+					for (String param : gr.getQueryParameters()) {
+						declares.append(" " + param);
 					}
 					declares.append("))");
 

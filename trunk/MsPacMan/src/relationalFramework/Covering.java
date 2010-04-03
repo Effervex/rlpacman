@@ -687,7 +687,7 @@ public class Covering {
 							actionPred, preGoalState, ruleConditions,
 							replacementTerms, reverseReplacementTerms,
 							ruleTerms, preGoalTerms, preGoalSplit, cond,
-							condSplit);
+							condSplit, rule.getQueryParameters());
 				}
 
 				// 3. If the fact pred isn't in the cond preds, add it,
@@ -707,6 +707,7 @@ public class Covering {
 						mutatedConditions.add(preGoalFact);
 						GuidedRule mutant = new GuidedRule(mutatedConditions,
 								rule.getAction(), true);
+						mutant.setQueryParams(rule.getQueryParameters());
 						mutant.expandConditions();
 						mutants.add(mutant);
 					}
@@ -719,7 +720,7 @@ public class Covering {
 	}
 
 	/**
-	 * Individual mutation of facts method. This method creates mutations tjhat
+	 * Individual mutation of facts method. This method creates mutations that
 	 * operate on the very facts themselves, by swapping fact terms for other
 	 * terms. This method was automatically extracted, so it's a bit messy with
 	 * its arguments.
@@ -748,6 +749,8 @@ public class Covering {
 	 *            The current rule condition being looked at.
 	 * @param condSplit
 	 *            The split form of the cond.
+	 * @param queryParameters
+	 *            The query parameters of the parent rule, if any.
 	 * @return True if the cond and pre-goal fact match.
 	 */
 	private boolean factMutation(String ruleAction, Set<GuidedRule> mutants,
@@ -755,7 +758,8 @@ public class Covering {
 			List<String> ruleConditions, Map<String, String> replacementTerms,
 			Map<String, String> reverseReplacementTerms,
 			List<String> ruleTerms, List<String> preGoalTerms,
-			String[] preGoalSplit, String cond, String[] condSplit) {
+			String[] preGoalSplit, String cond, String[] condSplit,
+			List<String> queryParameters) {
 		// 4a. If the fact pred matches the rule pred, try replacing all
 		// occurrences of each cond term with the fact term in every cond
 		boolean hasPred = false;
@@ -805,6 +809,7 @@ public class Covering {
 										.indexOf(cond), newCond);
 								GuidedRule mutant = new GuidedRule(
 										mutatedConditions, ruleAction, true);
+								mutant.setQueryParams(queryParameters);
 								mutant.expandConditions();
 								mutants.add(mutant);
 							}

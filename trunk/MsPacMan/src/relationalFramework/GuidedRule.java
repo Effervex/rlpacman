@@ -2,14 +2,14 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.log4j.helpers.Loader;
 
 import jess.ValueVector;
 
@@ -59,8 +59,8 @@ public class GuidedRule {
 	/** The actual parameters given for this rule. */
 	private List<String> parameters_;
 
-	/** Temporary parameter swapping, if necessary. */
-	private List<String> tempParameters_;
+	/** If this rule is from a loaded module. */
+	private boolean isLoadedModule_ = false;
 
 	/**
 	 * A constructor taking the bare minimum for a guided rule.
@@ -138,6 +138,7 @@ public class GuidedRule {
 	public GuidedRule(String ruleString, List<String> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
+		isLoadedModule_ = true;
 	}
 
 	/**
@@ -147,12 +148,8 @@ public class GuidedRule {
 	 *            The parameters to set.
 	 * @return A new rule, the same as this, but with parameters set.
 	 */
-	public GuidedRule setParameters(List<String> parameters) {
-		GuidedRule paramed = new GuidedRule(ruleConditions_, ruleAction_,
-				mutant_);
-		paramed.queryParams_ = queryParams_;
-		paramed.parameters_ = parameters;
-		return paramed;
+	public void setParameters(List<String> parameters) {
+		parameters_ = parameters;
 	}
 
 	/**
@@ -163,21 +160,29 @@ public class GuidedRule {
 	 * @param arguments
 	 *            The arguments being set.
 	 */
-	public void setTempParameters(ValueVector arguments) {
+	public void setParameters(ValueVector arguments) {
 		if (arguments == null) {
-			tempParameters_ = null;
+			parameters_ = null;
 			return;
 		}
 
 		try {
-			if (tempParameters_ == null)
-				tempParameters_ = new ArrayList<String>();
+			if (parameters_ == null)
+				parameters_ = new ArrayList<String>();
+			else
+				parameters_.clear();
 
 			for (int i = 0; i < arguments.size(); i++) {
-				tempParameters_.add(arguments.get(i).stringValue(null));
+				parameters_.add(arguments.get(i).stringValue(null));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+
+		if (queryParams_ == null) {
+			queryParams_ = new ArrayList<String>();
+			for (int i = 0; i < parameters_.size(); i++)
+				queryParams_.add(Module.createModuleParameter(i));
 		}
 	}
 
@@ -387,12 +392,15 @@ public class GuidedRule {
 		return queryParams_;
 	}
 
-	public List<String> getParameters() {
-		return parameters_;
+	public void setQueryParams(List<String> queryParameters) {
+		if (queryParameters != null)
+			queryParams_ = new ArrayList<String>(queryParameters);
+		else
+			queryParams_ = null;
 	}
 
-	public List<String> getTempParameters() {
-		return tempParameters_;
+	public List<String> getParameters() {
+		return parameters_;
 	}
 
 	/**
@@ -407,6 +415,17 @@ public class GuidedRule {
 			return queryParam;
 
 		return parameters_.get(queryParams_.indexOf(queryParam));
+	}
+
+	public boolean isLoadedModuleRule() {
+		return isLoadedModule_;
+	}
+
+	/**
+	 * Sets this rule as a loaded module.
+	 */
+	public void setAsLoadedModuleRule() {
+		isLoadedModule_ = true;
 	}
 
 	/**
@@ -511,8 +530,6 @@ public class GuidedRule {
 				+ ((ruleConditions_ == null) ? 0 : ruleConditions_.hashCode());
 		result = prime * result
 				+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
-		result = prime * result
-				+ ((parameters_ == null) ? 0 : parameters_.hashCode());
 		return result;
 	}
 
@@ -543,11 +560,6 @@ public class GuidedRule {
 			if (other.queryParams_ != null)
 				return false;
 		} else if (!queryParams_.equals(other.queryParams_))
-			return false;
-		if (parameters_ == null) {
-			if (other.parameters_ != null)
-				return false;
-		} else if (!parameters_.equals(other.parameters_))
 			return false;
 		return true;
 	}
