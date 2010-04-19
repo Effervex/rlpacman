@@ -122,8 +122,7 @@ public class PolicyActor implements AgentInterface {
 	// @Override
 	public Action agent_start(Observation arg0) {
 		// Initialising the actions
-		actionsModule_ = new ActionSwitch(StateSpec.getInstance()
-				.getNumActions());
+		actionsModule_ = new ActionSwitch();
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -212,7 +211,8 @@ public class PolicyActor implements AgentInterface {
 		prevState_ = stateFacts;
 
 		// Return the actions.
-		return actionsModule_.getPrioritisedActions();
+		ArrayList<String> actions = actionsModule_.getPrioritisedActions();
+		return actions.toArray(new String[actions.size()]);
 	}
 
 	/**
@@ -366,14 +366,14 @@ public class PolicyActor implements AgentInterface {
 				}
 			}
 
-			String[] actions = actionsModule_.getPrioritisedActions();
-			for (int i = 0; i < actions.length; i++) {
-				String action = actions[i];
+			ArrayList<String> actions = actionsModule_.getPrioritisedActions();
+			for (int i = 0; i < actions.size(); i++) {
+				String action = actions.get(i);
 				for (String constant : replacements.keySet()) {
-					action.replaceAll(" " + Pattern.quote(constant)
+					action = action.replaceAll(" " + Pattern.quote(constant)
 							+ "(?=( |\\)))", " " + replacements.get(constant));
 				}
-				actions[i] = action;
+				actions.set(i, action);
 			}
 
 			// Forming the pre-goal with placeholder constants

@@ -261,8 +261,7 @@ public class Policy {
 							&& (actionsFound < actionsReturned)) {
 						actionSwitch.switchOn(actionsList
 								.remove(PolicyGenerator.random_
-										.nextInt(actionsList.size())),
-								actionsFound);
+										.nextInt(actionsList.size())));
 						actionsFound++;
 					}
 				}

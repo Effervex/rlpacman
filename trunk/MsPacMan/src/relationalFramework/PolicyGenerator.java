@@ -318,13 +318,14 @@ public class PolicyGenerator {
 	 *            The constants used in the pre-goal formation.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState,
-			String[] actions, List<String> constants) {
+			ArrayList<String> actions, List<String> constants) {
 		if (!frozen_) {
 			// If the state has settled and is probably at minimum, trigger
 			// mutation.
+			// TODO Action set may consist of more than one action
 			Collection<String> settledGoals = covering_.formPreGoalState(
-					preGoalState, actions[0], constants);
-			String actionPred = StateSpec.splitFact(actions[0])[0];
+					preGoalState, actions.get(0), constants);
+			String actionPred = StateSpec.splitFact(actions.get(0))[0];
 			if (debugMode_) {
 				try {
 					if (settledGoals.contains(actionPred))

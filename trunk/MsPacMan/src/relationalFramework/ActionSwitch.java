@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import java.util.ArrayList;
+
 /**
  * This class represents an actions module. It controls which actions are switched on and off
  * @author Samuel J. Sarjant
@@ -7,52 +9,45 @@ package relationalFramework;
  */
 public class ActionSwitch {
 	/** The prioritised list of switched actions. Max 3. */ 
-	private String[] activeActions_;
+	private ArrayList<String> activeActions_;
 	
-	public ActionSwitch(int actionsPerStep) {
-		activeActions_ = new String[actionsPerStep];
+	public ActionSwitch() {
+		activeActions_ = new ArrayList<String>();
 	}
 	
 	/**
-	 * Switches on a high action at the given priority.
+	 * Switches on an action.
 	 * 
 	 * @param action The action being switched on.
-	 * @param priority The priority level of the action.
 	 */
-	public void switchOn(String action, int priority) {
-		activeActions_[priority] = action;
+	public void switchOn(String action) {
+		activeActions_.add(action);
 	}
 
 	/**
 	 * Switches off all action slots.
 	 */
 	public void switchOffAll() {
-		for (int i = 0; i < activeActions_.length; i++) {
-			activeActions_[i] = null;
-		}
+		activeActions_.clear();
 	}
 	
 	/**
-	 * Gets the int version of the action list.
+	 * Gets the active actions.
 	 * 
-	 * @return The int version of the action list.
+	 * @return The list of active actions, of arbitrary length.
 	 */
-	public String[] getPrioritisedActions() {
+	public ArrayList<String> getPrioritisedActions() {
 		return activeActions_;
 	}
 	
 	/**
-	 * Gets the switch state of a particular action.
+	 * Checks if a particular action is active.
 	 * 
 	 * @param action The action to check.
 	 * @return True if it is on, false otherwise
 	 */
 	public boolean isActionActive(String action) {
-		for (int i = 0; i < activeActions_.length; i++) {
-			if ((activeActions_[i] != null) && (activeActions_[i].equals(action)))
-				return true;
-		}
-		return false;
+		return activeActions_.contains(action);
 	}
 	
 	/**
@@ -61,9 +56,8 @@ public class ActionSwitch {
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		for (int i = 0; i < activeActions_.length; i++) {
-			buffer.append("[" + (i + 1) + "]: ");
-			buffer.append(activeActions_[i] + "\n");
+		for (String action : activeActions_) {
+			buffer.append(action + "\n");
 		}
 		return buffer.toString();
 	}
