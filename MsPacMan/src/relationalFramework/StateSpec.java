@@ -623,6 +623,25 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Checks if the current state is a goal state by looking for the terminal
+	 * fact.
+	 * 
+	 * @param rete The state.
+	 * @return True if we're in the goal state, false otherwise.
+	 */
+	public boolean isGoal(Rete rete) {
+		try {
+			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
+					new ValueVector());
+			if (result.next())
+				return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
+	/**
 	 * Gets or creates a rule query for a guided rule.
 	 * 
 	 * @param gr

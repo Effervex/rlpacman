@@ -8,39 +8,42 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.Arrays;
 
-import org.mandarax.kernel.Fact;
+import jess.JessException;
+import jess.Rete;
+
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ObjectObservations;
+import relationalFramework.Policy;
+import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static final int PLAYER_SPEED = 5;
+	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
 	private GameModel model_;
 	private int[][] distanceGrid_;
 	private SortedSet<JunctionPoint> pacJunctions_;
-	private Object[] state_;
 	private Point gridStart_;
 	private ArrayList<Double>[] observationFreqs_;
 
-	// @Override
+	@Override
 	public void env_cleanup() {
 		environment_ = null;
 	}
 
-	// @Override
+	@Override
 	public String env_init() {
 		environment_ = new PacMan();
 		environment_.init();
@@ -48,17 +51,18 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_ = environment_.getGameModel();
 
 		// Initialise the observations
-		resetObservations();
+		resetDistanceGrid();
 
 		try {
-			Thread.sleep(4096);
+			Thread.sleep(512);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
 		return null;
 	}
 
-	// @Override
+	@Override
 	public String env_message(String arg0) {
 		if (arg0.equals("writeFreqs")) {
 			writeFreqs();
@@ -77,15 +81,111 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return null;
 	}
 
-	// @Override
+	@Override
 	public Observation env_start() {
+		resetEnvironment();
+
+		// Run the optimal policy if it hasn't yet been run
+		if (!PolicyGenerator.getInstance().hasPreGoal()) {
+			optimalPolicy();
+		}
+
+		// If we're not in full experiment mode, redraw the scene.
+		if (!environment_.experimentMode_) {
+			environment_.m_gameUI.m_bRedrawAll = true;
+			environment_.m_gameUI.repaint();
+			environment_.m_topCanvas.repaint();
+		} else {
+			environment_.m_gameUI.update(null);
+			environment_.m_gameUI.m_bRedrawAll = false;
+		}
+
+		return calculateObservations(rete_);
+	}
+
+	@Override
+	public Reward_observation_terminal env_step(Action arg0) {
+		// Letting the thread 'sleep', so that the game still runs.
+		try {
+			if (!environment_.experimentMode_)
+				Thread.sleep(PLAYER_SPEED);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// Applying the action (up down left right or nothing)
+		String[] actions = (String[]) ObjectObservations.getInstance().objectArray;
+		environment_.simulateKeyPress(chooseLowAction(actions).getKey());
+
+		synchronized (environment_) {
+			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
+				environment_.tick(false);
+			}
+		}
+
+		// If we're not in full experiment mode, redraw the scene.
+		if (!environment_.experimentMode_) {
+			drawActions(actions);
+			environment_.m_gameUI.m_bRedrawAll = true;
+			environment_.m_gameUI.repaint();
+			environment_.m_topCanvas.repaint();
+			environment_.m_bottomCanvas.repaint();
+		} else {
+			environment_.m_gameUI.update(null);
+			environment_.m_bottomCanvas.setActionsList(null);
+		}
+		environment_.m_gameUI.m_bRedrawAll = false;
+
+		Observation obs = calculateObservations(rete_);
+		Reward_observation_terminal rot = new Reward_observation_terminal(
+				calculateReward(), obs, isTerminal());
+		return rot;
+	}
+
+	/**
+	 * Runs the optimal policy until a pre-goal is obtained.
+	 */
+	private void optimalPolicy() {
+		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
+
+		// Run the policy through the environment until goal is satisfied.
+		PolicyActor optimalAgent = new PolicyActor();
+		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
+		optimalAgent.agent_message("Optimal");
+		optimalAgent.agent_message("Policy");
+		Action act = optimalAgent.agent_start(calculateObservations(rete_));
+		// Loop until the task is complete
+		Reward_observation_terminal rot = env_step(act);
+		while ((rot == null) || (!rot.isTerminal())) {
+			optimalAgent.agent_step(rot.r, rot.o);
+			rot = env_step(act);
+		}
+
+		// Form the pre-goal.
+		if (!PolicyGenerator.getInstance().hasPreGoal())
+			optimalAgent.agent_message("formPreGoal");
+
+		// Return the state to normal
+		resetEnvironment();
+	}
+
+	/**
+	 * Resets the environment back to normal.
+	 */
+	private void resetEnvironment() {
 		environment_.reinit();
 
 		model_ = environment_.getGameModel();
+		rete_ = StateSpec.getInstance().getRete();
 
 		// Initialise the observations
-		resetObservations();
-		// Letting the thread 'sleep', so that the game still runs.
+		resetDistanceGrid();
+
+		prevScore_ = 0;
+		gridStart_ = null;
+
+		// Letting the thread 'sleep' when not experiment mode, so it's
+		// watchable for humans.
 		try {
 			if (!environment_.experimentMode_)
 				Thread.sleep(PLAYER_SPEED);
@@ -100,64 +200,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				environment_.tick(false);
 			}
 		}
-
-		// If we're not in full experiment mode, redraw the scene.
-		if (!environment_.experimentMode_) {
-			environment_.m_gameUI.m_bRedrawAll = true;
-			environment_.m_gameUI.repaint();
-			environment_.m_topCanvas.repaint();
-		} else {
-			environment_.m_gameUI.update(null);
-			environment_.m_gameUI.m_bRedrawAll = false;
-		}
-
-		prevScore_ = 0;
-		gridStart_ = null;
-		return calculateObservations();
-	}
-
-	// @Override
-	public Reward_observation_terminal env_step(Action arg0) {
-		// Letting the thread 'sleep', so that the game still runs.
-		try {
-			if (!environment_.experimentMode_)
-				Thread.sleep(PLAYER_SPEED);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		// Applying the action (up down left right or nothing)
-		List<Fact>[] actionPriority = (List<Fact>[]) ObjectObservations
-				.getInstance().objectArray;
-		environment_.simulateKeyPress(chooseLowAction(actionPriority).getKey());
-
-		synchronized (environment_) {
-			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
-				environment_.tick(false);
-				// If the agent has gone through 10 stages, end the episode
-				if (model_.m_stage > 10) {
-					return new Reward_observation_terminal(0,
-							calculateObservations(), true);
-				}
-			}
-		}
-
-		// If we're not in full experiment mode, redraw the scene.
-		if (!environment_.experimentMode_) {
-			drawActions(actionPriority);
-			environment_.m_gameUI.m_bRedrawAll = true;
-			environment_.m_gameUI.repaint();
-			environment_.m_topCanvas.repaint();
-			environment_.m_bottomCanvas.repaint();
-		} else {
-			environment_.m_gameUI.update(null);
-			environment_.m_bottomCanvas.setActionsList(null);
-		}
-		environment_.m_gameUI.m_bRedrawAll = false;
-
-		Reward_observation_terminal rot = new Reward_observation_terminal(
-				calculateReward(), calculateObservations(), isTerminal());
-		return rot;
 	}
 
 	/**
@@ -167,7 +209,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(List<Fact>[] actionPriority) {
+	private void drawActions(String[] actionPriority) {
 		String[] actionList = new String[actionPriority.length];
 		for (int i = 0; i < actionPriority.length; i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
@@ -175,7 +217,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			if ((actionPriority[i] == null) || (actionPriority[i].isEmpty())) {
 				buffer.append("null");
 			} else {
-				buffer.append(StateSpec.lightenFact(actionPriority[i].get(0)));
+				buffer.append(actionPriority[i]);
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -183,14 +225,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Chooses a low action when given a high action.
+	 * Chooses a direction based off the chosen high actions to follow.
 	 * 
 	 * @param actionArray
-	 *            The high action to take, sorted in order from most to least
+	 *            The high actions to take, sorted in order from most to least
 	 *            priority, being processed into a single low action.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(List<Fact>[] actionArray) {
+	private PacManLowAction chooseLowAction(String[] actionArray) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -205,44 +247,50 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (Thing.getDestination(Thing.RIGHT, x, y, blag, model_))
 			directions.add(PacManLowAction.RIGHT);
 
-		int i = 0;
-		do {
+		// Compile the state
+		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_ };
+		PacManState state = new PacManState(stateObjs);
+
+		double[] directionVote = new double[PacManLowAction.values().length];
+		for (int i = 0; i < actionArray.length; i++) {
 			if (actionArray[i] != null) {
-				int[] directionVote = new int[PacManLowAction.values().length];
-				for (Fact fact : actionArray[i]) {
-					Byte direction = (Byte) fact.getPredicate().perform(
-							fact.getTerms(), null);
-					if (direction > 0)
-						directionVote[direction]++;
-					else if (direction < 0)
-						directionVote[-direction]--;
-				}
+				// Use a linearly decreasing weight for directional voting.
+				double weighting = 1 - ((1.0 * i) / actionArray.length);
 
-				// Find the best direction/s
-				ArrayList<PacManLowAction> chosen = new ArrayList<PacManLowAction>();
-				chosen.add(PacManLowAction.values()[1]);
-				int best = directionVote[1];
-				for (int j = 2; j < directionVote.length; j++) {
-					// Same value, add
-					if (directionVote[j] == best) {
-						chosen.add(PacManLowAction.values()[j]);
-					} else if (directionVote[j] > best) {
-						// Better value, clear
-						chosen.clear();
-						chosen.add(PacManLowAction.values()[j]);
-					}
-				}
-
-				// Checking for negative direction
-				chosen.retainAll(directions);
-				if (!chosen.isEmpty())
-					directions = chosen;
+				Byte direction = ((PacManStateSpec) StateSpec.getInstance())
+						.applyAction(actionArray[i], state);
+				if (direction > 0)
+					directionVote[direction] += weighting;
+				else if (direction < 0)
+					directionVote[-direction] -= weighting;
 			}
-			i++;
-		} while ((i < actionArray.length) && (directions.size() > 1));
+		}
 
-		// Choose a random action from the directions (may only be one)
-		return directions.get((int) (Math.random() * directions.size()));
+		// Find the best direction/s
+		ArrayList<PacManLowAction> chosen = new ArrayList<PacManLowAction>();
+		chosen.add(PacManLowAction.values()[1]);
+		double best = directionVote[1];
+		for (int j = 2; j < directionVote.length; j++) {
+			// Same value, add
+			if (directionVote[j] == best) {
+				chosen.add(PacManLowAction.values()[j]);
+			} else if (directionVote[j] > best) {
+				// Better value, clear
+				chosen.clear();
+				chosen.add(PacManLowAction.values()[j]);
+				best = directionVote[j];
+			}
+		}
+
+		// Checking for negative direction
+		chosen.retainAll(directions);
+		if (!chosen.isEmpty())
+			directions = chosen;
+		else
+			System.out.println("What?");
+
+		// Choose the first valid direction available.
+		return directions.get(0);
 	}
 
 	/**
@@ -262,61 +310,141 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * 
 	 * @return True if Game over or level complete, false otherwise.
 	 */
-	private boolean isTerminal() {
+	private int isTerminal() {
 		int state = model_.m_state;
 		if (state == GameModel.STATE_GAMEOVER)
-			return true;
-		return false;
+			return -1;
+		if (StateSpec.getInstance().isGoal(rete_))
+			return 1;
+		return 0;
 	}
 
 	/**
 	 * A method for calculating observations about the current PacMan state.
+	 * These are put into the Rete object, and placed into the
+	 * ObjectObservations object.
 	 * 
-	 * Currently extracts features from the state, rather than the basic state.
-	 * 
+	 * @param rete
+	 *            The rete object to add observations to.
 	 * @return An observation of the current state
 	 */
-	private Observation calculateObservations() {
-		// Find the player related observations
-		SortedSet<JunctionPoint> newJunctions = searchMaze(model_.m_player);
-		// If our junctions have changed, remove the old set and add the new
-		if (!newJunctions.equals(pacJunctions_)) {
-			if (pacJunctions_ != null) {
-				for (JunctionPoint oldJP : pacJunctions_)
-					model_.removeKBFact(oldJP);
-			}
-			for (JunctionPoint newJP : newJunctions)
-				model_.addKBFact(newJP);
-			pacJunctions_ = newJunctions;
-		}
+	private Observation calculateObservations(Rete rete) {
+		try {
+			rete.reset();
 
-		// Find the maximally safe junctions
-		for (int i = 0; i < model_.m_ghosts.length; i++) {
-			// If the ghost is active and hostile
-			Ghost ghost = model_.m_ghosts[i];
-			if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-				// Calculate the ghost's distance from each of the player's
-				// junctions
-				if (ghost.m_nTicks2Flee <= 0) {
-					for (JunctionPoint jp : pacJunctions_) {
-						int ghostDist = calculateDistance(ghost, jp
-								.getLocation());
-						int result = ghostDist
-								- distanceGrid_[jp.getLocation().x][jp
-										.getLocation().y];
-						// Looking for the minimally safe junction
-						if ((result > Integer.MIN_VALUE)
-								&& (result < jp.getSafety()))
-							jp.setSafety(result);
-					}
+			// Player
+			rete_.eval("(assert (pacman player))");
+
+			// Calculate the distances and junctions
+			SortedSet<JunctionPoint> newJunctions = searchMaze(model_.m_player);
+			// If our junctions have changed, remove the old set and add the new
+			int closest = Integer.MAX_VALUE;
+			Set<String> closePoints = new HashSet<String>();
+			if (!newJunctions.equals(pacJunctions_)) {
+				for (JunctionPoint newJP : newJunctions) {
+					String juncName = "junc_" + newJP.m_locX + "_"
+							+ newJP.m_locY;
+					rete_.eval("(assert (junction " + juncName + "))");
+
+					closest = distanceAssertions(newJP, juncName, closest, closePoints);
+				}
+				pacJunctions_ = newJunctions;
+			}
+			closest = assertClosePoints(closePoints);
+
+			// Ghost
+			for (Ghost ghost : model_.m_ghosts) {
+				// Don't note ghost if it is running back to hideout or if it is
+				// in hideout
+				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
+					rete_.eval("(assert (ghost " + ghost + "))");
+					// If edible, add assertion
+					if (ghost.isEdible())
+						rete_.eval("(assert (edible " + ghost + "))");
+					// If flashing, add assertion
+					if (ghost.isBlinking())
+						rete_.eval("(assert (blinking " + ghost + "))");
+
+					// Distances from pacman to ghost
+					closest = distanceAssertions(ghost, ghost.toString(), closest,
+							closePoints);
 				}
 			}
+			closest = assertClosePoints(closePoints);
+
+			// Dots
+			for (Dot dot : model_.m_dots.values()) {
+				String dotName = "dot_" + dot.m_locX + "_" + dot.m_locY;
+				rete_.eval("(assert (dot " + dotName + "))");
+
+				// Distances
+				closest = distanceAssertions(dot, dotName, closest, closePoints);
+			}
+			closest = assertClosePoints(closePoints);
+
+			// Powerdots
+			for (PowerDot powerdot : model_.m_powerdots.values()) {
+				String pdotName = "powerDot_" + powerdot.m_locX + "_"
+						+ powerdot.m_locY;
+				rete_.eval("(assert (dot " + pdotName + "))");
+
+				// Distances
+				closest = distanceAssertions(powerdot, pdotName, closest, closePoints);
+			}
+			closest = assertClosePoints(closePoints);
+
+			// Fruit
+			if (model_.m_fruit.isEdible()) {
+				rete_.eval("(assert (fruit " + model_.m_fruit + "))");
+
+				// Distances
+				closest = distanceAssertions(model_.m_fruit, model_.m_fruit.toString(),
+						closest, closePoints);
+			}
+			closest = assertClosePoints(closePoints);
+
+			// Score, level, lives, highScore
+			rete_.eval("(assert (level " + model_.m_stage + "))");
+			rete_.eval("(assert (lives " + model_.m_nLives + "))");
+			rete_.eval("(assert (score " + model_.m_player.m_score + "))");
+			rete_.eval("(assert (highScore " + model_.m_highScore + "))");
+
+			rete_.run();
+
+			// Adding the valid actions
+			StateSpec.getInstance().insertValidActions(rete_);
+
+			//rete_.eval("(facts)");
+
+			// Find the maximally safe junctions
+			// for (int i = 0; i < model_.m_ghosts.length; i++) {
+			// // If the ghost is active and hostile
+			// Ghost ghost = model_.m_ghosts[i];
+			// if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
+			// // Calculate the ghost's distance from each of the player's
+			// // junctions
+			// if (ghost.m_nTicks2Flee <= 0) {
+			// for (JunctionPoint jp : pacJunctions_) {
+			// int ghostDist = calculateDistance(ghost, jp
+			// .getLocation());
+			// int result = ghostDist
+			// - distanceGrid_[jp.getLocation().x][jp
+			// .getLocation().y];
+			// // Looking for the minimally safe junction
+			// if ((result > Integer.MIN_VALUE)
+			// && (result < jp.getSafety()))
+			// jp.setSafety(result);
+			// }
+			// }
+			// }
+			// }
+
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
 		// Send the state of the system
-		state_ = updateState();
-		ObjectObservations.getInstance().objectArray = state_;
-		ObjectObservations.getInstance().predicateKB = model_.getKB();
+		ObjectObservations.getInstance().predicateKB = rete;
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 
@@ -324,26 +452,64 @@ public class PacManEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Updates the state observation by loading an array with the necessary
-	 * state objects.
+	 * Asserts the closest points (ghosts, dots, etc) to PacMan.
 	 * 
-	 * @return An ordered array according to the state enum of observations.
+	 * @param closePoints
+	 *            The point names to assert.
+	 * @return The new value of closest (Integer.MAX_VALUE).
 	 */
-	private Object[] updateState() {
-		// Remove the old state
-		model_.removeKBFact(state_);
-
-		Object[] observations = { model_.m_player, model_.m_dots.values(),
-				model_.m_powerdots.values(), model_.m_ghosts, model_.m_fruit,
-				distanceGrid_ };
-
-		// State
-		model_.addKBFact(new PacManState(observations));
-		return observations;
+	private int assertClosePoints(Set<String> closePoints) throws JessException {
+		for (String point : closePoints) {
+			rete_.eval("(assert (closest player " + point + "))");
+		}
+		closePoints.clear();
+		return Integer.MAX_VALUE;
 	}
 
 	/**
-	 * Calculates the distance for a thing to a point
+	 * Make a distance assertion from the player to an object.
+	 * 
+	 * @param thing
+	 *            The thing as arg2 of the distance.
+	 * @param thingName
+	 *            The JESS name of the thing.
+	 * @param closePoints
+	 *            The set of things that are at closest distance from pacman.
+	 * @param closest
+	 *            The value of the closest thing to pacman.
+	 * @throws JessException
+	 *             If Jess goes wrong.
+	 */
+	private int distanceAssertions(PacPoint thing, String thingName,
+			int closest, Set<String> closePoints) throws JessException {
+		rete_.eval("(assert (distance player " + thingName + " "
+				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
+		if (distanceGrid_[thing.m_locX][thing.m_locY] < closest) {
+			closePoints.clear();
+			closest = distanceGrid_[thing.m_locX][thing.m_locY];
+		}
+		if (distanceGrid_[thing.m_locX][thing.m_locY] == closest)
+			closePoints.add(thingName);
+		return closest;
+	}
+
+	/**
+	 * Discretises the distance of a thing to a discrete value.
+	 * 
+	 * @param distance
+	 *            The distance between 2 things.
+	 * @return A distance metric which discretises distance values.
+	 */
+	private String discretiseDistance(int distance) {
+		for (DistanceMetric dm : DistanceMetric.values()) {
+			if (distance <= dm.getMaxDistance())
+				return dm.toString().toLowerCase();
+		}
+		return DistanceMetric.FAR.toString().toLowerCase();
+	}
+
+	/**
+	 * Calculates the distance for a ghost to a point
 	 * 
 	 * @param ghost
 	 *            The ghost that is being calculated for.
@@ -418,7 +584,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if ((gridStart_ == null) || (!gridStart_.equals(playerLoc))) {
 			gridStart_ = playerLoc;
 			// Redoing the observations
-			resetObservations();
+			resetDistanceGrid();
 
 			// Update the distance grid
 			Set<Point> knownJunctions = new HashSet<Point>();
@@ -599,7 +765,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Resets the observation and distance grid array.
 	 */
-	private void resetObservations() {
+	private void resetDistanceGrid() {
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
 		for (int x = 0; x < distanceGrid_.length; x++)
 			Arrays.fill(distanceGrid_[x], Integer.MAX_VALUE);

@@ -168,32 +168,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
 				/ nonOptimalSteps;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
-				reward, obs, isGoal(rete_, StateSpec.getInstance()
-						.getGoalState()));
+				reward, obs, StateSpec.getInstance().isGoal(rete_));
 
 		return rot;
-	}
-
-	/**
-	 * Checks if the current state is a goal state by looking for the terminal
-	 * fact.
-	 * 
-	 * @param stateKB
-	 *            The current state.
-	 * @param goalState
-	 *            The goal state.
-	 * @return True if we're in the goal state, false otherwise.
-	 */
-	private boolean isGoal(Rete rete, String goalState) {
-		try {
-			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
-					new ValueVector());
-			if (result.next())
-				return true;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return false;
 	}
 
 	/**
@@ -299,7 +276,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Check this isn't the goal state
 		formState(worldState);
-		if (isGoal(rete_, goalState))
+		if (StateSpec.getInstance().isGoal(rete_))
 			return initialiseWorld(numBlocks, goalState);
 		else
 			return new BlocksState(worldState);

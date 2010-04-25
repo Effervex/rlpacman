@@ -55,7 +55,6 @@ public class GameModel {
 	static final int STATE_ABOUT = 10; // About page
 
 	int[][] m_gameState; // Represents maze as integers
-	private String classPrefix_;
 	Map<Point, Dot> m_dots;
 	Map<Point, PowerDot> m_powerdots;
 	int m_gameSizeX;
@@ -112,7 +111,6 @@ public class GameModel {
 	GameModel(PacMan pacMan) {
 		m_pacMan = pacMan;
 		m_stage = 1;
-		classPrefix_ = PolicyGenerator.getInstance().getClassPrefix();
 
 		// GameState
 		m_gameSizeX = 28;

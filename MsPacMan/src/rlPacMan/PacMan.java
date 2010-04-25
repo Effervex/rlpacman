@@ -26,7 +26,7 @@ public class PacMan {
 	protected AgentInterface agent_;
 	protected PacManKeyAdapter keyAdapter_;
 
-	public boolean experimentMode_ = true;
+	public boolean experimentMode_ = false;
 
 	public void init() {
 		setTicksPerSec(35);
@@ -347,7 +347,7 @@ public class PacMan {
 		// Check to see if there are any fleeing Ghosts left
 		// because of a power up pacman ate.
 		for (int i = 0; i < m_gameModel.m_ghosts.length; i++) {
-			bFleeing |= m_gameModel.m_ghosts[i].m_nTicks2Flee > 0;
+			bFleeing |= m_gameModel.m_ghosts[i].isEdible();
 		}
 		// If no fleeing ghosts, then reset the Power Up eat ghost score back to
 		// 200

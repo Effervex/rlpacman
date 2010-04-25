@@ -33,14 +33,20 @@ class Ghost extends Thing {
 	int m_targetY; // The actual Y target of this ghost. May not be related to
 	// the player
 	Color m_color;
+	/** The type of this ghost */
 	byte m_type;
-	int m_nTicks2Exit; // Ticks before ghost is allowed to exit.
-	int m_nExitMilliSec; // Milliseconds before exiting.
-	int m_nTicks2Flee = 0; // How long the Ghost will run from Pacman
-	boolean m_bEaten = false; // Set to true when Pacman has eaten this ghost
+	/** Ticks before ghost is allowed to exit. */
+	int m_nTicks2Exit;
+	/** Milliseconds before exiting. */
+	int m_nExitMilliSec;
+	/** How long the Ghost will run from Pacman */
+	int m_nTicks2Flee = 0;
+	/** Set to true when Pacman has eaten this ghost */
+	boolean m_bEaten = false;
 	int m_ghostDeltaMax = 4; // Should never change
 	int m_eatenPoints; // Point worth for eaten Ghost
-	int m_nTicks2Popup; // Ticks to display eaten points
+	/** Ticks to display eaten points */
+	int m_nTicks2Popup;
 	boolean m_bEnteringDoor = false;
 	boolean m_bChaseMode = false; // Chase Pacman, or scatter when false
 	boolean m_bOldChaseMode = false;
@@ -57,7 +63,7 @@ class Ghost extends Thing {
 	boolean m_bCanUseNextBest = true; // Can ghost try the next best direction
 	// first 25% of the time
 	boolean m_bInsaneAI = false; // No holds barred!
-	// If the ghost is flashing.
+	/** If the ghost is flashing. */
 	private boolean flashing_;
 
 	Ghost(GameModel gameModel, byte type, int startX, int startY,
@@ -240,7 +246,7 @@ class Ghost extends Thing {
 		}
 
 		// Alter the Ghost's color if Pacman ate a Powerup
-		if (m_nTicks2Flee == 0) {
+		if (!isEdible()) {
 			g2.setColor(m_color);
 			flashing_ = false;
 		} else {
@@ -289,7 +295,7 @@ class Ghost extends Thing {
 		double ghostEyeBallX = 0;
 		double ghostEyeBallY = 0;
 
-		if (m_nTicks2Flee > 0 && !m_bEaten) {
+		if (isEdible() && !m_bEaten) {
 			crossEyeDelta = 2;
 			ghostEyeX = ghostX + ghostHeadDiameter / 4.0 - ghostEyeWidth / 2.0;
 			ghostEyeY = ghostY + ghostHeadDiameter / 7.0;
@@ -373,7 +379,7 @@ class Ghost extends Thing {
 							(int) (ghostEyeDiameter), (int) (ghostEyeDiameter),
 							(int) (ghostEyeDiameter), (int) (ghostEyeDiameter));
 
-		} else if (m_nTicks2Flee > 0 && !m_bEaten) {
+		} else if (isEdible() && !m_bEaten) {
 			// Draw the ghost running away
 			g2.setColor(Color.lightGray);
 			// Left Eye Ball
@@ -461,7 +467,7 @@ class Ghost extends Thing {
 		}
 
 		// Count down until the powerup expires
-		if (m_nTicks2Flee > 0) {
+		if (isEdible()) {
 			m_nTicks2Flee--;
 			if (m_nTicks2Flee == 0 && !m_bEaten) {
 				m_deltaMax = m_ghostDeltaMax;
@@ -651,7 +657,7 @@ class Ghost extends Thing {
 
 		// If the ghost is fleeing and not eaten, then reverse the array of best
 		// directions to go.
-		if (bBackoff || (m_nTicks2Flee > 0 && !m_bEaten)) {
+		if (bBackoff || (isEdible() && !m_bEaten)) {
 			byte temp = bestDirection[0];
 			bestDirection[0] = bestDirection[3];
 			bestDirection[3] = temp;
@@ -897,7 +903,7 @@ class Ghost extends Thing {
 				player.m_direction = Thing.STILL;
 				return 2;
 
-			} else if (m_nTicks2Flee > 0 && !m_bEaten) {
+			} else if (isEdible() && !m_bEaten) {
 				// If the ghost was fleeing and is not eaten,
 				// then Pacman caught the Ghost.
 				player.m_score += m_gameModel.m_eatGhostPoints;
@@ -918,6 +924,10 @@ class Ghost extends Thing {
 		}
 		return 0;
 
+	}
+
+	public boolean isEdible() {
+		return m_nTicks2Flee > 0;
 	}
 
 	// This is called each time the game is restarted
@@ -945,7 +955,7 @@ class Ghost extends Thing {
 	 * 
 	 * @return The state of the ghost's flashing.
 	 */
-	public boolean isFlashing() {
+	public boolean isBlinking() {
 		return flashing_;
 	}
 
@@ -968,20 +978,18 @@ class Ghost extends Thing {
 		String ghostString = null;
 		switch(m_type) {
 		case BLINKY:
-			ghostString = "Blinky";
+			ghostString = "blinky";
 			break;
 		case PINKY:
-			ghostString = "Pinky";
+			ghostString = "pinky";
 			break;
 		case INKY:
-			ghostString = "Inky";
+			ghostString = "inky";
 			break;
 		case CLYDE:
-			ghostString = "Clyde";
+			ghostString = "clyde";
 			break;
 		}
-		if (m_nTicks2Flee > 0)
-			ghostString += " (Edb)";
 		return ghostString;
 	}
 }

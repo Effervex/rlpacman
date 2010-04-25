@@ -192,7 +192,7 @@ public class Policy {
 	 * @param actionSwitch
 	 *            The current actions.
 	 * @param actionsReturned
-	 *            The number of actions to be returned.
+	 *            The number of actions to be returned, or if -1, all actions.
 	 * @param optimal
 	 *            If the policy is an optimal test one.
 	 * @param alreadyCovered
@@ -205,6 +205,9 @@ public class Policy {
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
+		
+		if (actionsReturned == -1)
+			actionsReturned = Integer.MAX_VALUE;
 
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
@@ -270,6 +273,10 @@ public class Policy {
 				e.printStackTrace();
 			}
 		}
+		
+		// If optimal, just exit
+		if (optimal)
+			return;
 
 		// If the policy didn't generate enough rules, cover a set of new rules
 		// for each action.
@@ -283,7 +290,7 @@ public class Policy {
 			}
 			evaluatePolicy(state, actionSwitch, actionsReturned, optimal, true,
 					noteTriggered);
-		} else if (!alreadyCovered && !optimal) {
+		} else if (!alreadyCovered) {
 			PolicyGenerator.getInstance().triggerCovering(state, false);
 		}
 	}
