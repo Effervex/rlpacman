@@ -249,6 +249,13 @@ class Fruit extends Thing {
 	
 	@Override
 	public String toString() {
-		return "Fruit";
+		return "fruit";
+	}
+	
+	public boolean isEdible() {
+		if (m_bVisible && m_nTicks2Hide > 0) {
+			return true;
+		}
+		return false;
 	}
 }

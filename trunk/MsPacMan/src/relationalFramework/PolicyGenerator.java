@@ -246,7 +246,8 @@ public class PolicyGenerator {
 					.specialiseToPreGoal(baseRule);
 
 			String actionPred = baseRule.getActionPredicate();
-			// TODO Mutate at every step of forming pre-goal, removing old mutants
+			// TODO Mutate at every step of forming pre-goal, removing old
+			// mutants
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (settledPreGoal) {
@@ -322,43 +323,48 @@ public class PolicyGenerator {
 		if (!frozen_) {
 			// If the state has settled and is probably at minimum, trigger
 			// mutation.
-			// TODO Action set may consist of more than one action
-			Collection<String> settledGoals = covering_.formPreGoalState(
-					preGoalState, actions.get(0), constants);
-			String actionPred = StateSpec.splitFact(actions.get(0))[0];
-			if (debugMode_) {
-				try {
-					if (settledGoals.contains(actionPred))
-						System.out.println("\tSETTLED PRE-GOAL STATE " + "("
-								+ actionPred + "):");
-					else
-						System.out.println("\tFORMING PRE-GOAL STATE " + "("
-								+ actionPred + "):");
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
 
-			// Check if we have LGG rules to mutate
-			if (!settledGoals.isEmpty()) {
-				// For each maximally general rule
-				for (String settledAction : settledGoals) {
-					if (lggRules_.containsKey(settledAction))
-						for (GuidedRule general : lggRules_.get(settledAction))
-							mutateRule(general, general.getSlot(), true);
-				}
-			}
-
-			if (debugMode_) {
-				try {
-					for (String action : StateSpec.getInstance().getActions().keySet()) {
-						System.out.println(action + ": "
-								+ covering_.getPreGoalState(action));
+			// Form the pre-goal for every action present in the final actions
+			for (String action : actions) {
+				Collection<String> settledGoals = covering_.formPreGoalState(
+						preGoalState, action, constants);
+				String actionPred = StateSpec.splitFact(actions.get(0))[0];
+				if (debugMode_) {
+					try {
+						if (settledGoals.contains(actionPred))
+							System.out.println("\tSETTLED PRE-GOAL STATE "
+									+ "(" + actionPred + "):");
+						else
+							System.out.println("\tFORMING PRE-GOAL STATE "
+									+ "(" + actionPred + "):");
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-				} catch (Exception e) {
-					e.printStackTrace();
 				}
-			}		
+
+				// Check if we have LGG rules to mutate
+				if (!settledGoals.isEmpty()) {
+					// For each maximally general rule
+					for (String settledAction : settledGoals) {
+						if (lggRules_.containsKey(settledAction))
+							for (GuidedRule general : lggRules_
+									.get(settledAction))
+								mutateRule(general, general.getSlot(), true);
+					}
+				}
+
+				if (debugMode_) {
+					try {
+						for (String stateAction : StateSpec.getInstance()
+								.getActions().keySet()) {
+							System.out.println(stateAction + ": "
+									+ covering_.getPreGoalState(stateAction));
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			}
 		}
 	}
 
@@ -618,7 +624,7 @@ public class PolicyGenerator {
 	public boolean isFrozen() {
 		return frozen_;
 	}
-	
+
 	public boolean isModuleGenerator() {
 		return moduleGenerator_;
 	}

@@ -13,6 +13,23 @@ import relationalFramework.StateSpec;
 public class BlocksWorldStateSpec extends StateSpec {
 
 	@Override
+	protected Map<String, String> initialiseActionPreconditions() {
+		Map<String, String> actionPreconditions = new HashMap<String, String>();
+
+		// Put the pure precondition in, the rest is taken care of...
+		actionPreconditions.put("move", "(clear ?X) (clear ?Y &:(neq ?X ?Y))");
+
+		actionPreconditions.put("moveFloor", "(clear ?X) (on ?X ?)");
+
+		return actionPreconditions;
+	}
+
+	@Override
+	protected int initialiseActionsPerStep() {
+		return 1;
+	}
+
+	@Override
 	protected MultiMap<String, Class> initialiseActionTemplates() {
 		MultiMap<String, Class> actions = new MultiMap<String, Class>();
 
@@ -28,23 +45,6 @@ public class BlocksWorldStateSpec extends StateSpec {
 		actions.putCollection("moveFloor", structure);
 
 		return actions;
-	}
-
-	@Override
-	protected int initialiseActionsPerStep() {
-		return 1;
-	}
-
-	@Override
-	protected Map<String, String> initialiseActionPreconditions() {
-		Map<String, String> actionPreconditions = new HashMap<String, String>();
-
-		// Put the pure precondition in, the rest is taken care of...
-		actionPreconditions.put("move", "(clear ?X) (clear ?Y &:(neq ?X ?Y))");
-
-		actionPreconditions.put("moveFloor", "(clear ?X) (on ?X ?)");
-
-		return actionPreconditions;
 	}
 
 	@Override
@@ -85,7 +85,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Stack goal
 		if (goal_.equals("stack")) {
-			return "(onFloor ?X) (not (exists (onFloor ?Y &:(<> ?Y ?X))))";
+			return "(onFloor ?X) (not (onFloor ?Y &:(<> ?Y ?X)))";
 		}
 
 		// Clear goal

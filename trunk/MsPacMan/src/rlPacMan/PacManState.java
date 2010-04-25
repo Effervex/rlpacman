@@ -11,12 +11,9 @@ import relationalFramework.State;
  * @author Sam Sarjant
  */
 public class PacManState extends State {
-	public static final int PACMAN = 0;
-	public static final int DOT_COLLECTION = 1;
-	public static final int POWERDOT_COLLECTION = 2;
-	public static final int GHOST_ARRAY = 3;
-	public static final int FRUIT = 4;
-	public static final int DISTANCE_GRID = 5;
+	public static final int GHOST_ARRAY = 0;
+	public static final int FRUIT = 1;
+	public static final int DISTANCE_GRID = 2;
 
 	/**
 	 * A constructor for a pacman state.
@@ -26,18 +23,6 @@ public class PacManState extends State {
 	 */
 	public PacManState(Object[] stateArray) {
 		super(stateArray);
-	}
-
-	public Player getPlayer() {
-		return (Player) getStateArray()[PACMAN];
-	}
-
-	public Collection<Dot> getDots() {
-		return (Collection<Dot>) getStateArray()[DOT_COLLECTION];
-	}
-
-	public Collection<PowerDot> getPowerDots() {
-		return (Collection<PowerDot>) getStateArray()[POWERDOT_COLLECTION];
 	}
 
 	public Ghost[] getGhosts() {

@@ -240,7 +240,7 @@ public class LearningController {
 
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-					RLGlue.RL_episode(maxSteps_);
+					int result = RLGlue.RL_episode(maxSteps_);
 					if (localPolicy.isModuleGenerator())
 						score += Double.parseDouble(RLGlue
 								.RL_agent_message("internalReward"));
