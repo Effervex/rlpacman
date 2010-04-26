@@ -28,6 +28,7 @@ public class PacManStateSpec extends StateSpec {
 		// Basic preconditions for actions
 		preconds.put("toDot", "(dot ?X)");
 		preconds.put("toPowerDot", "(powerDot ?X)");
+		preconds.put("fromPowerDot", "(powerDot ?X)");
 		preconds.put("toFruit", "(fruit ?X)");
 		preconds.put("toGhost", "(ghost ?X)");
 		preconds.put("fromGhost", "(ghost ?X)");
@@ -52,6 +53,10 @@ public class PacManStateSpec extends StateSpec {
 		structure = new ArrayList<Class>();
 		structure.add(PowerDot.class);
 		actions.putCollection("toPowerDot", structure);
+
+		structure = new ArrayList<Class>();
+		structure.add(PowerDot.class);
+		actions.putCollection("fromPowerDot", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(Fruit.class);
@@ -111,8 +116,13 @@ public class PacManStateSpec extends StateSpec {
 		ArrayList<String> rules = new ArrayList<String>();
 		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
 				+ "(pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
+		rules.add("(distance ?Player ?PowerDot near) (edible ?Ghost) "
+				+ "(pacman ?Player) (powerDot ?PowerDot) "
+				+ "=> (fromPowerDot ?PowerDot)");
 		rules.add("(distance ?Player ?Ghost near) (pacman ?Player) "
 				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
+		rules.add("(distance ?Player ?Fruit mid) (pacman ?Player) "
+				+ "(fruit ?Fruit) => (toFruit ?Fruit)");
 		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot)");
 
