@@ -84,6 +84,12 @@ public class PacManStateSpec extends StateSpec {
 					+ " ?X) => (assert (pacPoint ?X))");
 		}
 
+		// Distance expanding
+		bckKnowledge.put("nearMid",
+				"(distance ?X ?Y near) => (assert (distance ?X ?Y mid))");
+		bckKnowledge.put("midFar",
+				"(distance ?X ?Y mid) => (assert (distance ?X ?Y far))");
+
 		return bckKnowledge;
 	}
 
@@ -103,7 +109,12 @@ public class PacManStateSpec extends StateSpec {
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
-		rules.add("(closest ?Player ?Dot) (pacman ?Player) (dot ?Dot) => (toDot ?Dot)");
+		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
+				+ "(pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
+		rules.add("(distance ?Player ?Ghost near) (pacman ?Player) "
+				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
+		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
+				+ "(dot ?Dot) => (toDot ?Dot)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false);
@@ -149,7 +160,7 @@ public class PacManStateSpec extends StateSpec {
 		structure = new ArrayList<Class>();
 		structure.add(PacPoint.class);
 		structure.add(PacPoint.class);
-		structure.add(Integer.class);
+		structure.add(DistanceMetric.class);
 		predicates.putCollection("distance", structure);
 
 		// Closest Metric

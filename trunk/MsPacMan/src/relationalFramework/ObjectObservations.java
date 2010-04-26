@@ -12,6 +12,8 @@ public class ObjectObservations {
 	/** The ID used in the regular observations to identify this. */
 	public static final String OBSERVATION_ID = "ObjectObservations";
 
+	public static final String NO_PRE_GOAL = "NoPreGoal";
+
 	/** The private singleton instance. */
 	private static ObjectObservations instance_;
 
@@ -25,7 +27,7 @@ public class ObjectObservations {
 	 * The private, empty constructor
 	 */
 	private ObjectObservations() {
-
+		objectArray = new Object[1];
 	}
 
 	public static ObjectObservations getInstance() {

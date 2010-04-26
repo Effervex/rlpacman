@@ -23,8 +23,6 @@ public class RunPacManExperiment {
 		// This will run the experiment in the main thread. The Agent and
 		// Environment will run
 		// locally, without sockets.
-		//PacManExperiment.main(args);
 		LearningController.main(args);
-		System.out.println("RunMinesSarsaExperimentNoSockets Complete");
 	}
 }

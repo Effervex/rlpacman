@@ -86,10 +86,12 @@ public class LearningController {
 
 			ArrayList<String> extraArgsList = new ArrayList<String>();
 			String extraArgs = bf.readLine();
-			Pattern p = Pattern.compile("((\".+?\")|\\w+)");
-			Matcher m = p.matcher(extraArgs);
-			while (m.find())
-				extraArgsList.add(m.group().replaceAll("\"", ""));
+			if (extraArgs != null) {
+				Pattern p = Pattern.compile("((\".+?\")|\\w+)");
+				Matcher m = p.matcher(extraArgs);
+				while (m.find())
+					extraArgsList.add(m.group().replaceAll("\"", ""));
+			}
 
 			bf.close();
 			reader.close();
@@ -240,7 +242,7 @@ public class LearningController {
 
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-					int result = RLGlue.RL_episode(maxSteps_);
+					RLGlue.RL_episode(maxSteps_);
 					if (localPolicy.isModuleGenerator())
 						score += Double.parseDouble(RLGlue
 								.RL_agent_message("internalReward"));
