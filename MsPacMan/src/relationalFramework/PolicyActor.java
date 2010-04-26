@@ -108,7 +108,7 @@ public class PolicyActor implements AgentInterface {
 			if (goalPredicate_.isEmpty()) {
 				goalPredicate_ = null;
 			}
-			
+
 			internalGoal_ = null;
 			possibleGoals_.clear();
 			return oldGoal;
@@ -165,9 +165,12 @@ public class PolicyActor implements AgentInterface {
 				processInternalGoal(stateFacts, prevState_);
 			}
 		} else {
-			PolicyGenerator.getInstance().formPreGoalState(prevState_,
-					actionsModule_.getPrioritisedActions(),
-					StateSpec.getInstance().getConstants());
+			if (!ObjectObservations.getInstance().objectArray[0]
+					.equals(ObjectObservations.NO_PRE_GOAL)) {
+				PolicyGenerator.getInstance().formPreGoalState(prevState_,
+						actionsModule_.getPrioritisedActions(),
+						StateSpec.getInstance().getConstants());
+			}
 		}
 
 		actionsModule_ = null;
@@ -196,7 +199,7 @@ public class PolicyActor implements AgentInterface {
 	 */
 	private String[] chooseAction(Rete state, Collection<Fact> stateFacts) {
 		actionsModule_.switchOffAll();
-		
+
 		boolean noteTriggered = true;
 		if ((internalGoal_ != null) && (internalGoalMet_))
 			noteTriggered = false;

@@ -5,7 +5,10 @@ package rlPacMan;
  * 
  * @author Sam Sarjant
  */
-public class PowerDot extends Dot {
+public class PowerDot extends Thing {
+	/** The value of the powerdot. */ 
+	protected int value_;
+	
 	/**
 	 * A constructor.
 	 * 
@@ -15,7 +18,9 @@ public class PowerDot extends Dot {
 	 * @param bMiddleX The middle param. Not needed.
 	 */
 	public PowerDot(GameModel gameModel, int x, int y) {
-		super(gameModel, x, y);
+		super(gameModel, x, y, false);
+		m_locX = x;
+		m_locY = y;
 		value_ = 40;
 	}
 	
@@ -34,5 +39,18 @@ public class PowerDot extends Dot {
 		
 		buffer.append(" Powerdot");
 		return buffer.toString();
+	}
+	
+	/**
+	 * Gets the value of the dot.
+	 * 
+	 * @return The dot value.
+	 */
+	public int getValue() {
+		return value_;
+	}
+
+	@Override
+	protected void updatePixelVals(GameUI gameUI) {
 	}
 }

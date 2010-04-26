@@ -328,7 +328,7 @@ public class PolicyGenerator {
 			for (String action : actions) {
 				Collection<String> settledGoals = covering_.formPreGoalState(
 						preGoalState, action, constants);
-				String actionPred = StateSpec.splitFact(actions.get(0))[0];
+				String actionPred = StateSpec.splitFact(action)[0];
 				if (debugMode_) {
 					try {
 						if (settledGoals.contains(actionPred))

@@ -477,6 +477,8 @@ public class Covering {
 			// Replace all constant terms in the action with matching variables
 			// or anonymous variables
 			for (int j = 1; j < factSplit.length; j++) {
+				// TODO Need to change system such that (on ?X ?) becomes (on ?X
+				// b) where the b may be removed in unification.
 				// If the term isn't a constant, replace it with a variable
 				if (!constants.contains(factSplit[j])) {
 					String replacementTerm = termMapping.get(factSplit[j]);

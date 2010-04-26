@@ -64,9 +64,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 	@Override
 	public String env_message(String arg0) {
-		if (arg0.equals("writeFreqs")) {
-			writeFreqs();
-		}
 		if (arg0.equals("maxSteps")) {
 			return 1000000 + "";
 		}
@@ -138,7 +135,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		Observation obs = calculateObservations(rete_);
 		Reward_observation_terminal rot = new Reward_observation_terminal(
-				calculateReward(), obs, isTerminal());
+				calculateReward(), obs, isTerminal(obs));
 		return rot;
 	}
 
@@ -149,24 +146,28 @@ public class PacManEnvironment implements EnvironmentInterface {
 		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
 
 		// Run the policy through the environment until goal is satisfied.
-		PolicyActor optimalAgent = new PolicyActor();
-		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
-		optimalAgent.agent_message("Optimal");
-		optimalAgent.agent_message("Policy");
-		Action act = optimalAgent.agent_start(calculateObservations(rete_));
-		// Loop until the task is complete
-		Reward_observation_terminal rot = env_step(act);
-		while ((rot == null) || (!rot.isTerminal())) {
-			optimalAgent.agent_step(rot.r, rot.o);
-			rot = env_step(act);
+		while (!PolicyGenerator.getInstance().hasPreGoal()) {
+			PolicyActor optimalAgent = new PolicyActor();
+			ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
+			optimalAgent.agent_message("Optimal");
+			optimalAgent.agent_message("Policy");
+			Action act = optimalAgent.agent_start(calculateObservations(rete_));
+			// Loop until the task is complete
+			Reward_observation_terminal rot = env_step(act);
+			while ((rot == null) || !rot.isTerminal()) {
+				optimalAgent.agent_step(rot.r, rot.o);
+				rot = env_step(act);
+			}
+
+			// Form the pre-goal.
+			if (!ObjectObservations.getInstance().objectArray[0]
+					.equals(ObjectObservations.NO_PRE_GOAL)
+					&& !PolicyGenerator.getInstance().hasPreGoal())
+				optimalAgent.agent_message("formPreGoal");
+
+			// Return the state to normal
+			resetEnvironment();
 		}
-
-		// Form the pre-goal.
-		if (!PolicyGenerator.getInstance().hasPreGoal())
-			optimalAgent.agent_message("formPreGoal");
-
-		// Return the state to normal
-		resetEnvironment();
 	}
 
 	/**
@@ -268,17 +269,19 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// Find the best direction/s
 		ArrayList<PacManLowAction> chosen = new ArrayList<PacManLowAction>();
-		chosen.add(PacManLowAction.values()[1]);
-		double best = directionVote[1];
-		for (int j = 2; j < directionVote.length; j++) {
-			// Same value, add
-			if (directionVote[j] == best) {
-				chosen.add(PacManLowAction.values()[j]);
-			} else if (directionVote[j] > best) {
-				// Better value, clear
-				chosen.clear();
-				chosen.add(PacManLowAction.values()[j]);
-				best = directionVote[j];
+		double best = -Double.MAX_VALUE;
+		for (int j = 1; j < directionVote.length; j++) {
+			PacManLowAction dir = PacManLowAction.values()[j];
+			if (directions.contains(dir)) {
+				// Same value, add
+				if (directionVote[j] == best) {
+					chosen.add(dir);
+				} else if (directionVote[j] > best) {
+					// Better value, clear
+					chosen.clear();
+					chosen.add(dir);
+					best = directionVote[j];
+				}
 			}
 		}
 
@@ -308,12 +311,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Checks if the episode has terminated.
 	 * 
+	 * @param obs
+	 * 
 	 * @return True if Game over or level complete, false otherwise.
 	 */
-	private int isTerminal() {
+	private int isTerminal(Observation obs) {
 		int state = model_.m_state;
-		if (state == GameModel.STATE_GAMEOVER)
-			return -1;
+		if (state == GameModel.STATE_GAMEOVER) {
+			ObjectObservations.getInstance().objectArray[0] = ObjectObservations.NO_PRE_GOAL;
+			return 1;
+		}
 		if (StateSpec.getInstance().isGoal(rete_))
 			return 1;
 		return 0;
@@ -335,6 +342,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Player
 			rete_.eval("(assert (pacman player))");
 
+			// Declare the distance metrics
+			for (DistanceMetric dm : DistanceMetric.values()) {
+				rete_.eval("(assert (distanceMetric "
+						+ dm.toString().toLowerCase() + "))");
+			}
+
 			// Calculate the distances and junctions
 			SortedSet<JunctionPoint> newJunctions = searchMaze(model_.m_player);
 			// If our junctions have changed, remove the old set and add the new
@@ -346,7 +359,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 							+ newJP.m_locY;
 					rete_.eval("(assert (junction " + juncName + "))");
 
-					closest = distanceAssertions(newJP, juncName, closest, closePoints);
+					closest = distanceAssertions(newJP, juncName, closest,
+							closePoints);
 				}
 				pacJunctions_ = newJunctions;
 			}
@@ -366,8 +380,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 						rete_.eval("(assert (blinking " + ghost + "))");
 
 					// Distances from pacman to ghost
-					closest = distanceAssertions(ghost, ghost.toString(), closest,
-							closePoints);
+					closest = distanceAssertions(ghost, ghost.toString(),
+							closest, closePoints);
 				}
 			}
 			closest = assertClosePoints(closePoints);
@@ -386,10 +400,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 			for (PowerDot powerdot : model_.m_powerdots.values()) {
 				String pdotName = "powerDot_" + powerdot.m_locX + "_"
 						+ powerdot.m_locY;
-				rete_.eval("(assert (dot " + pdotName + "))");
+				rete_.eval("(assert (powerDot " + pdotName + "))");
 
 				// Distances
-				closest = distanceAssertions(powerdot, pdotName, closest, closePoints);
+				closest = distanceAssertions(powerdot, pdotName, closest,
+						closePoints);
 			}
 			closest = assertClosePoints(closePoints);
 
@@ -398,8 +413,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 				rete_.eval("(assert (fruit " + model_.m_fruit + "))");
 
 				// Distances
-				closest = distanceAssertions(model_.m_fruit, model_.m_fruit.toString(),
-						closest, closePoints);
+				closest = distanceAssertions(model_.m_fruit, model_.m_fruit
+						.toString(), closest, closePoints);
 			}
 			closest = assertClosePoints(closePoints);
 
@@ -414,7 +429,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			StateSpec.getInstance().insertValidActions(rete_);
 
-			//rete_.eval("(facts)");
+			// rete_.eval("(facts)");
 
 			// Find the maximally safe junctions
 			// for (int i = 0; i < model_.m_ghosts.length; i++) {
@@ -483,7 +498,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int distanceAssertions(PacPoint thing, String thingName,
 			int closest, Set<String> closePoints) throws JessException {
 		rete_.eval("(assert (distance player " + thingName + " "
-				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
+				+ discretiseDistance(distanceGrid_[thing.m_locX][thing.m_locY])
+				+ "))");
 		if (distanceGrid_[thing.m_locX][thing.m_locY] < closest) {
 			closePoints.clear();
 			closest = distanceGrid_[thing.m_locX][thing.m_locY];
@@ -769,35 +785,5 @@ public class PacManEnvironment implements EnvironmentInterface {
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
 		for (int x = 0; x < distanceGrid_.length; x++)
 			Arrays.fill(distanceGrid_[x], Integer.MAX_VALUE);
-	}
-
-	/**
-	 * Writes the frequencies to file.
-	 */
-	private void writeFreqs() {
-		if (observationFreqs_ != null) {
-			try {
-				File output = new File("freqs");
-				output.createNewFile();
-
-				FileWriter writer = new FileWriter(output);
-				BufferedWriter bf = new BufferedWriter(writer);
-				bf.write("CONSTANT=1.0\n");
-
-				for (int i = 1; i < observationFreqs_.length; i++) {
-					Collections.sort(observationFreqs_[i]);
-					for (int j = 1; j <= 5; j++) {
-						int splitIndex = (int) (observationFreqs_[i].size() * (j / 6.0));
-						bf.write(observationFreqs_[i].get(splitIndex) + ",");
-					}
-					bf.write("\n");
-				}
-
-				bf.close();
-				writer.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
 	}
 }

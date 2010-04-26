@@ -369,7 +369,7 @@ public class CoveringTest {
 		assertEquals(result.size(), 5);
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
-		assertTrue(result.contains("(on ?X ?)"));
+		assertTrue(result.contains("(on ?X d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
 
@@ -382,7 +382,7 @@ public class CoveringTest {
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?Y)"));
 		assertTrue(result.contains("(clear ?)"));
-		assertTrue(result.contains("(on ?X ?)"));
+		assertTrue(result.contains("(on ?X d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?Y)"));
 
@@ -395,7 +395,7 @@ public class CoveringTest {
 		assertTrue(result.contains("(clear a)"));
 		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?)"));
-		assertTrue(result.contains("(on a ?)"));
+		assertTrue(result.contains("(on a d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
 
@@ -406,8 +406,8 @@ public class CoveringTest {
 		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
-		assertTrue(result.contains("(on a ?)"));
-		assertTrue(result.contains("(on ?X ?)"));
+		assertTrue(result.contains("(on a d)"));
+		assertTrue(result.contains("(on ?X e)"));
 		assertTrue(result.contains("(onFloor ?)"));
 	}
 
