@@ -345,7 +345,7 @@ public class Covering {
 	 *            Note the rules are exclusive from one-another.
 	 * @param constants
 	 *            The constants to maintain in rules.
-	 * @return A Rule representing a general action.
+	 * @return All rules representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
 			MultiMap<String, Fact> relevantConditions, String actionPred,
@@ -474,37 +474,83 @@ public class Covering {
 		// anonymous terms.
 		for (Fact fact : actionFacts) {
 			String[] factSplit = StateSpec.splitFact(fact.toString());
+
+			// Maintain a backup to include terms used in facts with action
+			// variables/constants
+			String[] backupFactSplit = Arrays.copyOf(factSplit,
+					factSplit.length);
+			boolean useBackup = false;
+			Collection<String> backupTypeFacts = new ArrayList<String>();
+
 			// Replace all constant terms in the action with matching variables
 			// or anonymous variables
 			for (int j = 1; j < factSplit.length; j++) {
-				// TODO Need to change system such that (on ?X ?) becomes (on ?X
-				// b) where the b may be removed in unification.
 				// If the term isn't a constant, replace it with a variable
 				if (!constants.contains(factSplit[j])) {
 					String replacementTerm = termMapping.get(factSplit[j]);
-					if (replacementTerm != null)
+					// If using variables, keep all other terms in the fact.
+					if (replacementTerm != null) {
 						factSplit[j] = replacementTerm;
-					else
+						backupFactSplit[j] = replacementTerm;
+						useBackup = true;
+					} else {
 						factSplit[j] = "?";
+						// Note down type predicates as a backup, we may need
+						// them
+						addTypePred(backupTypeFacts, backupFactSplit, j);
+					}
 				} else {
-					// Add the constant type predicate
-					String[] typePred = new String[2];
-					typePred[0] = StateSpec.getInstance().getTypePredicate(
-							factSplit[0], j - 1);
-					typePred[1] = factSplit[j];
+					// If using a constant, keep all other terms
+					useBackup = true;
 
-					String formedType = StateSpec.reformFact(typePred);
-					if (!substitution.contains(formedType))
-						substitution.add(formedType);
+					// Add the constant type predicate
+					addTypePred(substitution, factSplit, j);
 				}
 			}
 
-			// Reform the fact and add it back
-			String reformedFact = StateSpec.reformFact(factSplit);
+			// Reform the fact, possibly using the backup
+			String reformedFact = null;
+			if (useBackup) {
+				reformedFact = StateSpec.reformFact(backupFactSplit);
+				// Also add any backup types if necessary
+				for (String backupTypeFact : backupTypeFacts) {
+					if (!substitution.contains(backupTypeFact))
+						substitution.add(backupTypeFact);
+				}
+			} else
+				reformedFact = StateSpec.reformFact(factSplit);
+
+			// Add the fact
 			if (!substitution.contains(reformedFact))
 				substitution.add(reformedFact);
 		}
 		return substitution;
+	}
+
+	/**
+	 * Adds a type predicate to a collection for the jth term in the fact split.
+	 * 
+	 * @param collection
+	 *            The collection of facts.
+	 * @param factSplit
+	 *            The fact split.
+	 * @param j
+	 *            The jth index.
+	 */
+	private void addTypePred(Collection<String> collection, String[] factSplit,
+			int j) {
+		String[] typePred = new String[2];
+		typePred[0] = StateSpec.getInstance().getTypePredicate(factSplit[0],
+				j - 1);
+		// Check it is a valid type pred.
+		if (typePred[0] == null)
+			return;
+
+		typePred[1] = factSplit[j];
+
+		String formedType = StateSpec.reformFact(typePred);
+		if (!collection.contains(formedType))
+			collection.add(formedType);
 	}
 
 	/**

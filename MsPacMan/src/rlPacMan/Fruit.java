@@ -253,7 +253,7 @@ class Fruit extends Thing {
 	}
 	
 	public boolean isEdible() {
-		if (m_bVisible && m_nTicks2Hide > 0) {
+		if (m_bAvailable && m_bVisible && m_nTicks2Hide > 0) {
 			return true;
 		}
 		return false;

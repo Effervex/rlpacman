@@ -193,14 +193,15 @@ public class CoveringTest {
 				assertTrue(gr.getConditions(false).contains("(on ?X b)"));
 				assertTrue(gr.getConditions(false).contains("(above ?X b)"));
 				assertTrue(gr.getConditions(false).contains("(above ?X a)"));
-				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
+				assertTrue(gr.getConditions(false).contains("(above ?X c)"));
 				assertTrue(gr.getConditions(false).contains("(block a)"));
 				assertTrue(gr.getConditions(false).contains("(block b)"));
+				assertTrue(gr.getConditions(false).contains("(block c)"));
 				assertEquals("(moveFloor ?X)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
-				assertEquals(8, condCount);
+				assertEquals(9, condCount);
 				existingRules.put("moveFloor", gr);
 			} else {
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
@@ -228,6 +229,62 @@ public class CoveringTest {
 		state.eval("(assert (onFloor e))");
 		state.eval("(assert (onFloor d))");
 		state.eval("(assert (on a c))");
+		state.eval("(assert (on b a))");
+		state.eval("(assert (block a))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block c))");
+		state.eval("(assert (block d))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (highest b))");
+		state.run();
+		StateSpec.getInstance().insertValidActions(state);
+
+		rules = sut_.coverState(state, existingRules, true);
+		assertEquals(2, rules.size());
+		assertEquals(2, existingRules.sizeTotal());
+		for (GuidedRule gr : existingRules.values()) {
+			System.out.println(gr.toString());
+			if (gr.getAction().contains("moveFloor")) {
+				assertTrue(gr.getConditions(false).contains("(highest ?X)"));
+				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
+				assertTrue(gr.getConditions(false).contains("(on ?X ?)"));
+				assertFalse(gr.getConditions(false).contains("(on ?X b)"));
+				assertFalse(gr.getConditions(false).contains("(above ?X b)"));
+				assertTrue(gr.getConditions(false).contains("(above ?X a)"));
+				assertTrue(gr.getConditions(false).contains("(above ?X c)"));
+				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
+				assertTrue(gr.getConditions(false).contains("(block a)"));
+				assertTrue(gr.getConditions(false).contains("(block c)"));
+				assertEquals("(moveFloor ?X)", gr.getAction());
+				int condCount = StateSpec.getInstance().encodeRule(gr).split(
+						StateSpec.INFERS_ACTION)[0].replaceAll(
+						"\\(.+?\\)( |$)", ".").length();
+				assertEquals(8, condCount);
+			} else {
+				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
+				assertTrue(gr.getConditions(false).contains("(clear ?Y)"));
+				assertFalse(gr.getConditions(false).contains("(on ?X ?)"));
+				assertFalse(gr.getConditions(false).contains("(on ? b)"));
+				assertFalse(gr.getConditions(false).contains("(above ? b)"));
+				assertFalse(gr.getConditions(false).contains("(above ? a)"));
+				assertFalse(gr.getConditions(false).contains("(above ?X ?)"));
+				assertFalse(gr.getConditions(false).contains("(highest ?X)"));
+				assertFalse(gr.getConditions(false).contains("(on ?Y ?)"));
+				assertFalse(gr.getConditions(false).contains("(above ?Y ?)"));
+				assertFalse(gr.getConditions(false).contains("(highest ?Y)"));
+				assertEquals("(move ?X ?Y)", gr.getAction());
+				int condCount = StateSpec.getInstance().encodeRule(gr).split(
+						StateSpec.INFERS_ACTION)[0].replaceAll(
+						"\\(.+?\\)( |$)", ".").length();
+				assertEquals(2, condCount);
+			}
+		}
+		
+		state.reset();
+		state.eval("(assert (onFloor c))");
+		state.eval("(assert (onFloor e))");
+		state.eval("(assert (onFloor d))");
+		state.eval("(assert (on a d))");
 		state.eval("(assert (on b a))");
 		state.eval("(assert (block a))");
 		state.eval("(assert (block b))");
@@ -278,6 +335,7 @@ public class CoveringTest {
 		}
 
 		// Constants covering
+		existingRules.clear();
 		state.reset();
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (onFloor e))");
@@ -301,15 +359,20 @@ public class CoveringTest {
 			if (gr.getAction().contains("moveFloor")) {
 				assertTrue(gr.getConditions(false).contains("(highest b)"));
 				assertTrue(gr.getConditions(false).contains("(clear b)"));
-				assertTrue(gr.getConditions(false).contains("(on b ?)"));
+				assertTrue(gr.getConditions(false).contains("(on b d)"));
 				assertTrue(gr.getConditions(false).contains("(above b a)"));
-				assertTrue(gr.getConditions(false).contains("(above b ?)"));
+				assertTrue(gr.getConditions(false).contains("(above b d)"));
+				assertTrue(gr.getConditions(false).contains("(above b c)"));
 				assertTrue(gr.getConditions(false).contains("(block a)"));
+				assertTrue(gr.getConditions(false).contains("(block b)"));
+				assertTrue(gr.getConditions(false).contains("(block c)"));
+				assertTrue(gr.getConditions(false).contains("(block d)"));
 				assertEquals("(moveFloor b)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
-				assertEquals(6, condCount);
+				assertEquals(9, condCount);
+				existingRules.put("moveFloor", gr);
 			} else {
 				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
 				assertTrue(gr.getConditions(false).contains("(clear ?Y)"));
@@ -324,6 +387,40 @@ public class CoveringTest {
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
+				existingRules.put("move", gr);
+			}
+		}
+		
+		state.reset();
+		state.eval("(assert (onFloor g))");
+		state.eval("(assert (on f g))");
+		state.eval("(assert (on e f))");
+		state.eval("(assert (on b e))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (block f))");
+		state.eval("(assert (block g))");
+		state.eval("(assert (highest b))");
+		state.run();
+		StateSpec.getInstance().insertValidActions(state);
+
+		rules = sut_
+				.coverState(state, existingRules, true);
+		assertEquals(1, rules.size());
+		assertEquals(2, existingRules.sizeTotal());
+		for (GuidedRule gr : rules) {
+			System.out.println(gr.toString());
+			if (gr.getAction().contains("moveFloor")) {
+				assertTrue(gr.getConditions(false).contains("(highest b)"));
+				assertTrue(gr.getConditions(false).contains("(clear b)"));
+				assertTrue(gr.getConditions(false).contains("(on b ?)"));
+				assertTrue(gr.getConditions(false).contains("(above b ?)"));
+				assertTrue(gr.getConditions(false).contains("(block b)"));
+				assertEquals("(moveFloor b)", gr.getAction());
+				int condCount = StateSpec.getInstance().encodeRule(gr).split(
+						StateSpec.INFERS_ACTION)[0].replaceAll(
+						"\\(.+?\\)( |$)", ".").length();
+				assertEquals(4, condCount);
 			}
 		}
 	}
@@ -366,10 +463,11 @@ public class CoveringTest {
 		facts = StateSpec.extractFacts(state);
 		actionTerms[0] = "a";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 5);
+		assertEquals(result.size(), 6);
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on ?X d)"));
+		assertTrue(result.contains("(block d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
 
@@ -378,11 +476,12 @@ public class CoveringTest {
 		actionTerms[0] = "a";
 		actionTerms[1] = "c";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 6);
+		assertEquals(result.size(), 7);
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?Y)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on ?X d)"));
+		assertTrue(result.contains("(block d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?Y)"));
 
@@ -391,23 +490,26 @@ public class CoveringTest {
 		actionTerms = new String[1];
 		actionTerms[0] = "a";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 6);
+		assertEquals(result.size(), 7);
 		assertTrue(result.contains("(clear a)"));
 		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on a d)"));
+		assertTrue(result.contains("(block d)"));
 		assertTrue(result.contains("(on ? ?)"));
 		assertTrue(result.contains("(onFloor ?)"));
 
 		actionTerms[0] = "b";
 		result = sut_.inverselySubstitute(facts, actionTerms, constants);
-		assertEquals(result.size(), 7);
+		assertEquals(result.size(), 9);
 		assertTrue(result.contains("(clear a)"));
 		assertTrue(result.contains("(block a)"));
 		assertTrue(result.contains("(clear ?X)"));
 		assertTrue(result.contains("(clear ?)"));
 		assertTrue(result.contains("(on a d)"));
+		assertTrue(result.contains("(block d)"));
 		assertTrue(result.contains("(on ?X e)"));
+		assertTrue(result.contains("(block e)"));
 		assertTrue(result.contains("(onFloor ?)"));
 	}
 
@@ -457,16 +559,20 @@ public class CoveringTest {
 		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance().getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
-		assertEquals(9, preGoal.size());
+		assertEquals(13, preGoal.size());
 		assertTrue(preGoal.contains("(clear a)"));
 		assertTrue(preGoal.contains("(clear b)"));
 		assertTrue(preGoal.contains("(block a)"));
 		assertTrue(preGoal.contains("(block b)"));
-		assertTrue(preGoal.contains("(on a ?)"));
-		assertTrue(preGoal.contains("(on b ?)"));
+		assertTrue(preGoal.contains("(block c)"));
+		assertTrue(preGoal.contains("(block d)"));
+		assertTrue(preGoal.contains("(block e)"));
+		assertTrue(preGoal.contains("(on a d)"));
+		assertTrue(preGoal.contains("(on b e)"));
 		assertTrue(preGoal.contains("(highest a)"));
-		assertTrue(preGoal.contains("(above a ?)"));
-		assertTrue(preGoal.contains("(above b ?)"));
+		assertTrue(preGoal.contains("(above a d)"));
+		assertTrue(preGoal.contains("(above a c)"));
+		assertTrue(preGoal.contains("(above b e)"));
 
 		state.reset();
 		state.eval("(assert (block a))");
@@ -476,7 +582,7 @@ public class CoveringTest {
 		state.eval("(assert (block e))");
 		state.eval("(assert (onFloor a))");
 		state.eval("(assert (onFloor d))");
-		state.eval("(assert (on b e))");
+		state.eval("(assert (on b f))");
 		state.eval("(assert (onFloor e))");
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (highest b))");
@@ -918,6 +1024,39 @@ public class CoveringTest {
 //		assertEquals(2, oldState.size());
 //		assertTrue(oldState.contains("(on a b)"));
 //		assertTrue(oldState.contains("(clear a)"));
+	}
+	
+	@Test
+	public void testNumericalUnifyStates() {
+		// No change unification
+		List<String> oldState = new ArrayList<String>();
+		oldState.add("(distance a b 1)");
+		List<String> newState = new ArrayList<String>();
+		newState.add("(distance a b 1)");
+		List<String> oldTerms = new ArrayList<String>();
+		oldTerms.add("a");
+		List<String> newTerms = new ArrayList<String>();
+		newTerms.add("a");
+		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains("(distance a b 1)"));
+		assertTrue(oldTerms.contains("a"));
+		
+		// Range addition
+		oldState.clear();
+		oldState.add("(distance a b 1)");
+		newState.clear();
+		newState.add("(distance a b 2)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains("(distance a b ?D0)"));
+		assertTrue(oldState.contains("(distance a b ?D0)"));
 	}
 
 	@Test
