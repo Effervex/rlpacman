@@ -115,15 +115,18 @@ public class PacManStateSpec extends StateSpec {
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
 		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
+				+ "(blinking ?Ghost) (pacman ?Player) "
+				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
+		rules.add("(distance ?Player ?Ghost mid) (edible ?Ghost) "
 				+ "(pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
 		rules.add("(distance ?Player ?PowerDot near) (edible ?Ghost) "
 				+ "(pacman ?Player) (powerDot ?PowerDot) "
 				+ "=> (fromPowerDot ?PowerDot)");
 		rules.add("(distance ?Player ?Ghost near) (pacman ?Player) "
 				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
-		rules.add("(distance ?Player ?Fruit mid) (pacman ?Player) "
+		rules.add("(distance ?Player ?Fruit far) (pacman ?Player) "
 				+ "(fruit ?Fruit) => (toFruit ?Fruit)");
-		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
+		rules.add("(distance ?Player ?Dot near) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot)");
 
 		for (String rule : rules)
