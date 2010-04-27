@@ -35,6 +35,8 @@ public abstract class StateSpec {
 
 	private static final String ACTION_TERM_REPL = "__TYPE__";
 
+	private static final String BETWEEN_RANGE = "betweenRange";
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -121,6 +123,11 @@ public abstract class StateSpec {
 				rete_.eval("(defrule " + ruleNames + " "
 						+ backgroundRules.get(ruleNames) + ")");
 			}
+
+			// Initialise the betweenRange function
+			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
+					+ "(if (and (>= ?val ?low) (<= ?val ?high)) then "
+					+ "return TRUE))");
 
 			// Initialise the goal state rules
 			constants_ = new ArrayList<String>();
@@ -626,7 +633,8 @@ public abstract class StateSpec {
 	 * Checks if the current state is a goal state by looking for the terminal
 	 * fact.
 	 * 
-	 * @param rete The state.
+	 * @param rete
+	 *            The state.
 	 * @return True if we're in the goal state, false otherwise.
 	 */
 	public boolean isGoal(Rete rete) {
@@ -660,7 +668,7 @@ public abstract class StateSpec {
 				} else {
 					StringBuffer declares = new StringBuffer(
 							"(declare (variables");
-					
+
 					for (String param : gr.getQueryParameters()) {
 						declares.append(" " + param);
 					}

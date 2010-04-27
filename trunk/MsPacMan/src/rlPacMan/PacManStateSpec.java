@@ -117,7 +117,7 @@ public class PacManStateSpec extends StateSpec {
 		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
 				+ "(blinking ?Ghost) (pacman ?Player) "
 				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
-		rules.add("(distance ?Player ?Ghost mid) (edible ?Ghost) "
+		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
 				+ "(pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
 		rules.add("(distance ?Player ?PowerDot near) (edible ?Ghost) "
 				+ "(pacman ?Player) (powerDot ?PowerDot) "
@@ -126,7 +126,7 @@ public class PacManStateSpec extends StateSpec {
 				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
 		rules.add("(distance ?Player ?Fruit far) (pacman ?Player) "
 				+ "(fruit ?Fruit) => (toFruit ?Fruit)");
-		rules.add("(distance ?Player ?Dot near) (pacman ?Player) "
+		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot)");
 
 		for (String rule : rules)
