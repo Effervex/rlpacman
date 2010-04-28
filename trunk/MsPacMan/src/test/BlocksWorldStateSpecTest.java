@@ -192,9 +192,10 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(body.contains("(block ?X)"));
 		assertTrue(body.contains("(clear ?X)"));
 		assertTrue(head.contains("(moveFloor ?X)"));
-		
+
 		// Test inequals parsing
-		rule = spec_.parseRule("(clear ?X) (clear ?Y) (test (<> ?X ?Y)) (block ?X) (block ?Y) => (move ?X ?Y)");
+		rule = spec_
+				.parseRule("(clear ?X) (clear ?Y) (test (<> ?X ?Y)) (block ?X) (block ?Y) => (move ?X ?Y)");
 		body = rule.split("=>")[0];
 		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
@@ -207,7 +208,7 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(head.contains("(move ?X ?Y)"));
 		assertTrue(body.indexOf("clear") < body.indexOf("test"));
 		assertTrue(body.indexOf("test") < body.indexOf("block"));
-		
+
 		// Testing module syntax
 		rule = spec_.parseRule("(above ?X ?*a*) (clear ?X) => (moveFloor ?X)");
 		body = rule.split("=>")[0];
@@ -229,18 +230,21 @@ public class BlocksWorldStateSpecTest {
 
 	@Test
 	public void testEncodeRule() {
-		String result = spec_
-				.encodeRule(new GuidedRule("(block a) (clear a) => (moveFloor a)"));
+		String result = spec_.encodeRule(new GuidedRule(
+				"(block a) (clear a) => (moveFloor a)"));
 		assertTrue(result.equals("(clear a) => (moveFloor a)"));
 
-		result = spec_.encodeRule(new GuidedRule("(block a) (block b) (on a b) => (move a b)"));
+		result = spec_.encodeRule(new GuidedRule(
+				"(block a) (block b) (on a b) => (move a b)"));
 		assertTrue(result.equals("(on a b) => (move a b)"));
 
-		result = spec_.encodeRule(new GuidedRule("(block ?X) (clear ?X) => (moveFloor ?X)"));
+		result = spec_.encodeRule(new GuidedRule(
+				"(block ?X) (clear ?X) => (moveFloor ?X)"));
 		assertTrue(result.equals("(clear ?X) => (moveFloor ?X)"));
 
-		result = spec_.encodeRule(new GuidedRule("(block ?X) (block ?Y) (test (<> ?X ?Y)) "
-				+ "(clear ?X) (clear ?Y) => (move ?X ?Y)"));
+		result = spec_.encodeRule(new GuidedRule(
+				"(block ?X) (block ?Y) (test (<> ?X ?Y)) "
+						+ "(clear ?X) (clear ?Y) => (move ?X ?Y)"));
 		assertTrue(result.equals("(clear ?X) (clear ?Y) => (move ?X ?Y)"));
 
 		result = spec_.encodeRule(new GuidedRule("(block a) => (moveFloor a)"));
@@ -334,5 +338,9 @@ public class BlocksWorldStateSpecTest {
 		// Module declaration
 		result = StateSpec.splitFact("(MAIN::clear a)");
 		assertArrayEquals(new String[] { "clear", "a" }, result);
+
+		// Inner condition
+		result = StateSpec.splitFact("(clear ?X&:(<> ?X hat))");
+		assertArrayEquals(new String[] { "clear", "?X&:(<> ?X hat)" }, result);
 	}
 }

@@ -3,7 +3,7 @@
 ;; Initial facts
 (assert (pacman player))
 (assert (dot a4))
-(assert (distance player a4 4))
+(assert (distance player a4 -4))
 (assert (dot a1))
 (assert (distance player a1 2.5))
 (assert (dot a2))
@@ -27,7 +27,7 @@
     =>
     (assert (closest ?X ?Y)))
 (defrule testtest
-    (pacman ?X) (dot ?Y) (distance ?X ?Y ?YDist&:(betweenRange ?YDist 2 3))
+    (pacman ?X) (dot ?Y) (distance ?X ?Y ?YDist) (test (betweenRange ?YDist 2 3))
     =>
     (assert (closeEnough ?X ?Y)))
 
