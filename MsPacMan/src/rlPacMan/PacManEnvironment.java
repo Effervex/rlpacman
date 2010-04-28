@@ -28,7 +28,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static final int PLAYER_SPEED = 10;
+	public static final int PLAYER_DELAY = 10;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
@@ -105,7 +105,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
 			if (!environment_.experimentMode_)
-				Thread.sleep(PLAYER_SPEED);
+				Thread.sleep(PLAYER_DELAY);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -189,7 +189,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// watchable for humans.
 		try {
 			if (!environment_.experimentMode_)
-				Thread.sleep(PLAYER_SPEED);
+				Thread.sleep(PLAYER_DELAY);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -498,7 +498,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int distanceAssertions(PacPoint thing, String thingName,
 			int closest, Set<String> closePoints) throws JessException {
 		rete_.eval("(assert (distance player " + thingName + " "
-				+ discretiseDistance(distanceGrid_[thing.m_locX][thing.m_locY])
+				+ distanceGrid_[thing.m_locX][thing.m_locY]
 				+ "))");
 		if (distanceGrid_[thing.m_locX][thing.m_locY] < closest) {
 			closePoints.clear();

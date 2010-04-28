@@ -114,18 +114,23 @@ public class PacManStateSpec extends StateSpec {
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
-		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
-				+ "(blinking ?Ghost) (pacman ?Player) "
-				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
-		rules.add("(distance ?Player ?Ghost near) (edible ?Ghost) "
-				+ "(pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
-		rules.add("(distance ?Player ?PowerDot near) (edible ?Ghost) "
-				+ "(pacman ?Player) (powerDot ?PowerDot) "
-				+ "=> (fromPowerDot ?PowerDot)");
-		rules.add("(distance ?Player ?Ghost near) (pacman ?Player) "
-				+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
-		rules.add("(distance ?Player ?Fruit far) (pacman ?Player) "
-				+ "(fruit ?Fruit) => (toFruit ?Fruit)");
+		rules
+				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(edible ?Ghost) (blinking ?Ghost) (pacman ?Player) "
+						+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
+		rules
+				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
+		rules
+				.add("(distance ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
+						+ "=> (fromPowerDot ?PowerDot)");
+		rules
+				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost)");
+		rules
+				.add("(distance ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
+						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit)");
 		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot)");
 
@@ -173,7 +178,7 @@ public class PacManStateSpec extends StateSpec {
 		structure = new ArrayList<Class>();
 		structure.add(PacPoint.class);
 		structure.add(PacPoint.class);
-		structure.add(DistanceMetric.class);
+		structure.add(Integer.class);
 		predicates.putCollection("distance", structure);
 
 		// Closest Metric

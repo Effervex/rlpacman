@@ -21,21 +21,29 @@ import jess.ValueVector;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
+	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
 
+	/** The anonymous variable symbol. */
 	public static final String ANONYMOUS = "?";
 
+	/** The suffix for an action precondition. */
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
+	/** The valid actions predicate name. */
 	public static final String VALID_ACTIONS = "validActions";
 
+	/** The goal query name */
 	public static final String GOAL_QUERY = "isGoal";
 
+	/** The policy rule prefix. */
 	public static final String POLICY_QUERY_PREFIX = "polRule";
 
-	private static final String ACTION_TERM_REPL = "__TYPE__";
+	/** The between a range of values function name. */
+	public static final String BETWEEN_RANGE = "betweenRange";
 
-	private static final String BETWEEN_RANGE = "betweenRange";
+	/** The replacement value for unnecessary facts. */
+	private static final String ACTION_TERM_REPL = "__TYPE__";
 
 	/** The singleton instance. */
 	private static StateSpec instance_;
@@ -318,27 +326,11 @@ public abstract class StateSpec {
 			String predicate = split[i];
 
 			// A Regexp looking for a predicate with args '(clear a)'
-			// '(move b ?X)' '(cool)' '(on ?X _)'
-			Pattern p = null;
-			if (i == 0) {
-				p = Pattern
-						.compile("\\((\\w+)((?: (?:(?:[\\w$*=+/<>_#.]+)|(?:\\?[\\w-_*:]+)|(?:"
-								+ Pattern.quote(ANONYMOUS) + ")))*)\\)");
-			} else {
-				p = Pattern
-						.compile("\\((\\w+)((?: (?:(?:[\\w$*=+/<>_#.]+)|(?:\\?[\\w-_*:]+)|(?:\\?)))*)\\)");
-			}
-
+			// '(move b ?X)' '(cool beans)' '(on ?X _)'
+			Pattern p = Pattern.compile("\\((\\w+)( .+?)+\\)(?= |$)");
 			Matcher m = p.matcher(predicate);
 			while (m.find()) {
-				// Group 1 is the predicate name, Group 2 is the arg(s)
-				String arguments = m.group(2).trim();
-				String[] args = arguments.split(" ");
-				String[] fact = new String[args.length + 1];
-				fact[0] = m.group(1);
-				for (int j = 0; j < args.length; j++) {
-					fact[j + 1] = args[j];
-				}
+				String[] fact = splitFact(m.group());
 
 				if (i == 0)
 					info.addCondition(fact);
@@ -448,9 +440,14 @@ public abstract class StateSpec {
 	 * @return A string array of the facts.
 	 */
 	public static String[] splitFact(String fact) {
-		// Remove any module declarations
-		fact = fact.substring(fact.lastIndexOf(':') + 1);
-		return fact.replaceAll("(\\(|\\))", "").split(" ");
+		Pattern p = Pattern.compile("((?:\\?[-\\w$*=+/<>_#.]+&:\\(.+?\\))"
+				+ "|(?:[-?\\w$*=+/<>_#.]+))(?= |\\)|$)");
+		Matcher m = p.matcher(fact);
+		ArrayList<String> matches = new ArrayList<String>();
+		while (m.find())
+			matches.add(m.group());
+
+		return matches.toArray(new String[matches.size()]);
 	}
 
 	/**
@@ -830,8 +827,20 @@ public abstract class StateSpec {
 			for (int i = 1; i < fact.length; i++) {
 				String term = fact[i];
 				// If the term isn't anonymous and isn't already in, add it.
-				if (!term.equals("?") && !terms_.contains(term))
-					terms_.add(term);
+				if (!term.equals("?") && !terms_.contains(term)) {
+					// Don't include any numerical terms (variable or otherwise)
+					try {
+						// Basic forced parsing
+						Double.parseDouble(term);
+					} catch (Exception e) {
+						// Check the term doesn't have a condition associated
+						// with it (at the moment only numerical terms have
+						// this).
+						int index = term.indexOf("&:");
+						if (index == -1)
+							terms_.add(term);
+					}
+				}
 			}
 		}
 
@@ -852,8 +861,10 @@ public abstract class StateSpec {
 				if (!fact[i].equals("?")) {
 					String[] typePred = new String[2];
 					typePred[0] = typePredicates_.get(classes.get(i - 1));
-					typePred[1] = fact[i];
-					addContainsArray(typeConditions_, typePred);
+					if (typePred[0] != null) {
+						typePred[1] = fact[i];
+						addContainsArray(typeConditions_, typePred);
+					}
 				}
 			}
 		}

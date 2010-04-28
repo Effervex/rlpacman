@@ -279,7 +279,7 @@ public class CoveringTest {
 				assertEquals(2, condCount);
 			}
 		}
-		
+
 		state.reset();
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (onFloor e))");
@@ -390,7 +390,7 @@ public class CoveringTest {
 				existingRules.put("move", gr);
 			}
 		}
-		
+
 		state.reset();
 		state.eval("(assert (onFloor g))");
 		state.eval("(assert (on f g))");
@@ -404,8 +404,7 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_
-				.coverState(state, existingRules, true);
+		rules = sut_.coverState(state, existingRules, true);
 		assertEquals(1, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : rules) {
@@ -523,7 +522,8 @@ public class CoveringTest {
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor a)", StateSpec.getInstance().getConstants());
+		sut_.formPreGoalState(facts, "(moveFloor a)", StateSpec.getInstance()
+				.getConstants());
 		List<String> preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear a)"));
@@ -533,7 +533,8 @@ public class CoveringTest {
 		state.reset();
 		state.eval("(assert (clear b))");
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor b)", StateSpec.getInstance().getConstants());
+		sut_.formPreGoalState(facts, "(moveFloor b)", StateSpec.getInstance()
+				.getConstants());
 		preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains("(clear ?X)"));
@@ -556,7 +557,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance().getConstants());
+		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance()
+				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
 		assertEquals(13, preGoal.size());
@@ -589,7 +591,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance().getConstants());
+		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance()
+				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(6, preGoal.size());
@@ -601,7 +604,8 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(above b ?)"));
 
 		// Generalising the action
-		sut_.formPreGoalState(facts, "(move b a)", StateSpec.getInstance().getConstants());
+		sut_.formPreGoalState(facts, "(move b a)", StateSpec.getInstance()
+				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(4, preGoal.size());
@@ -1006,26 +1010,26 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(clear a)"));
 
 		// Improper unification
-//		oldState.clear();
-//		oldState.add("(on a ?Y)");
-//		oldState.add("(on a b)");
-//		oldState.add("(clear a)");
-//		newState.clear();
-//		newState.add("(on a b)");
-//		newState.add("(clear a)");
-//		oldTerms.clear();
-//		oldTerms.add("a");
-//		oldTerms.add("?Y");
-//		newTerms.clear();
-//		newTerms.add("a");
-//		newTerms.add("b");
-//		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
-//		assertEquals(1, result);
-//		assertEquals(2, oldState.size());
-//		assertTrue(oldState.contains("(on a b)"));
-//		assertTrue(oldState.contains("(clear a)"));
+		// oldState.clear();
+		// oldState.add("(on a ?Y)");
+		// oldState.add("(on a b)");
+		// oldState.add("(clear a)");
+		// newState.clear();
+		// newState.add("(on a b)");
+		// newState.add("(clear a)");
+		// oldTerms.clear();
+		// oldTerms.add("a");
+		// oldTerms.add("?Y");
+		// newTerms.clear();
+		// newTerms.add("a");
+		// newTerms.add("b");
+		// result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		// assertEquals(1, result);
+		// assertEquals(2, oldState.size());
+		// assertTrue(oldState.contains("(on a b)"));
+		// assertTrue(oldState.contains("(clear a)"));
 	}
-	
+
 	@Test
 	public void testNumericalUnifyStates() {
 		// No change unification
@@ -1042,7 +1046,7 @@ public class CoveringTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(distance a b 1)"));
 		assertTrue(oldTerms.contains("a"));
-		
+
 		// Range addition
 		oldState.clear();
 		oldState.add("(distance a b 1)");
@@ -1055,8 +1059,174 @@ public class CoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(distance a b ?D0)"));
-		assertTrue(oldState.contains("(distance a b ?D0)"));
+		int index = 0;
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
+
+		// Range addition (reversed)
+		oldState.clear();
+		oldState.add("(distance a b 2)");
+		newState.clear();
+		newState.add("(distance a b 1)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
+
+		// Negative range addition
+		oldState.clear();
+		oldState.add("(distance a b -1)");
+		newState.clear();
+		newState.add("(distance a b 2)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
+
+		// Tiny value range addition
+		oldState.clear();
+		oldState.add("(distance a b -1)");
+		newState.clear();
+		newState.add("(distance a b 2.567483E-64)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index
+				+ " -1.0 2.567483E-64))"));
+
+		// Regular variable unification with numerical values too
+		oldState.clear();
+		oldState.add("(distance x y -1)");
+		newState.clear();
+		newState.add("(distance a b 2)");
+		oldTerms.clear();
+		oldTerms.add("x");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distance ?X ? ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
+		assertTrue(oldTerms.contains("?X"));
+
+		// Unification under an existing range term
+		oldState.clear();
+		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
+				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
+		newState.clear();
+		newState.add("(distance a b 2)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+
+		// Unification under an existing range term (extension)
+		oldState.clear();
+		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
+				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
+		newState.clear();
+		newState.add("(distance a b -2)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
+
+		// Multiple numerical terms
+		oldState.clear();
+		oldState.add("(distance a b 1)");
+		oldState.add("(level a 1)");
+		newState.clear();
+		newState.add("(distance a b -2)");
+		newState.add("(level a 3)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -2.0 1.0))"));
+		index++;
+		assertTrue(oldState.contains("(level a ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))"));
+
+		// Multiple numerical terms with existing range term
+		oldState.clear();
+		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
+				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
+		oldState.add("(level a 1)");
+		newState.clear();
+		newState.add("(distance a b -2)");
+		newState.add("(level a 3)");
+		oldTerms.clear();
+		oldTerms.add("a");
+		newTerms.clear();
+		newTerms.add("a");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		assertTrue(oldState.contains("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
+		index++;
+		assertTrue(oldState.contains("(level a ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))"));
 	}
 
 	@Test

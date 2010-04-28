@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jess.Fact;
@@ -22,11 +23,18 @@ import jess.ValueVector;
  * @author Samuel J. Sarjant
  */
 public class Covering {
+	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
+	/** The final character for variables. */
 	private static final char MODULO_CHAR = 'Z' + 1;
+	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
+	/** The amount of state inactivity until it is considered settled. */
 	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 50;
+	/** A simple empty list. */
 	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
+	/** The prefix for range variables. */
+	public static final String RANGE_VARIABLE_PREFIX = "__Num";
 
 	/**
 	 * The pre-goal state for each action predicate, for use in covering
@@ -39,6 +47,9 @@ public class Covering {
 	 * ones.
 	 */
 	private boolean createNewRules_;
+
+	/** A suffix numbered variable to use when defining new ranged variables. */
+	private int rangeIndex_ = 0;
 
 	public Covering(int numActions) {
 		clearPreGoalState(numActions);
@@ -130,6 +141,9 @@ public class Covering {
 	 * unification process. This process does not keep useless facts around
 	 * (facts using only anonymous terms).
 	 * 
+	 * This process performs special unification on numerical variables, by
+	 * creating a range function under which the variables fall.
+	 * 
 	 * @param oldState
 	 *            The old state to be unified with. This may be modified.
 	 * @param newState
@@ -151,30 +165,9 @@ public class Covering {
 		// If the terms don't match up, create a replacement map
 		Map<String, String> oldReplacementMap = new HashMap<String, String>();
 		Map<String, String> newReplacementMap = new HashMap<String, String>();
-		for (int i = 0; i < oldTerms.size(); i++) {
-			// If this index of terms don't match up
-			String oldTerm = oldTerms.get(i);
-			String newTerm = newTerms.get(i);
-			if (!oldTerm.equals(newTerm)) {
-				boolean bothVariables = true;
-				String variable = getVariableTermString(i);
-				// Replace old term if necessary
-				if (oldTerm.charAt(0) != '?') {
-					oldReplacementMap.put(oldTerm, variable);
-					// hasChanged = true;
-					bothVariables = false;
-				}
-				if (newTerm.charAt(0) != '?') {
-					newReplacementMap.put(newTerm, variable);
-					bothVariables = false;
-				}
-
-				// Check that both slots aren't inequal variables
-				if (bothVariables) {
-					return -1;
-				}
-			}
-		}
+		if (!createReplacementMaps(oldTerms, newTerms, oldReplacementMap,
+				newReplacementMap))
+			return -1;
 
 		// For each item in the old state, see if it is present in the new state
 		List<String> oldStateRepl = new ArrayList<String>();
@@ -206,9 +199,54 @@ public class Covering {
 	}
 
 	/**
+	 * Creates replacement maps if necessary. Also, if replacements are
+	 * impossible, unification is impossible, so return false.
+	 * 
+	 * @param oldTerms
+	 *            The old terms.
+	 * @param newTerms
+	 *            The new terms.
+	 * @param oldReplacementMap
+	 *            The replacement map for the old terms.
+	 * @param newReplacementMap
+	 *            The replacement map for the new terms.
+	 * @return False if replacement is impossible, true otherwise.
+	 */
+	private boolean createReplacementMaps(List<String> oldTerms,
+			List<String> newTerms, Map<String, String> oldReplacementMap,
+			Map<String, String> newReplacementMap) {
+		for (int i = 0; i < oldTerms.size(); i++) {
+			// If this index of terms don't match up
+			String oldTerm = oldTerms.get(i);
+			String newTerm = newTerms.get(i);
+			if (!oldTerm.equals(newTerm)) {
+				boolean bothVariables = true;
+				String variable = getVariableTermString(i);
+				// Replace old term if necessary
+				if (oldTerm.charAt(0) != '?') {
+					oldReplacementMap.put(oldTerm, variable);
+					// hasChanged = true;
+					bothVariables = false;
+				}
+				if (newTerm.charAt(0) != '?') {
+					newReplacementMap.put(newTerm, variable);
+					bothVariables = false;
+				}
+
+				// Check that both slots aren't inequal variables
+				if (bothVariables) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Unifies a single fact by searching for the term itself or a generalised
 	 * form of the term within a collection. The search is special because it
-	 * can generalise terms to anonymous terms if necessary for unification.
+	 * can generalise terms to anonymous terms if necessary for unification. It
+	 * can also introduce new range terms for numerical unification.
 	 * 
 	 * @param fact
 	 *            The fact being searched for in the unity collection.
@@ -285,9 +323,13 @@ public class Covering {
 							thisGeneralness++;
 							notAnonymous = true;
 						} else {
-							// Failing that simply use an anonymous variable
-							unification[i] = StateSpec.ANONYMOUS;
-							thisGeneralness++;
+							// Check for numerical values
+							if (!numericalValueCheck(factSplit[i],
+									unitySplit[i], unification, i)) {
+								// Failing that simply use an anonymous variable
+								unification[i] = StateSpec.ANONYMOUS;
+								thisGeneralness++;
+							}
 						}
 					}
 				}
@@ -312,6 +354,85 @@ public class Covering {
 		factTerms.addAll(bestTerms);
 		bestUnified[0] = factSplit[0];
 		return StateSpec.reformFact(bestUnified);
+	}
+
+	/**
+	 * Check for numerical or numerical range values for a fact.
+	 * 
+	 * @param factValue
+	 *            The term in the fact.
+	 * @param unityValue
+	 *            The term in the unity fact.
+	 * @param unification
+	 *            The unification between the two.
+	 * @param index
+	 *            The index of the unification to fill.
+	 * @return True if the two are numerical and could be unified into a ranged
+	 *         variable.
+	 */
+	private boolean numericalValueCheck(String factValue, String unityValue,
+			String[] unification, int index) {
+		// TODO Create method, but need to check for existing range variables to
+		// ensure that a unique range variable is created. Maybe maintain a
+		// private list of them.
+
+		// Check the unity is a number
+		double unityDouble = 0;
+		try {
+			unityDouble = Double.parseDouble(unityValue);
+		} catch (Exception e) {
+			return false;
+		}
+
+		// The factValue may be a range
+		Pattern rangePattern = Pattern.compile("(\\?"
+				+ Pattern.quote(RANGE_VARIABLE_PREFIX) + "[\\d]+)&:\\("
+				+ StateSpec.BETWEEN_RANGE + " \\1 ([-\\dE.]+) ([-\\dE.]+)\\)");
+		Matcher m = rangePattern.matcher(factValue);
+
+		if (m.find()) {
+			// We have a pre-existing range
+			String variableName = m.group(1);
+			double min = Double.parseDouble(m.group(2));
+			double max = Double.parseDouble(m.group(3));
+
+			// Possibly expand the range if need be
+			boolean redefine = false;
+			if (unityDouble < min) {
+				min = unityDouble;
+				redefine = true;
+			} else if (unityDouble > max) {
+				max = unityDouble;
+				redefine = true;
+			}
+
+			// If the min or max has changed, redefine the range
+			if (redefine) {
+				unification[index] = variableName + "&:("
+						+ StateSpec.BETWEEN_RANGE + " " + variableName + " "
+						+ min + " " + max + ")";
+			}
+
+			return true;
+		} else {
+			// We're possibly dealing with two numbers
+			// Check the unity is a number
+			double factDouble = 0;
+			try {
+				factDouble = Double.parseDouble(factValue);
+			} catch (Exception e) {
+				return false;
+			}
+
+			// Find the min, max, then form the range
+			double min = Math.min(factDouble, unityDouble);
+			double max = Math.max(factDouble, unityDouble);
+			String rangeVariable = "?" + RANGE_VARIABLE_PREFIX + rangeIndex_++;
+			unification[index] = rangeVariable + "&:("
+					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " " + min
+					+ " " + max + ")";
+			return true;
+		}
 	}
 
 	/**
