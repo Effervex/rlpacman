@@ -2,7 +2,7 @@ package rlPacMan;
 
 import java.awt.*;
 
-class Player extends Thing {
+public class Player extends Thing {
 	static int MAX_MOUTH_DEGREE = 60;
 	int m_degreeRotation = 0; // Used to track Pacman's degree rotation
 	int m_score = 0;

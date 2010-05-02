@@ -205,7 +205,7 @@ public class Policy {
 	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
-		
+
 		if (actionsReturned == -1)
 			actionsReturned = Integer.MAX_VALUE;
 
@@ -234,7 +234,7 @@ public class Policy {
 					// Only add non-modular rules if we're noting rules.
 					if (!gr.isLoadedModuleRule() && noteTriggered)
 						triggeredRules_.add(gr);
-					List<String> actionsList = new ArrayList<String>();
+					ArrayList<String> actionsList = new ArrayList<String>();
 
 					// For each possible replacement
 					do {
@@ -259,21 +259,16 @@ public class Policy {
 						actionsList.add(actBuffer.toString());
 					} while (results.next());
 
-					// Switch on as many random actions as required.
-					while (!actionsList.isEmpty()
-							&& (actionsFound < actionsReturned)) {
-						actionSwitch.switchOn(actionsList
-								.remove(PolicyGenerator.random_
-										.nextInt(actionsList.size())));
-						actionsFound++;
-					}
+					// Turn on the actions
+					actionSwitch.switchOn(actionsList);
+					actionsFound += actionsList.size();
 				}
 				results.close();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
-		
+
 		// If optimal, just exit
 		if (optimal)
 			return;

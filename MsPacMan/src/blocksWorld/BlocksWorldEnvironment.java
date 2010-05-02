@@ -3,6 +3,7 @@ package blocksWorld;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,10 +135,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		String action = null;
-		for (int i = 0; i < ObjectObservations.getInstance().objectArray.length; i++) {
-			action = (String) ObjectObservations.getInstance().objectArray[i];
-		}
+		ArrayList<String> actions = (ArrayList<String>) ObjectObservations.getInstance().objectArray[0];
+		String action = actions.get(PolicyGenerator.random_.nextInt(actions.size()));
 
 		BlocksState newState = actOnAction(action, state_);
 		if (PolicyGenerator.debugMode_ && !optimal_) {

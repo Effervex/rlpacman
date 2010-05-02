@@ -197,7 +197,8 @@ public class PolicyActor implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private String[] chooseAction(Rete state, Collection<Fact> stateFacts) {
+	private ArrayList<String>[] chooseAction(Rete state,
+			Collection<Fact> stateFacts) {
 		actionsModule_.switchOffAll();
 
 		boolean noteTriggered = true;
@@ -211,8 +212,9 @@ public class PolicyActor implements AgentInterface {
 		prevState_ = stateFacts;
 
 		// Return the actions.
-		ArrayList<String> actions = actionsModule_.getPrioritisedActions();
-		return actions.toArray(new String[actions.size()]);
+		ArrayList<ArrayList<String>> actions = actionsModule_
+				.getPrioritisedActions();
+		return actions.toArray(new ArrayList[actions.size()]);
 	}
 
 	/**
@@ -366,14 +368,22 @@ public class PolicyActor implements AgentInterface {
 				}
 			}
 
-			ArrayList<String> actions = actionsModule_.getPrioritisedActions();
+			// Changing all the actions to modular format
+			ArrayList<ArrayList<String>> actions = actionsModule_
+					.getPrioritisedActions();
 			for (int i = 0; i < actions.size(); i++) {
-				String action = actions.get(i);
-				for (String constant : replacements.keySet()) {
-					action = action.replaceAll(" " + Pattern.quote(constant)
-							+ "(?=( |\\)))", " " + replacements.get(constant));
+				ArrayList<String> modularActions = new ArrayList<String>();
+				// Run through each action in the collection and replace
+				// constants with modular variables.
+				for (String action : actions.get(i)) {
+					for (String constant : replacements.keySet()) {
+						action = action.replaceAll(" "
+								+ Pattern.quote(constant) + "(?=( |\\)))", " "
+								+ replacements.get(constant));
+					}
+					modularActions.add(action);
 				}
-				actions.set(i, action);
+				actions.set(i, modularActions);
 			}
 
 			// Forming the pre-goal with placeholder constants

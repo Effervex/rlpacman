@@ -406,10 +406,13 @@ public abstract class StateSpec {
 
 		try {
 			for (String action : actions_.keySet()) {
-				factBuffer.append(" (" + action);
+				boolean hasResults = false;
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
+					if (!hasResults)
+						factBuffer.append(" (" + action);
+					hasResults = true;
 					factBuffer.append(" \"");
 					boolean first = true;
 					for (String term : actionPreconditions_.get(action)) {
@@ -420,7 +423,8 @@ public abstract class StateSpec {
 					}
 					factBuffer.append("\"");
 				}
-				factBuffer.append(")");
+				if (hasResults)
+					factBuffer.append(")");
 			}
 
 			// Finalise the expression and assert it
@@ -829,16 +833,10 @@ public abstract class StateSpec {
 				// If the term isn't anonymous and isn't already in, add it.
 				if (!term.equals("?") && !terms_.contains(term)) {
 					// Don't include any numerical terms (variable or otherwise)
-					try {
-						// Basic forced parsing
-						Double.parseDouble(term);
-					} catch (Exception e) {
-						// Check the term doesn't have a condition associated
-						// with it (at the moment only numerical terms have
-						// this).
-						int index = term.indexOf("&:");
-						if (index == -1)
-							terms_.add(term);
+					if ((predicates_.get(fact[0]) == null)
+							|| (!Number.class.isAssignableFrom(predicates_.get(
+									fact[0]).get(i - 1)))) {
+						terms_.add(term);
 					}
 				}
 			}

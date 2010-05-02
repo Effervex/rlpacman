@@ -107,7 +107,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Applying the action (up down left right or nothing)
-		String[] actions = (String[]) ObjectObservations.getInstance().objectArray;
+		ArrayList<String>[] actions = (ArrayList<String>[]) ObjectObservations
+				.getInstance().objectArray;
 		environment_.simulateKeyPress(chooseLowAction(actions).getKey());
 
 		synchronized (environment_) {
@@ -169,7 +170,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Resets the environment back to normal.
 	 */
-	private void resetEnvironment() {
+	public void resetEnvironment() {
 		environment_.reinit();
 
 		model_ = environment_.getGameModel();
@@ -202,19 +203,19 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Draws the agent's action switch.
 	 * 
-	 * @param actionPriority
+	 * @param actions
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(String[] actionPriority) {
-		String[] actionList = new String[actionPriority.length];
-		for (int i = 0; i < actionPriority.length; i++) {
+	private void drawActions(ArrayList<String>[] actions) {
+		String[] actionList = new String[actions.length];
+		for (int i = 0; i < actions.length; i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
 			// If the action is null
-			if ((actionPriority[i] == null) || (actionPriority[i].isEmpty())) {
+			if ((actions[i] == null) || (actions[i].isEmpty())) {
 				buffer.append("null");
 			} else {
-				buffer.append(actionPriority[i]);
+				buffer.append(actions[i]);
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -224,12 +225,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 	/**
 	 * Chooses a direction based off the chosen high actions to follow.
 	 * 
-	 * @param actionArray
-	 *            The high actions to take, sorted in order from most to least
-	 *            priority, being processed into a single low action.
+	 * @param actions
+	 *            The prioritised actions the agent will take, joined together
+	 *            into a weighted singular direction to take.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(String[] actionArray) {
+	private PacManLowAction chooseLowAction(ArrayList<String>[] actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -249,17 +250,23 @@ public class PacManEnvironment implements EnvironmentInterface {
 		PacManState state = new PacManState(stateObjs);
 
 		double[] directionVote = new double[PacManLowAction.values().length];
-		for (int i = 0; i < actionArray.length; i++) {
-			if (actionArray[i] != null) {
-				// Use a linearly decreasing weight for directional voting.
-				double weighting = 1 - ((1.0 * i) / actionArray.length);
+		for (int i = 0; i < actions.length; i++) {
+			// Find the individual distance weighting and direction of each
+			// action in the ArrayList.
+			for (String action : actions[i]) {
+				// One weighting for each level of actions returned
+				double weighting = 1 / (i + 1);
+				if (actions[i] != null) {
+					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
+							.getInstance()).applyAction(action, state);
 
-				Byte direction = ((PacManStateSpec) StateSpec.getInstance())
-						.applyAction(actionArray[i], state);
-				if (direction > 0)
-					directionVote[direction] += weighting;
-				else if (direction < 0)
-					directionVote[-direction] -= weighting;
+					// Use a linearly decreasing weight and the object proximity
+					weighting *= weightedDir.getWeight();
+					if (weightedDir.getDirection() > 0)
+						directionVote[weightedDir.getDirection()] += weighting;
+					else if (weightedDir.getDirection() < 0)
+						directionVote[-weightedDir.getDirection()] -= weighting;
+				}
 			}
 		}
 
@@ -285,8 +292,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		chosen.retainAll(directions);
 		if (!chosen.isEmpty())
 			directions = chosen;
-		else
-			System.out.println("What?");
 
 		// Choose the first valid direction available.
 		return directions.get(0);
@@ -314,7 +319,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int isTerminal(Observation obs) {
 		int state = model_.m_state;
 		if (state == GameModel.STATE_GAMEOVER) {
-			ObjectObservations.getInstance().objectArray[0] = ObjectObservations.NO_PRE_GOAL;
+			ObjectObservations.getInstance().objectArray = new String[] { ObjectObservations.NO_PRE_GOAL };
 			return 1;
 		}
 		if (StateSpec.getInstance().isGoal(rete_))
@@ -494,8 +499,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int distanceAssertions(PacPoint thing, String thingName,
 			int closest, Set<String> closePoints) throws JessException {
 		rete_.eval("(assert (distance player " + thingName + " "
-				+ distanceGrid_[thing.m_locX][thing.m_locY]
-				+ "))");
+				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
 		if (distanceGrid_[thing.m_locX][thing.m_locY] < closest) {
 			closePoints.clear();
 			closest = distanceGrid_[thing.m_locX][thing.m_locY];
@@ -503,21 +507,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (distanceGrid_[thing.m_locX][thing.m_locY] == closest)
 			closePoints.add(thingName);
 		return closest;
-	}
-
-	/**
-	 * Discretises the distance of a thing to a discrete value.
-	 * 
-	 * @param distance
-	 *            The distance between 2 things.
-	 * @return A distance metric which discretises distance values.
-	 */
-	private String discretiseDistance(int distance) {
-		for (DistanceMetric dm : DistanceMetric.values()) {
-			if (distance <= dm.getMaxDistance())
-				return dm.toString().toLowerCase();
-		}
-		return DistanceMetric.FAR.toString().toLowerCase();
 	}
 
 	/**
@@ -586,7 +575,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The searching from.
 	 * @return A mapping of minimal distances to junctions, given by points.
 	 */
-	private SortedSet<JunctionPoint> searchMaze(Thing thing) {
+	public SortedSet<JunctionPoint> searchMaze(Thing thing) {
 		SortedSet<JunctionPoint> closeJunctions = new TreeSet<JunctionPoint>();
 		Collection<Dot> dots = model_.m_dots.values();
 
@@ -731,6 +720,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		for (JunctionPoint jp : isJunct) {
 			if (jp.getDirection() == oldDir) {
 				removal = jp;
+				break;
 			}
 		}
 		isJunct.remove(removal);
@@ -765,9 +755,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_SOUTH) == 0)
 			dirs.add(new JunctionPoint(loc, Thing.DOWN, distance));
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_EAST) == 0)
-			dirs.add(new JunctionPoint(loc, Thing.LEFT, distance));
-		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_WEST) == 0)
 			dirs.add(new JunctionPoint(loc, Thing.RIGHT, distance));
+		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_WEST) == 0)
+			dirs.add(new JunctionPoint(loc, Thing.LEFT, distance));
 
 		if (dirs.size() > 2)
 			return dirs;
@@ -781,5 +771,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
 		for (int x = 0; x < distanceGrid_.length; x++)
 			Arrays.fill(distanceGrid_[x], Integer.MAX_VALUE);
+	}
+
+	/**
+	 * @return the model_
+	 */
+	public GameModel getModel() {
+		return model_;
+	}
+
+	public int[][] getDistanceGrid() {
+		return distanceGrid_;
+	}
+
+	public void resetGridStart() {
+		gridStart_ = null;
 	}
 }
