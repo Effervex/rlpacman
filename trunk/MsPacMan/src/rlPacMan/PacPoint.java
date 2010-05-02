@@ -7,8 +7,8 @@ package rlPacMan;
  * @author Sam Sarjant
  */
 public abstract class PacPoint {
-	int m_locX;
-	int m_locY;
+	public int m_locX;
+	public int m_locY;
 
 	@Override
 	public String toString() {

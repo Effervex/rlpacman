@@ -556,12 +556,20 @@ public class GameUI extends Canvas {
 		g.setColor(wallColor);
 
 		gameCell = m_gameModel.m_gameState[x][y];
+		
+		
 
 		// Treat the Hideout door as a special case because it will
 		// be re-drawn last.
 		if (y == m_gameModel.m_doorLocY && x >= m_gameModel.m_doorLocX - 1
 				&& x <= m_gameModel.m_doorLocX + 2)
 			return;
+		
+		// TODO Debug drawing
+//		if (gameCell >= GameModel.PAL_BEND_TOPLEFT) {
+//			g.fillRect(x1, y1, CELL_LENGTH, CELL_LENGTH);
+//			return;
+//		}
 
 		// If we are in the intro, don't draw any walls.
 		if (m_bShowIntro == true)

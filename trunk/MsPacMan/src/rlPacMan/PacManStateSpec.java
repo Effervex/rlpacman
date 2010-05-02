@@ -1,19 +1,13 @@
 package rlPacMan;
 
-import java.awt.geom.Point2D;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
-import relationalFramework.State;
 import relationalFramework.StateSpec;
 
 /**
@@ -26,13 +20,13 @@ public class PacManStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("toDot", "(dot ?X)");
-		preconds.put("toPowerDot", "(powerDot ?X)");
-		preconds.put("fromPowerDot", "(powerDot ?X)");
-		preconds.put("toFruit", "(fruit ?X)");
-		preconds.put("toGhost", "(ghost ?X)");
-		preconds.put("fromGhost", "(ghost ?X)");
-		preconds.put("toJunction", "(junction ?X)");
+		preconds.put("toDot", "(dot ?X) (distance player ?X ?Y)");
+		preconds.put("toPowerDot", "(powerDot ?X) (distance player ?X ?Y)");
+		preconds.put("fromPowerDot", "(powerDot ?X) (distance player ?X ?Y)");
+		preconds.put("toFruit", "(fruit ?X) (distance player ?X ?Y)");
+		preconds.put("toGhost", "(ghost ?X) (distance player ?X ?Y)");
+		preconds.put("fromGhost", "(ghost ?X) (distance player ?X ?Y)");
+		preconds.put("toJunction", "(junction ?X) (distance player ?X ?Y)");
 
 		return preconds;
 	}
@@ -46,32 +40,40 @@ public class PacManStateSpec extends StateSpec {
 	protected MultiMap<String, Class> initialiseActionTemplates() {
 		MultiMap<String, Class> actions = new MultiMap<String, Class>();
 
+		// Actions have a type and a distance
 		List<Class> structure = new ArrayList<Class>();
 		structure.add(Dot.class);
+		structure.add(Integer.class);
 		actions.putCollection("toDot", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(PowerDot.class);
+		structure.add(Integer.class);
 		actions.putCollection("toPowerDot", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(PowerDot.class);
+		structure.add(Integer.class);
 		actions.putCollection("fromPowerDot", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(Fruit.class);
+		structure.add(Integer.class);
 		actions.putCollection("toFruit", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(Ghost.class);
+		structure.add(Integer.class);
 		actions.putCollection("toGhost", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(Ghost.class);
+		structure.add(Integer.class);
 		actions.putCollection("fromGhost", structure);
 
 		structure = new ArrayList<Class>();
 		structure.add(JunctionPoint.class);
+		structure.add(Integer.class);
 		actions.putCollection("toJunction", structure);
 
 		return actions;
@@ -115,24 +117,25 @@ public class PacManStateSpec extends StateSpec {
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
 		rules
-				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 2)) "
 						+ "(edible ?Ghost) (blinking ?Ghost) (pacman ?Player) "
-						+ "(ghost ?Ghost) => (fromGhost ?Ghost)");
+						+ "(ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 		rules
-				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost)");
+				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
 				.add("(distance ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
 						+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
-						+ "=> (fromPowerDot ?PowerDot)");
+						+ "=> (fromPowerDot ?PowerDot ?Dist0)");
 		rules
 				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost)");
+						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 		rules
 				.add("(distance ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
-						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit)");
-		rules.add("(closest ?Player ?Dot) (pacman ?Player) "
-				+ "(dot ?Dot) => (toDot ?Dot)");
+						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
+		rules.add("(distance ?Player ?Dot ?Dist0) (pacman ?Player) "
+				+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false);
@@ -255,19 +258,22 @@ public class PacManStateSpec extends StateSpec {
 	 *            The action to apply.
 	 * @return A Byte direction to move towards/from.
 	 */
-	public Byte applyAction(String action, PacManState state) {
+	public WeightedDirection applyAction(String action, PacManState state) {
 		String[] actionSplit = StateSpec.splitFact(action);
+		double weight = determineWeight(Integer.parseInt(actionSplit[2]));
+
 		// Move towards static points (dots, powerdots, junctions)
 		if ((actionSplit[0].equals("toDot"))
 				|| (actionSplit[0].equals("toPowerDot"))
 				|| (actionSplit[0].equals("toJunction"))) {
 			String[] coords = actionSplit[1].split("_");
-			return (byte) followPath(Integer.parseInt(coords[1]),
-					Integer.parseInt(coords[2]), state.getDistanceGrid())
-					.ordinal();
+			return new WeightedDirection((byte) followPath(
+					Integer.parseInt(coords[1]), Integer.parseInt(coords[2]),
+					state.getDistanceGrid()).ordinal(), weight);
 		} else if (actionSplit[0].equals("toFruit")) {
-			return (byte) followPath(state.getFruit().m_locX,
-					state.getFruit().m_locY, state.getDistanceGrid()).ordinal();
+			return new WeightedDirection((byte) followPath(
+					state.getFruit().m_locX, state.getFruit().m_locY,
+					state.getDistanceGrid()).ordinal(), weight);
 		} else {
 			int ghostIndex = 0;
 			if (actionSplit[1].equals("blinky"))
@@ -283,9 +289,20 @@ public class PacManStateSpec extends StateSpec {
 					state.getGhosts()[ghostIndex].m_locY,
 					state.getDistanceGrid()).ordinal();
 			if (actionSplit[0].equals("toGhost"))
-				return path;
+				return new WeightedDirection(path, weight);
 			else
-				return (byte) -path;
+				return new WeightedDirection((byte) -path, weight);
 		}
+	}
+
+	/**
+	 * Determines the weight of the action based on the proximity of the object.
+	 * 
+	 * @param distance
+	 *            The distance to the object.
+	 * @return A weight inversely proportional to the distance.
+	 */
+	private double determineWeight(int distance) {
+		return (1.0 / Math.pow(distance + 1, 2));
 	}
 }

@@ -471,8 +471,7 @@ public class PacMan {
 		}
 
 		// If the thing has moved past the middle of the two cells, then switch
-		// his
-		// location to the other side.
+		// his location to the other side.
 		if (thing.m_deltaLocX <= -thing.m_deltaMax) // Shift thing to adjacent
 		// cell on left
 		{

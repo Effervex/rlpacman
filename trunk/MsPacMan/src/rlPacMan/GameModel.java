@@ -4,10 +4,6 @@ import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.PolicyGenerator;
-import relationalFramework.State;
-import relationalFramework.StateSpec;
-
 // GameState is primarly maintained by the int[][] m_gameState
 // 2D array where each integer is a location in the maze.  Integers
 // consists of GameState Values ORd together.  By using bitwise
@@ -24,18 +20,18 @@ public class GameModel {
 	// PAL_**** where in this location, a certain type of wall
 	// must be drawn. These game state values tells the View (GameUI)
 	// how to draw the maze.
-	static final int PAL_BEND_TOPLEFT = 1 << 6;
-	static final int PAL_BEND_BOTTOMLEFT = 1 << 7;
-	static final int PAL_BEND_BOTTOMRIGHT = 1 << 8;
-	static final int PAL_BEND_TOPRIGHT = 1 << 9;
+	public static final int PAL_BEND_TOPLEFT = 1 << 6;
+	public static final int PAL_BEND_BOTTOMLEFT = 1 << 7;
+	public static final int PAL_BEND_BOTTOMRIGHT = 1 << 8;
+	public static final int PAL_BEND_TOPRIGHT = 1 << 9;
 
-	static final int PAL_EDGE_TOP = 1 << 10;
-	static final int PAL_EDGE_LEFT = 1 << 12;
-	static final int PAL_EDGE_BOTTOM = 1 << 13;
-	static final int PAL_EDGE_RIGHT = 1 << 14;
+	public static final int PAL_EDGE_TOP = 1 << 10;
+	public static final int PAL_EDGE_LEFT = 1 << 12;
+	public static final int PAL_EDGE_BOTTOM = 1 << 13;
+	public static final int PAL_EDGE_RIGHT = 1 << 14;
 
-	static final int PAL_LINE_HORIZ = 1 << 15;
-	static final int PAL_LINE_VERT = 1 << 16;
+	public static final int PAL_LINE_HORIZ = 1 << 15;
+	public static final int PAL_LINE_VERT = 1 << 16;
 
 	// Trying to model a FSM where the game is always
 	// in one of the below States
@@ -54,7 +50,7 @@ public class GameModel {
 	static final int STATE_INTRO = 9; // Intro to game with nice JPEG banner
 	static final int STATE_ABOUT = 10; // About page
 
-	int[][] m_gameState; // Represents maze as integers
+	public int[][] m_gameState; // Represents maze as integers
 	Map<Point, Dot> m_dots;
 	Map<Point, PowerDot> m_powerdots;
 	int m_gameSizeX;
@@ -289,14 +285,14 @@ public class GameModel {
 		// There are five different game boards which are
 		// rotated after a board is completed twice
 		switch (m_stage % 10) {
-		case 3:
-		case 4:
+		case 1:
+		case 2:
 			loadPacManMaze();
 			m_pacMan.m_gameUI.m_wallColor = Color.blue;
 			m_pacMan.m_gameUI.m_wallAltColor = Color.white;
 			break;
-		case 1:
-		case 2:
+		case 3:
+		case 4:
 			loadMsPacManMaze1();
 			m_pacMan.m_gameUI.m_wallColor = Color.red;
 			m_pacMan.m_gameUI.m_wallAltColor = Color.white;
@@ -8692,5 +8688,9 @@ public class GameModel {
 		m_gameState[27][30] = PAL_BEND_TOPLEFT | PAL_EDGE_BOTTOM
 				| PAL_EDGE_RIGHT | GS_NORTH | GS_WEST;
 
+	}
+
+	public Player getPlayer() {
+		return m_player;
 	}
 }
