@@ -202,7 +202,7 @@ public class Policy {
 	 *            If this policy is noting the rules fired as triggered. Usually
 	 *            deactivated after agent has found internal goal.
 	 */
-	public void evaluatePolicy(Rete state, ActionSwitch actionSwitch,
+	public ActionChoice evaluatePolicy(Rete state, ActionChoice actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
 
@@ -271,7 +271,7 @@ public class Policy {
 
 		// If optimal, just exit
 		if (optimal)
-			return;
+			return actionSwitch;
 
 		// If the policy didn't generate enough rules, cover a set of new rules
 		// for each action.
@@ -288,5 +288,7 @@ public class Policy {
 		} else if (!alreadyCovered) {
 			PolicyGenerator.getInstance().triggerCovering(state, false);
 		}
+		
+		return actionSwitch;
 	}
 }

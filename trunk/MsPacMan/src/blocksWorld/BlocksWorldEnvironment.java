@@ -18,6 +18,7 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import relationalFramework.ActionChoice;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -135,8 +136,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		ArrayList<String> actions = (ArrayList<String>) ObjectObservations.getInstance().objectArray[0];
-		String action = actions.get(PolicyGenerator.random_.nextInt(actions.size()));
+		ArrayList<String> actions = ((ActionChoice) ObjectObservations
+				.getInstance().objectArray[0]).getFirstActionList();
+		String action = actions.get(PolicyGenerator.random_.nextInt(actions
+				.size()));
 
 		BlocksState newState = actOnAction(action, state_);
 		if (PolicyGenerator.debugMode_ && !optimal_) {
@@ -481,7 +484,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 						else
 							buffer.append("[" + blocksChars[x][y] + "]");
 					}
-					
+
 					if (y != 0)
 						buffer.append("\n");
 				}

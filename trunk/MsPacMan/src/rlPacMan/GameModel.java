@@ -116,7 +116,7 @@ public class GameModel {
 		m_powerdots = new HashMap<Point, PowerDot>();
 
 		// Ghosts and Pacman
-		m_player = new Player(this, Thing.PACMAN, 13, 23, true);
+		m_player = new Player(this, Thing.PACMAN, 13, 23, false);
 		m_ghosts = new Ghost[4];
 		m_ghosts[Ghost.BLINKY] = new Ghost(this, Ghost.BLINKY, 13, 11, true, 0);
 		m_ghosts[Ghost.PINKY] = new Ghost(this, Ghost.PINKY, 12, 14, false,

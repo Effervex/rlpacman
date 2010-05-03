@@ -28,8 +28,8 @@ public class PolicyActor implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
 
-	/** The currently switched actions. */
-	private ActionSwitch actionsModule_;
+	/** The last chosen actions. */
+	private ActionChoice prevActions_;
 
 	/** The previous state seen by the agent. */
 	private Collection<Fact> prevState_;
@@ -98,8 +98,7 @@ public class PolicyActor implements AgentInterface {
 			// Only form pre-goal if the generator isn't a module.
 			if (!PolicyGenerator.getInstance().isModuleGenerator())
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						actionsModule_.getPrioritisedActions(),
-						StateSpec.getInstance().getConstants());
+						prevActions_, StateSpec.getInstance().getConstants());
 		} else if (arg0.indexOf(LearningController.INTERNAL_PREFIX) == 0) {
 			// Setting an internal goal
 			String oldGoal = goalPredicate_;
@@ -119,7 +118,7 @@ public class PolicyActor implements AgentInterface {
 	// @Override
 	public Action agent_start(Observation arg0) {
 		// Initialising the actions
-		actionsModule_ = new ActionSwitch();
+		prevActions_ = new ActionChoice();
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -127,8 +126,10 @@ public class PolicyActor implements AgentInterface {
 		Collection<Fact> stateFacts = StateSpec.extractFacts(ObjectObservations
 				.getInstance().predicateKB);
 		setInternalGoal(stateFacts);
-		ObjectObservations.getInstance().objectArray = chooseAction(
+
+		prevActions_ = chooseAction(
 				ObjectObservations.getInstance().predicateKB, stateFacts);
+		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
 
 		return action;
 	}
@@ -147,8 +148,9 @@ public class PolicyActor implements AgentInterface {
 			processInternalGoal(stateFacts, prevState_);
 		}
 
-		ObjectObservations.getInstance().objectArray = chooseAction(
+		prevActions_ = chooseAction(
 				ObjectObservations.getInstance().predicateKB, stateFacts);
+		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
 
 		return action;
 	}
@@ -168,12 +170,11 @@ public class PolicyActor implements AgentInterface {
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)) {
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						actionsModule_.getPrioritisedActions(),
-						StateSpec.getInstance().getConstants());
+						prevActions_, StateSpec.getInstance().getConstants());
 			}
 		}
 
-		actionsModule_ = null;
+		prevActions_ = null;
 	}
 
 	/**
@@ -197,24 +198,21 @@ public class PolicyActor implements AgentInterface {
 	 *            The state of the system as given by predicates.
 	 * @return A relational action.
 	 */
-	private ArrayList<String>[] chooseAction(Rete state,
-			Collection<Fact> stateFacts) {
-		actionsModule_.switchOffAll();
+	private ActionChoice chooseAction(Rete state, Collection<Fact> stateFacts) {
+		ActionChoice actions = new ActionChoice();
 
 		boolean noteTriggered = true;
 		if ((internalGoal_ != null) && (internalGoalMet_))
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
-		policy_.evaluatePolicy(state, actionsModule_, StateSpec.getInstance()
-				.getNumActions(), optimal_, false, noteTriggered);
+		actions = policy_.evaluatePolicy(state, actions, StateSpec
+				.getInstance().getNumActions(), optimal_, false, noteTriggered);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;
 
 		// Return the actions.
-		ArrayList<ArrayList<String>> actions = actionsModule_
-				.getPrioritisedActions();
-		return actions.toArray(new ArrayList[actions.size()]);
+		return actions;
 	}
 
 	/**
@@ -369,26 +367,11 @@ public class PolicyActor implements AgentInterface {
 			}
 
 			// Changing all the actions to modular format
-			ArrayList<ArrayList<String>> actions = actionsModule_
-					.getPrioritisedActions();
-			for (int i = 0; i < actions.size(); i++) {
-				ArrayList<String> modularActions = new ArrayList<String>();
-				// Run through each action in the collection and replace
-				// constants with modular variables.
-				for (String action : actions.get(i)) {
-					for (String constant : replacements.keySet()) {
-						action = action.replaceAll(" "
-								+ Pattern.quote(constant) + "(?=( |\\)))", " "
-								+ replacements.get(constant));
-					}
-					modularActions.add(action);
-				}
-				actions.set(i, modularActions);
-			}
+			prevActions_.replaceTerms(replacements);
 
 			// Forming the pre-goal with placeholder constants
 			PolicyGenerator.getInstance().formPreGoalState(prevStateClone,
-					actions, placeholderConstants);
+					prevActions_, placeholderConstants);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
