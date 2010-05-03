@@ -102,12 +102,12 @@ public class PacManStateSpec extends StateSpec {
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		constants.add("player");
+		//constants.add("player");
 		// Actual goal condition
 		// return "(level 10) (not (exists (dot ?X)";
 
 		// Score maximisation
-		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
+		return "(highScore ?X) (score ?Y &:(>= ?Y 100))";
 	}
 
 	@Override
@@ -125,12 +125,18 @@ public class PacManStateSpec extends StateSpec {
 						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
 				.add("(distance ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+						+ "(distance ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
 						+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
 						+ "=> (fromPowerDot ?PowerDot ?Dist0)");
 		rules
 				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
 						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
+		rules
+				.add("(not (edible ?Ghost)) "
+						+ "(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
+						+ "(distance ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
+						+ "(pacman ?Player) (ghost ?Ghost) "
+						+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
 		rules
 				.add("(distance ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
 						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");

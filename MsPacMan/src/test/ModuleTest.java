@@ -4,12 +4,9 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.Covering;
 import relationalFramework.GuidedRule;
 import relationalFramework.Module;
 import relationalFramework.StateSpec;

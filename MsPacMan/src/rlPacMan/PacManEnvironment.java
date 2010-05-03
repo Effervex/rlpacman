@@ -17,6 +17,7 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import relationalFramework.ActionChoice;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -24,7 +25,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static final int PLAYER_DELAY = 10;
+	public static final int PLAYER_DELAY = 1;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
@@ -32,7 +33,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int[][] distanceGrid_;
 	private SortedSet<JunctionPoint> pacJunctions_;
 	private Point gridStart_;
-	private ArrayList<Double>[] observationFreqs_;
 
 	@Override
 	public void env_cleanup() {
@@ -96,6 +96,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return calculateObservations(rete_);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
@@ -107,19 +108,19 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Applying the action (up down left right or nothing)
-		ArrayList<String>[] actions = (ArrayList<String>[]) ObjectObservations
-				.getInstance().objectArray;
-		environment_.simulateKeyPress(chooseLowAction(actions).getKey());
+		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
+		environment_.simulateKeyPress(chooseLowAction(actions.getActions())
+				.getKey());
 
 		synchronized (environment_) {
-			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
+			for (int i = 0; i < model_.m_player.m_deltaMax * 2 - 1; i++) {
 				environment_.tick(false);
 			}
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
 		if (!environment_.experimentMode_) {
-			drawActions(actions);
+			drawActions(actions.getActions());
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
 			environment_.m_topCanvas.repaint();
@@ -194,7 +195,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		environment_.m_gameUI.m_bDrawPaused = false;
 
 		synchronized (environment_) {
-			for (int i = 0; i < model_.m_player.m_deltaMax; i++) {
+			while (model_.m_state != GameModel.STATE_PLAYING) {
 				environment_.tick(false);
 			}
 		}
@@ -207,15 +208,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(ArrayList<String>[] actions) {
-		String[] actionList = new String[actions.length];
-		for (int i = 0; i < actions.length; i++) {
+	private void drawActions(ArrayList<ArrayList<String>> actions) {
+		String[] actionList = new String[actions.size()];
+		for (int i = 0; i < actions.size(); i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
 			// If the action is null
-			if ((actions[i] == null) || (actions[i].isEmpty())) {
+			if ((actions.get(i) == null) || (actions.get(i).isEmpty())) {
 				buffer.append("null");
 			} else {
-				buffer.append(actions[i]);
+				buffer.append(actions.get(i));
 			}
 			actionList[i] = buffer.toString();
 		}
@@ -230,7 +231,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            into a weighted singular direction to take.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(ArrayList<String>[] actions) {
+	private PacManLowAction chooseLowAction(ArrayList<ArrayList<String>> actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -250,13 +251,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 		PacManState state = new PacManState(stateObjs);
 
 		double[] directionVote = new double[PacManLowAction.values().length];
-		for (int i = 0; i < actions.length; i++) {
+		for (int i = 0; i < actions.size(); i++) {
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
-			for (String action : actions[i]) {
+			for (String action : actions.get(i)) {
 				// One weighting for each level of actions returned
 				double weighting = 1 / (i + 1);
-				if (actions[i] != null) {
+				if (actions.get(i) != null) {
 					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 							.getInstance()).applyAction(action, state);
 

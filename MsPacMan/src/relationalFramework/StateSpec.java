@@ -530,6 +530,22 @@ public abstract class StateSpec {
 		return buffer.toString();
 	}
 
+	/**
+	 * Checks if this String can be parsed into a double.
+	 * 
+	 * @param unityValue
+	 *            The value being checked.
+	 * @return True if the String can be put into a numerical form.
+	 */
+	public static boolean isNumber(String string) {
+		try {
+			double unityDouble = Double.parseDouble(string);
+		} catch (Exception e) {
+			return false;
+		}
+		return true;
+	}
+
 	public String getEnvironmentName() {
 		return environment_;
 	}

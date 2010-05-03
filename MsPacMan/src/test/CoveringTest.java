@@ -15,6 +15,7 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
+import relationalFramework.ActionChoice;
 import relationalFramework.Covering;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
@@ -522,7 +523,9 @@ public class CoveringTest {
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor a)", StateSpec.getInstance()
+		ActionChoice ac = new ActionChoice();
+		ac.switchOn("(moveFloor a)");
+		sut_.formPreGoalState(facts, ac, StateSpec.getInstance()
 				.getConstants());
 		List<String> preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
@@ -533,7 +536,9 @@ public class CoveringTest {
 		state.reset();
 		state.eval("(assert (clear b))");
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(moveFloor b)", StateSpec.getInstance()
+		ac = new ActionChoice();
+		ac.switchOn("(moveFloor b)");
+		sut_.formPreGoalState(facts, ac, StateSpec.getInstance()
 				.getConstants());
 		preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
@@ -557,7 +562,9 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance()
+		ac = new ActionChoice();
+		ac.switchOn("(move a b)");
+		sut_.formPreGoalState(facts, ac, StateSpec.getInstance()
 				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
@@ -591,7 +598,9 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 		facts = StateSpec.extractFacts(state);
-		sut_.formPreGoalState(facts, "(move a b)", StateSpec.getInstance()
+		ac = new ActionChoice();
+		ac.switchOn("(move a b)");
+		sut_.formPreGoalState(facts, ac, StateSpec.getInstance()
 				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
@@ -604,7 +613,9 @@ public class CoveringTest {
 		assertTrue(preGoal.contains("(above b ?)"));
 
 		// Generalising the action
-		sut_.formPreGoalState(facts, "(move b a)", StateSpec.getInstance()
+		ac = new ActionChoice();
+		ac.switchOn("(move b a)");
+		sut_.formPreGoalState(facts, ac, StateSpec.getInstance()
 				.getConstants());
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
@@ -1008,26 +1019,6 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on a ?Y)"));
 		assertTrue(oldState.contains("(on a b)"));
 		assertTrue(oldState.contains("(clear a)"));
-
-		// Improper unification
-		// oldState.clear();
-		// oldState.add("(on a ?Y)");
-		// oldState.add("(on a b)");
-		// oldState.add("(clear a)");
-		// newState.clear();
-		// newState.add("(on a b)");
-		// newState.add("(clear a)");
-		// oldTerms.clear();
-		// oldTerms.add("a");
-		// oldTerms.add("?Y");
-		// newTerms.clear();
-		// newTerms.add("a");
-		// newTerms.add("b");
-		// result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
-		// assertEquals(1, result);
-		// assertEquals(2, oldState.size());
-		// assertTrue(oldState.contains("(on a b)"));
-		// assertTrue(oldState.contains("(clear a)"));
 	}
 
 	@Test
@@ -1227,6 +1218,81 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))"));
+		
+		// Variables and numerical unification (differing distance)
+		oldState.clear();
+		oldState.add("(distance ? ?X 1)");
+		oldState.add("(dot ?X)");
+		newState.clear();
+		newState.add("(distance player blinky 2)");
+		newState.add("(ghost blinky)");
+		newState.add("(distance player dot_1 5)");
+		newState.add("(dot dot_1)");
+		oldTerms.clear();
+		oldTerms.add("?X");
+		oldTerms.add("1");
+		newTerms.clear();
+		newTerms.add("dot_1");
+		newTerms.add("5");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index += 2;
+		assertTrue(oldState.contains("(distance ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
+		assertTrue(oldState.contains("(dot ?X)"));
+		
+		// Variables and numerical unification (out-of-range distance)
+		oldState.clear();
+		oldState.add("(distance ? ?X 1)");
+		oldState.add("(dot ?X)");
+		newState.clear();
+		newState.add("(distance player blinky 10)");
+		newState.add("(ghost blinky)");
+		newState.add("(distance player dot_1 5)");
+		newState.add("(dot dot_1)");
+		oldTerms.clear();
+		oldTerms.add("?X");
+		oldTerms.add("1");
+		newTerms.clear();
+		newTerms.add("dot_1");
+		newTerms.add("5");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index += 2;
+		assertTrue(oldState.contains("(distance ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
+		assertTrue(oldState.contains("(dot ?X)"));
+		
+		// Variables and numerical unification (same distance)
+		oldState.clear();
+		oldState.add("(distanceDot ? ?X 1)");
+		oldState.add("(dot ?X)");
+		newState.clear();
+		newState.add("(distanceGhost player blinky 1)");
+		newState.add("(ghost blinky)");
+		newState.add("(distanceDot player dot_1 5)");
+		newState.add("(dot dot_1)");
+		oldTerms.clear();
+		oldTerms.add("?X");
+		oldTerms.add("1");
+		newTerms.clear();
+		newTerms.add("dot_1");
+		newTerms.add("5");
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains("(distanceDot ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
+		assertTrue(oldState.contains("(dot ?X)"));
 	}
 
 	@Test

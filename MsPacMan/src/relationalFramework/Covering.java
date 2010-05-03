@@ -219,7 +219,9 @@ public class Covering {
 			// If this index of terms don't match up
 			String oldTerm = oldTerms.get(i);
 			String newTerm = newTerms.get(i);
-			if (!oldTerm.equals(newTerm)) {
+			// If the terms don't match and aren't numbers, create a replacement
+			if (!oldTerm.equals(newTerm) && !StateSpec.isNumber(oldTerm)
+					&& !StateSpec.isNumber(newTerm)) {
 				boolean bothVariables = true;
 				String variable = getVariableTermString(i);
 				// Replace old term if necessary
@@ -372,17 +374,12 @@ public class Covering {
 	 */
 	private boolean numericalValueCheck(String factValue, String unityValue,
 			String[] unification, int index) {
-		// TODO Create method, but need to check for existing range variables to
-		// ensure that a unique range variable is created. Maybe maintain a
-		// private list of them.
-
 		// Check the unity is a number
 		double unityDouble = 0;
-		try {
+		if (StateSpec.isNumber(unityValue))
 			unityDouble = Double.parseDouble(unityValue);
-		} catch (Exception e) {
+		else
 			return false;
-		}
 
 		// The factValue may be a range
 		Pattern rangePattern = Pattern.compile("(\\?"
@@ -415,14 +412,11 @@ public class Covering {
 
 			return true;
 		} else {
-			// We're possibly dealing with two numbers
-			// Check the unity is a number
 			double factDouble = 0;
-			try {
+			if (StateSpec.isNumber(factValue))
 				factDouble = Double.parseDouble(factValue);
-			} catch (Exception e) {
+			else
 				return false;
-			}
 
 			// Find the min, max, then form the range
 			double min = Math.min(factDouble, unityDouble);
@@ -586,6 +580,7 @@ public class Covering {
 		Map<String, String> termMapping = new HashMap<String, String>();
 		int i = 0;
 		for (String term : actionTerms) {
+
 			termMapping.put(term, getVariableTermString(i));
 			i++;
 		}
@@ -1048,55 +1043,72 @@ public class Covering {
 	 * 
 	 * @param preGoalState
 	 *            The pre-goal state seen by the agent.
-	 * @param action
-	 *            The final action taken by the agent.
+	 * @param actions
+	 *            The final action/s taken by the agent.
 	 * @param constants
 	 *            The list of constants used in forming the pre-goal state.
 	 * @return A collection of actions which have settled pre-goals.
 	 */
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			String action, List<String> constants) {
+			ActionChoice actionChoice, List<String> constants) {
+		// A set to note which actions have been covered this state to avoid
+		// premature settling.
+		Set<String> formedActions = new HashSet<String>();
+
 		// If the state isn't yet settled, try unification
-		if (!isPreGoalSettled(action)) {
-			// Inversely substitute the old pregoal state
-			String[] actionSplit = StateSpec.splitFact(action);
-			String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
-					actionSplit.length);
-			// The actions become constants if possible
-			constants = new ArrayList<String>(constants);
-			List<String> newStateTerms = new ArrayList<String>();
-			for (String actionTerm : actionTerms) {
-				newStateTerms.add(actionTerm);
-				if (!constants.contains(actionTerm))
-					constants.add(actionTerm);
-			}
-			Collection<String> preGoalStringState = inverselySubstitute(
-					preGoalState, actionTerms, constants);
-			removeUselessFacts(preGoalStringState);
+		for (ArrayList<String> actions : actionChoice.getActions()) {
+			String actionPred = StateSpec.splitFact(actions.get(0))[0];
+			if (!isPreGoalSettled(actionPred)) {
 
-			// Unify with the old state
-			PreGoalInformation oldPreGoal = preGoals_.get(actionSplit[0]);
-			if (oldPreGoal == null) {
-				preGoals_.put(actionSplit[0], new PreGoalInformation(
-						(List<String>) preGoalStringState, newStateTerms));
-			} else {
-				// Unify the two states and check if it has changed at all.
-				PreGoalInformation preGoal = preGoals_.get(actionSplit[0]);
-				int result = unifyStates(preGoal.getState(),
-						preGoalStringState, preGoal.getActionTerms(),
-						newStateTerms);
+				// Create a pre-goal from every action in the actions list.
+				for (String action : actions) {
+					// Inversely substitute the old pregoal state
+					String[] actionSplit = StateSpec.splitFact(action);
+					String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
+							actionSplit.length);
 
-				// If the states unified, reset the counter, otherwise
-				// increment.
-				// Hopefully there aren't any errors.
-				if (result == 1)
-					preGoal.resetInactivity();
-				else if (result == 0)
-					preGoal.incrementInactivity();
-				else if (result == -1)
-					throw new RuntimeException(
-							"Pre-goal states did not unify: " + preGoal + ", "
-									+ preGoalStringState);
+					// The actions become constants if possible
+					List<String> newConstants = new ArrayList<String>(constants);
+					List<String> newStateTerms = new ArrayList<String>();
+					for (String actionTerm : actionTerms) {
+						newStateTerms.add(actionTerm);
+						// Ignore numerical terms and terms already added
+						if (!newConstants.contains(actionTerm))
+							newConstants.add(actionTerm);
+					}
+					Collection<String> preGoalStringState = inverselySubstitute(
+							preGoalState, actionTerms, newConstants);
+					removeUselessFacts(preGoalStringState);
+
+					// Unify with the old state
+					PreGoalInformation preGoal = preGoals_.get(actionSplit[0]);
+					if (preGoal == null) {
+						preGoals_.put(actionSplit[0], new PreGoalInformation(
+								(List<String>) preGoalStringState,
+								newStateTerms));
+					} else {
+						// Unify the two states and check if it has changed at
+						// all.
+						int result = unifyStates(preGoal.getState(),
+								preGoalStringState, preGoal.getActionTerms(),
+								newStateTerms);
+
+						// If the states unified, reset the counter, otherwise
+						// increment.
+						if (result == 1) {
+							preGoal.resetInactivity();
+						} else if (result == 0) {
+							if (!formedActions.contains(actionPred))
+								preGoal.incrementInactivity();
+						} else if (result == -1) {
+							throw new RuntimeException(
+									"Pre-goal states did not unify: " + preGoal
+											+ ", " + preGoalStringState);
+						}
+
+						formedActions.add(actionPred);
+					}
+				}
 			}
 		}
 
@@ -1135,12 +1147,14 @@ public class Covering {
 	/**
 	 * If the pre-goal state has settled to a stable state.
 	 * 
+	 * @param actionPred
+	 *            The action predicate to check for pre-goal settlement.
 	 * @return True if the state has settled, false otherwise.
 	 */
-	public boolean isPreGoalSettled(String action) {
+	public boolean isPreGoalSettled(String actionPred) {
 		// If the pre-goal isn't empty and is settled, return true
-		if (preGoals_.containsKey(action)) {
-			if (preGoals_.get(action).isSettled())
+		if (preGoals_.containsKey(actionPred)) {
+			if (preGoals_.get(actionPred).isSettled())
 				return true;
 		}
 		return false;
