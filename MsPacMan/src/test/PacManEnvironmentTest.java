@@ -41,7 +41,7 @@ public class PacManEnvironmentTest {
 			int x = player.m_locX;
 			int y = player.m_locY;
 
-			SortedSet<JunctionPoint> points = sut_.searchMaze(player);
+			SortedSet<Junction> points = sut_.searchMaze(player);
 			// Always at least 2 junctions
 			assertTrue(points.size() >= 2);
 

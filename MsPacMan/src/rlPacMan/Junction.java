@@ -2,13 +2,13 @@ package rlPacMan;
 
 import java.awt.Point;
 
-public class JunctionPoint extends PacPoint implements
-		Comparable<JunctionPoint> {
+public class Junction extends PacPoint implements
+		Comparable<Junction> {
 	private byte direction_;
 	private int distance_;
 	private int safety_ = Integer.MAX_VALUE;
 
-	public JunctionPoint(Point loc, byte dir, int dist) {
+	public Junction(Point loc, byte dir, int dist) {
 		m_locX = loc.x;
 		m_locY = loc.y;
 		direction_ = dir;
@@ -16,7 +16,7 @@ public class JunctionPoint extends PacPoint implements
 	}
 
 	// @Override
-	public int compareTo(JunctionPoint otherPoint) {
+	public int compareTo(Junction otherPoint) {
 		// Mainly comparable by distance
 		if (otherPoint.distance_ < distance_)
 			return 1;
@@ -46,9 +46,9 @@ public class JunctionPoint extends PacPoint implements
 	// @Override
 	@Override
 	public boolean equals(Object obj) {
-		if ((obj == null) || (!(obj instanceof JunctionPoint)))
+		if ((obj == null) || (!(obj instanceof Junction)))
 			return false;
-		JunctionPoint other = (JunctionPoint) obj;
+		Junction other = (Junction) obj;
 		// All must be equal for truth
 		if ((m_locX == other.m_locX) && (m_locY == other.m_locY)
 				&& (distance_ == other.distance_)
