@@ -20,13 +20,13 @@ public class PacManStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("toDot", "(dot ?X) (distance player ?X ?Y)");
-		preconds.put("toPowerDot", "(powerDot ?X) (distance player ?X ?Y)");
-		preconds.put("fromPowerDot", "(powerDot ?X) (distance player ?X ?Y)");
-		preconds.put("toFruit", "(fruit ?X) (distance player ?X ?Y)");
-		preconds.put("toGhost", "(ghost ?X) (distance player ?X ?Y)");
-		preconds.put("fromGhost", "(ghost ?X) (distance player ?X ?Y)");
-		preconds.put("toJunction", "(junction ?X) (distance player ?X ?Y)");
+		preconds.put("toDot", "(dot ?X) (distanceDot player ?X ?Y)");
+		preconds.put("toPowerDot", "(powerDot ?X) (distancePowerDot player ?X ?Y)");
+		preconds.put("fromPowerDot", "(powerDot ?X) (distancePowerDot player ?X ?Y)");
+		preconds.put("toFruit", "(fruit ?X) (distanceFruit player ?X ?Y)");
+		preconds.put("toGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
+		preconds.put("fromGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
+		preconds.put("toJunction", "(junction ?X) (distanceJunction player ?X ?Y)");
 
 		return preconds;
 	}
@@ -72,7 +72,7 @@ public class PacManStateSpec extends StateSpec {
 		actions.putCollection("fromGhost", structure);
 
 		structure = new ArrayList<Class>();
-		structure.add(JunctionPoint.class);
+		structure.add(Junction.class);
 		structure.add(Integer.class);
 		actions.putCollection("toJunction", structure);
 
@@ -82,20 +82,6 @@ public class PacManStateSpec extends StateSpec {
 	@Override
 	protected Map<String, String> initialiseBackgroundKnowledge() {
 		Map<String, String> bckKnowledge = new HashMap<String, String>();
-
-		// Type generalisation
-		String[] type = { "pacman", "ghost", "dot", "powerDot", "junction",
-				"fruit" };
-		for (int i = 0; i < type.length; i++) {
-			bckKnowledge.put("pacPoint" + i, "(" + type[i]
-					+ " ?X) => (assert (pacPoint ?X))");
-		}
-
-		// Distance expanding
-		bckKnowledge.put("nearMid",
-				"(distance ?X ?Y near) => (assert (distance ?X ?Y mid))");
-		bckKnowledge.put("midFar",
-				"(distance ?X ?Y mid) => (assert (distance ?X ?Y far))");
 
 		return bckKnowledge;
 	}
@@ -107,7 +93,7 @@ public class PacManStateSpec extends StateSpec {
 		// return "(level 10) (not (exists (dot ?X)";
 
 		// Score maximisation
-		return "(highScore ?X) (score ?Y &:(>= ?Y 100))";
+		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
 	}
 
 	@Override
@@ -117,30 +103,30 @@ public class PacManStateSpec extends StateSpec {
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
 		rules
-				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 2)) "
+				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 2)) "
 						+ "(edible ?Ghost) (blinking ?Ghost) (pacman ?Player) "
 						+ "(ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 		rules
-				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
 						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
-				.add("(distance ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(distance ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
+				.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
+						+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
 						+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
 						+ "=> (fromPowerDot ?PowerDot ?Dist0)");
 		rules
-				.add("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
 						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 		rules
 				.add("(not (edible ?Ghost)) "
-						+ "(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-						+ "(distance ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
+						+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
+						+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
 						+ "(pacman ?Player) (ghost ?Ghost) "
 						+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
 		rules
-				.add("(distance ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
+				.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
 						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
-		rules.add("(distance ?Player ?Dot ?Dist0) (pacman ?Player) "
+		rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
 
 		for (String rule : rules)
@@ -183,18 +169,36 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Ghost.class);
 		predicates.putCollection("blinking", structure);
 
-		// Distance Metric
+		// Distance Metrics
 		structure = new ArrayList<Class>();
-		structure.add(PacPoint.class);
-		structure.add(PacPoint.class);
+		structure.add(Player.class);
+		structure.add(Dot.class);
 		structure.add(Integer.class);
-		predicates.putCollection("distance", structure);
-
-		// Closest Metric
+		predicates.putCollection("distanceDot", structure);
+		
 		structure = new ArrayList<Class>();
-		structure.add(PacPoint.class);
-		structure.add(PacPoint.class);
-		predicates.putCollection("closest", structure);
+		structure.add(Player.class);
+		structure.add(PowerDot.class);
+		structure.add(Integer.class);
+		predicates.putCollection("distancePowerDot", structure);
+		
+		structure = new ArrayList<Class>();
+		structure.add(Player.class);
+		structure.add(Ghost.class);
+		structure.add(Integer.class);
+		predicates.putCollection("distanceGhost", structure);
+		
+		structure = new ArrayList<Class>();
+		structure.add(Player.class);
+		structure.add(Fruit.class);
+		structure.add(Integer.class);
+		predicates.putCollection("distanceFruit", structure);
+		
+		structure = new ArrayList<Class>();
+		structure.add(Player.class);
+		structure.add(Junction.class);
+		structure.add(Integer.class);
+		predicates.putCollection("distanceJunction", structure);
 
 		return predicates;
 	}
@@ -208,9 +212,7 @@ public class PacManStateSpec extends StateSpec {
 		typeMap.put(PowerDot.class, "powerDot");
 		typeMap.put(Ghost.class, "ghost");
 		typeMap.put(Fruit.class, "fruit");
-		typeMap.put(JunctionPoint.class, "junction");
-		typeMap.put(DistanceMetric.class, "distanceMetric");
-		typeMap.put(PacPoint.class, "pacPoint");
+		typeMap.put(Junction.class, "junction");
 
 		return typeMap;
 	}

@@ -31,7 +31,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int prevScore_;
 	private GameModel model_;
 	private int[][] distanceGrid_;
-	private SortedSet<JunctionPoint> pacJunctions_;
+	private SortedSet<Junction> pacJunctions_;
 	private Point gridStart_;
 
 	@Override
@@ -344,29 +344,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Player
 			rete_.eval("(assert (pacman player))");
 
-			// Declare the distance metrics
-			for (DistanceMetric dm : DistanceMetric.values()) {
-				rete_.eval("(assert (distanceMetric "
-						+ dm.toString().toLowerCase() + "))");
-			}
-
 			// Calculate the distances and junctions
-			SortedSet<JunctionPoint> newJunctions = searchMaze(model_.m_player);
+			SortedSet<Junction> newJunctions = searchMaze(model_.m_player);
 			// If our junctions have changed, remove the old set and add the new
-			int closest = Integer.MAX_VALUE;
 			Set<String> closePoints = new HashSet<String>();
 			if (!newJunctions.equals(pacJunctions_)) {
-				for (JunctionPoint newJP : newJunctions) {
+				for (Junction newJP : newJunctions) {
 					String juncName = "junc_" + newJP.m_locX + "_"
 							+ newJP.m_locY;
 					rete_.eval("(assert (junction " + juncName + "))");
 
-					closest = distanceAssertions(newJP, juncName, closest,
-							closePoints);
+					distanceAssertions(newJP, juncName);
 				}
 				pacJunctions_ = newJunctions;
 			}
-			closest = assertClosePoints(closePoints);
 
 			// Ghost
 			for (Ghost ghost : model_.m_ghosts) {
@@ -382,11 +373,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 						rete_.eval("(assert (blinking " + ghost + "))");
 
 					// Distances from pacman to ghost
-					closest = distanceAssertions(ghost, ghost.toString(),
-							closest, closePoints);
+					distanceAssertions(ghost, ghost.toString());
 				}
 			}
-			closest = assertClosePoints(closePoints);
+			assertClosePoints(closePoints);
 
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
@@ -394,9 +384,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 				rete_.eval("(assert (dot " + dotName + "))");
 
 				// Distances
-				closest = distanceAssertions(dot, dotName, closest, closePoints);
+				distanceAssertions(dot, dotName);
 			}
-			closest = assertClosePoints(closePoints);
 
 			// Powerdots
 			for (PowerDot powerdot : model_.m_powerdots.values()) {
@@ -405,20 +394,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 				rete_.eval("(assert (powerDot " + pdotName + "))");
 
 				// Distances
-				closest = distanceAssertions(powerdot, pdotName, closest,
-						closePoints);
+				distanceAssertions(powerdot, pdotName);
 			}
-			closest = assertClosePoints(closePoints);
 
 			// Fruit
 			if (model_.m_fruit.isEdible()) {
 				rete_.eval("(assert (fruit " + model_.m_fruit + "))");
 
 				// Distances
-				closest = distanceAssertions(model_.m_fruit, model_.m_fruit
-						.toString(), closest, closePoints);
+				distanceAssertions(model_.m_fruit, model_.m_fruit.toString());
 			}
-			closest = assertClosePoints(closePoints);
 
 			// Score, level, lives, highScore
 			rete_.eval("(assert (level " + model_.m_stage + "))");
@@ -431,7 +416,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			StateSpec.getInstance().insertValidActions(rete_);
 
-			// rete_.eval("(facts)");
+//			rete_.eval("(facts)");
 
 			// Find the maximally safe junctions
 			// for (int i = 0; i < model_.m_ghosts.length; i++) {
@@ -490,24 +475,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The thing as arg2 of the distance.
 	 * @param thingName
 	 *            The JESS name of the thing.
-	 * @param closePoints
-	 *            The set of things that are at closest distance from pacman.
-	 * @param closest
-	 *            The value of the closest thing to pacman.
 	 * @throws JessException
 	 *             If Jess goes wrong.
 	 */
-	private int distanceAssertions(PacPoint thing, String thingName,
-			int closest, Set<String> closePoints) throws JessException {
-		rete_.eval("(assert (distance player " + thingName + " "
+	private void distanceAssertions(PacPoint thing, String thingName)
+			throws JessException {
+		rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
+				+ " player " + thingName + " "
 				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
-		if (distanceGrid_[thing.m_locX][thing.m_locY] < closest) {
-			closePoints.clear();
-			closest = distanceGrid_[thing.m_locX][thing.m_locY];
-		}
-		if (distanceGrid_[thing.m_locX][thing.m_locY] == closest)
-			closePoints.add(thingName);
-		return closest;
 	}
 
 	/**
@@ -576,8 +551,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The searching from.
 	 * @return A mapping of minimal distances to junctions, given by points.
 	 */
-	public SortedSet<JunctionPoint> searchMaze(Thing thing) {
-		SortedSet<JunctionPoint> closeJunctions = new TreeSet<JunctionPoint>();
+	public SortedSet<Junction> searchMaze(Thing thing) {
+		SortedSet<Junction> closeJunctions = new TreeSet<Junction>();
 		Collection<Dot> dots = model_.m_dots.values();
 
 		Point playerLoc = new Point(thing.m_locX, thing.m_locY);
@@ -591,26 +566,26 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Update the distance grid
 			Set<Point> knownJunctions = new HashSet<Point>();
 			// Check for junctions here.
-			Set<JunctionPoint> thisLoc = isJunction(playerLoc, 0);
+			Set<Junction> thisLoc = isJunction(playerLoc, 0);
 			if (thisLoc != null) {
 				Point p = thisLoc.iterator().next().getLocation();
 				knownJunctions.add(p);
 			}
 
-			SortedSet<JunctionPoint> junctionStack = new TreeSet<JunctionPoint>();
+			SortedSet<Junction> junctionStack = new TreeSet<Junction>();
 			// Add the initial junction points to the stack
-			junctionStack.add(new JunctionPoint(playerLoc, Thing.UP, 0));
-			junctionStack.add(new JunctionPoint(playerLoc, Thing.DOWN, 0));
-			junctionStack.add(new JunctionPoint(playerLoc, Thing.LEFT, 0));
-			junctionStack.add(new JunctionPoint(playerLoc, Thing.RIGHT, 0));
+			junctionStack.add(new Junction(playerLoc, Thing.UP, 0));
+			junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0));
+			junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0));
+			junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0));
 			distanceGrid_[playerLoc.x][playerLoc.y] = 0;
 
 			// Keep following junctions until all have been found
 			while (!junctionStack.isEmpty()) {
-				JunctionPoint point = junctionStack.first();
+				Junction point = junctionStack.first();
 				junctionStack.remove(point);
 
-				Set<JunctionPoint> nextJunction = searchToJunction(point,
+				Set<Junction> nextJunction = searchToJunction(point,
 						knownJunctions);
 				junctionStack.addAll(nextJunction);
 
@@ -652,7 +627,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * @return The set of starting points for the next found junction or an
 	 *         empty set.
 	 */
-	private Set<JunctionPoint> searchToJunction(JunctionPoint startingPoint,
+	private Set<Junction> searchToJunction(Junction startingPoint,
 			Set<Point> knownJunctions) {
 		byte direction = startingPoint.getDirection();
 		int x = startingPoint.getLocation().x;
@@ -661,12 +636,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// Checking for an invalid request to move
 		if (!Thing.getDestination(direction, x, y, new Point(), model_)) {
-			return new HashSet<JunctionPoint>();
+			return new HashSet<Junction>();
 		}
 
 		// Move in the direction
 		byte oldDir = 0;
-		Set<JunctionPoint> isJunct = null;
+		Set<Junction> isJunct = null;
 		boolean changed = false;
 		do {
 			changed = false;
@@ -717,8 +692,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		} while (isJunct == null);
 
 		// Post-process the junction to remove the old direction scan
-		JunctionPoint removal = null;
-		for (JunctionPoint jp : isJunct) {
+		Junction removal = null;
+		for (Junction jp : isJunct) {
 			if (jp.getDirection() == oldDir) {
 				removal = jp;
 				break;
@@ -735,7 +710,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			knownJunctions.add(junction);
 			return isJunct;
 		}
-		return new HashSet<JunctionPoint>();
+		return new HashSet<Junction>();
 	}
 
 	/**
@@ -749,16 +724,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * @return A list of the possible directions the junction goes or null if no
 	 *         junction.
 	 */
-	private Set<JunctionPoint> isJunction(Point loc, int distance) {
-		Set<JunctionPoint> dirs = new HashSet<JunctionPoint>();
+	private Set<Junction> isJunction(Point loc, int distance) {
+		Set<Junction> dirs = new HashSet<Junction>();
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_NORTH) == 0)
-			dirs.add(new JunctionPoint(loc, Thing.UP, distance));
+			dirs.add(new Junction(loc, Thing.UP, distance));
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_SOUTH) == 0)
-			dirs.add(new JunctionPoint(loc, Thing.DOWN, distance));
+			dirs.add(new Junction(loc, Thing.DOWN, distance));
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_EAST) == 0)
-			dirs.add(new JunctionPoint(loc, Thing.RIGHT, distance));
+			dirs.add(new Junction(loc, Thing.RIGHT, distance));
 		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_WEST) == 0)
-			dirs.add(new JunctionPoint(loc, Thing.LEFT, distance));
+			dirs.add(new Junction(loc, Thing.LEFT, distance));
 
 		if (dirs.size() > 2)
 			return dirs;

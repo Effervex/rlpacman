@@ -511,6 +511,27 @@ public class CoveringTest {
 		assertTrue(result.contains("(on ?X e)"));
 		assertTrue(result.contains("(block e)"));
 		assertTrue(result.contains("(onFloor ?)"));
+		
+		// Numerical values (Same dist)
+		state.reset();
+		state.eval("(assert (distance player dotA 3))");
+		state.eval("(assert (dot dotA))");
+		state.eval("(assert (distance player blinky 3))");
+		state.eval("(assert (ghost blinky))");
+		constants.clear();
+		constants.add("dotA");
+		constants.add("3");
+		actionTerms = new String[2];
+		actionTerms[0] = "dotA";
+		actionTerms[1] = "3";
+		facts = StateSpec.extractFacts(state);
+		result = sut_.inverselySubstitute(facts, actionTerms, constants);
+		assertTrue(result.contains("(initial-fact)"));
+		assertTrue(result.contains("(distance player dotA 3)"));
+		assertTrue(result.contains("(dot dotA)"));
+		assertTrue(result.contains("(distance ? ? ?)"));
+		assertTrue(result.contains("(ghost ?)"));
+		assertEquals(result.size(), 5);
 	}
 
 	@Test

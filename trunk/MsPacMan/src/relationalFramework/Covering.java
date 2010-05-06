@@ -485,9 +485,11 @@ public class Covering {
 			// Find the facts containing the same (useful) terms in the action
 			for (int i = 0; i < terms.length; i++) {
 				List<Fact> termFacts = relevantConditions.get(terms[i]);
-				for (Fact termFact : termFacts) {
-					if (!actionFacts.contains(termFact))
-						actionFacts.add(termFact);
+				if (termFacts != null) {
+					for (Fact termFact : termFacts) {
+						if (!actionFacts.contains(termFact))
+							actionFacts.add(termFact);
+					}
 				}
 
 				// Format the action
@@ -580,7 +582,6 @@ public class Covering {
 		Map<String, String> termMapping = new HashMap<String, String>();
 		int i = 0;
 		for (String term : actionTerms) {
-
 			termMapping.put(term, getVariableTermString(i));
 			i++;
 		}
@@ -616,11 +617,17 @@ public class Covering {
 						addTypePred(backupTypeFacts, backupFactSplit, j);
 					}
 				} else {
-					// If using a constant, keep all other terms
-					useBackup = true;
+					// If we have a numerical value, make it anonymous unless
+					// we're using the backup
+					if (StateSpec.isNumber(factSplit[j])) {
+						factSplit[j] = "?";
+					} else {
+						// If using a constant, keep all other terms
+						useBackup = true;
 
-					// Add the constant type predicate
-					addTypePred(substitution, factSplit, j);
+						// Add the constant type predicate
+						addTypePred(substitution, factSplit, j);
+					}
 				}
 			}
 
@@ -779,7 +786,9 @@ public class Covering {
 			String[] split = StateSpec.splitFact(stateFact.toString());
 			if (StateSpec.getInstance().isUsefulPredicate(split[0])) {
 				for (int i = 1; i < split.length; i++) {
-					relevantConditions.putContains(split[i], stateFact);
+					// Ignore numerical terms
+					if (!StateSpec.isNumber(split[i]))
+						relevantConditions.putContains(split[i], stateFact);
 				}
 			} else if (split[0].equals(StateSpec.VALID_ACTIONS))
 				// Find the action fact
