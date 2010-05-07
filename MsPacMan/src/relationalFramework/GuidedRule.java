@@ -9,8 +9,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.log4j.helpers.Loader;
-
 import jess.ValueVector;
 
 /**
@@ -18,6 +16,10 @@ import jess.ValueVector;
  * contained within.
  * 
  * @author Sam Sarjant
+ */
+/**
+ * @author Sam Sarjant
+ * 
  */
 public class GuidedRule {
 	/**
@@ -118,6 +120,8 @@ public class GuidedRule {
 	 *            If this rule is maximally general.
 	 * @param mutant
 	 *            If this rule is a mutant (implying max general is false).
+	 * @param slot
+	 *            The slot this rule starts under.
 	 */
 	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant,
 			Slot slot) {
@@ -503,6 +507,7 @@ public class GuidedRule {
 	 * 
 	 * @return A clone of this rule.
 	 */
+	@Override
 	public Object clone() {
 		GuidedRule clone = new GuidedRule(ruleConditions_, ruleAction_, mutant_);
 		clone.hasSpawned_ = hasSpawned_;
