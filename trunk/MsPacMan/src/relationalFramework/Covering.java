@@ -35,6 +35,8 @@ public class Covering {
 	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
 	/** The prefix for range variables. */
 	public static final String RANGE_VARIABLE_PREFIX = "__Num";
+	/** The number of discretised ranges the rules are split into. */
+	public static final int NUM_DISCRETE_RANGES = 4;
 
 	/**
 	 * The pre-goal state for each action predicate, for use in covering
@@ -327,7 +329,7 @@ public class Covering {
 						} else {
 							// Check for numerical values
 							if (!numericalValueCheck(factSplit[i],
-									unitySplit[i], unification, i)) {
+									unitySplit[i], unification, i, thisTerms)) {
 								// Failing that simply use an anonymous variable
 								unification[i] = StateSpec.ANONYMOUS;
 								thisGeneralness++;
@@ -369,11 +371,13 @@ public class Covering {
 	 *            The unification between the two.
 	 * @param index
 	 *            The index of the unification to fill.
+	 * @param factTerms
+	 *            The terms the fact uses as action parameters.
 	 * @return True if the two are numerical and could be unified into a ranged
 	 *         variable.
 	 */
 	private boolean numericalValueCheck(String factValue, String unityValue,
-			String[] unification, int index) {
+			String[] unification, int index, List<String> factTerms) {
 		// Check the unity is a number
 		double unityDouble = 0;
 		if (StateSpec.isNumber(unityValue))
@@ -412,6 +416,7 @@ public class Covering {
 
 			return true;
 		} else {
+			// Check that the fact value is a number
 			double factDouble = 0;
 			if (StateSpec.isNumber(factValue))
 				factDouble = Double.parseDouble(factValue);
@@ -425,6 +430,11 @@ public class Covering {
 			unification[index] = rangeVariable + "&:("
 					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " " + min
 					+ " " + max + ")";
+
+			// Change the action terms as well.
+			if (factTerms.contains(factValue)) {
+				factTerms.set(factTerms.indexOf(factValue), rangeVariable);
+			}
 			return true;
 		}
 	}
@@ -942,16 +952,23 @@ public class Covering {
 			// Run through each term
 			boolean ceaseMutation = false;
 			for (int i = 1; i < condSplit.length; i++) {
+				// Refining ranged numerical variables
+				int suchThatIndex = preGoalSplit[i].indexOf("&:");
+				String preGoalITerm = preGoalSplit[i];
+				if (suchThatIndex != -1)
+					preGoalITerm = preGoalSplit[i].substring(0, suchThatIndex);
+
+				// Finding the replacement term
 				String replacedTerm = (replacementTerms
-						.containsKey(preGoalSplit[i])) ? replacementTerms
-						.get(preGoalSplit[i]) : preGoalSplit[i];
+						.containsKey(preGoalITerm)) ? replacementTerms
+						.get(preGoalITerm) : preGoalITerm;
 
 				// 5. Replacing variable terms
 				if (condSplit[i].charAt(0) == '?') {
 					String backup = condSplit[i];
 					// The pregoal term is not anonymous
 					if (!ceaseMutation
-							&& !preGoalSplit[i].equals(StateSpec.ANONYMOUS)) {
+							&& !preGoalITerm.equals(StateSpec.ANONYMOUS)) {
 						// 5a. If the cond term is ? and the preds match, use
 						// the fact term
 						boolean continueCreation = true;
@@ -961,8 +978,8 @@ public class Covering {
 							condSplit[i] = replacedTerm;
 						// Otherwise, a variable can be replaced with a
 						// non-action constant
-						else if (!preGoalTerms.contains(preGoalSplit[i]))
-							condSplit[i] = preGoalSplit[i];
+						else if (!preGoalTerms.contains(preGoalITerm))
+							condSplit[i] = preGoalITerm;
 						// Otherwise, we're looking at two non-mutatable
 						// actions.
 						else {
@@ -999,50 +1016,116 @@ public class Covering {
 
 				// If we haven't looked at a replacement yet
 				if (reverseReplacementTerms.containsKey(condSplit[i])) {
-					List<String> replacementConds = new ArrayList<String>(
-							ruleConditions.size());
-					for (String condition : ruleConditions) {
-						// Replace variables
-						String replCond = condition
-								.replaceAll(" " + Pattern.quote(condSplit[i])
-										+ "(?=( |\\)))", " "
-										+ reverseReplacementTerms
-												.get(condSplit[i]));
-						replacementConds.add(replCond);
-					}
-
 					// Replacing the actions
 					List<String> replActionTerms = new ArrayList<String>(
 							ruleTerms);
 					replActionTerms.set(replActionTerms.indexOf(condSplit[i]),
 							reverseReplacementTerms.get(condSplit[i]));
 
-					// 4b. If the new cond is valid (through unification), keep
-					// it and note that the replacement has occurred
-					if (unifyStates(replacementConds, preGoalState,
-							replActionTerms, preGoalTerms) == 0) {
-						// Reforming the action
-						String[] replActionArray = new String[replActionTerms
-								.size() + 1];
-						replActionArray[0] = actionPred;
-						for (int j = 0; j < replActionTerms.size(); j++)
-							replActionArray[j + 1] = replActionTerms.get(j);
-						String action = StateSpec.reformFact(replActionArray);
-
-						// Adding the mutated rule
-						GuidedRule mutant = new GuidedRule(replacementConds,
-								action, true);
-						mutant.expandConditions();
-						mutants.add(mutant);
+					// If we're dealing with a numerical term
+					if (suchThatIndex != -1) {
+						String[] betweenRangeSplit = preGoalSplit[i].split(" ");
+						// Find the values
+						double min = Double.parseDouble(betweenRangeSplit[2]);
+						double max = Double
+								.parseDouble(betweenRangeSplit[3].substring(0,
+										betweenRangeSplit[3].length() - 1));
+						double rangeSplit = (max - min) / NUM_DISCRETE_RANGES;
+						// Create a mutant for each range
+						for (int r = 0; r < NUM_DISCRETE_RANGES; r++) {
+							String replacementTerm = preGoalITerm
+									+ "&:("
+									+ StateSpec.BETWEEN_RANGE
+									+ " "
+									+ preGoalITerm
+									+ " "
+									+ (min + rangeSplit * r)
+									+ " "
+									+ (max - rangeSplit
+											* (NUM_DISCRETE_RANGES - r - 1))
+									+ ")";
+							GuidedRule mutant = replaceActionTerm(actionPred,
+									preGoalState, preGoalTerms, ruleConditions,
+									condSplit[i], replacementTerm,
+									replActionTerms, false);
+							if (mutant != null)
+								mutants.add(mutant);
+						}
+					} else {
+						GuidedRule mutant = replaceActionTerm(actionPred,
+								preGoalState, preGoalTerms, ruleConditions,
+								condSplit[i], reverseReplacementTerms
+										.get(condSplit[i]), replActionTerms,
+								true);
+						if (mutant != null)
+							mutants.add(mutant);
 					}
 
-					// Whatever the outcome, remove the reverse replacement as
-					// it has already been tested.
+					// Whatever the outcome, remove the reverse replacement
+					// as it has already been tested.
 					reverseReplacementTerms.remove(condSplit[i]);
 				}
 			}
 		}
 		return hasPred;
+	}
+
+	/**
+	 * Replaces an action term with the action term used in the pre-goal.
+	 * 
+	 * @param actionPred
+	 *            The action predicate.
+	 * @param preGoalState
+	 *            The current pre-goal state.
+	 * @param preGoalTerms
+	 *            The pre-goal action terms.
+	 * @param ruleConditions
+	 *            The rule conditions in the to-be-mutated rule.
+	 * @param replacedTerm
+	 *            The term to be replaced.
+	 * @param replacementTerm
+	 *            The term that will be replacing the above term.
+	 * @param replActionTerms
+	 *            The action terms, already with the replaced term included.
+	 * @param requireUnification
+	 *            If unification is required to verify the swap.
+	 * @return The mutant rule.
+	 */
+	private GuidedRule replaceActionTerm(String actionPred,
+			List<String> preGoalState, List<String> preGoalTerms,
+			List<String> ruleConditions, String replacedTerm,
+			String replacementTerm, List<String> replActionTerms,
+			boolean requireUnification) {
+		// Replace the variables with their replacements.
+		List<String> replacementConds = new ArrayList<String>(ruleConditions
+				.size());
+		for (String condition : ruleConditions) {
+			// Replace variables
+			String replCond = condition.replaceAll(" "
+					+ Pattern.quote(replacedTerm) + "(?=( |\\)))", " "
+					+ replacementTerm);
+			replacementConds.add(replCond);
+		}
+
+		// 4b. If the new cond is valid (through unification),
+		// keep
+		// it and note that the replacement has occurred
+		if (!requireUnification
+				|| (unifyStates(replacementConds, preGoalState,
+						replActionTerms, preGoalTerms) == 0)) {
+			// Reforming the action
+			String[] replActionArray = new String[replActionTerms.size() + 1];
+			replActionArray[0] = actionPred;
+			for (int j = 0; j < replActionTerms.size(); j++)
+				replActionArray[j + 1] = replActionTerms.get(j);
+			String action = StateSpec.reformFact(replActionArray);
+
+			// Adding the mutated rule
+			GuidedRule mutant = new GuidedRule(replacementConds, action, true);
+			mutant.expandConditions();
+			return mutant;
+		}
+		return null;
 	}
 
 	/**

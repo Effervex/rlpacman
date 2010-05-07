@@ -31,35 +31,35 @@ public class PacManStateSpecTest {
 
 		// Testing numbers
 		String rule = spec_
-				.parseRule("(distance ?Player ?Ghost 4) => (fromGhost ?Ghost)");
+				.parseRule("(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
 		String body = rule.split("=>")[0];
 		int condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		String head = rule.split("=>")[1];
 		// 2 assertions in the body: clear, and block
 		assertEquals(condCount, 4);
-		assertTrue(body.contains("(distance ?Player ?Ghost 4)"));
+		assertTrue(body.contains("(distanceGhost ?Player ?Ghost 4)"));
 		assertTrue(body.contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(body.contains("(pacPoint ?Player)"));
-		assertTrue(body.contains("(pacPoint ?Ghost)"));
-		assertTrue(body.indexOf("distance") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("pacPoint"));
+		assertTrue(body.contains("(pacman ?Player)"));
+		assertTrue(body.contains("(ghost ?Ghost)"));
+		assertTrue(body.indexOf("distanceGhost") < body.indexOf("test"));
+		assertTrue(body.indexOf("test") < body.indexOf("pacman"));
 		assertTrue(head.contains("(fromGhost ?Ghost)"));
 
 		// Testing conditional &:elements
 		rule = spec_
-				.parseRule("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
+				.parseRule("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
 						+ " => (fromGhost ?Ghost)");
 		body = rule.split("=>")[0];
 		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
 		head = rule.split("=>")[1];
 		// 2 assertions in the body: clear, and block
 		assertEquals(condCount, 4);
-		assertTrue(body.contains("(distance ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"));
+		assertTrue(body.contains("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"));
 		assertTrue(body.contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(body.contains("(pacPoint ?Player)"));
-		assertTrue(body.contains("(pacPoint ?Ghost)"));
-		assertTrue(body.indexOf("distance") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("pacPoint"));
+		assertTrue(body.contains("(pacman ?Player)"));
+		assertTrue(body.contains("(ghost ?Ghost)"));
+		assertTrue(body.indexOf("distanceGhost") < body.indexOf("test"));
+		assertTrue(body.indexOf("test") < body.indexOf("pacman"));
 		assertTrue(head.contains("(fromGhost ?Ghost)"));
 	}
 }

@@ -21,12 +21,15 @@ public class PacManStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
 		preconds.put("toDot", "(dot ?X) (distanceDot player ?X ?Y)");
-		preconds.put("toPowerDot", "(powerDot ?X) (distancePowerDot player ?X ?Y)");
-		preconds.put("fromPowerDot", "(powerDot ?X) (distancePowerDot player ?X ?Y)");
+		preconds.put("toPowerDot",
+				"(powerDot ?X) (distancePowerDot player ?X ?Y)");
+		preconds.put("fromPowerDot",
+				"(powerDot ?X) (distancePowerDot player ?X ?Y)");
 		preconds.put("toFruit", "(fruit ?X) (distanceFruit player ?X ?Y)");
 		preconds.put("toGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
 		preconds.put("fromGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
-		preconds.put("toJunction", "(junction ?X) (distanceJunction player ?X ?Y)");
+		preconds.put("toJunction",
+				"(junction ?X) (distanceJunction player ?X ?Y)");
 
 		return preconds;
 	}
@@ -88,9 +91,9 @@ public class PacManStateSpec extends StateSpec {
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		//constants.add("player");
+		// constants.add("player");
 		// Actual goal condition
-		// return "(level 10) (not (exists (dot ?X)";
+		// return "(level 10) (not (dot ?X))";
 
 		// Score maximisation
 		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
@@ -108,7 +111,8 @@ public class PacManStateSpec extends StateSpec {
 						+ "(ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 		rules
 				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-						+ "(edible ?Ghost) (pacman ?Player) (ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
+						+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
+						+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
 				.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
 						+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
@@ -175,25 +179,25 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Dot.class);
 		structure.add(Integer.class);
 		predicates.putCollection("distanceDot", structure);
-		
+
 		structure = new ArrayList<Class>();
 		structure.add(Player.class);
 		structure.add(PowerDot.class);
 		structure.add(Integer.class);
 		predicates.putCollection("distancePowerDot", structure);
-		
+
 		structure = new ArrayList<Class>();
 		structure.add(Player.class);
 		structure.add(Ghost.class);
 		structure.add(Integer.class);
 		predicates.putCollection("distanceGhost", structure);
-		
+
 		structure = new ArrayList<Class>();
 		structure.add(Player.class);
 		structure.add(Fruit.class);
 		structure.add(Integer.class);
 		predicates.putCollection("distanceFruit", structure);
-		
+
 		structure = new ArrayList<Class>();
 		structure.add(Player.class);
 		structure.add(Junction.class);
