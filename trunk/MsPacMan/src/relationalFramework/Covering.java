@@ -147,9 +147,11 @@ public class Covering {
 	 * creating a range function under which the variables fall.
 	 * 
 	 * @param oldState
-	 *            The old state to be unified with. This may be modified.
+	 *            The old state to be unified with. May contain constants,
+	 *            variables and anonymous values. This may be modified.
 	 * @param newState
-	 *            The new state being unified with.
+	 *            The new state being unified with. Will only contain constant
+	 *            terms and facts.
 	 * @param oldTerms
 	 *            The terms for the actions on the old state. Should be for the
 	 *            same action as newTerms. This may be modified.
@@ -174,15 +176,20 @@ public class Covering {
 		// For each item in the old state, see if it is present in the new state
 		List<String> oldStateRepl = new ArrayList<String>();
 		for (String oldStateFact : oldState) {
-			String modFact = unifyFact(oldStateFact, newState,
+			Collection<String> modFacts = unifyFact(oldStateFact, newState,
 					oldReplacementMap, newReplacementMap, oldTerms);
-
-			// Check for a change
-			if (!oldStateFact.equals(modFact))
+			
+			if (modFacts.isEmpty())
 				hasChanged = true;
 
-			if ((modFact != null) && (!oldStateRepl.contains(modFact)))
-				oldStateRepl.add(modFact);
+			for (String modFact : modFacts) {
+				// Check for a change
+				if (!oldStateFact.equals(modFact))
+					hasChanged = true;
+
+				if ((modFact != null) && (!oldStateRepl.contains(modFact)))
+					oldStateRepl.add(modFact);
+			}
 		}
 
 		// Replace the oldState
@@ -266,17 +273,18 @@ public class Covering {
 	 * @return The unified version of the fact (possibly more general than the
 	 *         input fact) or null if no unification.
 	 */
-	private String unifyFact(String fact, Collection<String> unityFacts,
+	private Collection<String> unifyFact(String fact,
+			Collection<String> unityFacts,
 			Map<String, String> factReplacementMap,
 			Map<String, String> unityReplacementMap, List<String> factTerms) {
+		Collection<String> result = new ArrayList<String>();
+
 		// Split the fact up and apply the replacements
 		String[] factSplit = StateSpec.splitFact(fact);
 
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
-		String[] bestUnified = null;
-		int generalisation = 0;
-		List<String> bestTerms = null;
+		int generalisation = Integer.MAX_VALUE;
 		// Check against each item in the unity state,
 		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
 			String[] unitySplit = StateSpec.splitFact(iter.next());
@@ -284,80 +292,60 @@ public class Covering {
 			// Check it if the same fact
 			if (factSplit[0].equals(unitySplit[0])) {
 				String[] unification = new String[factSplit.length];
-				List<String> thisTerms = new ArrayList<String>(factTerms);
 				int thisGeneralness = 0;
 				boolean notAnonymous = false;
 
 				// Unify each term
 				for (int i = 1; i < factSplit.length; i++) {
+					// Apply the replacements
+					String factTerm = (factReplacementMap
+							.containsKey(factSplit[i])) ? factReplacementMap
+							.get(factSplit[i]) : factSplit[i];
+					String unityTerm = (unityReplacementMap
+							.containsKey(unitySplit[i])) ? unityReplacementMap
+							.get(unitySplit[i]) : unitySplit[i];
+
 					// If either are anonymous, the unification must be
 					// anonymous
-					if (factSplit[i].equals(StateSpec.ANONYMOUS)
-							|| unitySplit.equals(StateSpec.ANONYMOUS)) {
+					if (factTerm.equals(StateSpec.ANONYMOUS)) {
 						unification[i] = StateSpec.ANONYMOUS;
-						// If the fact was not originally anonymous, increment
-						// generalisation
-						if (factSplit[i].equals(StateSpec.ANONYMOUS))
-							thisGeneralness++;
-					} else if (factSplit[i].equals(unitySplit[i])
-							&& equalReplacements(factReplacementMap
-									.get(factSplit[i]), unityReplacementMap
-									.get(unitySplit[i]))) {
+					} else if (factTerm.equals(unityTerm)) {
 						// If the two are the same term (not anonymous) and
 						// their replacements match up, use that
-						unification[i] = factSplit[i];
+						unification[i] = factTerm;
 						notAnonymous = true;
-					} else {
-						// Apply replacement operators
-						// Use the unification array to hold a temp value
-						if (factReplacementMap.containsKey(factSplit[i])) {
-							unification[i] = factReplacementMap
-									.get(factSplit[i]);
-							Collections.replaceAll(thisTerms, factSplit[i],
-									unification[i]);
-						} else
-							unification[i] = factSplit[i];
-
-						if (unityReplacementMap.containsKey(unitySplit[i]))
-							unitySplit[i] = unityReplacementMap
-									.get(unitySplit[i]);
-
-						// If the replaced values are equal, use them
-						if (unitySplit[i].equals(unification[i])) {
-							thisGeneralness++;
-							notAnonymous = true;
-						} else {
-							// Check for numerical values
-							if (!numericalValueCheck(factSplit[i],
-									unitySplit[i], unification, i, thisTerms)) {
-								// Failing that simply use an anonymous variable
-								unification[i] = StateSpec.ANONYMOUS;
-								thisGeneralness++;
-							}
-						}
+					} else if (!numericalValueCheck(factSplit[i],
+							unitySplit[i], unification, i, factTerms)) {
+						// Failing that simply use an anonymous variable
+						unification[i] = StateSpec.ANONYMOUS;
+						thisGeneralness++;
 					}
 				}
 
 				// Store if:
 				// 1. The fact is not fully anonymous
 				// 2. The fact is less general than the current best
-				if (notAnonymous
-						&& ((bestUnified == null) || (thisGeneralness < generalisation))) {
-					bestUnified = unification;
-					bestTerms = thisTerms;
-					generalisation = thisGeneralness;
+				if (notAnonymous) {
+					if (thisGeneralness < generalisation) {
+						result.clear();
+						generalisation = thisGeneralness;
+					}
+					if (thisGeneralness == generalisation) {
+						unification[0] = factSplit[0];
+						result.add(StateSpec.reformFact(unification));
+					}
 				}
 			}
 		}
 
-		if (bestUnified == null)
-			return null;
+		if (!result.isEmpty()) {
+			// Setting the fact terms
+			for (String factKey : factReplacementMap.keySet())
+				Collections.replaceAll(factTerms, factKey, factReplacementMap
+						.get(factKey));
+		}
 
-		// Setting the fact terms
-		factTerms.clear();
-		factTerms.addAll(bestTerms);
-		bestUnified[0] = factSplit[0];
-		return StateSpec.reformFact(bestUnified);
+		return result;
 	}
 
 	/**
@@ -412,6 +400,8 @@ public class Covering {
 				unification[index] = variableName + "&:("
 						+ StateSpec.BETWEEN_RANGE + " " + variableName + " "
 						+ min + " " + max + ")";
+			} else {
+				unification[index] = factValue;
 			}
 
 			return true;
@@ -437,23 +427,6 @@ public class Covering {
 			}
 			return true;
 		}
-	}
-
-	/**
-	 * Simple equality method for comparing two possibly null strings.
-	 * 
-	 * @param string
-	 *            String 1.
-	 * @param string2
-	 *            String 2.
-	 * @return True if either strings are null, or if both are equal.
-	 */
-	private boolean equalReplacements(String string, String string2) {
-		if ((string == null) || (string2 == null))
-			return true;
-		if (!string.equals(string2))
-			return false;
-		return true;
 	}
 
 	/**
