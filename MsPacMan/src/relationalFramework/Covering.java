@@ -286,6 +286,8 @@ public class Covering {
 		// be present)
 		int generalisation = Integer.MAX_VALUE;
 		// Check against each item in the unity state,
+		// TODO Speed this up by assigning the facts to a map so tey are quickly
+		// accessible.
 		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
 			String[] unitySplit = StateSpec.splitFact(iter.next());
 
@@ -430,6 +432,27 @@ public class Covering {
 	}
 
 	/**
+<<<<<<< .mine
+	 * Simple equality method for comparing two possibly null strings.
+	 * 
+	 * @param string
+	 *            String 1.
+	 * @param string2
+	 *            String 2.
+	 * @return True if either strings are null, or if both are equal.
+	 */
+	private boolean equalReplacements(String string, String string2) {
+		if (string == null) {
+			if (string2 == null)
+				return true;
+			return false;
+		}
+		return string.equals(string2);
+	}
+
+	/**
+=======
+>>>>>>> .r73
 	 * Unifies action rules together into one general all-covering rule.
 	 * 
 	 * @param argsList

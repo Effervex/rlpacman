@@ -1022,28 +1022,43 @@ public class CoveringTest {
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
-
-		// Proper unification
+		
+		// Interesting case
 		oldState.clear();
-		oldState.add("(on a ?Y)");
-		oldState.add("(on a b)");
+		oldState.add("(on a c)");
+		oldState.add("(on c ?)");
+		oldState.add("(on ?X d)");
+		oldState.add("(onFloor e)");
+		oldState.add("(onFloor d)");
 		oldState.add("(clear a)");
+		oldState.add("(clear ?X)");
+		oldState.add("(highest a)");
 		newState.clear();
-		newState.add("(on a b)");
-		newState.add("(on a c)");
+		newState.add("(on b c)");
+		newState.add("(on c f)");
+		newState.add("(on a e)");
+		newState.add("(onFloor d)");
+		newState.add("(onFloor f)");
+		newState.add("(onFloor e)");
+		newState.add("(clear d)");
+		newState.add("(clear b)");
 		newState.add("(clear a)");
+		newState.add("(highest b)");
 		oldTerms.clear();
+		oldTerms.add("?X");
 		oldTerms.add("a");
-		oldTerms.add("?Y");
 		newTerms.clear();
-		newTerms.add("a");
+		newTerms.add("d");
 		newTerms.add("b");
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
-		assertEquals(3, oldState.size());
-		assertTrue(oldState.contains("(on a ?Y)"));
-		assertTrue(oldState.contains("(on a ?)"));
-		assertTrue(oldState.contains("(clear a)"));
+		assertEquals(6, oldState.size());
+		assertTrue(oldState.contains("(on ?Y c)"));
+		assertTrue(oldState.contains("(on c ?)"));
+		assertTrue(oldState.contains("(onFloor e)"));
+		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains("(clear ?Y)"));
+		assertTrue(oldState.contains("(highest ?Y)"));
 		
 		// Action precedence
 		oldState.clear();
