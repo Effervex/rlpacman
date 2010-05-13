@@ -256,7 +256,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// action in the ArrayList.
 			for (String action : actions.get(i)) {
 				// One weighting for each level of actions returned
-				double weighting = 1 / (i + 1);
+				double weighting = 1.0 / (i + 1);
 				if (actions.get(i) != null) {
 					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 							.getInstance()).applyAction(action, state);
@@ -345,21 +345,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 			rete_.eval("(assert (pacman player))");
 
 			// Calculate the distances and junctions
-			SortedSet<Junction> newJunctions = searchMaze(model_.m_player);
-			// If our junctions have changed, remove the old set and add the new
-			Set<String> closePoints = new HashSet<String>();
-			if (!newJunctions.equals(pacJunctions_)) {
-				for (Junction newJP : newJunctions) {
-					String juncName = "junc_" + newJP.m_locX + "_"
-							+ newJP.m_locY;
-					rete_.eval("(assert (junction " + juncName + "))");
+			pacJunctions_ = searchMaze(model_.m_player);
 
-					distanceAssertions(newJP, juncName);
-				}
-				pacJunctions_ = newJunctions;
-			}
-
-			// Ghost
+			// Ghosts
 			for (Ghost ghost : model_.m_ghosts) {
 				// Don't note ghost if it is running back to hideout or if it is
 				// in hideout
@@ -368,6 +356,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 					// If edible, add assertion
 					if (ghost.isEdible())
 						rete_.eval("(assert (edible " + ghost + "))");
+					else {
+						// Junction safety calculations
+						for (Junction jp : pacJunctions_) {
+							int ghostDist = calculateDistance(ghost, jp
+									.getLocation());
+							int result = ghostDist
+									- distanceGrid_[jp.getLocation().x][jp
+											.getLocation().y];
+							// Looking for the minimally safe junction
+							if ((result > Integer.MIN_VALUE)
+									&& (result < jp.getSafety()))
+								jp.setSafety(result);
+						}
+					}
 					// If flashing, add assertion
 					if (ghost.isBlinking())
 						rete_.eval("(assert (blinking " + ghost + "))");
@@ -376,7 +378,31 @@ public class PacManEnvironment implements EnvironmentInterface {
 					distanceAssertions(ghost, ghost.toString());
 				}
 			}
-			assertClosePoints(closePoints);
+
+			// Junctions
+			for (Junction newJP : pacJunctions_) {
+				String juncName = "junc_" + newJP.m_locX + "_" + newJP.m_locY;
+				rete_.eval("(assert (junction " + juncName + "))");
+
+				distanceAssertions(newJP, juncName);
+
+				// Junction safety
+				rete_.eval("(assert (junctionSafety " + juncName + " "
+						+ newJP.getSafety() + "))");
+			}
+
+			// Find the maximally safe junctions
+			for (int i = 0; i < model_.m_ghosts.length; i++) {
+				// If the ghost is active and hostile
+				Ghost ghost = model_.m_ghosts[i];
+				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
+					// Calculate the ghost's distance from each of the player's
+					// junctions
+					if (ghost.m_nTicks2Flee <= 0) {
+
+					}
+				}
+			}
 
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
@@ -416,30 +442,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			StateSpec.getInstance().insertValidActions(rete_);
 
-//			rete_.eval("(facts)");
-
-			// Find the maximally safe junctions
-			// for (int i = 0; i < model_.m_ghosts.length; i++) {
-			// // If the ghost is active and hostile
-			// Ghost ghost = model_.m_ghosts[i];
-			// if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-			// // Calculate the ghost's distance from each of the player's
-			// // junctions
-			// if (ghost.m_nTicks2Flee <= 0) {
-			// for (JunctionPoint jp : pacJunctions_) {
-			// int ghostDist = calculateDistance(ghost, jp
-			// .getLocation());
-			// int result = ghostDist
-			// - distanceGrid_[jp.getLocation().x][jp
-			// .getLocation().y];
-			// // Looking for the minimally safe junction
-			// if ((result > Integer.MIN_VALUE)
-			// && (result < jp.getSafety()))
-			// jp.setSafety(result);
-			// }
-			// }
-			// }
-			// }
+			//rete_.eval("(facts)");
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -451,21 +454,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 
 		return obs;
-	}
-
-	/**
-	 * Asserts the closest points (ghosts, dots, etc) to PacMan.
-	 * 
-	 * @param closePoints
-	 *            The point names to assert.
-	 * @return The new value of closest (Integer.MAX_VALUE).
-	 */
-	private int assertClosePoints(Set<String> closePoints) throws JessException {
-		for (String point : closePoints) {
-			rete_.eval("(assert (closest player " + point + "))");
-		}
-		closePoints.clear();
-		return Integer.MAX_VALUE;
 	}
 
 	/**
