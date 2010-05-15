@@ -106,11 +106,7 @@ public class PacManStateSpec extends StateSpec {
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
 		rules
-				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 2)) "
-						+ "(edible ?Ghost) (blinking ?Ghost) (pacman ?Player) "
-						+ "(ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
-		rules
-				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 25)) "
 						+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
 						+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
@@ -327,6 +323,6 @@ public class PacManStateSpec extends StateSpec {
 	 * @return A weight inversely proportional to the distance.
 	 */
 	private double determineWeight(double distance) {
-		return (1.0 / Math.pow(distance + 1, 2));
+		return (1.0 / Math.pow(distance + 0.01, 2));
 	}
 }

@@ -245,54 +245,64 @@ public class PacManEnvironment implements EnvironmentInterface {
 			directions.add(PacManLowAction.LEFT);
 		if (Thing.getDestination(Thing.RIGHT, x, y, blag, model_))
 			directions.add(PacManLowAction.RIGHT);
+		double inverseDirs = 1d / directions.size();
 
 		// Compile the state
 		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_ };
 		PacManState state = new PacManState(stateObjs);
 
-		double[] directionVote = new double[PacManLowAction.values().length];
+		// Run through each action, until a clear singular direction is arrived
+		// upon.
 		for (int i = 0; i < actions.size(); i++) {
+			double[] directionVote = new double[PacManLowAction.values().length];
+			double best = 0;
+			double worst = 0;
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
 			for (String action : actions.get(i)) {
-				// One weighting for each level of actions returned
-				double weighting = 1.0 / (i + 1);
+				// For each rule, a list of actions are returned
+				//double weighting = 1.0 / (i + 1);
 				if (actions.get(i) != null) {
 					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 							.getInstance()).applyAction(action, state);
 
 					// Use a linearly decreasing weight and the object proximity
-					weighting *= weightedDir.getWeight();
-					if (weightedDir.getDirection() > 0)
-						directionVote[weightedDir.getDirection()] += weighting;
-					else if (weightedDir.getDirection() < 0)
-						directionVote[-weightedDir.getDirection()] -= weighting;
-				}
+					double weighting = weightedDir.getWeight();
+					byte dir = (byte) Math.abs(weightedDir.getDirection());
+					// byte oppositeDir = (byte) (((dir % 2) == 1) ? dir + 1 :
+					// dir - 1);
+					if (weightedDir.getDirection() > 0) {
+						directionVote[dir] += weighting;
+					} else if (weightedDir.getDirection() < 0) {
+						directionVote[dir] -= weighting;
+					}
+					
+					// Recording best and worst
+					best = Math.max(best, directionVote[dir]);
+					worst = Math.min(worst, directionVote[dir]);
+				}			
 			}
-		}
-
-		// Find the best direction/s
-		ArrayList<PacManLowAction> chosen = new ArrayList<PacManLowAction>();
-		double best = -Double.MAX_VALUE;
-		for (int j = 1; j < directionVote.length; j++) {
-			PacManLowAction dir = PacManLowAction.values()[j];
-			if (directions.contains(dir)) {
-				// Same value, add
-				if (directionVote[j] == best) {
-					chosen.add(dir);
-				} else if (directionVote[j] > best) {
-					// Better value, clear
-					chosen.clear();
-					chosen.add(dir);
-					best = directionVote[j];
-				}
+			
+			// Normalise the directionVote and remove any directions not
+			// significantly weighted.
+			ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(directions);
+			for (int d = 0; d < directionVote.length; d++) {
+				directionVote[d] = (directionVote[d] - worst) / (best - worst);
+				// If the vote is less than 1 - # valid directions, then remove it.
+				if (directionVote[d] <= 1d - inverseDirs)
+					directions.remove(PacManLowAction.values()[d]);
+				
+				// Resetting the direction vote
+				directionVote[d] = 0;
 			}
-		}
 
-		// Checking for negative direction
-		chosen.retainAll(directions);
-		if (!chosen.isEmpty())
-			directions = chosen;
+			// If only a single direction left, return
+			if (directions.size() == 1)
+				return directions.get(0);
+			
+			if (directions.isEmpty())
+				directions = backupDirections;
+		}
 
 		// Choose the first valid direction available.
 		return directions.get(0);
@@ -442,7 +452,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			StateSpec.getInstance().insertValidActions(rete_);
 
-			//rete_.eval("(facts)");
+			// rete_.eval("(facts)");
 
 		} catch (Exception e) {
 			e.printStackTrace();
