@@ -192,7 +192,7 @@ public class PolicyGenerator {
 				// If the rule is maximally general, mutate and store it
 				if (coveredRule.isLGG()) {
 					nonLGGCoveredRules_.get(actionPred).remove(coveredRule);
-					lggRules_.put(actionPred, coveredRule);
+					lggRules_.putContains(actionPred, coveredRule);
 					System.out.println("\tLGG RULE FOUND: " + coveredRule);
 
 					// Mutate unless already mutated
@@ -200,7 +200,7 @@ public class PolicyGenerator {
 						mutateRule(coveredRule, coveredRule.getSlot(), false);
 					}
 				} else if (createNewRules) {
-					nonLGGCoveredRules_.put(actionPred, coveredRule);
+					nonLGGCoveredRules_.putContains(actionPred, coveredRule);
 				}
 			}
 
