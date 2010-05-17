@@ -1,4 +1,4 @@
-package blocksWorld;
+package extBlocksWorld;
 
 import java.awt.Point;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ import relationalFramework.StateSpec;
  * 
  * @author Sam Sarjant
  */
-public class BlocksWorldEnvironment implements EnvironmentInterface {
+public class ExtBlocksWorldEnvironment implements EnvironmentInterface {
 	/** The constant for multiplying the number of steps the agent can take. */
 	public static final int STEP_CONSTANT = 2;
 

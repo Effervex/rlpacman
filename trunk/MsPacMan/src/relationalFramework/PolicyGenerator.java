@@ -43,11 +43,8 @@ public class PolicyGenerator {
 	/** The maximally general rules for each action. */
 	private MultiMap<String, GuidedRule> lggRules_;
 
-	/**
-	 * The covered rules which are not yet LGG. Items in this list are mutually
-	 * exclusive from the lggRules list.
-	 */
-	private MultiMap<String, GuidedRule> nonLGGCoveredRules_;
+	/** The set of covered rules, some which may be LGG, others not. */
+	private MultiMap<String, GuidedRule> coveredRules_;
 
 	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
 	private MultiMap<String, GuidedRule> mutatedRules_;
@@ -60,6 +57,12 @@ public class PolicyGenerator {
 
 	/** If this policy generator is being used for learning a module. */
 	private boolean moduleGenerator_;
+
+	/** The goal this generator is working towards if modular. */
+	private String moduleGoal_;
+	
+	/** If modules are being used. */
+	public boolean useModules_ = true;
 
 	/** The random number generator. */
 	public static Random random_ = new Random(0);
@@ -84,7 +87,7 @@ public class PolicyGenerator {
 	 */
 	public PolicyGenerator() {
 		actionSet_ = StateSpec.getInstance().getActions();
-		nonLGGCoveredRules_ = new MultiMap<String, GuidedRule>();
+		coveredRules_ = new MultiMap<String, GuidedRule>();
 		covering_ = new Covering(actionSet_.size());
 		lggRules_ = new MultiMap<String, GuidedRule>();
 		mutatedRules_ = new MultiMap<String, GuidedRule>();
@@ -149,13 +152,17 @@ public class PolicyGenerator {
 	 * @return The list of covered rules, one for each action type.
 	 */
 	public List<GuidedRule> triggerCovering(Rete state, boolean createNewRules) {
-		if (!frozen_) {
+		// If we already have the LGG rules for each action then no need to
+		// cover new rules.
+		if (!frozen_
+				&& (lggRules_.size() < StateSpec.getInstance().getActions()
+						.size())) {
 			if (createNewRules)
 				System.out.println("\t<COVERING TRIGGERED:>");
 
 			List<GuidedRule> covered = null;
 			try {
-				covered = covering_.coverState(state, nonLGGCoveredRules_,
+				covered = covering_.coverState(state, coveredRules_, lggRules_,
 						createNewRules);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -191,16 +198,18 @@ public class PolicyGenerator {
 
 				// If the rule is maximally general, mutate and store it
 				if (coveredRule.isLGG()) {
-					nonLGGCoveredRules_.get(actionPred).remove(coveredRule);
-					lggRules_.putContains(actionPred, coveredRule);
-					System.out.println("\tLGG RULE FOUND: " + coveredRule);
+					if (lggRules_.putContains(actionPred, coveredRule)) {
+						System.out.println("\tLGG RULE FOUND: " + coveredRule);
 
-					// Mutate unless already mutated
-					if (!covering_.isPreGoalSettled(actionPred)) {
-						mutateRule(coveredRule, coveredRule.getSlot(), false);
+						// Mutate unless already mutated
+						if (!covering_.isPreGoalSettled(actionPred)) {
+							mutateRule(coveredRule, coveredRule.getSlot(),
+									false);
+						}
 					}
 				} else if (createNewRules) {
-					nonLGGCoveredRules_.putContains(actionPred, coveredRule);
+					// Add the rule, unless it is already found.
+					coveredRules_.putContains(actionPred, coveredRule);
 				}
 			}
 
@@ -389,10 +398,10 @@ public class PolicyGenerator {
 		}
 
 		// Rules need to have been created at one point
-		if (nonLGGCoveredRules_.isKeysEmpty())
+		if (coveredRules_.isKeysEmpty())
 			return false;
-		// There should be no rules under the nonLGGRules
-		if (!nonLGGCoveredRules_.allValuesEmpty()) {
+		// The rules within coveredRules should all be in LGG rules also.
+		if (!coveredRules_.equals(lggRules_)) {
 			return false;
 		}
 		return true;
@@ -443,7 +452,7 @@ public class PolicyGenerator {
 			policyGenerator_.add(new Slot(action));
 		}
 
-		nonLGGCoveredRules_.clear();
+		coveredRules_.clear();
 		lggRules_.clear();
 		mutatedRules_.clear();
 		policyGenerator_.normaliseProbs();
@@ -596,12 +605,16 @@ public class PolicyGenerator {
 	 * 
 	 * @param policyGenerator
 	 *            The policy generator containing the old LGG rules.
+	 * @param internalGoal
+	 *            The modular goal being worked towards.
 	 * @return The new PolicyGenerator.
 	 */
-	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator) {
+	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
+			String internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addLGGRules(policyGenerator.lggRules_);
 		instance_.moduleGenerator_ = true;
+		instance_.moduleGoal_ = internalGoal;
 		return instance_;
 	}
 
@@ -613,6 +626,8 @@ public class PolicyGenerator {
 	 */
 	public static void setInstance(PolicyGenerator generator) {
 		instance_ = generator;
+		instance_.moduleGenerator_ = false;
+		instance_.moduleGoal_ = null;
 	}
 
 	public boolean isFrozen() {
@@ -621,6 +636,10 @@ public class PolicyGenerator {
 
 	public boolean isModuleGenerator() {
 		return moduleGenerator_;
+	}
+
+	public String getModuleGoal() {
+		return moduleGoal_;
 	}
 
 	public ProbabilityDistribution<Slot> getGenerator() {
@@ -643,11 +662,8 @@ public class PolicyGenerator {
 				rule.setSpawned(false);
 				slot.addNewRule(rule, false);
 				lggRules_.put(action, rule);
+				coveredRules_.put(action, rule);
 			}
-
-			// Adding the actions to the non-LGG, to show that non-LGG rules
-			// have already been considered.
-			nonLGGCoveredRules_.put(action, null);
 		}
 	}
 
@@ -798,7 +814,8 @@ public class PolicyGenerator {
 		for (Slot slot : probs) {
 			// Output every non-zero rule
 			boolean single = true;
-			for (GuidedRule rule : slot.getGenerator().getNonZero()) {
+			for (GuidedRule rule : slot.getGenerator()
+					.getNonZeroOrderedElements()) {
 				if (!single)
 					buf.write(" / ");
 				buf.write(StateSpec.getInstance().encodeRule(rule));

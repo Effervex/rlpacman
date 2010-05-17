@@ -539,7 +539,7 @@ public abstract class StateSpec {
 	 */
 	public static boolean isNumber(String string) {
 		try {
-			double unityDouble = Double.parseDouble(string);
+			Double.parseDouble(string);
 		} catch (Exception e) {
 			return false;
 		}
@@ -558,7 +558,7 @@ public abstract class StateSpec {
 		return actions_;
 	}
 
-	public int getNumActions() {
+	public int getNumReturnedActions() {
 		return actionNum_;
 	}
 

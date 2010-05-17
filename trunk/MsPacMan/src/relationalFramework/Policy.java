@@ -2,11 +2,10 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import jess.QueryResult;
@@ -50,7 +49,7 @@ public class Policy {
 		if (!policyRules_.contains(rule)) {
 			// Check if the rule contains constant facts that could invoke
 			// modular rules.
-			if (checkModular)
+			if (checkModular && PolicyGenerator.getInstance().useModules_)
 				checkModular(rule);
 			policyRules_.add(rule);
 		}
@@ -205,6 +204,7 @@ public class Policy {
 	public ActionChoice evaluatePolicy(Rete state, ActionChoice actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
+		actionSwitch.switchOffAll();
 
 		if (actionsReturned == -1)
 			actionsReturned = Integer.MAX_VALUE;
@@ -234,7 +234,7 @@ public class Policy {
 					// Only add non-modular rules if we're noting rules.
 					if (!gr.isLoadedModuleRule() && noteTriggered)
 						triggeredRules_.add(gr);
-					ArrayList<String> actionsList = new ArrayList<String>();
+					List<String> actionsList = new ArrayList<String>();
 
 					// For each possible replacement
 					do {
@@ -242,9 +242,6 @@ public class Policy {
 						String[] split = StateSpec.splitFact(gr.getAction());
 						StringBuffer actBuffer = new StringBuffer("("
 								+ split[0]);
-
-						// TODO Check that the action is within the valid action
-						// set
 
 						for (int i = 1; i < split.length; i++) {
 							String value = split[i];
@@ -259,9 +256,17 @@ public class Policy {
 						actionsList.add(actBuffer.toString());
 					} while (results.next());
 
+					// Trim down the action list as it may contain too many
+					// actions
+					if ((actionsFound + actionsList.size()) > actionsReturned) {
+						Collections.shuffle(actionsList);
+						actionsList = actionsList.subList(0, actionsReturned
+								- actionsFound);
+					}
+					actionsFound += actionsList.size();
+
 					// Turn on the actions
 					actionSwitch.switchOn(actionsList);
-					actionsFound += actionsList.size();
 				}
 				results.close();
 			} catch (Exception e) {
@@ -275,20 +280,25 @@ public class Policy {
 
 		// If the policy didn't generate enough rules, cover a set of new rules
 		// for each action.
-		if (actionsFound < actionsReturned) {
-			List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
-					.triggerCovering(state, true);
-			// Add any new rules to the policy
-			for (GuidedRule gr : coveredRules) {
-				if (!policyRules_.contains(gr))
-					policyRules_.add(gr);
+		if (!alreadyCovered) {
+			if (actionsFound < actionsReturned) {
+				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
+						.triggerCovering(state, true);
+
+				if (coveredRules != null) {
+					// Add any new rules to the policy
+					for (GuidedRule gr : coveredRules) {
+						if (!policyRules_.contains(gr))
+							policyRules_.add(gr);
+					}
+					evaluatePolicy(state, actionSwitch, actionsReturned,
+							optimal, true, noteTriggered);
+				}
+			} else {
+				PolicyGenerator.getInstance().triggerCovering(state, false);
 			}
-			evaluatePolicy(state, actionSwitch, actionsReturned, optimal, true,
-					noteTriggered);
-		} else if (!alreadyCovered) {
-			PolicyGenerator.getInstance().triggerCovering(state, false);
 		}
-		
+
 		return actionSwitch;
 	}
 }

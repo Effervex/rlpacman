@@ -4,6 +4,7 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -96,7 +97,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return calculateObservations(rete_);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
@@ -208,7 +208,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(ArrayList<ArrayList<String>> actions) {
+	private void drawActions(ArrayList<List<String>> actions) {
 		String[] actionList = new String[actions.size()];
 		for (int i = 0; i < actions.size(); i++) {
 			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
@@ -231,7 +231,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            into a weighted singular direction to take.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(ArrayList<ArrayList<String>> actions) {
+	private PacManLowAction chooseLowAction(ArrayList<List<String>> actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -330,7 +330,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int isTerminal(Observation obs) {
 		int state = model_.m_state;
 		if (state == GameModel.STATE_GAMEOVER) {
-			ObjectObservations.getInstance().objectArray = new String[] { ObjectObservations.NO_PRE_GOAL };
+			ObjectObservations.getInstance().setNoPreGoal();
 			return 1;
 		}
 		if (StateSpec.getInstance().isGoal(rete_))
@@ -366,20 +366,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 					// If edible, add assertion
 					if (ghost.isEdible())
 						rete_.eval("(assert (edible " + ghost + "))");
-					else {
-						// Junction safety calculations
-						for (Junction jp : pacJunctions_) {
-							int ghostDist = calculateDistance(ghost, jp
-									.getLocation());
-							int result = ghostDist
-									- distanceGrid_[jp.getLocation().x][jp
-											.getLocation().y];
-							// Looking for the minimally safe junction
-							if ((result > Integer.MIN_VALUE)
-									&& (result < jp.getSafety()))
-								jp.setSafety(result);
-						}
-					}
 					// If flashing, add assertion
 					if (ghost.isBlinking())
 						rete_.eval("(assert (blinking " + ghost + "))");
@@ -387,18 +373,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 					// Distances from pacman to ghost
 					distanceAssertions(ghost, ghost.toString());
 				}
-			}
-
-			// Junctions
-			for (Junction newJP : pacJunctions_) {
-				String juncName = "junc_" + newJP.m_locX + "_" + newJP.m_locY;
-				rete_.eval("(assert (junction " + juncName + "))");
-
-				distanceAssertions(newJP, juncName);
-
-				// Junction safety
-				rete_.eval("(assert (junctionSafety " + juncName + " "
-						+ newJP.getSafety() + "))");
 			}
 
 			// Find the maximally safe junctions
@@ -481,64 +455,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
 				+ " player " + thingName + " "
 				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
-	}
-
-	/**
-	 * Calculates the distance for a ghost to a point
-	 * 
-	 * @param ghost
-	 *            The ghost that is being calculated for.
-	 * @param p
-	 *            The point the thing is going to.
-	 * @return The distance the ghost must travel to get to the destination
-	 *         point.
-	 */
-	private int calculateDistance(Ghost ghost, Point p) {
-		// Create a duplicate and move it greedily towards the destination
-		Ghost duplicate = (Ghost) ghost.clone();
-		// Setting up greedy behaviour
-		duplicate.m_bCanFollow = true;
-		duplicate.m_bCanUseNextBest = false;
-		duplicate.m_bInsaneAI = true;
-		duplicate.m_bChaseMode = true;
-		duplicate.m_bOldChaseMode = true;
-		duplicate.m_deltaMax = 1;
-		duplicate.m_deltaStartX = 0;
-		duplicate.m_destinationX = -1;
-		duplicate.m_destinationY = -1;
-		duplicate.m_lastDirection = Thing.STILL;
-		duplicate.m_targetX = p.x;
-		duplicate.m_targetY = p.y;
-
-		int distance = 0;
-		// While the ghost has not arrived at the destination
-		while (!((duplicate.m_locX == p.x) && (duplicate.m_locY == p.y))) {
-			duplicate.m_deltaMax = 1;
-			duplicate.m_deltaLocX = 0;
-			duplicate.m_deltaLocY = 0;
-			if ((duplicate.m_locX == 13) && (duplicate.m_locY <= 14)
-					&& (duplicate.m_locY >= 12)) {
-				duplicate.m_lastLocX = duplicate.m_locX;
-				duplicate.m_lastLocY = duplicate.m_locY;
-				duplicate.m_destinationX = -1;
-				duplicate.m_destinationY = -1;
-				duplicate.m_locY--;
-				duplicate.m_bInsideRoom = false;
-				duplicate.m_bEnteringDoor = false;
-				duplicate.m_bEaten = false;
-			} else {
-				duplicate.tickThing(model_.m_pacMan.m_gameUI);
-				model_.m_pacMan.Move(duplicate);
-			}
-			distance++;
-
-			// Break if something goes wrong
-			if (distance > 99) {
-				distance = -99;
-				break;
-			}
-		}
-		return distance;
 	}
 
 	/**

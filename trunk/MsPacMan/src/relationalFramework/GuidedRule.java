@@ -513,6 +513,7 @@ public class GuidedRule {
 		clone.hasSpawned_ = hasSpawned_;
 		clone.lgg_ = lgg_;
 		clone.withoutInequals_ = withoutInequals_;
+		clone.isLoadedModule_ = isLoadedModule_;
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)

@@ -20,7 +20,7 @@ public class PacManCoveringTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new Covering(StateSpec.getInstance().getNumActions());
+		sut_ = new Covering(StateSpec.getInstance().getActions().size());
 	}
 
 	@Test

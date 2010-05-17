@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -16,7 +17,7 @@ public class ActionChoice {
 	 * The prioritised list of switched actions. Each rule may return a list of
 	 * actions.
 	 */
-	private ArrayList<ArrayList<String>> activeActions_;
+	private ArrayList<List<String>> activeActions_;
 
 	/** The action preds used in this action choice. */
 	private ArrayList<String> actionPreds_;
@@ -25,17 +26,17 @@ public class ActionChoice {
 	 * A constructor for a new ActionChoice, which initialises the action array.
 	 */
 	public ActionChoice() {
-		activeActions_ = new ArrayList<ArrayList<String>>();
+		activeActions_ = new ArrayList<List<String>>();
 		actionPreds_ = new ArrayList<String>();
 	}
 
 	/**
 	 * Switches on actions.
 	 * 
-	 * @param action
+	 * @param actions
 	 *            The actions being switched on.
 	 */
-	public void switchOn(ArrayList<String> actions) {
+	public void switchOn(List<String> actions) {
 		if ((actions != null) && (!actions.isEmpty())) {
 			activeActions_.add(actions);
 			String pred = StateSpec.splitFact(actions.get(0))[0];
@@ -60,11 +61,18 @@ public class ActionChoice {
 	}
 
 	/**
+	 * Switches off all active actions.
+	 */
+	public void switchOffAll() {
+		activeActions_.clear();
+	}
+
+	/**
 	 * Gets the active actions.
 	 * 
 	 * @return The list of active actions, of arbitrary length.
 	 */
-	public ArrayList<ArrayList<String>> getActions() {
+	public ArrayList<List<String>> getActions() {
 		return activeActions_;
 	}
 
@@ -74,7 +82,7 @@ public class ActionChoice {
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		for (ArrayList<String> actions : activeActions_) {
+		for (List<String> actions : activeActions_) {
 			buffer.append(actions + "\n");
 		}
 		return buffer.toString();
@@ -117,7 +125,7 @@ public class ActionChoice {
 	 * 
 	 * @return The first list of actions.
 	 */
-	public ArrayList<String> getFirstActionList() {
+	public List<String> getFirstActionList() {
 		return activeActions_.get(0);
 	}
 
