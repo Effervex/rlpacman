@@ -63,17 +63,21 @@ public class Covering {
 	 * 
 	 * @param state
 	 *            The state of the environment, containing the valid actions.
-	 * @param nonLGGCoveredRules
+	 * @param coveredRules
 	 *            A starting point for the rules, if any exist.
+	 * @param lggRules
+	 *            The lgg rules, all of which are also contained within
+	 *            coveredRules.
 	 * @param createNewRules
 	 *            If this should cover new rules.
 	 * @return A list of guided rules, one for each action type.
 	 */
 	public List<GuidedRule> coverState(Rete state,
-			MultiMap<String, GuidedRule> nonLGGCoveredRules,
-			boolean createNewRules) throws Exception {
+			MultiMap<String, GuidedRule> coveredRules,
+			MultiMap<String, GuidedRule> lggRules, boolean createNewRules)
+			throws Exception {
 		// If we're not creating new rules and the nonLGGs are empty, return
-		if (!createNewRules && nonLGGCoveredRules.allValuesEmpty())
+		if (!createNewRules && coveredRules.allValuesEmpty())
 			return EMPTY_LIST;
 		createNewRules_ = createNewRules;
 
@@ -90,16 +94,19 @@ public class Covering {
 		// A multimap with the action predicate as key and args as values.
 		MultiMap<String, String> validActions = arrangeActions(actionFact);
 		for (String action : validActions.keySet()) {
-			// Format any previous rules into a list of strings
-			List<GuidedRule> previousRules = nonLGGCoveredRules.get(action);
+			// Get the list of previous rules, both LGG and non-LGG.
+			List<GuidedRule> previousRules = coveredRules.get(action);
 			if (previousRules == null)
 				previousRules = new ArrayList<GuidedRule>();
+			Set<GuidedRule> lggSet = null;
+			if (lggRules.get(action) != null)
+				lggSet = new HashSet<GuidedRule>(lggRules.get(action));
 
 			// Cover the state, using the previous rules and/or newly created
 			// rules
 			List<GuidedRule> actionRules = unifyActionRules(validActions
 					.get(action), relevantConditions, action, previousRules,
-					constants);
+					lggSet, constants);
 			generalActions.addAll(actionRules);
 		}
 
@@ -178,7 +185,7 @@ public class Covering {
 		for (String oldStateFact : oldState) {
 			Collection<String> modFacts = unifyFact(oldStateFact, newState,
 					oldReplacementMap, newReplacementMap, oldTerms);
-			
+
 			if (modFacts.isEmpty())
 				hasChanged = true;
 
@@ -432,27 +439,6 @@ public class Covering {
 	}
 
 	/**
-<<<<<<< .mine
-	 * Simple equality method for comparing two possibly null strings.
-	 * 
-	 * @param string
-	 *            String 1.
-	 * @param string2
-	 *            String 2.
-	 * @return True if either strings are null, or if both are equal.
-	 */
-	private boolean equalReplacements(String string, String string2) {
-		if (string == null) {
-			if (string2 == null)
-				return true;
-			return false;
-		}
-		return string.equals(string2);
-	}
-
-	/**
-=======
->>>>>>> .r73
 	 * Unifies action rules together into one general all-covering rule.
 	 * 
 	 * @param argsList
@@ -462,15 +448,16 @@ public class Covering {
 	 * @param actionPred
 	 *            The action predicate spawning this rule.
 	 * @param previousRules
-	 *            A pre-existing list of rules that each need to be generalised.
-	 *            Note the rules are exclusive from one-another.
+	 *            A pre-existing list of previously created rules, both LGG and
+	 *            non-LGG.
+	 * @param lggRules The lgg rules, if any.
 	 * @param constants
 	 *            The constants to maintain in rules.
 	 * @return All rules representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
 			MultiMap<String, Fact> relevantConditions, String actionPred,
-			List<GuidedRule> previousRules, List<String> constants) {
+			List<GuidedRule> previousRules, Set<GuidedRule> lggRules, List<String> constants) {
 		// The terms in the action
 		String[] action = new String[1 + StateSpec.getInstance().getActions()
 				.get(actionPred).size()];
@@ -480,9 +467,8 @@ public class Covering {
 		// Do until:
 		// 1) We have no actions left to look at
 		// 2) Every rule is not yet minimal
-		Set<GuidedRule> minimalRules = null;
 		while ((argIter.hasNext())
-				&& ((minimalRules == null) || (minimalRules.size() < previousRules
+				&& ((lggRules == null) || (lggRules.size() < previousRules
 						.size()))) {
 			String arg = argIter.next();
 			List<Fact> actionFacts = new ArrayList<Fact>();
@@ -510,8 +496,8 @@ public class Covering {
 					actionFacts, terms, constants), StateSpec
 					.reformFact(action), false);
 
-			if (minimalRules == null)
-				minimalRules = new HashSet<GuidedRule>();
+			if (lggRules == null)
+				lggRules = new HashSet<GuidedRule>();
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -520,7 +506,7 @@ public class Covering {
 				if (createNewRules_) {
 					previousRules.add(inverseSubbed);
 					if (inverseSubbed.isLGG())
-						minimalRules.add(inverseSubbed);
+						lggRules.add(inverseSubbed);
 				}
 			} else {
 				// Unify with each rule in the previous rule/s
@@ -528,25 +514,27 @@ public class Covering {
 				for (int i = 0; i < previousRules.size(); i++) {
 					GuidedRule prev = previousRules.get(i);
 
-					// Unify the prev rule and the inverse subbed rule
-					List<String> ruleConditions = prev.getConditions(true);
-					List<String> ruleTerms = prev.getActionTerms();
-					int changed = unifyStates(ruleConditions, inverseSubbed
-							.getConditions(false), ruleTerms, inverseSubbed
-							.getActionTerms());
+					if (!prev.isLGG()) {
+						// Unify the prev rule and the inverse subbed rule
+						List<String> ruleConditions = prev.getConditions(true);
+						List<String> ruleTerms = prev.getActionTerms();
+						int changed = unifyStates(ruleConditions, inverseSubbed
+								.getConditions(false), ruleTerms, inverseSubbed
+								.getActionTerms());
 
-					if (changed == 1) {
-						prev.setActionTerms(ruleTerms);
-						prev.setConditions(ruleConditions, true);
-					}
+						if (changed == 1) {
+							prev.setActionTerms(ruleTerms);
+							prev.setConditions(ruleConditions, true);
+						}
 
-					if (prev.isLGG()) {
-						// The rule is minimal
-						minimalRules.add(prev);
-						createNewRule = false;
-					} else {
-						// The rule isn't minimal (but it changed)
-						createNewRule = false;
+						if (prev.isLGG()) {
+							// The rule is lgg
+							lggRules.add(prev);
+							createNewRule = false;
+						} else {
+							// The rule isn't minimal (but it changed)
+							createNewRule = false;
+						}
 					}
 				}
 
@@ -556,7 +544,7 @@ public class Covering {
 					if (createNewRules_) {
 						previousRules.add(inverseSubbed);
 						if (inverseSubbed.isLGG())
-							minimalRules.add(inverseSubbed);
+							lggRules.add(inverseSubbed);
 					}
 				}
 			}
@@ -1143,9 +1131,9 @@ public class Covering {
 		// premature settling.
 		Set<String> formedActions = new HashSet<String>();
 
-		// If the state isn't yet settled, try unification
-		for (ArrayList<String> actions : actionChoice.getActions()) {
+		for (List<String> actions : actionChoice.getActions()) {
 			String actionPred = StateSpec.splitFact(actions.get(0))[0];
+			// If the state isn't yet settled, try unification
 			if (!isPreGoalSettled(actionPred)) {
 
 				// Create a pre-goal from every action in the actions list.
@@ -1338,6 +1326,11 @@ public class Covering {
 
 		public List<String> getActionTerms() {
 			return actionTerms_;
+		}
+
+		@Override
+		public String toString() {
+			return state_.toString() + " : " + actionTerms_.toString();
 		}
 	}
 }

@@ -1,8 +1,5 @@
 package relationalFramework;
 
-import org.rlcommunity.rlglue.codec.EnvironmentInterface;
-import org.rlcommunity.rlglue.codec.types.Action;
-import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 /**

@@ -24,14 +24,14 @@ public class ModuleTest {
 		assertNotNull(result);
 		assertEquals("clear", result.getModulePredicate());
 		ArrayList<String> params = new ArrayList<String>();
-		params.add("?*a*");
+		params.add("?_MOD_a");
 		assertEquals(params, result.getParameterTerms());
 		ArrayList<GuidedRule> rules = new ArrayList<GuidedRule>();
 		rules.add(new GuidedRule(
-				"(above ?X ?*a*) (clear ?X) => (moveFloor ?X)", params));
+				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", params));
 		rules
 				.add(new GuidedRule(
-						"(above ?X ?*a*) (clear ?X) (clear ?Y) => (move ?X ?Y)",
+						"(above ?X ?_MOD_a) (clear ?X) (clear ?Y) => (move ?X ?Y)",
 						params));
 		assertEquals(rules, result.getModuleRules());
 

@@ -28,8 +28,6 @@ public class PacManStateSpec extends StateSpec {
 		preconds.put("toFruit", "(fruit ?X) (distanceFruit player ?X ?Y)");
 		preconds.put("toGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
 		preconds.put("fromGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
-		preconds
-				.put("toSafestJunction", "(junction ?X) (junctionSafety ?X ?Y)");
 
 		return preconds;
 	}
@@ -74,11 +72,6 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Integer.class);
 		actions.putCollection("fromGhost", structure);
 
-		structure = new ArrayList<Class>();
-		structure.add(Junction.class);
-		structure.add(Integer.class);
-		actions.putCollection("toSafestJunction", structure);
-
 		return actions;
 	}
 
@@ -106,7 +99,7 @@ public class PacManStateSpec extends StateSpec {
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
 		rules
-				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 25)) "
+				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
 						+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
 						+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 		rules
@@ -124,12 +117,10 @@ public class PacManStateSpec extends StateSpec {
 						+ "(pacman ?Player) (ghost ?Ghost) "
 						+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
 		rules
-				.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 99)) "
+				.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
 						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
 		rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
 				+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
-//		rules.add("(junctionSafety ?Junction ?Safe) (junction ?Junction) "
-//				+ "=> (toSafestJunction ?Junction ?Safe)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false);
@@ -196,17 +187,6 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Integer.class);
 		predicates.putCollection("distanceFruit", structure);
 
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(Junction.class);
-		structure.add(Integer.class);
-		predicates.putCollection("distanceJunction", structure);
-
-		structure = new ArrayList<Class>();
-		structure.add(Junction.class);
-		structure.add(Integer.class);
-		predicates.putCollection("junctionSafety", structure);
-
 		return predicates;
 	}
 
@@ -219,7 +199,6 @@ public class PacManStateSpec extends StateSpec {
 		typeMap.put(PowerDot.class, "powerDot");
 		typeMap.put(Ghost.class, "ghost");
 		typeMap.put(Fruit.class, "fruit");
-		typeMap.put(Junction.class, "junction");
 
 		return typeMap;
 	}
@@ -287,12 +266,6 @@ public class PacManStateSpec extends StateSpec {
 		} else if (actionSplit[0].equals("toFruit")) {
 			return new WeightedDirection((byte) followPath(
 					state.getFruit().m_locX, state.getFruit().m_locY,
-					state.getDistanceGrid()).ordinal(), weight);
-		} else if (actionSplit[0].equals("toSafestJunction")) {
-			String[] coords = actionSplit[1].split("_");
-			weight = determineWeight(50 - Integer.parseInt(actionSplit[2]));
-			return new WeightedDirection((byte) followPath(
-					Integer.parseInt(coords[1]), Integer.parseInt(coords[2]),
 					state.getDistanceGrid()).ordinal(), weight);
 		} else {
 			int ghostIndex = 0;

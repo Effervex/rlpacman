@@ -251,6 +251,25 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		}
 		return ordered;
 	}
+	
+	/**
+	 * Gets the elements of this distribution in an ordered list, from most
+	 * likely to least, excluding zero-probability elements.
+	 * 
+	 * @return The non-zero elements of the distribution in order.
+	 */
+	public ArrayList<T> getNonZeroOrderedElements() {
+		ArrayList<ItemProb> ips = new ArrayList<ItemProb>(itemProbs_);
+		Collections.sort(ips, Collections.reverseOrder());
+
+		ArrayList<T> ordered = new ArrayList<T>();
+		for (ItemProb ip : ips) {
+			if (ip.prob_ == 0)
+				return ordered;
+			ordered.add(ip.getItem());
+		}
+		return ordered;
+	}
 
 	/**
 	 * Gets all non-zero elements in this distribution.

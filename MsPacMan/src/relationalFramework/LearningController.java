@@ -44,7 +44,7 @@ public class LearningController {
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double POPULATION_CONSTANT = 50;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double SELECTION_RATIO = 0.05;
+	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
 	/** The minimum value for weight updating. */
@@ -224,8 +224,10 @@ public class LearningController {
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
 		int t = 0;
 		while ((t < maxEpisodes_) && (!localPolicy.isConverged())) {
-			// Check if the agent needs to drop into learning a module
-			checkForModularLearning(localPolicy);
+			if (PolicyGenerator.getInstance().useModules_) {
+				// Check if the agent needs to drop into learning a module
+				checkForModularLearning(localPolicy);
+			}
 
 			// Determine the dynamic population, based on rule-base size
 			int population = determinePopulation();
@@ -277,8 +279,15 @@ public class LearningController {
 
 			// Save the results at each episode
 			try {
-				File tempGen = new File(TEMP_FOLDER + "/"
-						+ generatorFile_.getName() + run);
+				File tempGen = null;
+				if (PolicyGenerator.getInstance().isModuleGenerator())
+					tempGen = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER
+							+ "/"
+							+ PolicyGenerator.getInstance().getModuleGoal()
+							+ generatorFile_.getName() + run);
+				else
+					tempGen = new File(TEMP_FOLDER + "/"
+							+ generatorFile_.getName() + run);
 				tempGen.createNewFile();
 				PolicyGenerator.saveGenerators(tempGen);
 				saveBestPolicy(bestPolicy);
@@ -321,7 +330,6 @@ public class LearningController {
 		if (!modularFacts.isEmpty()) {
 			// Commence learning of the module
 			for (String internalGoal : modularFacts) {
-				// TODO Modularisation
 				if (PolicyGenerator.debugMode_) {
 					try {
 						System.out.println("\n\n\n------LEARNING MODULE: "
@@ -339,8 +347,8 @@ public class LearningController {
 						.RL_agent_message(INTERNAL_PREFIX + " " + internalGoal);
 
 				// Begin development
-				PolicyGenerator modularGenerator = PolicyGenerator
-						.newInstance(policyGenerator);
+				PolicyGenerator modularGenerator = PolicyGenerator.newInstance(
+						policyGenerator, internalGoal);
 				developPolicy(modularGenerator);
 
 				// Save the module
@@ -445,8 +453,14 @@ public class LearningController {
 
 		// Write the state of the generators out in human readable form
 		try {
-			File output = new File(TEMP_FOLDER + "/"
-					+ humanGeneratorFile_.getName() + run);
+			File output = null;
+			if (PolicyGenerator.getInstance().isModuleGenerator())
+				output = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
+						+ PolicyGenerator.getInstance().getModuleGoal()
+						+ humanGeneratorFile_.getName() + run);
+			else
+				output = new File(TEMP_FOLDER + "/"
+						+ humanGeneratorFile_.getName() + run);
 			output.createNewFile();
 			PolicyGenerator.saveHumanGenerators(output);
 		} catch (Exception e) {
@@ -590,8 +604,14 @@ public class LearningController {
 	 */
 	private void savePerformance(ArrayList<Float> episodeAverage, int run)
 			throws Exception {
-		File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
-				+ run);
+		File tempPerf = null;
+		if (PolicyGenerator.getInstance().isModuleGenerator())
+			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
+					+ PolicyGenerator.getInstance().getModuleGoal()
+					+ performanceFile_.getName() + run);
+		else
+			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
+					+ run);
 		tempPerf.createNewFile();
 		FileWriter wr = new FileWriter(tempPerf);
 		BufferedWriter buf = new BufferedWriter(wr);

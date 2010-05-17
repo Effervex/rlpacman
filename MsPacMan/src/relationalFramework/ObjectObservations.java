@@ -67,4 +67,11 @@ public class ObjectObservations {
 	public int getNumObject() {
 		return objectArray.length;
 	}
+
+	/**
+	 * Sets the no pre-goal observation.
+	 */
+	public void setNoPreGoal() {
+		objectArray = new String[] { NO_PRE_GOAL };
+	}
 }

@@ -8,7 +8,6 @@ import java.util.List;
 
 import jess.Fact;
 import jess.Rete;
-import jess.ValueVector;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
@@ -56,6 +55,7 @@ public class CoveringTest {
 		StateSpec.getInstance().insertValidActions(state);
 
 		List<GuidedRule> rules = sut_.coverState(state,
+				new MultiMap<String, GuidedRule>(),
 				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(rules.size(), 2);
 		for (GuidedRule gr : rules) {
@@ -125,7 +125,8 @@ public class CoveringTest {
 				"(on ?X ?) (above ?X ?) (clear ?X) "
 						+ "(highest ?X) (block ?X) => (moveFloor ?X)"));
 
-		rules = sut_.coverState(state, existingRules, true);
+		rules = sut_.coverState(state, existingRules,
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(rules.size(), 1);
 		assertEquals(existingRules.sizeTotal(), 2);
 		for (GuidedRule gr : existingRules.values()) {
@@ -160,7 +161,7 @@ public class CoveringTest {
 
 		// Test the rule refinement flag.
 		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(),
-				false);
+				new MultiMap<String, GuidedRule>(), false);
 		assertTrue(rules.isEmpty());
 
 		// Consecutive covering (w/ constants)
@@ -182,8 +183,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_
-				.coverState(state, new MultiMap<String, GuidedRule>(), true);
+		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(),
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		existingRules.clear();
 		for (GuidedRule gr : rules) {
@@ -240,7 +241,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_.coverState(state, existingRules, true);
+		rules = sut_.coverState(state, existingRules,
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
@@ -296,7 +298,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_.coverState(state, existingRules, true);
+		rules = sut_.coverState(state, existingRules,
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
@@ -352,8 +355,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_
-				.coverState(state, new MultiMap<String, GuidedRule>(), true);
+		rules = sut_.coverState(state, new MultiMap<String, GuidedRule>(),
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(2, rules.size());
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
@@ -405,7 +408,8 @@ public class CoveringTest {
 		state.run();
 		StateSpec.getInstance().insertValidActions(state);
 
-		rules = sut_.coverState(state, existingRules, true);
+		rules = sut_.coverState(state, existingRules,
+				new MultiMap<String, GuidedRule>(), true);
 		assertEquals(1, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : rules) {
@@ -1022,7 +1026,7 @@ public class CoveringTest {
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
-		
+
 		// Interesting case
 		oldState.clear();
 		oldState.add("(on a c)");
@@ -1059,7 +1063,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(clear ?X)"));
 		assertTrue(oldState.contains("(clear ?Y)"));
 		assertTrue(oldState.contains("(highest ?Y)"));
-		
+
 		// Action precedence
 		oldState.clear();
 		oldState.add("(on a c)");
@@ -1082,7 +1086,7 @@ public class CoveringTest {
 		assertTrue(oldState.contains("(on ? c)"));
 		assertTrue(oldState.contains("(on c ?)"));
 		assertTrue(oldState.contains("(on b ?)"));
-		
+
 		// Double unification
 		oldState.clear();
 		oldState.add("(on c e)");
@@ -1100,7 +1104,7 @@ public class CoveringTest {
 		assertEquals(2, oldState.size());
 		assertTrue(oldState.contains("(on c ?)"));
 		assertTrue(oldState.contains("(on ? g)"));
-		
+
 		// Double unification
 		oldState.clear();
 		oldState.add("(on c g)");
@@ -1161,7 +1165,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Range addition (reversed)
@@ -1184,7 +1189,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Negative range addition
@@ -1207,7 +1213,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Tiny value range addition
@@ -1231,7 +1238,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index
 				+ " -1.0 2.567483E-64))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Regular variable unification with numerical values too
@@ -1254,9 +1262,9 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
 		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
-		
 
 		// Unification under an existing range term
 		oldState.clear();
@@ -1279,7 +1287,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
+		assertTrue(oldTerms
+				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
 		assertEquals(2, oldTerms.size());
 
 		// Unification under an existing range term (extension)
@@ -1303,7 +1312,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
+		assertTrue(oldTerms
+				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
 		assertEquals(2, oldTerms.size());
 
 		// Multiple numerical terms
@@ -1328,14 +1338,14 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -2.0 1.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 		index++;
 		assertTrue(oldState.contains("(level a ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))"));
-		
 
 		// Multiple numerical terms with existing range term
 		oldState.clear();
@@ -1360,7 +1370,8 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
 		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
+		assertTrue(oldTerms
+				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
 		assertEquals(2, oldTerms.size());
 		index++;
 		assertTrue(oldState.contains("(level a ?"
@@ -1393,7 +1404,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
 		assertTrue(oldState.contains("(dot ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Variables and numerical unification (out-of-range distance)
@@ -1421,7 +1433,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
 		assertTrue(oldState.contains("(dot ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 
 		// Variables and numerical unification (same distance)
@@ -1449,7 +1462,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
 		assertTrue(oldState.contains("(dot ?X)"));
 		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX + index));
+		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
+				+ index));
 		assertEquals(2, oldTerms.size());
 	}
 

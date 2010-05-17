@@ -1,0 +1,3 @@
+A typical policy:
+(on ?X ?_MOD_a) (above ?X ?) (clear ?X) (block ?_MOD_a) => (moveFloor ?X) / (on ?X ?) (above ?X ?_MOD_a) (clear ?X) (block ?_MOD_a) => (moveFloor ?X)
+(clear ?X) (clear ?Y) (above ?X ?_MOD_a) (block ?_MOD_a) => (move ?X ?Y)

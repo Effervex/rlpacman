@@ -23,7 +23,7 @@ import jess.ValueVector;
  */
 public class Module {
 	/** The relative directory in which modules are stored. */
-	private static final String MODULE_DIR = "modules";
+	public static final String MODULE_DIR = "modules";
 
 	/** The suffix for module files. */
 	private static final String MODULE_SUFFIX = ".mod";
@@ -193,7 +193,7 @@ public class Module {
 					bf.write(" " + createModuleParameter(i));
 				}
 				bf.write("))");
-				
+
 				// Writing the rules
 				for (GuidedRule gr : newModule.moduleRules_) {
 					ValueVector vv = null;
@@ -253,28 +253,17 @@ public class Module {
 	}
 
 	/**
-	 * Replaces all constants in the goal in a rule with parameterisable terms
-	 * (?_MOD_a, ?_MOD_b, etc).
+	 * Gets the rules for this module. Note that the rules returned are unique
+	 * from the module (clones).
 	 * 
-	 * @param rule
-	 *            The rule to be parameterised.
-	 * @param terms
-	 *            The terms to be swapped out.
-	 * @return The rule with goal constants swapped with parameterisable terms.
-	 */
-	private String parameteriseRule(String rule, ArrayList<String> terms) {
-		for (int i = 0; i < parameterTerms_.size(); i++) {
-			rule = rule.replaceAll(" " + terms.get(i) + "(?= |\\))", " "
-					+ parameterTerms_.get(i));
-		}
-		return rule;
-	}
-
-	/**
-	 * @return the moduleRules_
+	 * @return A cloned copy of the module rules.
 	 */
 	public ArrayList<GuidedRule> getModuleRules() {
-		return moduleRules_;
+		ArrayList<GuidedRule> clonedRules = new ArrayList<GuidedRule>();
+		for (GuidedRule gr : moduleRules_) {
+			clonedRules.add((GuidedRule) gr.clone());
+		}
+		return clonedRules;
 	}
 
 	/**

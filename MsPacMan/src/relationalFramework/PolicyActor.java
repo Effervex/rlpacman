@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.RU;
@@ -206,7 +205,7 @@ public class PolicyActor implements AgentInterface {
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
 		actions = policy_.evaluatePolicy(state, actions, StateSpec
-				.getInstance().getNumActions(), optimal_, false, noteTriggered);
+				.getInstance().getNumReturnedActions(), optimal_, false, noteTriggered);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;

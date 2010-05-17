@@ -1,7 +1,5 @@
 package rlPacMan;
 
-import java.util.Collection;
-
 import relationalFramework.State;
 
 /**
