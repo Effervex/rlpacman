@@ -112,8 +112,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		optimalSteps_ = optimalSteps();
 		if (PolicyGenerator.debugMode_) {
 			System.out.println("\tAgent:\n" + state_);
-			steps_ = 0;
 		}
+		steps_ = 0;
 
 		return formObs_Start();
 	}
@@ -133,8 +133,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		List<String> actions = ((ActionChoice) ObjectObservations
-				.getInstance().objectArray[0]).getFirstActionList();
+		List<String> actions = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
+				.getFirstActionList();
 		String action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 

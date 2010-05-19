@@ -11,6 +11,7 @@ import org.junit.Test;
 import relationalFramework.GuidedRule;
 import relationalFramework.Module;
 import relationalFramework.Policy;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PolicyTest {
@@ -18,6 +19,7 @@ public class PolicyTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		PolicyGenerator.newInstance();
 	}
 
 	@Test
