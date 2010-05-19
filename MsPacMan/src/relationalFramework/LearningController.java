@@ -183,7 +183,7 @@ public class LearningController {
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
 
-			developPolicy(localPolicy);
+			developPolicy(localPolicy, run);
 
 			// Flushing the rete object.
 			StateSpec.reinitInstance();
@@ -208,11 +208,9 @@ public class LearningController {
 	 * 
 	 * @param localPolicy
 	 *            The local policy to develop.
+	 * @param run The run number of the policy.
 	 */
-	private void developPolicy(PolicyGenerator localPolicy) {
-		// TODO Sort out the ETA
-		int run = 0;
-
+	private void developPolicy(PolicyGenerator localPolicy, int run) {
 		PolicyValue bestPolicy = null;
 
 		// Run the preliminary action discovery phase, only starting real
@@ -349,7 +347,7 @@ public class LearningController {
 				// Begin development
 				PolicyGenerator modularGenerator = PolicyGenerator.newInstance(
 						policyGenerator, internalGoal);
-				developPolicy(modularGenerator);
+				developPolicy(modularGenerator, -1);
 
 				// Save the module
 				Module.saveModule(internalGoal, StateSpec.getInstance()

@@ -62,10 +62,10 @@ public class PolicyGenerator {
 	private String moduleGoal_;
 	
 	/** If modules are being used. */
-	public boolean useModules_ = true;
+	public boolean useModules_ = false;
 
 	/** The random number generator. */
-	public static Random random_ = new Random(0);
+	public static Random random_ = new Random(456);
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
