@@ -208,7 +208,8 @@ public class LearningController {
 	 * 
 	 * @param localPolicy
 	 *            The local policy to develop.
-	 * @param run The run number of the policy.
+	 * @param run
+	 *            The run number of the policy.
 	 */
 	private void developPolicy(PolicyGenerator localPolicy, int run) {
 		PolicyValue bestPolicy = null;
@@ -663,8 +664,13 @@ public class LearningController {
 
 			// For every value within the performance file
 			float sum = 0;
+			float val = 0;
 			for (int e = 0; e < maxEpisodes_; e++) {
-				float val = Float.parseFloat(buf.readLine());
+				// Some performance files may be cut off, so just use the last
+				// recorded value.
+				String input = buf.readLine();
+				if (input != null)
+					val = Float.parseFloat(input);
 				performances[e][i] = val;
 				sum += val;
 			}
@@ -750,15 +756,17 @@ public class LearningController {
 		public PolicyValue(Policy pol, float value) {
 			policy_ = pol;
 			value_ = value;
-			
+
 			updateInternalRuleValues(pol, value);
 		}
 
 		/**
 		 * Updates the internal rule values for the rules within the policy.
 		 * 
-		 * @param pol The policy with the active rules.
-		 * @param value The value the policy achieved
+		 * @param pol
+		 *            The policy with the active rules.
+		 * @param value
+		 *            The value the policy achieved
 		 */
 		private void updateInternalRuleValues(Policy pol, float value) {
 			for (GuidedRule rule : pol.getFiringRules()) {
