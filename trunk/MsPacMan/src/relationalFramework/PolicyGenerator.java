@@ -499,8 +499,11 @@ public class PolicyGenerator {
 				slotCounts, stepSize);
 
 		for (Slot slot : policyGenerator_) {
+			double slotCount = 0;
+			if (slotCounts.containsKey(slot))
+				slotCount = slotCounts.get(slot);
 			updateDifference_ += slot.getGenerator().updateDistribution(
-					numSamples, ruleCounts, stepSize);
+					slotCount, ruleCounts, stepSize);
 		}
 	}
 
