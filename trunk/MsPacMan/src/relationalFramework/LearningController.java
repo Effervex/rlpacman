@@ -217,6 +217,8 @@ public class LearningController {
 		// Run the preliminary action discovery phase, only starting real
 		// optimisation once pre-goal has settled and LGG rules for each
 		// action have been found.
+		// TODO Remove preliminary processing and simply use an iterative cycle
+		// which just restarts the learning process whenever something changes.
 		preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
