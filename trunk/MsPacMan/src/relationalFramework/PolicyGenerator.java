@@ -62,7 +62,7 @@ public class PolicyGenerator {
 	private String moduleGoal_;
 	
 	/** If modules are being used. */
-	public boolean useModules_ = false;
+	public boolean useModules_ = true;
 
 	/** The random number generator. */
 	public static Random random_ = new Random(456);

@@ -64,6 +64,15 @@ public class GuidedRule {
 	/** If this rule is from a loaded module. */
 	private boolean isLoadedModule_ = false;
 
+	/** The rule's internal mean. */
+	private double internalMean_ = 0;
+
+	/** The rule's internal value for calculating standard deviation. */
+	private double internalS_ = 0;
+
+	/** The rule's internal count of value updates. */
+	private int internalCount_ = 0;
+
 	/**
 	 * A constructor taking the bare minimum for a guided rule.
 	 * 
@@ -319,6 +328,47 @@ public class GuidedRule {
 
 		lgg_ = true;
 		return 1;
+	}
+
+	/**
+	 * Updates the internal value of this rule, adjusting the rule mean and SD
+	 * appropriately.
+	 * 
+	 * @param value
+	 *            The value the rule attained as part of a policy.
+	 */
+	public void updateInternalValue(float value) {
+		internalCount_++;
+		
+		if (internalCount_ == 1) {
+			internalMean_ = value;
+			internalS_ = 0;
+		} else {
+			double newMean = internalMean_ + (value - internalMean_) / (internalCount_);
+			double newS = internalS_ + (value - internalMean_) * (value - newMean);
+			internalMean_ = newMean;
+			internalS_ = newS;
+		}
+	}
+	
+	/**
+	 * Gets the internal mean for the rule.
+	 * 
+	 * @return The rule's internal mean.
+	 */
+	public double getInternalMean() {
+		return internalMean_;
+	}
+	
+	/**
+	 * Gets the internal SD for the rule (which uses the count).
+	 * 
+	 * @return The internal standard deviation.
+	 */
+	public double getInternalSD() {
+		if (internalCount_ <= 1)
+			return 0;
+		return Math.sqrt(internalS_ / (internalCount_ - 1));
 	}
 
 	public Slot getSlot() {

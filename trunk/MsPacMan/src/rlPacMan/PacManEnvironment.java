@@ -26,7 +26,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static final int PLAYER_DELAY = 1;
+	public static final int PLAYER_DELAY = 0;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
