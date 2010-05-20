@@ -728,7 +728,7 @@ public class LearningController {
 
 	/**
 	 * A simple class for binding a policy and a value together in a comparable
-	 * format.
+	 * format. Also updates internal rule worth for rules within the policy.
 	 * 
 	 * @author Samuel J. Sarjant
 	 * 
@@ -750,6 +750,20 @@ public class LearningController {
 		public PolicyValue(Policy pol, float value) {
 			policy_ = pol;
 			value_ = value;
+			
+			updateInternalRuleValues(pol, value);
+		}
+
+		/**
+		 * Updates the internal rule values for the rules within the policy.
+		 * 
+		 * @param pol The policy with the active rules.
+		 * @param value The value the policy achieved
+		 */
+		private void updateInternalRuleValues(Policy pol, float value) {
+			for (GuidedRule rule : pol.getFiringRules()) {
+				rule.updateInternalValue(value);
+			}
 		}
 
 		/**
