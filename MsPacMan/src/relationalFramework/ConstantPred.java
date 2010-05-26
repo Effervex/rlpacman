@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -12,6 +13,7 @@ import java.util.Collections;
  * @author Samuel J. Sarjant
  */
 public class ConstantPred implements Comparable<ConstantPred> {
+	/** A sorted list of facts using only constant terms */
 	private ArrayList<String> facts_;
 
 	public ConstantPred(String fact) {
@@ -23,6 +25,7 @@ public class ConstantPred implements Comparable<ConstantPred> {
 		facts_ = new ArrayList<String>();
 		for (String fact : facts)
 			facts_.add(StateSpec.splitFact(fact)[0]);
+		Collections.sort(facts_);
 	}
 
 	public ArrayList<String> getFacts() {
@@ -59,8 +62,6 @@ public class ConstantPred implements Comparable<ConstantPred> {
 		if (facts_.size() > arg0.facts_.size())
 			return 1;
 
-		Collections.sort(facts_);
-		Collections.sort(arg0.facts_);
 		for (int i = 0; i < facts_.size(); i++) {
 			int value = facts_.get(i).compareTo(arg0.facts_.get(i));
 			if (value != 0)
