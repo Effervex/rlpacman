@@ -153,7 +153,7 @@ public class Slot {
 	@Override
 	public String toString() {
 		String result = (fixed_) ? "FIXED " : "";
-		return result + "Slot (" + action_.toString() + "):\n"
+		return result + "Slot (" + action_.toString() + "): "
 				+ ruleGenerator_.toString();
 	}
 

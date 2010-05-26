@@ -63,65 +63,41 @@ public class Policy {
 	 *            The rule being checked.
 	 */
 	private void checkModular(GuidedRule rule) {
-		List<String> conditions = rule.getConditions(false);
-		for (String cond : conditions) {
-			// If the condition doesn't contain any variables and isn't a type
-			// predicate, trigger module loading.
-			String[] condSplit = StateSpec.splitFact(cond);
-			if (isModularisable(condSplit, rule.getQueryParameters())) {
-				Module module = Module.loadModule(StateSpec.getInstance()
-						.getEnvironmentName(), condSplit[0]);
-				// If the module exists
-				if (module != null) {
-					// Put the parameters into an arraylist
-					ArrayList<String> parameters = new ArrayList<String>();
-					for (int i = 1; i < condSplit.length; i++) {
-						// May need to replace parameters if modular is
-						// recursive
-						if (rule.getParameters() != null) {
-							parameters.add(rule
-									.getReplacementParameter(condSplit[i]));
-						} else {
-							parameters.add(condSplit[i]);
-						}
-					}
+		List<String> constantConditions = rule.getConstantConditions();
+		if (constantConditions.isEmpty())
+			return;
+		Collections.sort(constantConditions);
+		String modName = Module.formName(new ConstantPred(constantConditions)
+				.getFacts());
 
-					// Add the module rules.
-					for (GuidedRule gr : module.getModuleRules()) {
-						gr.setParameters(parameters);
-						checkModular(gr);
-						policyRules_.add(gr);
+		Module module = Module.loadModule(StateSpec.getInstance()
+				.getEnvironmentName(), modName);
+		// If the module exists
+		if (module != null) {
+			// Put the parameters into an arraylist
+			ArrayList<String> parameters = new ArrayList<String>();
+			for (String cond : constantConditions) {
+				String[] condSplit = StateSpec.splitFact(cond);
+				// Extract the parameters used in the constant conditions
+				for (int i = 1; i < condSplit.length; i++) {
+					// May need to replace parameters if modular is
+					// recursive
+					if (rule.getParameters() != null) {
+						parameters.add(rule
+								.getReplacementParameter(condSplit[i]));
+					} else {
+						parameters.add(condSplit[i]);
 					}
 				}
 			}
-		}
-	}
 
-	/**
-	 * Small function for determining if a condition is modularisable.
-	 * 
-	 * @param condSplit
-	 *            The condition split up.
-	 * @param queryParams
-	 *            The query parameters for the rule, if any.
-	 * @return True if the condition is modularisable (is a constant or
-	 *         parameterised constant).
-	 */
-	private boolean isModularisable(String[] condSplit, List<String> queryParams) {
-		// Ignore type predicates
-		if (StateSpec.getInstance().isTypePredicate(condSplit[0]))
-			return false;
-
-		for (int i = 1; i < condSplit.length; i++) {
-			// If we're looking at a variable
-			if (condSplit[i].contains("?")) {
-				// It may be a parameter, else return false.
-				if ((queryParams == null)
-						|| (!queryParams.contains(condSplit[i])))
-					return false;
+			// Add the module rules.
+			for (GuidedRule gr : module.getModuleRules()) {
+				gr.setParameters(parameters);
+				checkModular(gr);
+				policyRules_.add(gr);
 			}
 		}
-		return true;
 	}
 
 	/**

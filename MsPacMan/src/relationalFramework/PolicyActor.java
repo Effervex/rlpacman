@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,10 +41,10 @@ public class PolicyActor implements AgentInterface {
 	private boolean optimal_;
 
 	/** An agent's internal goal to attempt to achieve. */
-	private String goalPredicate_;
+	private String[] goalPredicate_;
 
 	/** The agent's internal goal to chase, if learning modules. */
-	private String internalGoal_;
+	private String[] internalGoal_;
 
 	/** The internal reward the agent perceives when performing module learning. */
 	private double internalReward_;
@@ -78,8 +79,7 @@ public class PolicyActor implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
-			if ((goalPredicate_ != null) && (!goalPredicate_.isEmpty())
-					&& (!possibleGoals_.isEmpty())) {
+			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
 				policy_.parameterArgs(possibleGoals_
 						.get(PolicyGenerator.random_.nextInt(possibleGoals_
 								.size())));
@@ -98,18 +98,15 @@ public class PolicyActor implements AgentInterface {
 			if (!PolicyGenerator.getInstance().isModuleGenerator())
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
 						prevActions_, StateSpec.getInstance().getConstants());
-		} else if (arg0.indexOf(LearningController.INTERNAL_PREFIX) == 0) {
+		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
-			String oldGoal = goalPredicate_;
-			goalPredicate_ = arg0.substring(LearningController.INTERNAL_PREFIX
-					.length() + 1);
-			if (goalPredicate_.isEmpty()) {
-				goalPredicate_ = null;
-			}
+			String[] oldGoal = Arrays.copyOf(goalPredicate_,
+					goalPredicate_.length);
+			goalPredicate_ = (String[]) ObjectObservations.getInstance().objectArray;
 
 			internalGoal_ = null;
 			possibleGoals_.clear();
-			return oldGoal;
+			ObjectObservations.getInstance().objectArray = oldGoal;
 		}
 		return null;
 	}
@@ -205,7 +202,8 @@ public class PolicyActor implements AgentInterface {
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
 		actions = policy_.evaluatePolicy(state, actions, StateSpec
-				.getInstance().getNumReturnedActions(), optimal_, false, noteTriggered);
+				.getInstance().getNumReturnedActions(), optimal_, false,
+				noteTriggered);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;
@@ -321,6 +319,9 @@ public class PolicyActor implements AgentInterface {
 	 *            The temporary goal.
 	 */
 	private void formPlaceholderPreGoalState(String[] temporaryGoal) {
+		if (PolicyGenerator.getInstance().isSettled())
+			return;
+		
 		// The constants are the terms used in the fact
 		List<String> placeholderConstants = new ArrayList<String>(
 				temporaryGoal.length - 1);

@@ -575,10 +575,10 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer();
+		StringBuffer buffer = new StringBuffer("[");
 		Iterator<ItemProb> iter = itemProbs_.iterator();
 		if (iter.hasNext())
-			buffer.append("[" + iter.next());
+			buffer.append(iter.next());
 		while (iter.hasNext()) {
 			buffer.append(", " + iter.next());
 		}
