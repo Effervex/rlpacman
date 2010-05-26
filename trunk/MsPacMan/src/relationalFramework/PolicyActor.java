@@ -53,7 +53,7 @@ public class PolicyActor implements AgentInterface {
 	private boolean internalGoalMet_;
 
 	/** A collection of possible goals for the agent to pursue. */
-	private List<ValueVector> possibleGoals_;
+	private List<GoalState> possibleGoals_;
 
 	/** The total reward accrued by the agent. */
 	private double totalReward_;
@@ -229,7 +229,9 @@ public class PolicyActor implements AgentInterface {
 			List<ValueVector> trueArgs = new ArrayList<ValueVector>();
 			for (Fact fact : stateFacts) {
 				String[] factSplit = StateSpec.splitFact(fact.toString());
-				if (factSplit[0].equals(goalPredicate_)) {
+				// Check that the predicate is in the goal predicates.
+				int index = Arrays.binarySearch(goalPredicate_, factSplit[0]);
+				if (index != -1) {
 					try {
 						trueArgs.add(fact.getSlotValue("__data")
 								.listValue(null));
@@ -374,6 +376,20 @@ public class PolicyActor implements AgentInterface {
 					prevActions_, placeholderConstants);
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * A class for representing a possible goal state to use (i.e. one that has occurred).
+	 * 
+	 * @author Sam Sarjant
+	 */
+	private class GoalState {
+		/** The facts present in the state. */
+		private List<ValueVector> facts_;
+		
+		public GoalState(ValueVector[] facts) {
+			// TODO
 		}
 	}
 }
