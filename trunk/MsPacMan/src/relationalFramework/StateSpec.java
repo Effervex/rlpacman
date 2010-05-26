@@ -629,7 +629,7 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Checks if the predicate is useful (not type, action or inequal).
+	 * Checks if the predicate is useful (not action or inequal).
 	 * 
 	 * @param predicate
 	 *            The predicate being checked.

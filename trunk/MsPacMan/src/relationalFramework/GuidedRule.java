@@ -31,6 +31,9 @@ public class GuidedRule {
 	/** The conditions of the rule. */
 	private List<String> ruleConditions_;
 
+	/** The constant facts in the rule conditions, if any. Excludes type conds. */
+	private List<String> constantConditions_;
+
 	/** The guided predicate that defined the action. */
 	private String ruleAction_;
 
@@ -86,6 +89,7 @@ public class GuidedRule {
 		actionTerms_ = findTerms(ruleAction_);
 		slot_ = null;
 		expandConditions();
+		constantConditions_ = findConstants();
 	}
 
 	/**
@@ -105,6 +109,7 @@ public class GuidedRule {
 		actionTerms_ = findTerms(ruleAction_);
 		mutant_ = mutant;
 		slot_ = null;
+		constantConditions_ = findConstants();
 	}
 
 	/**
@@ -152,6 +157,7 @@ public class GuidedRule {
 		this(ruleString);
 		queryParams_ = queryParams;
 		isLoadedModule_ = true;
+		constantConditions_ = findConstants();
 	}
 
 	/**
@@ -257,6 +263,39 @@ public class GuidedRule {
 	}
 
 	/**
+	 * Finds the constants in the rule conditions.
+	 */
+	private List<String> findConstants() {
+		List<String> constants = new ArrayList<String>();
+		for (String cond : ruleConditions_) {
+			String[] condSplit = StateSpec.splitFact(cond);
+			// If the condition isn't a type predicate or test
+			if (!StateSpec.getInstance().isTypePredicate(condSplit[0])
+					&& StateSpec.getInstance().isUsefulPredicate(condSplit[0])) {
+				// If the condition doesn't contain variables - except modular
+				// variables
+				boolean isConstant = true;
+				for (int i = 1; i < condSplit.length; i++) {
+					// If we're looking at a variable
+					if (condSplit[i].contains("?")) {
+						// It may be a parameter, else return false.
+						if ((queryParams_ == null)
+								|| (!queryParams_.contains(condSplit[i]))) {
+							isConstant = false;
+							break;
+						}
+					}
+				}
+
+				if (isConstant)
+					constants.add(cond);
+			}
+		}
+
+		return constants;
+	}
+
+	/**
 	 * Checks if inequals is present (i.e. rule is fully expanded.)
 	 */
 	public void checkInequals() {
@@ -339,18 +378,20 @@ public class GuidedRule {
 	 */
 	public void updateInternalValue(float value) {
 		internalCount_++;
-		
+
 		if (internalCount_ == 1) {
 			internalMean_ = value;
 			internalS_ = 0;
 		} else {
-			double newMean = internalMean_ + (value - internalMean_) / (internalCount_);
-			double newS = internalS_ + (value - internalMean_) * (value - newMean);
+			double newMean = internalMean_ + (value - internalMean_)
+					/ (internalCount_);
+			double newS = internalS_ + (value - internalMean_)
+					* (value - newMean);
 			internalMean_ = newMean;
 			internalS_ = newS;
 		}
 	}
-	
+
 	/**
 	 * Gets the internal mean for the rule.
 	 * 
@@ -359,7 +400,7 @@ public class GuidedRule {
 	public double getInternalMean() {
 		return internalMean_;
 	}
-	
+
 	/**
 	 * Gets the internal SD for the rule (which uses the count).
 	 * 
@@ -425,13 +466,11 @@ public class GuidedRule {
 		}
 
 		String result = buffer.toString();
-		// if (tempParameters_ != null) {
-		// for (String tempParam : tempParameters_.keySet()) {
-		// result = result.replaceAll(" " + Pattern.quote(tempParam)
-		// + "(?=( |\\)))", " " + tempParameters_.get(tempParam));
-		// }
-		// }
 		return result;
+	}
+
+	public List<String> getConstantConditions() {
+		return constantConditions_;
 	}
 
 	public String getAction() {
@@ -564,6 +603,7 @@ public class GuidedRule {
 		clone.lgg_ = lgg_;
 		clone.withoutInequals_ = withoutInequals_;
 		clone.isLoadedModule_ = isLoadedModule_;
+		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)

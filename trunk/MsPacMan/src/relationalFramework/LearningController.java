@@ -315,22 +315,24 @@ public class LearningController {
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
 		// Run through each rule in the policy generator, noting which ones
 		// require module learning.
-		Collection<String> modularFacts = policyGenerator.getConstantFacts();
+		SortedSet<ConstantPred> modularFacts = policyGenerator
+				.getConstantFacts();
 
 		// Check if we have a module file for each.
-		for (Iterator<String> factIter = modularFacts.iterator(); factIter
+		for (Iterator<ConstantPred> factIter = modularFacts.iterator(); factIter
 				.hasNext();) {
-			String pred = factIter.next();
+			ConstantPred pred = factIter.next();
 			if (Module.moduleExists(StateSpec.getInstance()
-					.getEnvironmentName(), pred)) {
+					.getEnvironmentName(), pred.getFacts())) {
 				factIter.remove();
 			}
 		}
 
 		// We should be left with whatever modules do not yet exist
 		if (!modularFacts.isEmpty()) {
+			int modsComplete = 0;
 			// Commence learning of the module
-			for (String internalGoal : modularFacts) {
+			for (ConstantPred internalGoal : modularFacts) {
 				if (PolicyGenerator.debugMode_) {
 					try {
 						System.out.println("\n\n\n------LEARNING MODULE: "
@@ -344,24 +346,52 @@ public class LearningController {
 				}
 
 				// Set the internal goal
-				String oldInternalGoal = RLGlue
-						.RL_agent_message(INTERNAL_PREFIX + " " + internalGoal);
+				ObjectObservations.getInstance().objectArray = internalGoal
+						.getFacts().toArray(
+								new String[internalGoal.getFacts().size()]);
+				RLGlue.RL_agent_message(INTERNAL_PREFIX);
+				String[] oldInternalGoal = (String[]) ObjectObservations
+						.getInstance().objectArray;
 
 				// Begin development
-				PolicyGenerator modularGenerator = PolicyGenerator.newInstance(
-						policyGenerator, internalGoal);
-				developPolicy(modularGenerator, -1);
+				PolicyGenerator modularGenerator = null;
+				// If we have several constant facts in one rule, we need to
+				// find the distribution of rules in the module that fit it
+				// properly.
+				if (internalGoal.getFacts().size() > 1) {
+					Collection<GuidedRule> rules = new ArrayList<GuidedRule>();
+					// Run through each module (known to be created) and add the
+					// rules together.
+					for (String fact : internalGoal.getFacts()) {
+						Module partialMod = Module.loadModule(StateSpec
+								.getInstance().getEnvironmentName(), fact);
+						rules.addAll(partialMod.getModuleRules());
+					}
+					// Create a policy generator that only updates slot weights.
+					modularGenerator = PolicyGenerator.newInstance(
+							policyGenerator, rules, internalGoal.getFacts());
+				} else {
+					modularGenerator = PolicyGenerator.newInstance(
+							policyGenerator, internalGoal.getFacts());
+				}
+				developPolicy(modularGenerator, -modularFacts.size()
+						+ modsComplete);
 
 				// Save the module
-				Module.saveModule(internalGoal, StateSpec.getInstance()
-						.getEnvironmentName(), modularGenerator.getGenerator());
+				Module.saveModule(internalGoal.getFacts(), StateSpec
+						.getInstance().getEnvironmentName(), modularGenerator
+						.getGenerator());
+
+				modsComplete++;
 
 				// Unset the internal goal
-				if (oldInternalGoal == null)
-					RLGlue.RL_agent_message(INTERNAL_PREFIX + " ");
-				else
-					RLGlue.RL_agent_message(INTERNAL_PREFIX + " "
-							+ oldInternalGoal);
+				if (oldInternalGoal == null) {
+					ObjectObservations.getInstance().objectArray = null;
+					RLGlue.RL_agent_message(INTERNAL_PREFIX);
+				} else {
+					ObjectObservations.getInstance().objectArray = oldInternalGoal;
+					RLGlue.RL_agent_message(INTERNAL_PREFIX);
+				}
 			}
 
 			// Ensure to reset the policy generator

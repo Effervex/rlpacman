@@ -13,6 +13,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import jess.Fact;
 import jess.Rete;
@@ -59,10 +61,16 @@ public class PolicyGenerator {
 	private boolean moduleGenerator_;
 
 	/** The goal this generator is working towards if modular. */
-	private String moduleGoal_;
-	
+	private ArrayList<String> moduleGoal_;
+
 	/** If modules are being used. */
 	public boolean useModules_ = true;
+
+	/**
+	 * If this policy generator only updates the ordering of slots - no rule
+	 * creation or modification.
+	 */
+	private boolean slotOptimisation_ = false;
 
 	/** The random number generator. */
 	public static Random random_ = new Random(456);
@@ -155,6 +163,7 @@ public class PolicyGenerator {
 		// If we already have the LGG rules for each action then no need to
 		// cover new rules.
 		if (!frozen_
+				&& !slotOptimisation_
 				&& (lggRules_.size() < StateSpec.getInstance().getActions()
 						.size())) {
 			if (createNewRules)
@@ -329,7 +338,7 @@ public class PolicyGenerator {
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState,
 			ActionChoice actions, List<String> constants) {
-		if (!frozen_) {
+		if (!frozen_ && !slotOptimisation_) {
 			// Form the pre-goal using the final action/s as a parameter.
 			Collection<String> settledGoals = covering_.formPreGoalState(
 					preGoalState, actions, constants);
@@ -387,6 +396,9 @@ public class PolicyGenerator {
 	 * @return True if the generator values are settled, false otherwise.
 	 */
 	public boolean isSettled() {
+		// If we're just optimising the slot ordering, then it's settled.
+		if (slotOptimisation_)
+			return true;
 		// Must have at least one pre-goal
 		if (!hasPreGoal())
 			return false;
@@ -498,12 +510,14 @@ public class PolicyGenerator {
 		updateDifference_ = policyGenerator_.updateDistribution(numSamples,
 				slotCounts, stepSize);
 
-		for (Slot slot : policyGenerator_) {
-			double slotCount = 0;
-			if (slotCounts.containsKey(slot))
-				slotCount = slotCounts.get(slot);
-			updateDifference_ += slot.getGenerator().updateDistribution(
-					slotCount, ruleCounts, stepSize);
+		if (!slotOptimisation_) {
+			for (Slot slot : policyGenerator_) {
+				double slotCount = 0;
+				if (slotCounts.containsKey(slot))
+					slotCount = slotCounts.get(slot);
+				updateDifference_ += slot.getGenerator().updateDistribution(
+						slotCount, ruleCounts, stepSize);
+			}
 		}
 	}
 
@@ -512,6 +526,9 @@ public class PolicyGenerator {
 	 * includes further mutation of useful rules.
 	 */
 	public void postUpdateOperations() {
+		if (slotOptimisation_)
+			return;
+		
 		// Mutate the rules further
 		if (debugMode_) {
 			try {
@@ -560,23 +577,18 @@ public class PolicyGenerator {
 	 * @return A collection of predicates, each of which is involved in a rule
 	 *         where the predicate has only constant terms.
 	 */
-	public Collection<String> getConstantFacts() {
-		Collection<String> constantFacts = new HashSet<String>();
+	public SortedSet<ConstantPred> getConstantFacts() {
+		SortedSet<ConstantPred> constantFacts = new TreeSet<ConstantPred>();
 
 		// Run through each slot and rule for conditions that only use constant
 		// terms.
 		for (Slot slot : policyGenerator_) {
 			for (GuidedRule gr : slot.getGenerator()) {
-				for (String cond : gr.getConditions(false)) {
-					String[] condSplit = StateSpec.splitFact(cond);
-					// If the condition contains no variables and isn't a type
-					// predicate, we can use it
-					if (!cond.contains(" ?")
-							&& !StateSpec.getInstance().isTypePredicate(
-									condSplit[0])) {
-						constantFacts.add(condSplit[0]);
-					}
-				}
+				List<String> constants = gr.getConstantConditions();
+				for (String fact : constants)
+					constantFacts.add(new ConstantPred(fact));
+				if (constants.size() > 1)
+					constantFacts.add(new ConstantPred(constants));
 			}
 		}
 		return constantFacts;
@@ -613,11 +625,37 @@ public class PolicyGenerator {
 	 * @return The new PolicyGenerator.
 	 */
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			String internalGoal) {
+			ArrayList<String> internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addLGGRules(policyGenerator.lggRules_);
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
+		return instance_;
+	}
+
+	/**
+	 * Initialises the instance as a new policy generator which only optimises
+	 * the ordering of the provided rules.
+	 * 
+	 * @param policyGenerator
+	 *            The policy generator containing the old LGG rules.
+	 * @param rules
+	 *            The rules to be optimised orderly.
+	 * @return The new PolicyGenerator
+	 */
+	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
+			Collection<GuidedRule> rules, ArrayList<String> internalGoal) {
+		instance_ = newInstance(policyGenerator, internalGoal);
+		instance_.slotOptimisation_ = true;
+
+		// Set the slot rules
+		instance_.policyGenerator_.clear();
+		for (GuidedRule rule : rules) {
+			Slot slot = new Slot(rule.getAction());
+			slot.addNewRule(rule, false);
+			instance_.policyGenerator_.add(slot);
+		}
+		instance_.policyGenerator_.normaliseProbs();
 		return instance_;
 	}
 
@@ -641,7 +679,7 @@ public class PolicyGenerator {
 		return moduleGenerator_;
 	}
 
-	public String getModuleGoal() {
+	public ArrayList<String> getModuleGoal() {
 		return moduleGoal_;
 	}
 

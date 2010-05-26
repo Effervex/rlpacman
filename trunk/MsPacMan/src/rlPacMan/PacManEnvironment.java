@@ -186,6 +186,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep' when not experiment mode, so it's
 		// watchable for humans.
 		try {
+			rete_.reset();
 			if (!environment_.experimentMode_)
 				Thread.sleep(PLAYER_DELAY);
 		} catch (Exception e) {

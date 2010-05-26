@@ -70,11 +70,11 @@ public class PolicyTest {
 		int i = 0;
 		for (GuidedRule gr : pol.getPolicyRules()) {
 			if (i < clearRulesNum) {
-				assertTrue(gr.getParameters().size() == 1);
+				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("a"));
 			}
 			else if (i < (clearRulesNum * 2)) {
-				assertTrue(gr.getParameters().size() == 1);
+				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("b"));
 			} else {
 				assertTrue(gr.getParameters() == null);
@@ -96,14 +96,16 @@ public class PolicyTest {
 		// Clear rules
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
+		queryParams.add("?_MOD_b");
 		modRule = new GuidedRule(
 				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
 		params = new ArrayList<String>();
 		params.add("a");
+		params.add("b");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
-		params.clear();
-		params.add("b");
+		modRule = new GuidedRule(
+				"(above ?X ?_MOD_b) (clear ?X) => (moveFloor ?X)", queryParams);
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
 		// On rule

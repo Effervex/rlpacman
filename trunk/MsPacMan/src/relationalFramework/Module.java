@@ -7,7 +7,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,6 +29,9 @@ public class Module {
 
 	/** The suffix for module files. */
 	private static final String MODULE_SUFFIX = ".mod";
+
+	/** The string for joining predicates. */
+	private static final String MODULE_JOIN = "&";
 
 	/**
 	 * The policy rules which solve this module (not necessarily optimal). Note
@@ -50,29 +55,31 @@ public class Module {
 	 * Creates a new module, using the goal as the module goal, and the slot
 	 * distribution to create the module rules.
 	 * 
-	 * @param moduleGoal
+	 * @param facts
 	 *            The goal the agent was working towards.
 	 * @param slotDistribution
 	 *            The state of the distribution for the agent.
 	 */
-	private Module(String moduleGoal,
+	private Module(ArrayList<String> facts,
 			ProbabilityDistribution<Slot> slotDistribution) {
-		String[] splitGoal = StateSpec.splitFact(moduleGoal);
-		modulePredicate_ = splitGoal[0];
 		parameterTerms_ = new ArrayList<String>();
-		ArrayList<String> oldTerms = new ArrayList<String>();
-		for (int i = 1; i < splitGoal.length; i++) {
-			oldTerms.add(splitGoal[i]);
-			parameterTerms_.add(createModuleParameter(i - 1));
+		// Run through the facts (probably only 1)
+		modulePredicate_ = formName(facts);
+		for (String fact : facts) {
+			String[] splitGoal = StateSpec.splitFact(fact);
+
+			for (int i = 1; i < splitGoal.length; i++) {
+				parameterTerms_.add(createModuleParameter(i - 1));
+			}
 		}
 
+		// Add the rules by taking the most likely rule from the ordered slots.
 		moduleRules_ = new ArrayList<GuidedRule>();
 		ArrayList<Slot> orderedSlots = slotDistribution.getOrderedElements();
 		for (Slot slot : orderedSlots) {
 			GuidedRule rule = slot.getGenerator().getOrderedElements().get(0);
 			rule.setAsLoadedModuleRule();
 
-			// Replace the constants with parameters
 			moduleRules_.add(rule);
 		}
 	}
@@ -165,36 +172,42 @@ public class Module {
 	 * Saves a module to file by taking the state of the policy generator and
 	 * saving the necessary details about it.
 	 * 
-	 * @param internalGoal
+	 * @param facts
 	 *            The goal the module works towards.
 	 * @param environment
 	 *            The environment the module exists within.
 	 * @param generator
 	 *            The policy generator which solves the goal.
 	 */
-	public static void saveModule(String internalGoal, String environment,
+	public static void saveModule(ArrayList<String> facts, String environment,
 			ProbabilityDistribution<Slot> generator) {
-		Module newModule = new Module(internalGoal, generator);
-		nonExistantModules_.remove(internalGoal);
-		loadedModules_.put(internalGoal, newModule);
+		Module newModule = new Module(facts, generator);
+		nonExistantModules_.remove(facts);
+		loadedModules_.put(formName(facts), newModule);
 
 		try {
 			File modLocation = new File(MODULE_DIR + File.separatorChar
-					+ environment + File.separatorChar + internalGoal
-					+ MODULE_SUFFIX);
+					+ environment + File.separatorChar + facts + MODULE_SUFFIX);
 			if (modLocation.createNewFile()) {
 
 				FileWriter writer = new FileWriter(modLocation);
 				BufferedWriter bf = new BufferedWriter(writer);
 
+				bf
+						.write(";; The parameter variables given to the module on loading.\n");
 				bf.write("(declare (variables");
-				for (int i = 0; i < StateSpec.getInstance().getPredicates()
-						.get(internalGoal).size(); i++) {
-					bf.write(" " + createModuleParameter(i));
+				// Write the parameters out for each fact in the module.
+				for (String fact : facts) {
+					for (int i = 0; i < StateSpec.getInstance().getPredicates()
+							.get(fact).size(); i++) {
+						bf.write(" " + createModuleParameter(i));
+					}
 				}
-				bf.write("))");
+				bf.write("))\n");
 
 				// Writing the rules
+				bf.write(";; The rules of the module, evaluated "
+						+ "in order with variables replaced by parameters.");
 				for (GuidedRule gr : newModule.moduleRules_) {
 					ValueVector vv = null;
 					gr.setParameters(vv);
@@ -204,8 +217,8 @@ public class Module {
 				bf.close();
 				writer.close();
 			} else {
-				System.err.println("Module file exists! Saving to temp file.");
-				saveModule(internalGoal + "temp", environment, generator);
+				System.err.println("Module file exists!");
+				System.err.println(facts.toString());
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -217,19 +230,22 @@ public class Module {
 	 * 
 	 * @param packageName
 	 *            The name of the environment.
-	 * @param predicate
-	 *            The predicate name (module to load).
+	 * @param constantPred
+	 *            The predicate name(s) (module to load).
 	 * @return True, if it module exists, else false.
 	 */
-	public static boolean moduleExists(String environmentName, String predicate) {
+	public static boolean moduleExists(String environmentName,
+			ArrayList<String> constantPred) {
+		String modName = formName(constantPred);
+
 		// Checks to skip loading.
-		if (nonExistantModules_.contains(predicate))
+		if (nonExistantModules_.contains(modName))
 			return false;
-		if (loadedModules_.containsKey(predicate))
+		if (loadedModules_.containsKey(modName))
 			return true;
 
 		File modLocation = new File(MODULE_DIR + File.separatorChar
-				+ environmentName + File.separatorChar + predicate
+				+ environmentName + File.separatorChar + modName
 				+ MODULE_SUFFIX);
 
 		// If the module file exists, load it up.
@@ -237,8 +253,27 @@ public class Module {
 			return true;
 		}
 
-		nonExistantModules_.add(predicate);
+		nonExistantModules_.add(modName);
 		return false;
+	}
+
+	/**
+	 * Forms the name of a module file: just the predicate name if the
+	 * constantFacts only contains one pred, otherwise it will be an ordered
+	 * module name of predicates.
+	 * 
+	 * @param constantPred
+	 *            The constant pred(s).
+	 * @return A String representing the filename of the module.
+	 */
+	public static String formName(List<String> constantPred) {
+		Collections.sort(constantPred);
+		StringBuffer buffer = new StringBuffer(constantPred.get(0));
+		for (int i = 1; i < constantPred.size(); i++) {
+			buffer.append(MODULE_JOIN + constantPred.get(i));
+		}
+
+		return buffer.toString();
 	}
 
 	/**
