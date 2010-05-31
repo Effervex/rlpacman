@@ -14,8 +14,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jess.ValueVector;
-
 /**
  * A class representing a loaded module. Modules typically have parameterisable
  * arguments and return a rule(s) which solve the module. Note that if modules
@@ -78,7 +76,7 @@ public class Module {
 		ArrayList<Slot> orderedSlots = slotDistribution.getOrderedElements();
 		for (Slot slot : orderedSlots) {
 			GuidedRule rule = slot.getGenerator().getOrderedElements().get(0);
-			rule.setAsLoadedModuleRule();
+			rule.setAsLoadedModuleRule(true);
 
 			moduleRules_.add(rule);
 		}
@@ -131,6 +129,9 @@ public class Module {
 				ArrayList<GuidedRule> rules = new ArrayList<GuidedRule>();
 				// Read in the parameters
 				String input = bf.readLine();
+				// Skip through comments.
+				while (input.substring(0, 2).equals(";;"))
+					input = bf.readLine();
 				// The first line is typically the parameter declaration
 				if (input.substring(0, 8).equals("(declare")) {
 					// Parse the declares line for parameters
@@ -149,6 +150,9 @@ public class Module {
 
 				// Read in the rules
 				do {
+					// Skip through comments.
+					while (input.substring(0, 2).equals(";;"))
+						input = bf.readLine();
 					rules.add(new GuidedRule(input, parameters));
 					input = bf.readLine();
 				} while (input != null);
@@ -187,7 +191,8 @@ public class Module {
 
 		try {
 			File modLocation = new File(MODULE_DIR + File.separatorChar
-					+ environment + File.separatorChar + facts + MODULE_SUFFIX);
+					+ environment + File.separatorChar + formName(facts)
+					+ MODULE_SUFFIX);
 			if (modLocation.createNewFile()) {
 
 				FileWriter writer = new FileWriter(modLocation);
@@ -197,11 +202,14 @@ public class Module {
 						.write(";; The parameter variables given to the module on loading.\n");
 				bf.write("(declare (variables");
 				// Write the parameters out for each fact in the module.
+				int j = 0;
 				for (String fact : facts) {
-					for (int i = 0; i < StateSpec.getInstance().getPredicates()
+					int i = 0;
+					for (; i < StateSpec.getInstance().getPredicates()
 							.get(fact).size(); i++) {
-						bf.write(" " + createModuleParameter(i));
+						bf.write(" " + createModuleParameter(i + j));
 					}
+					j += i;
 				}
 				bf.write("))\n");
 
@@ -209,8 +217,7 @@ public class Module {
 				bf.write(";; The rules of the module, evaluated "
 						+ "in order with variables replaced by parameters.");
 				for (GuidedRule gr : newModule.moduleRules_) {
-					ValueVector vv = null;
-					gr.setParameters(vv);
+					gr.setParameters(null);
 					bf.write("\n" + StateSpec.getInstance().encodeRule(gr));
 				}
 

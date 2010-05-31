@@ -9,8 +9,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jess.ValueVector;
-
 /**
  * A class that keeps track of the guided predicates that make up the rule
  * contained within.
@@ -89,7 +87,7 @@ public class GuidedRule {
 		actionTerms_ = findTerms(ruleAction_);
 		slot_ = null;
 		expandConditions();
-		constantConditions_ = findConstants();
+		findConstants();
 	}
 
 	/**
@@ -109,7 +107,7 @@ public class GuidedRule {
 		actionTerms_ = findTerms(ruleAction_);
 		mutant_ = mutant;
 		slot_ = null;
-		constantConditions_ = findConstants();
+		findConstants();
 	}
 
 	/**
@@ -157,18 +155,7 @@ public class GuidedRule {
 		this(ruleString);
 		queryParams_ = queryParams;
 		isLoadedModule_ = true;
-		constantConditions_ = findConstants();
-	}
-
-	/**
-	 * Sets the parameters for a cloned GuidedRule.
-	 * 
-	 * @param parameters
-	 *            The parameters to set.
-	 * @return A new rule, the same as this, but with parameters set.
-	 */
-	public void setParameters(List<String> parameters) {
-		parameters_ = parameters;
+		findConstants();
 	}
 
 	/**
@@ -176,24 +163,24 @@ public class GuidedRule {
 	 * within. The temp parameters don't affect the rule itself, just the
 	 * evaluation, so rule updating will not be affected.
 	 * 
-	 * @param arguments
-	 *            The arguments being set.
+	 * @param parameters
+	 *            The parameters being set.
 	 */
-	public void setParameters(ValueVector arguments) {
-		if (arguments == null) {
+	public void setParameters(List<String> parameters) {
+		if (parameters == null) {
 			parameters_ = null;
 			return;
 		}
 
 		try {
+			// Inits/Clears the parameters
 			if (parameters_ == null)
 				parameters_ = new ArrayList<String>();
 			else
 				parameters_.clear();
 
-			for (int i = 0; i < arguments.size(); i++) {
-				parameters_.add(arguments.get(i).stringValue(null));
-			}
+			// Sets the parameters
+			parameters_.addAll(parameters);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -265,7 +252,7 @@ public class GuidedRule {
 	/**
 	 * Finds the constants in the rule conditions.
 	 */
-	private List<String> findConstants() {
+	private void findConstants() {
 		List<String> constants = new ArrayList<String>();
 		for (String cond : ruleConditions_) {
 			String[] condSplit = StateSpec.splitFact(cond);
@@ -292,7 +279,7 @@ public class GuidedRule {
 			}
 		}
 
-		return constants;
+		constantConditions_ = constants;
 	}
 
 	/**
@@ -456,7 +443,34 @@ public class GuidedRule {
 		hasSpawned_ = false;
 		statesSeen_ = 0;
 		ruleConditions_ = conditions;
+		findConstants();
 		return true;
+	}
+
+	/**
+	 * Shifts any modular rule variable names by an amount. e.g. a -> c when i =
+	 * 2.
+	 * 
+	 * @param i
+	 *            The amount to shift the variable name.
+	 */
+	public void shiftModularVariables(int i) {
+		if (i == 0)
+			return;
+
+		List<String> modConditions = new ArrayList<String>();
+		for (String cond : ruleConditions_) {
+			for (int j = 0; j < queryParams_.size(); j++) {
+				cond = cond.replaceAll(Pattern.quote(Module
+						.createModuleParameter(j)), Module
+						.createModuleParameter(j + i));
+				modConditions.add(cond);
+			}
+		}
+		
+		ruleConditions_ = modConditions;
+
+		findConstants();
 	}
 
 	public String getStringConditions() {
@@ -517,8 +531,8 @@ public class GuidedRule {
 	/**
 	 * Sets this rule as a loaded module.
 	 */
-	public void setAsLoadedModuleRule() {
-		isLoadedModule_ = true;
+	public void setAsLoadedModuleRule(boolean isModule) {
+		isLoadedModule_ = isModule;
 	}
 
 	/**

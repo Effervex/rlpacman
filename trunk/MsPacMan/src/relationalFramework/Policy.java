@@ -132,12 +132,27 @@ public class Policy {
 	/**
 	 * Apply arguments to any parameterised rules contained within this policy.
 	 * 
-	 * @param arguments
+	 * @param goalState
 	 *            The arguments to apply to the parameters.
 	 */
-	public void parameterArgs(ValueVector arguments) {
+	public void parameterArgs(List<ValueVector> goalState) {
+		List<String> params = null;
+		if (goalState != null) {
+			params = new ArrayList<String>();
+			try {
+				for (ValueVector vv : goalState) {
+					for (int i = 0; i < vv.size(); i++) {
+						params.add(vv.get(i).stringValue(null));
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		// Set the parameters for the policy rules.
 		for (GuidedRule gr : policyRules_) {
-			gr.setParameters(arguments);
+			gr.setParameters(params);
 		}
 	}
 

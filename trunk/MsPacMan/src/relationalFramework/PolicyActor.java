@@ -69,7 +69,7 @@ public class PolicyActor implements AgentInterface {
 	public void agent_init(String arg0) {
 		prevState_ = null;
 		optimal_ = false;
-		possibleGoals_ = new ArrayList<ValueVector>();
+		possibleGoals_ = new ArrayList<GoalState>();
 		totalReward_ = 0;
 		totalSteps_ = 0;
 	}
@@ -80,9 +80,9 @@ public class PolicyActor implements AgentInterface {
 		if (arg0.equals("Policy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
-				policy_.parameterArgs(possibleGoals_
-						.get(PolicyGenerator.random_.nextInt(possibleGoals_
-								.size())));
+				policy_.parameterArgs(possibleGoals_.get(
+						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
+						.getFacts());
 			}
 		} else if (arg0.equals("Optimal")) {
 			optimal_ = true;
@@ -100,8 +100,9 @@ public class PolicyActor implements AgentInterface {
 						prevActions_, StateSpec.getInstance().getConstants());
 		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
-			String[] oldGoal = Arrays.copyOf(goalPredicate_,
-					goalPredicate_.length);
+			String[] oldGoal = null;
+			if (goalPredicate_ != null)
+				oldGoal = Arrays.copyOf(goalPredicate_, goalPredicate_.length);
 			goalPredicate_ = (String[]) ObjectObservations.getInstance().objectArray;
 
 			internalGoal_ = null;
@@ -226,15 +227,15 @@ public class PolicyActor implements AgentInterface {
 			internalGoalMet_ = false;
 
 			// Examine the state for the goals that are true
-			List<ValueVector> trueArgs = new ArrayList<ValueVector>();
+			List<ValueVector> trueFacts = new ArrayList<ValueVector>();
 			for (Fact fact : stateFacts) {
 				String[] factSplit = StateSpec.splitFact(fact.toString());
 				// Check that the predicate is in the goal predicates.
 				int index = Arrays.binarySearch(goalPredicate_, factSplit[0]);
-				if (index != -1) {
+				if (index >= 0) {
 					try {
-						trueArgs.add(fact.getSlotValue("__data")
-								.listValue(null));
+						trueFacts.add(fact.getSlotValue("__data").listValue(
+								null));
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -242,26 +243,49 @@ public class PolicyActor implements AgentInterface {
 			}
 
 			Collections.shuffle(possibleGoals_);
-			ValueVector chosenGoal = null;
+			GoalState chosenGoal = null;
 			for (int i = 0; i < possibleGoals_.size(); i++) {
 				chosenGoal = possibleGoals_.get(i);
 
 				// Check the goal hasn't already been achieved
-				if (!trueArgs.contains(chosenGoal)) {
+				if (!factsContains(chosenGoal, trueFacts)) {
 					break;
 				}
 			}
 
 			// Modify the policy towards the chosen goal
-			policy_.parameterArgs(chosenGoal);
-			internalGoal_ = "(" + goalPredicate_ + " " + chosenGoal.toString()
-					+ ")";
+			policy_.parameterArgs(chosenGoal.getFacts());
+			internalGoal_ = new String[goalPredicate_.length];
+			for (int i = 0; i < goalPredicate_.length; i++) {
+				internalGoal_[i] = "(" + goalPredicate_[i] + " "
+						+ chosenGoal.getFacts().get(i) + ")";
+			}
 
 			if (PolicyGenerator.debugMode_) {
-				System.out.println("Internal goal: " + internalGoal_);
+				System.out.println("Internal goal: " + Arrays.toString(internalGoal_));
 				System.out.println(policy_);
 			}
 		}
+	}
+
+	/**
+	 * If the facts contains the chosen goal, exactly.
+	 * 
+	 * @param chosenGoal
+	 *            The chosen goal, in GoalState form.
+	 * @param facts
+	 *            The set of facts.
+	 * @return True if the set of facts contains all goal facts.
+	 */
+	private boolean factsContains(GoalState chosenGoal, List<ValueVector> facts) {
+		List<ValueVector> goalFacts = chosenGoal.getFacts();
+		// Check each fact, and only if all facts are present is the goal
+		// contained.
+		for (ValueVector gf : goalFacts) {
+			if (!facts.contains(gf))
+				return false;
+		}
+		return true;
 	}
 
 	/**
@@ -282,17 +306,18 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		// Check each predicate in the state
+		MultiMap<String, ValueVector> goalFactMap = new MultiMap<String, ValueVector>();
+		boolean[] goalAchieved = new boolean[goalPredicate_.length];
 		for (Fact fact : stateFacts) {
 			String[] factSplit = StateSpec.splitFact(fact.toString());
 			// If the fact is a goal fact and wasn't in the previous state, we
 			// have an achieved goal.
-			if (factSplit[0].equals(goalPredicate_)) {
+			if (isGoalFact(factSplit[0])) {
 				// Add the fact to the possible goals
 				try {
 					ValueVector vv = fact.getSlotValue("__data")
 							.listValue(null);
-					if (!possibleGoals_.contains(vv))
-						possibleGoals_.add(vv);
+					goalFactMap.put(factSplit[0], vv);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -304,12 +329,108 @@ public class PolicyActor implements AgentInterface {
 				}
 
 				// Checking if the internal goal is met
-				if (internalGoal_ != null) {
-					internalGoalMet_ |= StateSpec.reformFact(factSplit).equals(
-							internalGoal_);
+				if ((internalGoal_ != null) && !internalGoalMet_) {
+					// Check if the fact is in the internal goal
+					for (int i = 0; i < internalGoal_.length; i++) {
+						// If this index of the goal hasn't been achieved.
+						if (!goalAchieved[i]) {
+							// If the fact is a goal fact.
+							if (StateSpec.reformFact(factSplit).equals(
+									internalGoal_[i]))
+								goalAchieved[i] = true;
+						}
+					}
+
 				}
 			}
 		}
+
+		// Check if the internal goal is met
+		if (!internalGoalMet_) {
+			boolean goalFound = true;
+			for (boolean b : goalAchieved) {
+				goalFound &= b;
+			}
+			internalGoalMet_ |= goalFound;
+		}
+
+		// Form the possible goals
+		formPossibleGoals(goalFactMap);
+	}
+
+	/**
+	 * Forms the possible goals for the state, using the map of state facts.
+	 * 
+	 * @param stateFacts
+	 *            The state facts.
+	 */
+	@SuppressWarnings("unchecked")
+	private void formPossibleGoals(MultiMap<String, ValueVector> stateFacts) {
+		// Setting up the lists
+		List<ValueVector>[] goalFacts = new ArrayList[goalPredicate_.length];
+		for (int i = 0; i < goalPredicate_.length; i++) {
+			goalFacts[i] = stateFacts.get(goalPredicate_[i]);
+		}
+
+		// Iterate through the lists, combining facts together
+		recurseGoals(new ValueVector[goalFacts.length], 0, goalFacts,
+				new int[goalFacts.length]);
+	}
+
+	/**
+	 * Recurses through the facts, forming combinatorial goals.
+	 * 
+	 * @param possibleGoal
+	 *            A possible goal array - to be filled.
+	 * @param goalIndex
+	 *            The index of the goal facts.
+	 * @param goalFacts
+	 *            The goal facts.
+	 * @param goalFactIndex
+	 *            The index of each previous goal fact.
+	 */
+	private void recurseGoals(ValueVector[] possibleGoal, int goalIndex,
+			List<ValueVector>[] goalFacts, int[] goalFactIndex) {
+		// Find the begin index for the loop
+		int beginIndex = 0;
+		for (int i = goalIndex - 1; i >= 0; i--) {
+			// If using the same predicate, start from that index + 1
+			if (goalPredicate_[i].equals(goalPredicate_[goalIndex])) {
+				beginIndex = goalFactIndex[i] + 1;
+				break;
+			}
+		}
+
+		// For each goal fact
+		for (int i = beginIndex; i < goalFacts[goalIndex].size(); i++) {
+			possibleGoal[goalIndex] = goalFacts[goalIndex].get(i);
+			goalFactIndex[goalIndex] = i;
+			// If we're at the end of the possible goal, write it
+			if (goalIndex == (goalFacts.length - 1)) {
+				GoalState gs = new GoalState(possibleGoal);
+				if (!possibleGoals_.contains(gs))
+					possibleGoals_.add(gs);
+			} else {
+				// Recurse further
+				recurseGoals(possibleGoal, goalIndex + 1, goalFacts,
+						goalFactIndex);
+			}
+		}
+	}
+
+	/**
+	 * Checks if a fact pred is a goal fact.
+	 * 
+	 * @param factPred
+	 *            The fact predicate to check.
+	 * @return True if the fact predicate is a goal predicate.
+	 */
+	private boolean isGoalFact(String factPred) {
+		for (String goalPred : goalPredicate_) {
+			if (factPred.equals(goalPred))
+				return true;
+		}
+		return false;
 	}
 
 	/**
@@ -323,7 +444,7 @@ public class PolicyActor implements AgentInterface {
 	private void formPlaceholderPreGoalState(String[] temporaryGoal) {
 		if (PolicyGenerator.getInstance().isSettled())
 			return;
-		
+
 		// The constants are the terms used in the fact
 		List<String> placeholderConstants = new ArrayList<String>(
 				temporaryGoal.length - 1);
@@ -378,18 +499,85 @@ public class PolicyActor implements AgentInterface {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
-	 * A class for representing a possible goal state to use (i.e. one that has occurred).
+	 * A class for representing a possible goal state to use (i.e. one that has
+	 * occurred).
 	 * 
 	 * @author Sam Sarjant
 	 */
 	private class GoalState {
 		/** The facts present in the state. */
 		private List<ValueVector> facts_;
-		
+
+		/**
+		 * Constructor for a new GoalState.
+		 * 
+		 * @param facts
+		 *            The facts of the goal state, sorted by predicate.
+		 */
 		public GoalState(ValueVector[] facts) {
-			// TODO
+			facts_ = new ArrayList<ValueVector>();
+			for (int i = 0; i < facts.length; i++) {
+				facts_.add(facts[i]);
+			}
+		}
+
+		/**
+		 * Gets the facts.
+		 * 
+		 * @return
+		 */
+		public List<ValueVector> getFacts() {
+			return facts_;
+		}
+
+		/*
+		 * (non-Javadoc)
+		 * 
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + getOuterType().hashCode();
+			result = prime * result
+					+ ((facts_ == null) ? 0 : facts_.hashCode());
+			return result;
+		}
+
+		/*
+		 * (non-Javadoc)
+		 * 
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			GoalState other = (GoalState) obj;
+			if (!getOuterType().equals(other.getOuterType()))
+				return false;
+			if (facts_ == null) {
+				if (other.facts_ != null)
+					return false;
+			} else if (!facts_.equals(other.facts_))
+				return false;
+			return true;
+		}
+
+		private PolicyActor getOuterType() {
+			return PolicyActor.this;
+		}
+
+		@Override
+		public String toString() {
+			return facts_.toString();
 		}
 	}
 }

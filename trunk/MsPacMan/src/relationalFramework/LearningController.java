@@ -224,6 +224,7 @@ public class LearningController {
 		// The outer loop, for refinement episode by episode
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
 		int t = 0;
+		// TODO Change this to a single pass for modules.
 		while ((t < maxEpisodes_) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
 				// Check if the agent needs to drop into learning a module
@@ -284,7 +285,7 @@ public class LearningController {
 				if (PolicyGenerator.getInstance().isModuleGenerator())
 					tempGen = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER
 							+ "/"
-							+ PolicyGenerator.getInstance().getModuleGoal()
+							+ PolicyGenerator.getInstance().getModuleName()
 							+ generatorFile_.getName() + run);
 				else
 					tempGen = new File(TEMP_FOLDER + "/"
@@ -362,14 +363,34 @@ public class LearningController {
 					Collection<GuidedRule> rules = new ArrayList<GuidedRule>();
 					// Run through each module (known to be created) and add the
 					// rules together.
+					List<String> newQueryParams = new ArrayList<String>();
+					int i = 0;
 					for (String fact : internalGoal.getFacts()) {
 						Module partialMod = Module.loadModule(StateSpec
 								.getInstance().getEnvironmentName(), fact);
-						rules.addAll(partialMod.getModuleRules());
+
+						// Reform the rule parameters
+						int j = 0;
+						for (GuidedRule gr : partialMod.getModuleRules()) {
+							if (j == 0) {
+								j = gr.getQueryParameters().size();
+							}
+							gr.shiftModularVariables(i);
+							gr.setAsLoadedModuleRule(false);
+							rules.add(gr);
+						}
+
+						// Forming the new query parameters
+						for (int k = i; k < (j + i); k++)
+							newQueryParams.add(Module.createModuleParameter(k));
+						
+						i += j;
 					}
+
 					// Create a policy generator that only updates slot weights.
 					modularGenerator = PolicyGenerator.newInstance(
-							policyGenerator, rules, internalGoal.getFacts());
+							policyGenerator, rules, newQueryParams,
+							internalGoal.getFacts());
 				} else {
 					modularGenerator = PolicyGenerator.newInstance(
 							policyGenerator, internalGoal.getFacts());
@@ -487,7 +508,7 @@ public class LearningController {
 			File output = null;
 			if (PolicyGenerator.getInstance().isModuleGenerator())
 				output = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-						+ PolicyGenerator.getInstance().getModuleGoal()
+						+ PolicyGenerator.getInstance().getModuleName()
 						+ humanGeneratorFile_.getName() + run);
 			else
 				output = new File(TEMP_FOLDER + "/"
@@ -638,7 +659,7 @@ public class LearningController {
 		File tempPerf = null;
 		if (PolicyGenerator.getInstance().isModuleGenerator())
 			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-					+ PolicyGenerator.getInstance().getModuleGoal()
+					+ PolicyGenerator.getInstance().getModuleName()
 					+ performanceFile_.getName() + run);
 		else
 			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
