@@ -8,7 +8,6 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -122,7 +121,6 @@ public class PolicyGenerator {
 		// Sample each slot from the policy with removal, forming a
 		// deterministic policy.
 		ProbabilityDistribution<Slot> removalDist = policyGenerator_.clone();
-		List<GuidedRule> lggRules = new ArrayList<GuidedRule>();
 		for (int i = 0; i < policyGenerator_.size(); i++) {
 			// If frozen, use from list, else sample with removal.
 			Slot slot = (!frozen_) ? removalDist.sampleWithRemoval() : iter
@@ -130,15 +128,11 @@ public class PolicyGenerator {
 			GuidedRule gr = slot.getGenerator().sample();
 			if (gr != null)
 				policy.addRule(gr, true);
-
-			// Get the lgg rule for this slot
-			if (lggRules_.containsKey(slot.getAction()))
-				lggRules.addAll(lggRules_.get(slot.getAction()));
 		}
 
 		// Append the general rules as well (if they aren't already in there) to
 		// ensure unnecessary covering isn't triggered.
-		for (GuidedRule lggRule : lggRules) {
+		for (GuidedRule lggRule : lggRules_.values()) {
 			if (!policy.contains(lggRule))
 				policy.addRule(lggRule, false);
 		}
@@ -528,7 +522,7 @@ public class PolicyGenerator {
 	public void postUpdateOperations() {
 		if (slotOptimisation_)
 			return;
-		
+
 		// Mutate the rules further
 		if (debugMode_) {
 			try {
@@ -644,14 +638,16 @@ public class PolicyGenerator {
 	 * @return The new PolicyGenerator
 	 */
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			Collection<GuidedRule> rules, ArrayList<String> internalGoal) {
+			Collection<GuidedRule> rules, List<String> newQueryParams,
+			ArrayList<String> internalGoal) {
 		instance_ = newInstance(policyGenerator, internalGoal);
 		instance_.slotOptimisation_ = true;
 
 		// Set the slot rules
 		instance_.policyGenerator_.clear();
 		for (GuidedRule rule : rules) {
-			Slot slot = new Slot(rule.getAction());
+			rule.setQueryParams(newQueryParams);
+			Slot slot = new Slot(rule.getActionPredicate());
 			slot.addNewRule(rule, false);
 			instance_.policyGenerator_.add(slot);
 		}
@@ -679,8 +675,8 @@ public class PolicyGenerator {
 		return moduleGenerator_;
 	}
 
-	public ArrayList<String> getModuleGoal() {
-		return moduleGoal_;
+	public String getModuleName() {
+		return Module.formName(moduleGoal_);
 	}
 
 	public ProbabilityDistribution<Slot> getGenerator() {
