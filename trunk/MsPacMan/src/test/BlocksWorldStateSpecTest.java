@@ -2,6 +2,8 @@ package test;
 
 import static org.junit.Assert.*;
 
+import java.util.List;
+
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -12,6 +14,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.GuidedRule;
+import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 
 public class BlocksWorldStateSpecTest {
@@ -255,47 +258,38 @@ public class BlocksWorldStateSpecTest {
 	public void testInsertValidActions() throws Exception {
 		Rete state = spec_.getRete();
 
-		// Set up the query to find the facts
-		state.eval("(defquery listActions (" + StateSpec.VALID_ACTIONS
-				+ " (move $?X) (moveFloor $?Y)))");
-
 		// Empty case
-		spec_.insertValidActions(state);
+		MultiMap<String, String> validActions = spec_
+				.generateValidActions(state);
 		state.eval("(facts)");
-		QueryResult result = state.runQueryStar("listActions",
-				new ValueVector());
-		assertTrue(result.next());
-		String moveResult = result.get("X").toString();
-		assertEquals("", moveResult);
-		String moveFloorResult = result.get("Y").toString();
-		assertEquals("", moveFloorResult);
+		assertNotNull(validActions);
+		assertNull(validActions.get("move"));
+		assertNull(validActions.get("moveFloor"));
 		state.reset();
 
 		// Simple move case
 		state.eval("(assert (clear a))");
 		state.eval("(assert (clear b))");
-		spec_.insertValidActions(state);
+		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
-		result = state.runQueryStar("listActions", new ValueVector());
-		assertTrue(result.next());
-		moveResult = result.get("X").toString();
-		assertTrue(moveResult.contains("\"a b\""));
-		assertTrue(moveResult.contains("\"b a\""));
-		moveFloorResult = result.get("Y").toString();
-		assertEquals("", result.get("Y").toString());
+		assertNotNull(validActions);
+		List<String> moveResult = validActions.get("move");
+		assertTrue(moveResult.contains("a b"));
+		assertTrue(moveResult.contains("b a"));
+		List<String> moveFloorResult = validActions.get("moveFloor");
+		assertNull(moveFloorResult);
 		state.reset();
 
 		// Simple moveFloor case
 		state.eval("(assert (clear v))");
 		state.eval("(assert (on v y))");
-		spec_.insertValidActions(state);
+		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
-		result = state.runQueryStar("listActions", new ValueVector());
-		assertTrue(result.next());
-		moveResult = result.get("X").toString();
-		assertEquals("", result.get("X").toString());
-		moveFloorResult = result.get("Y").toString();
-		assertEquals("\"v\"", result.get("Y").toString());
+		assertNotNull(validActions);
+		moveResult = validActions.get("move");
+		assertNull(moveResult);
+		moveFloorResult = validActions.get("moveFloor");
+		assertTrue(moveFloorResult.contains("v"));
 		state.reset();
 
 		// Complex both case
@@ -305,20 +299,19 @@ public class BlocksWorldStateSpecTest {
 		state.eval("(assert (on e b))");
 		state.eval("(assert (on d a))");
 		state.eval("(assert (onFloor c))");
-		spec_.insertValidActions(state);
+		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
-		result = state.runQueryStar("listActions", new ValueVector());
-		assertTrue(result.next());
-		moveResult = result.get("X").toString();
-		assertTrue(moveResult.contains("\"d e\""));
-		assertTrue(moveResult.contains("\"d c\""));
-		assertTrue(moveResult.contains("\"e d\""));
-		assertTrue(moveResult.contains("\"e c\""));
-		assertTrue(moveResult.contains("\"c d\""));
-		assertTrue(moveResult.contains("\"c e\""));
-		moveFloorResult = result.get("Y").toString();
-		assertTrue(moveFloorResult.contains("\"d\""));
-		assertTrue(moveFloorResult.contains("\"e\""));
+		assertNotNull(validActions);
+		moveResult = validActions.get("move");
+		assertTrue(moveResult.contains("d e"));
+		assertTrue(moveResult.contains("d c"));
+		assertTrue(moveResult.contains("e d"));
+		assertTrue(moveResult.contains("e c"));
+		assertTrue(moveResult.contains("c d"));
+		assertTrue(moveResult.contains("c e"));
+		moveFloorResult = validActions.get("moveFloor");
+		assertTrue(moveFloorResult.contains("d"));
+		assertTrue(moveFloorResult.contains("e"));
 	}
 
 	@Test

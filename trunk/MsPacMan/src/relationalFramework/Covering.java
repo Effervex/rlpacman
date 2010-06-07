@@ -15,7 +15,6 @@ import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.Rete;
-import jess.ValueVector;
 
 /**
  * A class which deals specifically with covering rules from a state.
@@ -31,8 +30,6 @@ public class Covering {
 	private static final char FIRST_CHAR = 'A';
 	/** The amount of state inactivity until it is considered settled. */
 	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 50;
-	/** A simple empty list. */
-	private static final List<GuidedRule> EMPTY_LIST = new ArrayList<GuidedRule>();
 	/** The prefix for range variables. */
 	public static final String RANGE_VARIABLE_PREFIX = "__Num";
 	/** The number of discretised ranges the rules are split into. */
@@ -43,12 +40,6 @@ public class Covering {
 	 * specialisations.
 	 */
 	private Map<String, PreGoalInformation> preGoals_;
-
-	/**
-	 * If this coverer should be creating new rules or just refining existing
-	 * ones.
-	 */
-	private boolean createNewRules_;
 
 	/** A suffix numbered variable to use when defining new ranged variables. */
 	private int rangeIndex_ = 0;
@@ -63,36 +54,29 @@ public class Covering {
 	 * 
 	 * @param state
 	 *            The state of the environment, containing the valid actions.
+	 * @param validActions
+	 *            The set of valid actions ot choose from.
 	 * @param coveredRules
 	 *            A starting point for the rules, if any exist.
 	 * @param lggRules
 	 *            The lgg rules, all of which are also contained within
 	 *            coveredRules.
-	 * @param createNewRules
-	 *            If this should cover new rules.
 	 * @return A list of guided rules, one for each action type.
 	 */
 	public List<GuidedRule> coverState(Rete state,
+			MultiMap<String, String> validActions,
 			MultiMap<String, GuidedRule> coveredRules,
-			MultiMap<String, GuidedRule> lggRules, boolean createNewRules)
-			throws Exception {
-		// If we're not creating new rules and the nonLGGs are empty, return
-		if (!createNewRules && coveredRules.allValuesEmpty())
-			return EMPTY_LIST;
-		createNewRules_ = createNewRules;
-
+			MultiMap<String, GuidedRule> lggRules) throws Exception {
 		List<String> constants = StateSpec.getInstance().getConstants();
 
 		// The relevant facts which contain the key term
-		MultiMap<String, Fact> relevantConditions = new MultiMap<String, Fact>();
-		Fact actionFact = compileRelevantConditionMap(state, relevantConditions);
+		MultiMap<String, Fact> relevantConditions = compileRelevantConditionMap(state);
 
 		// Maintain a mapping for each action, to be used in unification between
 		// actions
 		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
 
-		// A multimap with the action predicate as key and args as values.
-		MultiMap<String, String> validActions = arrangeActions(actionFact);
+		// Run through each valid action.
 		for (String action : validActions.keySet()) {
 			// Get the list of previous rules, both LGG and non-LGG.
 			List<GuidedRule> previousRules = coveredRules.get(action);
@@ -450,14 +434,16 @@ public class Covering {
 	 * @param previousRules
 	 *            A pre-existing list of previously created rules, both LGG and
 	 *            non-LGG.
-	 * @param lggRules The lgg rules, if any.
+	 * @param lggRules
+	 *            The lgg rules, if any.
 	 * @param constants
 	 *            The constants to maintain in rules.
 	 * @return All rules representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
 			MultiMap<String, Fact> relevantConditions, String actionPred,
-			List<GuidedRule> previousRules, Set<GuidedRule> lggRules, List<String> constants) {
+			List<GuidedRule> previousRules, Set<GuidedRule> lggRules,
+			List<String> constants) {
 		// The terms in the action
 		String[] action = new String[1 + StateSpec.getInstance().getActions()
 				.get(actionPred).size()];
@@ -502,12 +488,9 @@ public class Covering {
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
 			if (previousRules.isEmpty()) {
-				// Only create new rules if necessary.
-				if (createNewRules_) {
-					previousRules.add(inverseSubbed);
-					if (inverseSubbed.isLGG())
-						lggRules.add(inverseSubbed);
-				}
+				previousRules.add(inverseSubbed);
+				if (inverseSubbed.isLGG())
+					lggRules.add(inverseSubbed);
 			} else {
 				// Unify with each rule in the previous rule/s
 				boolean createNewRule = true;
@@ -540,12 +523,9 @@ public class Covering {
 
 				// If all rules became invalid, we need a new rule
 				if (createNewRule) {
-					// Only create new rules if necessary.
-					if (createNewRules_) {
-						previousRules.add(inverseSubbed);
-						if (inverseSubbed.isLGG())
-							lggRules.add(inverseSubbed);
-					}
+					previousRules.add(inverseSubbed);
+					if (inverseSubbed.isLGG())
+						lggRules.add(inverseSubbed);
 				}
 			}
 		}
@@ -671,108 +651,17 @@ public class Covering {
 	}
 
 	/**
-	 * Arranges the collection of actions into a heuristical ordering which
-	 * attempts to find maximally dissimilar actions of the same type. The list
-	 * is ordered such that the actions of the same predicate, each one with
-	 * different arguments from the last, are first, followed by randomly
-	 * ordered remaining actions.
-	 * 
-	 * @param validActions
-	 *            The set of valid actions.
-	 * @return A multimap of each action predicate, with the action as key and
-	 *         the args as values, containing the heuristically ordered actions.
-	 */
-	private MultiMap<String, String> arrangeActions(Fact validActions)
-			throws Exception {
-		// Initialise a map for each action predicate (move {"a b" "b c"...})
-		MultiMap<String, String> actionsMap = new MultiMap<String, String>();
-		// A multimap which deals with each argument (move {{a,b,c} {b,e,d}})
-		MultiMap<String, Set<String>> usedTermsMap = new MultiMap<String, Set<String>>();
-
-		// A multimap recording similar actions (move {"a b" "a c"...})
-		MultiMap<String, String> notUsedMap = new MultiMap<String, String>();
-		// For each action
-		for (String action : StateSpec.getInstance().getActions().keySet()) {
-			ValueVector args = validActions.getSlotValue(action)
-					.listValue(null);
-			// Run through the valid args for the action
-			for (int i = 0; i < args.size(); i++) {
-				String arg = args.get(i).stringValue(null);
-				if (isDissimilarAction(arg, action, usedTermsMap)) {
-					actionsMap.put(action, arg);
-				} else {
-					notUsedMap.put(action, arg);
-				}
-			}
-		}
-
-		// If we have some actions not used (likely, then shuffle the ordering
-		// and add them to the end of the actions map.
-		if (!notUsedMap.isKeysEmpty()) {
-			for (List<String> notUsed : notUsedMap.valuesLists()) {
-				Collections.shuffle(notUsed);
-			}
-			actionsMap.putAll(notUsedMap);
-		}
-
-		return actionsMap;
-	}
-
-	/**
-	 * Is the given action dissimilar from the already seen actions? This is
-	 * measured by which terms have already been seen in their appropriate
-	 * predicate slots.
-	 * 
-	 * @param arg
-	 *            The arguments to the action "a b".
-	 * @param action
-	 *            The action name.
-	 * @param usedTermsMap
-	 *            The already used terms mapping.
-	 * @return True if the action is dissimilar, false otherwise.
-	 */
-	private boolean isDissimilarAction(String arg, String action,
-			MultiMap<String, Set<String>> usedTermsMap) {
-		String[] terms = arg.split(" ");
-		// Run through each term
-		for (int i = 0; i < terms.length; i++) {
-			// Checking if the term set already exists
-			Set<String> usedTerms = usedTermsMap.getIndex(action, i);
-			if (usedTerms == null) {
-				usedTerms = new HashSet<String>();
-				usedTermsMap.put(action, usedTerms);
-			}
-
-			// If the term has already been used (but isn't a state or state
-			// spec term), return false
-			if (usedTerms.contains(terms[i]))
-				return false;
-		}
-
-		// If the terms have not been used before, add them all to their
-		// appropriate sets.
-		for (int i = 0; i < terms.length; i++) {
-			usedTermsMap.getIndex(action, i).add(terms[i]);
-		}
-
-		return true;
-	}
-
-	/**
 	 * Compiles the relevant term conditions from the state into map format,
 	 * with the term as the key and the fact as the value. This makes finding
 	 * relevant conditions a quick matter.
 	 * 
 	 * @param state
 	 *            The state containing the conditions.
-	 * @param relevantConditions
-	 *            The relevant conditions mapping to be filled.
-	 * @return The action fact.
+	 * @return The relevant conditions multimap.
 	 */
 	@SuppressWarnings("unchecked")
-	private Fact compileRelevantConditionMap(Rete state,
-			MultiMap<String, Fact> relevantConditions) {
-		Fact actionFact = null;
+	private MultiMap<String, Fact> compileRelevantConditionMap(Rete state) {
+		MultiMap<String, Fact> relevantConditions = new MultiMap<String, Fact>();
 
 		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
 			Fact stateFact = factIter.next();
@@ -784,12 +673,10 @@ public class Covering {
 					if (!StateSpec.isNumber(split[i]))
 						relevantConditions.putContains(split[i], stateFact);
 				}
-			} else if (split[0].equals(StateSpec.VALID_ACTIONS))
-				// Find the action fact
-				actionFact = stateFact;
+			}
 		}
 
-		return actionFact;
+		return relevantConditions;
 	}
 
 	/**
@@ -1237,6 +1124,20 @@ public class Covering {
 	}
 
 	/**
+	 * Checks if the pregoal for the given action is rececntly changed.
+	 * 
+	 * @param actionPred
+	 *            The action predicate.
+	 * @return True if the pregoal was recently modified, false otherwise.
+	 */
+	public boolean isPreGoalRecentlyChanged(String actionPred) {
+		if (preGoals_.containsKey(actionPred)) {
+			return preGoals_.get(actionPred).isRecentlyChanged();
+		}
+		return false;
+	}
+
+	/**
 	 * Gets the pre-goal general state, seen by the agent.
 	 * 
 	 * @param action
@@ -1318,6 +1219,12 @@ public class Covering {
 			if (inactivity_ < MAX_STATE_UNIFICATION_INACTIVITY)
 				return false;
 			return true;
+		}
+
+		public boolean isRecentlyChanged() {
+			if (inactivity_ == 0)
+				return true;
+			return false;
 		}
 
 		public List<String> getState() {

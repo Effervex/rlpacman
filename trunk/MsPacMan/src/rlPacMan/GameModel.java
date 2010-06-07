@@ -103,6 +103,8 @@ public class GameModel {
 	private int[][] scatterChaseTable_;
 	private int scatterChaseDifficulty_;
 	private int scatterChaseIndex_ = 0;
+	public boolean noDots_ = false;
+	public boolean noPowerDots_ = false;
 
 	GameModel(PacMan pacMan) {
 		m_pacMan = pacMan;
@@ -317,6 +319,16 @@ public class GameModel {
 			break;
 		}
 
+		if (noPowerDots_) {
+			m_powerdots.clear();
+			// Slow the ghosts too
+			for (Ghost ghost : m_ghosts) {
+				ghost.m_ghostDeltaMax = 6;
+			}
+		}
+		if (noDots_)
+			m_dots.clear();
+
 		// Patch the maze for the ghost hideout
 		loadGhostHideout();
 
@@ -364,6 +376,18 @@ public class GameModel {
 		for (Ghost g : m_ghosts) {
 			g.m_bChaseMode = false;
 		}
+	}
+
+	/**
+	 * If the model is OK for learning (not paused or doing other needless
+	 * animations).
+	 * 
+	 * @return True if the model is OK for learning.
+	 */
+	public boolean isLearning() {
+		if ((m_state == STATE_PLAYING) || (m_state == STATE_GAMEOVER))
+			return true;
+		return false;
 	}
 
 	// Called to reinitialize the game state and start a new game

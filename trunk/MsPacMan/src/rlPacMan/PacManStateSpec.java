@@ -98,29 +98,70 @@ public class PacManStateSpec extends StateSpec {
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
-		rules
-				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-						+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
-						+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
-		rules
-				.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
-						+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
-						+ "=> (fromPowerDot ?PowerDot ?Dist0)");
-		rules
-				.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-						+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
-		rules
-				.add("(not (edible ?Ghost)) "
-						+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-						+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
-						+ "(pacman ?Player) (ghost ?Ghost) "
-						+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
-		rules
-				.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-						+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
-		rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
-				+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
+
+		if (envParameter_ != null && envParameter_.equals("noDots")) {
+			// Good policy for no dots play
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+							+ "(edible ?Ghost) (nonblinking ?Ghost) (pacman ?Player) "
+							+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
+			rules
+					.add("(aggressive ?Ghost) "
+							+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
+							+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
+							+ "(pacman ?Player) (ghost ?Ghost) "
+							+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
+			rules
+					.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 2)) "
+							+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
+							+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
+							+ "=> (fromPowerDot ?PowerDot ?Dist0)");
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+							+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
+			rules
+					.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+							+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
+			rules
+					.add("(distancePowerDot ?Player ?PDot ?Dist0&:(betweenRange ?Dist0 2 99)) "
+							+ "(pacman ?Player) (powerDot ?PDot) "
+							+ "=> (toPowerDot ?PDot ?Dist0)");
+		} else if (envParameter_ != null && envParameter_.equals("noPowerDots")) {
+			// Good policy for no power dot play
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+							+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
+			rules
+					.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+							+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
+			rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
+					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
+		} else {
+			// Good policy for regular play
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+							+ "(edible ?Ghost) (nonblinking ?Ghost) (pacman ?Player) "
+							+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
+			rules
+					.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
+							+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
+							+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
+							+ "=> (fromPowerDot ?PowerDot ?Dist0)");
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+							+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
+			rules
+					.add("(aggressive ?Ghost) "
+							+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
+							+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
+							+ "(pacman ?Player) (ghost ?Ghost) "
+							+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
+			rules
+					.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+							+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
+			rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
+					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
+		}
 
 		for (String rule : rules)
 			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false);
@@ -157,10 +198,20 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Ghost.class);
 		predicates.putCollection("edible", structure);
 
+		// Aggressive
+		structure = new ArrayList<Class>();
+		structure.add(Ghost.class);
+		predicates.putCollection("aggressive", structure);
+
 		// Blinking
 		structure = new ArrayList<Class>();
 		structure.add(Ghost.class);
 		predicates.putCollection("blinking", structure);
+
+		// Nonblinking
+		structure = new ArrayList<Class>();
+		structure.add(Ghost.class);
+		predicates.putCollection("nonblinking", structure);
 
 		// Distance Metrics
 		structure = new ArrayList<Class>();

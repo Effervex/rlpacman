@@ -72,6 +72,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
+		if ((arg0.length() > 7) && (arg0.substring(0, 6).equals("simple"))) {
+			// PacMan simplified by removing certain aspects of it.
+			String param = arg0.substring(7);
+			StateSpec.reinitInstance(param);
+			if (param.equals("noDots")) {
+				model_.noDots_ = true;
+			} else if (param.equals("noPowerDots")) {
+				model_.noPowerDots_ = true;
+			}
+		}
 		return null;
 	}
 
@@ -113,8 +123,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 				.getKey());
 
 		synchronized (environment_) {
-			for (int i = 0; i < model_.m_player.m_deltaMax * 2 - 1; i++) {
+			int i = 0;
+			while ((i < model_.m_player.m_deltaMax * 2 - 1)
+					|| (!model_.isLearning())) {
 				environment_.tick(false);
+				i++;
 			}
 		}
 
@@ -172,9 +185,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * Resets the environment back to normal.
 	 */
 	public void resetEnvironment() {
+		boolean noDots = model_.noDots_;
+		boolean noPowerDots = model_.noPowerDots_;
+		
 		environment_.reinit();
 
 		model_ = environment_.getGameModel();
+		model_.noDots_ = noDots;
+		model_.noPowerDots_ = noPowerDots;
 		rete_ = StateSpec.getInstance().getRete();
 
 		// Initialise the observations
@@ -196,7 +214,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		environment_.m_gameUI.m_bDrawPaused = false;
 
 		synchronized (environment_) {
-			while (model_.m_state != GameModel.STATE_PLAYING) {
+			while (!model_.isLearning()) {
 				environment_.tick(false);
 			}
 		}
@@ -262,7 +280,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// action in the ArrayList.
 			for (String action : actions.get(i)) {
 				// For each rule, a list of actions are returned
-				//double weighting = 1.0 / (i + 1);
+				// double weighting = 1.0 / (i + 1);
 				if (actions.get(i) != null) {
 					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 							.getInstance()).applyAction(action, state);
@@ -277,22 +295,24 @@ public class PacManEnvironment implements EnvironmentInterface {
 					} else if (weightedDir.getDirection() < 0) {
 						directionVote[dir] -= weighting;
 					}
-					
+
 					// Recording best and worst
 					best = Math.max(best, directionVote[dir]);
 					worst = Math.min(worst, directionVote[dir]);
-				}			
+				}
 			}
-			
+
 			// Normalise the directionVote and remove any directions not
 			// significantly weighted.
-			ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(directions);
+			ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(
+					directions);
 			for (int d = 0; d < directionVote.length; d++) {
 				directionVote[d] = (directionVote[d] - worst) / (best - worst);
-				// If the vote is less than 1 - # valid directions, then remove it.
+				// If the vote is less than 1 - # valid directions, then remove
+				// it.
 				if (directionVote[d] <= 1d - inverseDirs)
 					directions.remove(PacManLowAction.values()[d]);
-				
+
 				// Resetting the direction vote
 				directionVote[d] = 0;
 			}
@@ -300,7 +320,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// If only a single direction left, return
 			if (directions.size() == 1)
 				return directions.get(0);
-			
+
 			if (directions.isEmpty())
 				directions = backupDirections;
 		}
@@ -365,33 +385,27 @@ public class PacManEnvironment implements EnvironmentInterface {
 				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
 					rete_.eval("(assert (ghost " + ghost + "))");
 					// If edible, add assertion
-					if (ghost.isEdible())
+					if (ghost.isEdible()) {
 						rete_.eval("(assert (edible " + ghost + "))");
+					} else {
+						rete_.eval("(assert (aggressive " + ghost + "))");
+					}
 					// If flashing, add assertion
-					if (ghost.isBlinking())
+					if (ghost.isBlinking()) {
 						rete_.eval("(assert (blinking " + ghost + "))");
+					} else {
+						rete_.eval("(assert (nonblinking " + ghost + "))");
+					}
 
 					// Distances from pacman to ghost
 					distanceAssertions(ghost, ghost.toString());
 				}
 			}
 
-			// Find the maximally safe junctions
-			for (int i = 0; i < model_.m_ghosts.length; i++) {
-				// If the ghost is active and hostile
-				Ghost ghost = model_.m_ghosts[i];
-				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-					// Calculate the ghost's distance from each of the player's
-					// junctions
-					if (ghost.m_nTicks2Flee <= 0) {
-
-					}
-				}
-			}
-
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
 				String dotName = "dot_" + dot.m_locX + "_" + dot.m_locY;
+
 				rete_.eval("(assert (dot " + dotName + "))");
 
 				// Distances
@@ -425,9 +439,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 			rete_.run();
 
 			// Adding the valid actions
-			StateSpec.getInstance().insertValidActions(rete_);
-
-			// rete_.eval("(facts)");
+			ObjectObservations.getInstance().validActions = StateSpec
+					.getInstance().generateValidActions(rete_);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -453,6 +466,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private void distanceAssertions(PacPoint thing, String thingName)
 			throws JessException {
+		if (distanceGrid_[thing.m_locX][thing.m_locY] < Integer.MAX_VALUE / 2)
+			;
 		rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
 				+ " player " + thingName + " "
 				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");

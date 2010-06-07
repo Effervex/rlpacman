@@ -217,14 +217,11 @@ public class LearningController {
 		// Run the preliminary action discovery phase, only starting real
 		// optimisation once pre-goal has settled and LGG rules for each
 		// action have been found.
-		// TODO Remove preliminary processing and simply use an iterative cycle
-		// which just restarts the learning process whenever something changes.
 		preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
 		int t = 0;
-		// TODO Change this to a single pass for modules.
 		while ((t < maxEpisodes_) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
 				// Check if the agent needs to drop into learning a module
@@ -237,6 +234,9 @@ public class LearningController {
 			// Forming a population of solutions
 			List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
 			int expProg = 0;
+			boolean restart = false;
+			estimateETA(experimentStart_, expProg, expProg, run,
+					maxEpisodes_ * population, repetitions_, "experiment");
 			for (int i = 0; i < population; i++) {
 				Policy pol = localPolicy.generatePolicy();
 				System.out.println(pol);
@@ -252,7 +252,17 @@ public class LearningController {
 								.RL_agent_message("internalReward"));
 					else
 						score += RLGlue.RL_return();
+					
+					// Check for a restart
+					if (localPolicy.shouldRestart()) {
+						restart = true;
+						break;
+					}
 				}
+				
+				if (restart)
+					break;
+				
 				score /= AVERAGE_ITERATIONS;
 				System.out.println(score);
 
@@ -270,39 +280,48 @@ public class LearningController {
 						maxEpisodes_ * population, repetitions_, "experiment");
 			}
 
-			Collections.sort(pvs);
-			// Update the weights for all distributions using only the elite
-			// samples
-			updateWeights(pvs, (int) Math.ceil(population * SELECTION_RATIO));
+			if (!restart) {
+				Collections.sort(pvs);
+				// Update the weights for all distributions using only the elite
+				// samples
+				updateWeights(pvs, (int) Math
+						.ceil(population * SELECTION_RATIO));
 
-			// Test the agent and record the performances
-			episodePerformances.add(testAgent(t, maxSteps_, run, repetitions_,
-					expProg));
+				// Test the agent and record the performances
+				episodePerformances.add(testAgent(t, maxSteps_, run,
+						repetitions_, expProg));
 
-			// Save the results at each episode
-			try {
-				File tempGen = null;
-				if (PolicyGenerator.getInstance().isModuleGenerator())
-					tempGen = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER
-							+ "/"
-							+ PolicyGenerator.getInstance().getModuleName()
-							+ generatorFile_.getName() + run);
-				else
-					tempGen = new File(TEMP_FOLDER + "/"
-							+ generatorFile_.getName() + run);
-				tempGen.createNewFile();
-				PolicyGenerator.saveGenerators(tempGen);
-				saveBestPolicy(bestPolicy);
-				// Output the episode averages
-				savePerformance(episodePerformances, run);
-			} catch (Exception e) {
-				e.printStackTrace();
+				// Save the results at each episode
+				try {
+					File tempGen = null;
+					if (PolicyGenerator.getInstance().isModuleGenerator())
+						tempGen = new File(Module.MODULE_DIR + "/"
+								+ TEMP_FOLDER + "/"
+								+ PolicyGenerator.getInstance().getModuleName()
+								+ generatorFile_.getName());
+					else
+						tempGen = new File(TEMP_FOLDER + "/"
+								+ generatorFile_.getName() + run);
+					tempGen.createNewFile();
+					PolicyGenerator.saveGenerators(tempGen);
+					saveBestPolicy(bestPolicy);
+					// Output the episode averages
+					savePerformance(episodePerformances, run);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+
+				// Run the post update operations
+				localPolicy.postUpdateOperations();
+
+				t++;
+				// Clear the restart
+				localPolicy.shouldRestart();
 			}
-
-			// Run the post update operations
-			localPolicy.postUpdateOperations();
-
-			t++;
+			
+			// Only need one pass for modular learning.
+			if (!restart && localPolicy.isModuleGenerator())
+				break;
 		}
 	}
 
@@ -383,7 +402,7 @@ public class LearningController {
 						// Forming the new query parameters
 						for (int k = i; k < (j + i); k++)
 							newQueryParams.add(Module.createModuleParameter(k));
-						
+
 						i += j;
 					}
 
@@ -440,7 +459,7 @@ public class LearningController {
 	 * rules have all been found.
 	 */
 	private void preliminaryProcessing() {
-		while (!PolicyGenerator.getInstance().isSettled()) {
+		while (!PolicyGenerator.getInstance().isSettled(false)) {
 			Policy pol = PolicyGenerator.getInstance().generatePolicy();
 			System.out.println(pol);
 			// Send the agent a generated policy
@@ -509,7 +528,7 @@ public class LearningController {
 			if (PolicyGenerator.getInstance().isModuleGenerator())
 				output = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
 						+ PolicyGenerator.getInstance().getModuleName()
-						+ humanGeneratorFile_.getName() + run);
+						+ humanGeneratorFile_.getName());
 			else
 				output = new File(TEMP_FOLDER + "/"
 						+ humanGeneratorFile_.getName() + run);
@@ -660,7 +679,7 @@ public class LearningController {
 		if (PolicyGenerator.getInstance().isModuleGenerator())
 			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
 					+ PolicyGenerator.getInstance().getModuleName()
-					+ performanceFile_.getName() + run);
+					+ performanceFile_.getName());
 		else
 			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
 					+ run);

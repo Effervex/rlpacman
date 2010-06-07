@@ -23,6 +23,9 @@ public class ObjectObservations {
 	/** The knowledge base of current state predicate and background knowledge. */
 	public Rete predicateKB;
 
+	/** The valid actions for the above state. */
+	public MultiMap<String, String> validActions;
+
 	/**
 	 * The private, empty constructor
 	 */
