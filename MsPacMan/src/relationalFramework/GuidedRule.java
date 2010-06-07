@@ -48,6 +48,7 @@ public class GuidedRule {
 	private boolean hasSpawned_ = false;
 
 	/** If this rule is a least general generalisation. */
+	// TODO Remove this
 	private boolean lgg_ = false;
 
 	/** The number of states seen by this rule. */
@@ -617,6 +618,7 @@ public class GuidedRule {
 		clone.lgg_ = lgg_;
 		clone.withoutInequals_ = withoutInequals_;
 		clone.isLoadedModule_ = isLoadedModule_;
+		clone.statesSeen_ = statesSeen_;
 		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);

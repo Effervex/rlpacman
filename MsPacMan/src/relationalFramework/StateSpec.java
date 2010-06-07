@@ -72,8 +72,8 @@ public abstract class StateSpec {
 	/** The constants found within the goal. */
 	private List<String> constants_;
 
-	/** The name of the goal. */
-	protected String goal_;
+	/** The parameter of the environment. */
+	protected String envParameter_;
 
 	/** The optimal policy for the goal. */
 	private Policy optimalPolicy_;
@@ -394,26 +394,22 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Inserts the valid actions for the state into the state for the agent to
+	 * Generates the valid actions for the state into the state for the agent to
 	 * use. Actions are given in string format of just the arguments.
 	 * 
-	 * @param state
-	 *            The state into which the valid actions are calculated and
-	 *            inserted.
+	 * @param state The state from which the actions are generated.
+	 * @return A multimap with each valid action predicate as the key and the
+	 *         values as the arguments.
 	 */
-	public final void insertValidActions(Rete state) {
-		StringBuffer factBuffer = new StringBuffer("(assert (" + VALID_ACTIONS);
+	public final MultiMap<String, String> generateValidActions(Rete state) {
+		MultiMap<String, String> validActions = new MultiMap<String, String>();
 
 		try {
 			for (String action : actions_.keySet()) {
-				boolean hasResults = false;
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
-					if (!hasResults)
-						factBuffer.append(" (" + action);
-					hasResults = true;
-					factBuffer.append(" \"");
+					StringBuffer factBuffer = new StringBuffer(); 
 					boolean first = true;
 					for (String term : actionPreconditions_.get(action)) {
 						if (!first)
@@ -421,18 +417,14 @@ public abstract class StateSpec {
 						factBuffer.append(result.getSymbol(term));
 						first = false;
 					}
-					factBuffer.append("\"");
+					validActions.put(action, factBuffer.toString());
 				}
-				if (hasResults)
-					factBuffer.append(")");
 			}
-
-			// Finalise the expression and assert it
-			factBuffer.append("))");
-			state.eval(factBuffer.toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		
+		return validActions;
 	}
 
 	/**
@@ -790,7 +782,7 @@ public abstract class StateSpec {
 	public static void reinitInstance(String goalString) {
 		try {
 			instance_.rete_.clear();
-			instance_.goal_ = goalString;
+			instance_.envParameter_ = goalString;
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();

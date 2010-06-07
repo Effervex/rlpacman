@@ -71,8 +71,14 @@ public class PolicyGenerator {
 	 */
 	private boolean slotOptimisation_ = false;
 
+	/**
+	 * If the experiment should restart due to new rules being introduced
+	 * mid-learning.
+	 */
+	private boolean restart_ = false;
+
 	/** The random number generator. */
-	public static Random random_ = new Random(456);
+	public static Random random_ = new Random(1);
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -148,25 +154,32 @@ public class PolicyGenerator {
 	 * @param state
 	 *            The observations of the current state, including the valid
 	 *            actions to take.
+	 * @param validActions
+	 *            The set of valid actions to choose from.
+	 * @param activatedActions
+	 *            The set of actions that have already been activated by
+	 *            existing rules in the policy. By the way policies are set up,
+	 *            LGG rules will always be in them.
 	 * @param createNewRules
 	 *            Whether the covering algorithm should create new rules or only
-	 *            refine existing one.
+	 *            refine existing one. This is false when the policy already has
+	 *            enough actions, true when more actions are required.
 	 * @return The list of covered rules, one for each action type.
 	 */
-	public List<GuidedRule> triggerCovering(Rete state, boolean createNewRules) {
-		// If we already have the LGG rules for each action then no need to
-		// cover new rules.
-		if (!frozen_
-				&& !slotOptimisation_
-				&& (lggRules_.size() < StateSpec.getInstance().getActions()
-						.size())) {
+	public List<GuidedRule> triggerCovering(Rete state,
+			MultiMap<String, String> validActions,
+			MultiMap<String, String> activatedActions, boolean createNewRules) {
+		// If there are actions to cover, cover them.
+		if (!frozen_ && !slotOptimisation_
+				&& !coveredValidActions(validActions, activatedActions)) {
 			if (createNewRules)
 				System.out.println("\t<COVERING TRIGGERED:>");
+			// createNewRules = true;
 
 			List<GuidedRule> covered = null;
 			try {
-				covered = covering_.coverState(state, coveredRules_, lggRules_,
-						createNewRules);
+				covered = covering_.coverState(state, validActions,
+						coveredRules_, lggRules_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -200,6 +213,9 @@ public class PolicyGenerator {
 				}
 
 				// If the rule is maximally general, mutate and store it
+				// TODO Modify the LGG to simply isCovered, and mutate whenever
+				// it changes. Also have to modify the entire LGG system to just
+				// use covered.
 				if (coveredRule.isLGG()) {
 					if (lggRules_.putContains(actionPred, coveredRule)) {
 						System.out.println("\tLGG RULE FOUND: " + coveredRule);
@@ -207,7 +223,7 @@ public class PolicyGenerator {
 						// Mutate unless already mutated
 						if (!covering_.isPreGoalSettled(actionPred)) {
 							mutateRule(coveredRule, coveredRule.getSlot(),
-									false);
+									true, false);
 						}
 					}
 				} else if (createNewRules) {
@@ -224,16 +240,45 @@ public class PolicyGenerator {
 	}
 
 	/**
+	 * A method which checks if covering is necessary or required, based on the
+	 * valid actions of the state.
+	 * 
+	 * @param validActions
+	 *            The set of valid actions for the state. If we're creating LGG
+	 *            covering rules, the activated actions need to equal this set.
+	 * @param activatedActions
+	 *            The set of actions already activated by the policy. We only
+	 *            consider these when we're creating new rules.
+	 * @return True if the activated actions cover all valid actions, false
+	 *         otherwise.
+	 */
+	private boolean coveredValidActions(MultiMap<String, String> validActions,
+			MultiMap<String, String> activatedActions) {
+		for (String action : validActions.keySet()) {
+			// If the activated actions don't even contain the key, return
+			// false.
+			if (!activatedActions.containsKey(action))
+				return false;
+
+			// Check each set of actions match up
+			if (!activatedActions.get(action).containsAll(
+					(validActions.get(action))))
+				return false;
+		}
+		return true;
+	}
+
+	/**
 	 * Mutates a rule (if it hasn't spawned already) and creates and adds
 	 * children to the slots.
 	 * 
 	 * @param baseRule
 	 *            The rule to mutate.
-	 * @param settledPreGoal
+	 * @param removeOld
 	 *            If the pre-goal has settled.
 	 */
 	private void mutateRule(GuidedRule baseRule, Slot ruleSlot,
-			boolean settledPreGoal) {
+			boolean removeOld, boolean settled) {
 		// If the base rule hasn't already spawned pre-goal mutants
 		if (!baseRule.hasSpawned()) {
 
@@ -258,12 +303,12 @@ public class PolicyGenerator {
 					.specialiseToPreGoal(baseRule);
 
 			String actionPred = baseRule.getActionPredicate();
-			// TODO Mutate at every step of forming pre-goal, removing old
-			// mutants
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
-			if (settledPreGoal) {
-				baseRule.setSpawned(true);
+			if (removeOld) {
+				if (settled)
+					baseRule.setSpawned(true);
+
 				// If the rule isn't a mutant rule, we have mutants and have
 				// already created temp mutants, run through the mutations and
 				// remove unnecessary temp mutants.
@@ -290,10 +335,16 @@ public class PolicyGenerator {
 							}
 						}
 					}
+
+					// Setting the restart value.
+					restart_ = !removables.isEmpty();
+
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
 					mutatedRules_.get(actionPred).removeAll(removables);
 				}
+			} else {
+				restart_ = false;
 			}
 
 			// Add all mutants to the ruleSlot
@@ -350,13 +401,14 @@ public class PolicyGenerator {
 				}
 			}
 
-			// Check if we have LGG rules to mutate
-			if (!settledGoals.isEmpty()) {
-				// For each maximally general rule
-				for (String settledAction : settledGoals) {
-					if (lggRules_.containsKey(settledAction))
-						for (GuidedRule general : lggRules_.get(settledAction))
-							mutateRule(general, general.getSlot(), true);
+			// If the pre-goal has recently changed and we have an LGG rule for
+			// it, create and remove mutants.
+			for (String action : StateSpec.getInstance().getActions().keySet()) {
+				if (covering_.isPreGoalRecentlyChanged(action)
+						&& lggRules_.containsKey(action)) {
+					boolean settled = covering_.isPreGoalSettled(action);
+					for (GuidedRule general : lggRules_.get(action))
+						mutateRule(general, general.getSlot(), true, settled);
 				}
 			}
 
@@ -387,9 +439,12 @@ public class PolicyGenerator {
 	 * Checks if the state has settled. This means that the pre-goal has settled
 	 * and there are no non-LGG rules.
 	 * 
+	 * @param checkPreGoal
+	 *            If we're considering the pre-goal for settling.
+	 * 
 	 * @return True if the generator values are settled, false otherwise.
 	 */
-	public boolean isSettled() {
+	public boolean isSettled(boolean checkPreGoal) {
 		// If we're just optimising the slot ordering, then it's settled.
 		if (slotOptimisation_)
 			return true;
@@ -397,10 +452,12 @@ public class PolicyGenerator {
 		if (!hasPreGoal())
 			return false;
 		// All pre-goals must be settled (or null)
-		for (String action : actionSet_.keySet()) {
-			if ((covering_.getPreGoalState(action) != null)
-					&& !covering_.isPreGoalSettled(action))
-				return false;
+		if (checkPreGoal) {
+			for (String action : actionSet_.keySet()) {
+				if ((covering_.getPreGoalState(action) != null)
+						&& !covering_.isPreGoalSettled(action))
+					return false;
+			}
 		}
 
 		// Rules need to have been created at one point
@@ -548,7 +605,7 @@ public class PolicyGenerator {
 				// Create definite mutants
 				if (rule == null)
 					System.out.println("Problem...");
-				mutateRule(rule, slot, true);
+				mutateRule(rule, slot, true, true);
 			}
 		}
 
@@ -566,7 +623,8 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Gets the predicates for every rule fact which is a constant fact.
+	 * Gets the predicates for every rule fact which is a constant fact and has
+	 * a settled pre-goal.
 	 * 
 	 * @return A collection of predicates, each of which is involved in a rule
 	 *         where the predicate has only constant terms.
@@ -578,11 +636,14 @@ public class PolicyGenerator {
 		// terms.
 		for (Slot slot : policyGenerator_) {
 			for (GuidedRule gr : slot.getGenerator()) {
-				List<String> constants = gr.getConstantConditions();
-				for (String fact : constants)
-					constantFacts.add(new ConstantPred(fact));
-				if (constants.size() > 1)
-					constantFacts.add(new ConstantPred(constants));
+				// Check the rule's pre-goal is settled
+				if (covering_.isPreGoalSettled(gr.getActionPredicate())) {
+					List<String> constants = gr.getConstantConditions();
+					for (String fact : constants)
+						constantFacts.add(new ConstantPred(fact));
+					if (constants.size() > 1)
+						constantFacts.add(new ConstantPred(constants));
+				}
 			}
 		}
 		return constantFacts;
@@ -673,6 +734,21 @@ public class PolicyGenerator {
 
 	public boolean isModuleGenerator() {
 		return moduleGenerator_;
+	}
+
+	/**
+	 * If the experiment should restart learning because the rules have changed.
+	 * When this method is called, the restart is no longer active until
+	 * triggered again.
+	 * 
+	 * @return True if rules have recently changed, false otherwise.
+	 */
+	public boolean shouldRestart() {
+		if (restart_) {
+			restart_ = false;
+			return true;
+		}
+		return false;
 	}
 
 	public String getModuleName() {

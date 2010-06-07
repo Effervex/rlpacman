@@ -179,6 +179,8 @@ public class Policy {
 	 * 
 	 * @param state
 	 *            The current state in predicates.
+	 * @param validActions
+	 *            The set of valid actions to choose from in the state.
 	 * @param actionSwitch
 	 *            The current actions.
 	 * @param actionsReturned
@@ -192,10 +194,12 @@ public class Policy {
 	 *            If this policy is noting the rules fired as triggered. Usually
 	 *            deactivated after agent has found internal goal.
 	 */
-	public ActionChoice evaluatePolicy(Rete state, ActionChoice actionSwitch,
+	public ActionChoice evaluatePolicy(Rete state,
+			MultiMap<String, String> validActions, ActionChoice actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
 		actionSwitch.switchOffAll();
+		MultiMap<String, String> activatedActions = new MultiMap<String, String>();
 
 		if (actionsReturned == -1)
 			actionsReturned = Integer.MAX_VALUE;
@@ -203,7 +207,7 @@ public class Policy {
 		// Check every slot, from top-to-bottom until one activates
 		int actionsFound = 0;
 		Iterator<GuidedRule> iter = policyRules_.iterator();
-		while ((actionsFound < actionsReturned) && (iter.hasNext())) {
+		while (iter.hasNext()) {
 			GuidedRule gr = iter.next();
 
 			// Find the result set
@@ -234,14 +238,24 @@ public class Policy {
 						StringBuffer actBuffer = new StringBuffer("("
 								+ split[0]);
 
+						// Find the arguments.
+						StringBuffer args = new StringBuffer();
+						boolean first = true;
 						for (int i = 1; i < split.length; i++) {
 							String value = split[i];
 							if (value.charAt(0) == '?')
 								value = results
 										.getSymbol(split[i].substring(1));
 							actBuffer.append(" " + value);
+
+							if (!first)
+								args.append(" ");
+							args.append(value);
+							first = false;
 						}
 						actBuffer.append(")");
+
+						activatedActions.putContains(split[0], args.toString());
 
 						// Use the found action set as a result.
 						actionsList.add(actBuffer.toString());
@@ -274,7 +288,8 @@ public class Policy {
 		if (!alreadyCovered) {
 			if (actionsFound < actionsReturned) {
 				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
-						.triggerCovering(state, true);
+						.triggerCovering(state, validActions, activatedActions,
+								true);
 
 				if (coveredRules != null) {
 					// Add any new rules to the policy
@@ -282,11 +297,12 @@ public class Policy {
 						if (!policyRules_.contains(gr))
 							policyRules_.add(gr);
 					}
-					evaluatePolicy(state, actionSwitch, actionsReturned,
-							optimal, true, noteTriggered);
+					evaluatePolicy(state, validActions, actionSwitch,
+							actionsReturned, optimal, true, noteTriggered);
 				}
 			} else {
-				PolicyGenerator.getInstance().triggerCovering(state, false);
+				PolicyGenerator.getInstance().triggerCovering(state,
+						validActions, activatedActions, false);
 			}
 		}
 

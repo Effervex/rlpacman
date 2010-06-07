@@ -16,6 +16,7 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
+import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -333,7 +334,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			rete_.run();
 
 			// Adding the valid actions
-			StateSpec.getInstance().insertValidActions(rete_);
+			ObjectObservations.getInstance().validActions = StateSpec
+					.getInstance().generateValidActions(rete_);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -399,7 +401,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			rot = env_step(act);
 		}
 
-		// TODO Change this when dealing with internal goals
+		// Form the first pre-goal.
 		if (!PolicyGenerator.getInstance().hasPreGoal())
 			optimalAgent.agent_message("formPreGoal");
 

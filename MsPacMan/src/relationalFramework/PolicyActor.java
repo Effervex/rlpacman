@@ -202,9 +202,9 @@ public class PolicyActor implements AgentInterface {
 		if ((internalGoal_ != null) && (internalGoalMet_))
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
-		actions = policy_.evaluatePolicy(state, actions, StateSpec
-				.getInstance().getNumReturnedActions(), optimal_, false,
-				noteTriggered);
+		actions = policy_.evaluatePolicy(state, ObjectObservations
+				.getInstance().validActions, actions, StateSpec.getInstance()
+				.getNumReturnedActions(), optimal_, false, noteTriggered);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;
@@ -262,7 +262,8 @@ public class PolicyActor implements AgentInterface {
 			}
 
 			if (PolicyGenerator.debugMode_) {
-				System.out.println("Internal goal: " + Arrays.toString(internalGoal_));
+				System.out.println("Internal goal: "
+						+ Arrays.toString(internalGoal_));
 				System.out.println(policy_);
 			}
 		}
@@ -442,7 +443,7 @@ public class PolicyActor implements AgentInterface {
 	 *            The temporary goal.
 	 */
 	private void formPlaceholderPreGoalState(String[] temporaryGoal) {
-		if (PolicyGenerator.getInstance().isSettled())
+		if (PolicyGenerator.getInstance().isSettled(true))
 			return;
 
 		// The constants are the terms used in the fact

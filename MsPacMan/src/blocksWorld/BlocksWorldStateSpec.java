@@ -68,28 +68,28 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		if (goal_ == null)
-			goal_ = "onab";
+		if (envParameter_ == null)
+			envParameter_ = "onab";
 		
 		// On(a,b) goal
-		if (goal_.equals("onab")) {
+		if (envParameter_.equals("onab")) {
 			constants.add("a");
 			constants.add("b");
 			return "(on a b)";
 		}
 
 		// Unstack goal
-		if (goal_.equals("unstack")) {
+		if (envParameter_.equals("unstack")) {
 			return "(not (on ?X ?Y))";
 		}
 
 		// Stack goal
-		if (goal_.equals("stack")) {
+		if (envParameter_.equals("stack")) {
 			return "(onFloor ?X) (not (onFloor ?Y &:(<> ?Y ?X)))";
 		}
 
 		// Clear goal
-		if (goal_.equals("clearA")) {
+		if (envParameter_.equals("clearA")) {
 			constants.add("a");
 			return "(clear a)";
 		}
@@ -103,18 +103,18 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
-		if (goal_.equals("onab")) {
+		if (envParameter_.equals("onab")) {
 			rules = new String[3];
 			rules[0] = "(clear a) (clear b) => (move a b)";
 			rules[1] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
 			rules[2] = "(clear ?X) (above ?X b) => (moveFloor ?X)";
-		} else if (goal_.equals("stack")) {
+		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
-		} else if (goal_.equals("unstack")) {
+		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
 			rules[0] = "(highest ?X) => (moveFloor ?X)";
-		} else if (goal_.equals("clearA")) {
+		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
 		}
