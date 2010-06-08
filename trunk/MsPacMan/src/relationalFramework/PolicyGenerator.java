@@ -41,9 +41,6 @@ public class PolicyGenerator {
 	/** The covering object. */
 	private Covering covering_;
 
-	/** The maximally general rules for each action. */
-	private MultiMap<String, GuidedRule> lggRules_;
-
 	/** The set of covered rules, some which may be LGG, others not. */
 	private MultiMap<String, GuidedRule> coveredRules_;
 
@@ -102,7 +99,6 @@ public class PolicyGenerator {
 		actionSet_ = StateSpec.getInstance().getActions();
 		coveredRules_ = new MultiMap<String, GuidedRule>();
 		covering_ = new Covering(actionSet_.size());
-		lggRules_ = new MultiMap<String, GuidedRule>();
 		mutatedRules_ = new MultiMap<String, GuidedRule>();
 		updateDifference_ = Double.MAX_VALUE;
 
@@ -138,9 +134,9 @@ public class PolicyGenerator {
 
 		// Append the general rules as well (if they aren't already in there) to
 		// ensure unnecessary covering isn't triggered.
-		for (GuidedRule lggRule : lggRules_.values()) {
-			if (!policy.contains(lggRule))
-				policy.addRule(lggRule, false);
+		for (GuidedRule coveredRule : coveredRules_.values()) {
+			if (!policy.contains(coveredRule))
+				policy.addRule(coveredRule, false);
 		}
 
 		return policy;
@@ -179,7 +175,7 @@ public class PolicyGenerator {
 			List<GuidedRule> covered = null;
 			try {
 				covered = covering_.coverState(state, validActions,
-						coveredRules_, lggRules_);
+						coveredRules_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -192,43 +188,26 @@ public class PolicyGenerator {
 					else
 						System.out.println("\tREFINED RULE: " + coveredRule);
 
-					if (debugMode_) {
-						try {
-							System.out.println("Press Enter to continue.");
-							System.in.read();
-							System.in.read();
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
+					String actionPred = StateSpec.splitFact(coveredRule
+							.getAction())[0];
+					if (coveredRule.getSlot() == null) {
+						Slot slot = findSlot(actionPred);
+
+						// Adding the rule to the slot
+						slot.addNewRule(coveredRule, false);
 					}
-				}
 
-				String actionPred = StateSpec
-						.splitFact(coveredRule.getAction())[0];
-				if (coveredRule.getSlot() == null) {
-					Slot slot = findSlot(actionPred);
-
-					// Adding the rule to the slot
-					slot.addNewRule(coveredRule, false);
-				}
-
-				// If the rule is maximally general, mutate and store it
-				// TODO Modify the LGG to simply isCovered, and mutate whenever
-				// it changes. Also have to modify the entire LGG system to just
-				// use covered.
-				if (coveredRule.isLGG()) {
-					if (lggRules_.putContains(actionPred, coveredRule)) {
-						System.out.println("\tLGG RULE FOUND: " + coveredRule);
-
-						// Mutate unless already mutated
-						if (!covering_.isPreGoalSettled(actionPred)) {
-							mutateRule(coveredRule, coveredRule.getSlot(),
-									true, false);
-						}
-					}
-				} else if (createNewRules) {
-					// Add the rule, unless it is already found.
+					// If the rule is maximally general, mutate and store it
 					coveredRules_.putContains(actionPred, coveredRule);
+
+					// Mutate unless already mutated
+					if (!covering_.isPreGoalSettled(actionPred)) {
+						mutateRule(coveredRule, coveredRule.getSlot(), true,
+								false);
+					}
+					
+					// Rules were modified so learning needs to restart.
+					restart_ = true;
 				}
 			}
 
@@ -322,22 +301,24 @@ public class PolicyGenerator {
 							removables.add(gr);
 
 							if (debugMode_) {
-								try {
-									System.out.println("\tREMOVING MUTANT: "
-											+ gr);
-									System.out
-											.println("Press Enter to continue.");
-									System.in.read();
-									System.in.read();
-								} catch (Exception e) {
-									e.printStackTrace();
-								}
+								System.out.println("\tREMOVING MUTANT: " + gr);
 							}
 						}
 					}
 
 					// Setting the restart value.
-					restart_ = !removables.isEmpty();
+					if (!removables.isEmpty()) {
+						restart_ = true;
+						if (debugMode_) {
+							try {
+								System.out.println("Press Enter to continue.");
+								System.in.read();
+								System.in.read();
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					}
 
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
@@ -355,17 +336,21 @@ public class PolicyGenerator {
 				}
 
 				if (debugMode_) {
-					try {
-						System.out.println("\tADDED/EXISTING MUTANT: " + gr);
-						System.out.println("Press Enter to continue.");
-						System.in.read();
-						System.in.read();
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
+					System.out.println("\tADDED/EXISTING MUTANT: " + gr);
+
 				}
 
 				mutatedRules_.putContains(ruleSlot.getAction(), gr);
+			}
+
+			if (debugMode_ && !mutants.isEmpty()) {
+				try {
+					System.out.println("Press Enter to continue.");
+					System.in.read();
+					System.in.read();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
@@ -405,9 +390,9 @@ public class PolicyGenerator {
 			// it, create and remove mutants.
 			for (String action : StateSpec.getInstance().getActions().keySet()) {
 				if (covering_.isPreGoalRecentlyChanged(action)
-						&& lggRules_.containsKey(action)) {
+						&& coveredRules_.containsKey(action)) {
 					boolean settled = covering_.isPreGoalSettled(action);
-					for (GuidedRule general : lggRules_.get(action))
+					for (GuidedRule general : coveredRules_.get(action))
 						mutateRule(general, general.getSlot(), true, settled);
 				}
 			}
@@ -463,10 +448,6 @@ public class PolicyGenerator {
 		// Rules need to have been created at one point
 		if (coveredRules_.isKeysEmpty())
 			return false;
-		// The rules within coveredRules should all be in LGG rules also.
-		if (!coveredRules_.equals(lggRules_)) {
-			return false;
-		}
 		return true;
 	}
 
@@ -516,7 +497,6 @@ public class PolicyGenerator {
 		}
 
 		coveredRules_.clear();
-		lggRules_.clear();
 		mutatedRules_.clear();
 		policyGenerator_.normaliseProbs();
 	}
@@ -605,7 +585,7 @@ public class PolicyGenerator {
 				// Create definite mutants
 				if (rule == null)
 					System.out.println("Problem...");
-				mutateRule(rule, slot, true, true);
+				mutateRule(rule, slot, false, true);
 			}
 		}
 
@@ -682,7 +662,7 @@ public class PolicyGenerator {
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
 			ArrayList<String> internalGoal) {
 		instance_ = new PolicyGenerator();
-		instance_.addLGGRules(policyGenerator.lggRules_);
+		instance_.addCoveredRules(policyGenerator.coveredRules_);
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
 		return instance_;
@@ -765,8 +745,8 @@ public class PolicyGenerator {
 	 * @param lggRules
 	 *            The lgg rules (found previously).
 	 */
-	public void addLGGRules(MultiMap<String, GuidedRule> lggRules) {
-		lggRules_ = new MultiMap<String, GuidedRule>();
+	public void addCoveredRules(MultiMap<String, GuidedRule> lggRules) {
+		coveredRules_ = new MultiMap<String, GuidedRule>();
 		for (String action : lggRules.keySet()) {
 			// Adding the lgg rules to the slots
 			Slot slot = findSlot(action);
@@ -774,7 +754,6 @@ public class PolicyGenerator {
 				rule = (GuidedRule) rule.clone();
 				rule.setSpawned(false);
 				slot.addNewRule(rule, false);
-				lggRules_.put(action, rule);
 				coveredRules_.put(action, rule);
 			}
 		}

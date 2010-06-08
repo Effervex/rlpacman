@@ -26,7 +26,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static final int PLAYER_DELAY = 0;
+	public static int playerDelay_ = 0;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
@@ -63,16 +63,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
 			return 1000000 + "";
-		}
-		if (arg0.equals("freeze")) {
+		} else if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
 			return null;
-		}
-		if (arg0.equals("unfreeze")) {
+		} else if (arg0.equals("unfreeze")) {
 			PolicyGenerator.getInstance().freeze(false);
 			return null;
-		}
-		if ((arg0.length() > 7) && (arg0.substring(0, 6).equals("simple"))) {
+		} else if ((arg0.length() > 7)
+				&& (arg0.substring(0, 6).equals("simple"))) {
 			// PacMan simplified by removing certain aspects of it.
 			String param = arg0.substring(7);
 			StateSpec.reinitInstance(param);
@@ -80,6 +78,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 				model_.noDots_ = true;
 			} else if (param.equals("noPowerDots")) {
 				model_.noPowerDots_ = true;
+			}
+		} else {
+			try {
+				int delay = Integer.parseInt(arg0);
+			} catch (Exception e) {
+
 			}
 		}
 		return null;
@@ -112,7 +116,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
 			if (!environment_.experimentMode_)
-				Thread.sleep(PLAYER_DELAY);
+				Thread.sleep(playerDelay_);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -187,7 +191,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public void resetEnvironment() {
 		boolean noDots = model_.noDots_;
 		boolean noPowerDots = model_.noPowerDots_;
-		
+
 		environment_.reinit();
 
 		model_ = environment_.getGameModel();
@@ -206,7 +210,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		try {
 			rete_.reset();
 			if (!environment_.experimentMode_)
-				Thread.sleep(PLAYER_DELAY);
+				Thread.sleep(playerDelay_);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
