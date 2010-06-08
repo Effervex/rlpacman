@@ -566,14 +566,14 @@ public class GuidedRule {
 		slot_ = slot;
 	}
 
-	public boolean isLGG() {
-		// If the rule has seen enough states, assume it is LGG
-		if (statesSeen_ > SETTLED_RULE_STATES) {
-			lgg_ = true;
-			return true;
-		}
-		return lgg_;
-	}
+//	public boolean isLGG() {
+//		// If the rule has seen enough states, assume it is LGG
+//		if (statesSeen_ > SETTLED_RULE_STATES) {
+//			lgg_ = true;
+//			return true;
+//		}
+//		return lgg_;
+//	}
 
 	public boolean isMutant() {
 		return mutant_;

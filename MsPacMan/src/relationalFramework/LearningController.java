@@ -318,10 +318,6 @@ public class LearningController {
 				// Clear the restart
 				localPolicy.shouldRestart();
 			}
-			
-			// Only need one pass for modular learning.
-			if (!restart && localPolicy.isModuleGenerator())
-				break;
 		}
 	}
 
