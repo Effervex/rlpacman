@@ -60,6 +60,9 @@ public class PolicyTest {
 		params.add("a");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
+		
+		if (Module.loadModule("blocksWorld", "clear&clear") == null)
+			fail("'clear&clear' module doesn't exist!");
 
 		// Rule adding with multiple modular check
 		pol = new Policy();
@@ -91,7 +94,7 @@ public class PolicyTest {
 		pol = new Policy();
 		rule = new GuidedRule("(on a b) => (moveFloor a)");
 		pol.addRule(rule, true);
-		assertEquals(pol.getPolicyRules().size(), 4);
+		assertEquals(pol.getPolicyRules().size(), 6);
 		assertTrue(pol.getPolicyRules().contains(rule));
 		// Clear rules
 		queryParams = new ArrayList<String>();

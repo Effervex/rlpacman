@@ -16,6 +16,8 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
+import sun.reflect.generics.tree.Tree;
+
 /**
  * The cross entropy algorithm implementation.
  * 
@@ -100,8 +102,11 @@ public class LearningController {
 					generatorFile, performanceFile, extraArgsList
 							.toArray(new String[extraArgsList.size()]));
 
-			if ((args.length > 1) && (args[1].equals("-d")))
+			Arrays.sort(args);
+			if (Arrays.binarySearch(args, "-d") >= 0)
 				PolicyGenerator.debugMode_ = true;
+			if (Arrays.binarySearch(args, "-e") >= 0)
+				RLGlue.RL_env_message("-e");
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -214,9 +219,8 @@ public class LearningController {
 	private void developPolicy(PolicyGenerator localPolicy, int run) {
 		PolicyValue bestPolicy = null;
 
-		// Run the preliminary action discovery phase, only starting real
-		// optimisation once pre-goal has settled and LGG rules for each
-		// action have been found.
+		// Run the preliminary action discovery phase, only to create an initial
+		// number of rules.
 		preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
@@ -235,8 +239,8 @@ public class LearningController {
 			List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
 			int expProg = 0;
 			boolean restart = false;
-			estimateETA(experimentStart_, expProg, expProg, run,
-					maxEpisodes_ * population, repetitions_, "experiment");
+			estimateETA(experimentStart_, expProg, expProg, run, maxEpisodes_
+					* population, repetitions_, "experiment");
 			for (int i = 0; i < population; i++) {
 				Policy pol = localPolicy.generatePolicy();
 				System.out.println(pol);
@@ -252,17 +256,17 @@ public class LearningController {
 								.RL_agent_message("internalReward"));
 					else
 						score += RLGlue.RL_return();
-					
+
 					// Check for a restart
 					if (localPolicy.shouldRestart()) {
 						restart = true;
 						break;
 					}
 				}
-				
+
 				if (restart)
 					break;
-				
+
 				score /= AVERAGE_ITERATIONS;
 				System.out.println(score);
 
@@ -278,6 +282,9 @@ public class LearningController {
 				expProg = t * population + i + 1;
 				estimateETA(experimentStart_, expProg, expProg, run,
 						maxEpisodes_ * population, repetitions_, "experiment");
+
+				// Debug - Looking at rule values
+				printRuleWorths(localPolicy);
 			}
 
 			if (!restart) {
@@ -319,6 +326,43 @@ public class LearningController {
 				localPolicy.shouldRestart();
 			}
 		}
+	}
+
+	private void printRuleWorths(PolicyGenerator localPolicy) {
+		System.out.println("\tRULE WORTHS");
+		Comparator<GuidedRule> comp = new Comparator<GuidedRule>() {
+			
+			@Override
+			public int compare(GuidedRule o1, GuidedRule o2) {
+				// Bigger is better
+				if (o1.getInternalMean() > o2.getInternalMean())
+					return -1;
+				if (o1.getInternalMean() < o2.getInternalMean())
+					return 1;
+				// Smaller SD is better
+				if (o1.getInternalSD() < o2.getInternalSD())
+					return -1;
+				if (o1.getInternalSD() > o2.getInternalSD())
+					return 1;
+				// Else, just return a hashcode equality relation
+				if (o1.hashCode() < o2.hashCode())
+					return -1;
+				if (o1.hashCode() > o2.hashCode())
+					return 1;
+				return 0;
+			}
+		};
+		SortedSet<GuidedRule> sortedRules = new TreeSet<GuidedRule>(comp);
+		for (Slot slot : localPolicy.getGenerator()) {
+			for (GuidedRule rule : slot.getGenerator()) {
+				sortedRules.add(rule);
+			}
+		}
+
+		for (GuidedRule rule : sortedRules)
+			System.out.println(StateSpec.getInstance().encodeRule(rule) + ": "
+					+ rule.getInternalMean() + ((char) 177)
+					+ rule.getInternalSD());
 	}
 
 	/**
@@ -451,8 +495,8 @@ public class LearningController {
 	}
 
 	/**
-	 * Run the agent over the environment until pre-goal has settled and lgg
-	 * rules have all been found.
+	 * Run the agent over the environment until we have a single pre goal and
+	 * some rules to work with.
 	 */
 	private void preliminaryProcessing() {
 		while (!PolicyGenerator.getInstance().isSettled(false)) {
@@ -463,6 +507,7 @@ public class LearningController {
 			RLGlue.RL_agent_message("Policy");
 			RLGlue.RL_episode(maxSteps_);
 		}
+		PolicyGenerator.getInstance().shouldRestart();
 	}
 
 	/**

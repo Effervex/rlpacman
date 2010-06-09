@@ -23,6 +23,7 @@ import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
+import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
@@ -34,6 +35,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int[][] distanceGrid_;
 	private SortedSet<Junction> pacJunctions_;
 	private Point gridStart_;
+	private boolean experimentMode_ = false;
 
 	@Override
 	public void env_cleanup() {
@@ -43,7 +45,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	@Override
 	public String env_init() {
 		environment_ = new PacMan();
-		environment_.init();
+		environment_.init(experimentMode_);
 
 		model_ = environment_.getGameModel();
 
@@ -79,9 +81,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 			} else if (param.equals("noPowerDots")) {
 				model_.noPowerDots_ = true;
 			}
+		} else if (arg0.equals("-e")) {
+			// Run the program in experiment mode (No GUI).
+			experimentMode_ = true;
 		} else {
 			try {
 				int delay = Integer.parseInt(arg0);
+				playerDelay_ = delay;
 			} catch (Exception e) {
 
 			}
@@ -99,7 +105,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
-		if (!environment_.experimentMode_) {
+		if (!experimentMode_) {
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
 			environment_.m_topCanvas.repaint();
@@ -115,7 +121,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
-			if (!environment_.experimentMode_)
+			if (!experimentMode_)
 				Thread.sleep(playerDelay_);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -136,7 +142,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
-		if (!environment_.experimentMode_) {
+		if (!experimentMode_) {
 			drawActions(actions.getActions());
 			environment_.m_gameUI.m_bRedrawAll = true;
 			environment_.m_gameUI.repaint();
@@ -209,7 +215,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// watchable for humans.
 		try {
 			rete_.reset();
-			if (!environment_.experimentMode_)
+			if (!experimentMode_)
 				Thread.sleep(playerDelay_);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -231,19 +237,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(ArrayList<List<String>> actions) {
-		String[] actionList = new String[actions.size()];
+	private void drawActions(ArrayList<RuleAction> actions) {
+		ArrayList<String> activeActions = new ArrayList<String>();
 		for (int i = 0; i < actions.size(); i++) {
-			StringBuffer buffer = new StringBuffer("[" + (i + 1) + "]: ");
-			// If the action is null
-			if ((actions.get(i) == null) || (actions.get(i).isEmpty())) {
-				buffer.append("null");
-			} else {
-				buffer.append(actions.get(i));
-			}
-			actionList[i] = buffer.toString();
+			activeActions.add(actions.get(i).toString());
 		}
-		environment_.m_bottomCanvas.setActionsList(actionList);
+		environment_.m_bottomCanvas.setActionsList(activeActions
+				.toArray(new String[activeActions.size()]));
 	}
 
 	/**
@@ -254,7 +254,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            into a weighted singular direction to take.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(ArrayList<List<String>> actions) {
+	private PacManLowAction chooseLowAction(ArrayList<RuleAction> actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		Point blag = new Point();
@@ -276,34 +276,32 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// Run through each action, until a clear singular direction is arrived
 		// upon.
-		for (int i = 0; i < actions.size(); i++) {
+		for (RuleAction ruleAction : actions) {
 			double[] directionVote = new double[PacManLowAction.values().length];
 			double best = 0;
 			double worst = 0;
+
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
-			for (String action : actions.get(i)) {
+			for (String action : ruleAction.getTriggerActions()) {
 				// For each rule, a list of actions are returned
-				// double weighting = 1.0 / (i + 1);
-				if (actions.get(i) != null) {
-					WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
-							.getInstance()).applyAction(action, state);
+				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
+						.getInstance()).applyAction(action, state);
 
-					// Use a linearly decreasing weight and the object proximity
-					double weighting = weightedDir.getWeight();
-					byte dir = (byte) Math.abs(weightedDir.getDirection());
-					// byte oppositeDir = (byte) (((dir % 2) == 1) ? dir + 1 :
-					// dir - 1);
-					if (weightedDir.getDirection() > 0) {
-						directionVote[dir] += weighting;
-					} else if (weightedDir.getDirection() < 0) {
-						directionVote[dir] -= weighting;
-					}
-
-					// Recording best and worst
-					best = Math.max(best, directionVote[dir]);
-					worst = Math.min(worst, directionVote[dir]);
+				// Use a linearly decreasing weight and the object proximity
+				double weighting = weightedDir.getWeight();
+				byte dir = (byte) Math.abs(weightedDir.getDirection());
+				// byte oppositeDir = (byte) (((dir % 2) == 1) ? dir + 1 :
+				// dir - 1);
+				if (weightedDir.getDirection() > 0) {
+					directionVote[dir] += weighting;
+				} else if (weightedDir.getDirection() < 0) {
+					directionVote[dir] -= weighting;
 				}
+
+				// Recording best and worst
+				best = Math.max(best, directionVote[dir]);
+				worst = Math.min(worst, directionVote[dir]);
 			}
 
 			// Normalise the directionVote and remove any directions not

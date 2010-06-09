@@ -26,9 +26,7 @@ public class PacMan {
 	protected AgentInterface agent_;
 	protected PacManKeyAdapter keyAdapter_;
 
-	public boolean experimentMode_ = false;
-
-	public void init() {
+	public void init(boolean experimentMode) {
 		setTicksPerSec(35);
 
 		// Create canvases and layout
@@ -38,7 +36,7 @@ public class PacMan {
 		m_bottomCanvas = new BottomCanvas(this, m_gameModel, 400, 250);
 
 		keyAdapter_ = new PacManKeyAdapter(this);
-		if (!experimentMode_) {
+		if (!experimentMode) {
 			gui_ = new JFrame("Reinforcement Learning Ms. PacMan");
 			
 			GridBagLayout gridBag = new GridBagLayout();
@@ -180,7 +178,7 @@ public class PacMan {
 			tickBeginPlay();
 
 		} else if (m_gameModel.m_state == GameModel.STATE_PLAYING) {
-			tickGamePlay();
+			tickGamePlay(redraw);
 		} else if (m_gameModel.m_state == GameModel.STATE_DEAD_PLAY) {
 			tickDeadPlay();
 		}
@@ -303,16 +301,16 @@ public class PacMan {
 	}
 
 	// Ticked when the game is playing normally
-	public void tickGamePlay() {
+	public void tickGamePlay(boolean redraw) {
 		boolean bFleeing = false;
 		int nCollisionCode;
 
 		// Check if player has earned free life
 		if (m_gameModel.m_player.m_score >= m_gameModel.m_nextFreeUp) {
-			// m_soundMgr.playSound(SoundManager.SOUND_EXTRAPAC);
 			m_gameModel.m_nLives += 1;
 			m_gameModel.m_nextFreeUp += 10000;
-			m_bottomCanvas.repaint();
+			if (redraw)
+				m_bottomCanvas.repaint();
 		}
 
 		// Check for collisions between Things and Pacman
@@ -322,7 +320,6 @@ public class PacMan {
 
 			if (nCollisionCode == 1) // Ghost was eaten
 			{
-				// m_soundMgr.playSound(SoundManager.SOUND_EATGHOST);
 				break; // Must be eaten one tick at a time
 			} else if (nCollisionCode == 2) // Pacman was caught.
 			{
@@ -332,7 +329,6 @@ public class PacMan {
 				return;
 			} else if (nCollisionCode == 3) // Pacman ate a Fruit
 			{
-				// m_soundMgr.playSound(SoundManager.SOUND_EATFRUIT);
 				break; // Must be eaten one tick at a time
 			}
 		}
@@ -350,21 +346,15 @@ public class PacMan {
 			bFleeing |= m_gameModel.m_ghosts[i].isEdible();
 		}
 		// If no fleeing ghosts, then reset the Power Up eat ghost score back to
-		// 200
-		// and kill the BlueGhost loop
+		// 200 and kill the BlueGhost loop
 		if (bFleeing != true) {
 			m_gameModel.m_eatGhostPoints = 200;
-			// m_soundMgr.stopSound(SoundManager.SOUND_GHOSTBLUE);
-			// m_soundMgr.playSound(SoundManager.SOUND_SIREN);
 		}
 
 		if (m_gameModel.m_totalFoodCount == m_gameModel.m_currentFoodCount) {
 			m_gameModel.m_state = GameModel.STATE_LEVELCOMPLETE;
 			m_gameModel.m_nTicks2LevelComp = 0;
 		}
-		// Tick the sound manager (mainly to check if the Chomping loop needs to
-		// be stopped)
-		// m_soundMgr.tickSound();
 
 		m_gameModel.swapModes();
 	}
@@ -593,7 +583,7 @@ public class PacMan {
 		PacMan pacMan = new PacMan();
 
 		// Initialize instance
-		pacMan.init();
+		pacMan.init(false);
 
 		pacMan.start();
 	}
@@ -703,11 +693,6 @@ public class PacMan {
 
 			case KeyEvent.VK_ESCAPE:
 				System.exit(0);
-				break;
-
-			case KeyEvent.VK_SPACE:
-			case KeyEvent.VK_NUMPAD0:
-				m_pacMan.experimentMode_ = !m_pacMan.experimentMode_;
 				break;
 			}
 		}

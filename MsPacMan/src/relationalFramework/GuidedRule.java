@@ -15,10 +15,6 @@ import java.util.regex.Pattern;
  * 
  * @author Sam Sarjant
  */
-/**
- * @author Sam Sarjant
- * 
- */
 public class GuidedRule {
 	/**
 	 * The rule has to see 5 states without changing to be considered
@@ -46,10 +42,6 @@ public class GuidedRule {
 
 	/** If this rule has spawned any mutant rules yet. */
 	private boolean hasSpawned_ = false;
-
-	/** If this rule is a least general generalisation. */
-	// TODO Remove this
-	private boolean lgg_ = false;
 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
@@ -139,7 +131,6 @@ public class GuidedRule {
 	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant,
 			Slot slot) {
 		this(ruleString);
-		lgg_ = maxGeneral;
 		mutant_ = mutant;
 		slot_ = slot;
 	}
@@ -339,7 +330,6 @@ public class GuidedRule {
 			} else {
 				// If no term is in the condition, return false
 				if (!contains) {
-					lgg_ = false;
 					notLGG = true;
 				}
 			}
@@ -353,7 +343,6 @@ public class GuidedRule {
 		if (usedTerms.size() < actionTerms_.size())
 			return -1;
 
-		lgg_ = true;
 		return 1;
 	}
 
@@ -615,7 +604,6 @@ public class GuidedRule {
 	public Object clone() {
 		GuidedRule clone = new GuidedRule(ruleConditions_, ruleAction_, mutant_);
 		clone.hasSpawned_ = hasSpawned_;
-		clone.lgg_ = lgg_;
 		clone.withoutInequals_ = withoutInequals_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
