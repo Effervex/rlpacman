@@ -992,58 +992,68 @@ public class Covering {
 		// premature settling.
 		Set<String> formedActions = new HashSet<String>();
 
-		for (List<String> actions : actionChoice.getActions()) {
-			String actionPred = StateSpec.splitFact(actions.get(0))[0];
+		for (RuleAction ruleAction : actionChoice.getActions()) {
+			String actionPred = ruleAction.getRule().getActionPredicate();
 			// If the state isn't yet settled, try unification
 			if (!isPreGoalSettled(actionPred)) {
 
+				List<String> actions = ruleAction.getUtilisedActions();
+
 				// Create a pre-goal from every action in the actions list.
-				for (String action : actions) {
-					// Inversely substitute the old pregoal state
-					String[] actionSplit = StateSpec.splitFact(action);
-					String[] actionTerms = Arrays.copyOfRange(actionSplit, 1,
-							actionSplit.length);
+				if (actions != null) {
+					for (String action : actions) {
+						// Inversely substitute the old pregoal state
+						String[] actionSplit = StateSpec.splitFact(action);
+						String[] actionTerms = Arrays.copyOfRange(actionSplit,
+								1, actionSplit.length);
 
-					// The actions become constants if possible
-					List<String> newConstants = new ArrayList<String>(constants);
-					List<String> newStateTerms = new ArrayList<String>();
-					for (String actionTerm : actionTerms) {
-						newStateTerms.add(actionTerm);
-						// Ignore numerical terms and terms already added
-						if (!newConstants.contains(actionTerm))
-							newConstants.add(actionTerm);
-					}
-					Collection<String> preGoalStringState = inverselySubstitute(
-							preGoalState, actionTerms, newConstants);
-					removeUselessFacts(preGoalStringState);
-
-					// Unify with the old state
-					PreGoalInformation preGoal = preGoals_.get(actionSplit[0]);
-					if (preGoal == null) {
-						preGoals_.put(actionSplit[0], new PreGoalInformation(
-								(List<String>) preGoalStringState,
-								newStateTerms));
-					} else {
-						// Unify the two states and check if it has changed at
-						// all.
-						int result = unifyStates(preGoal.getState(),
-								preGoalStringState, preGoal.getActionTerms(),
-								newStateTerms);
-
-						// If the states unified, reset the counter, otherwise
-						// increment.
-						if (result == 1) {
-							preGoal.resetInactivity();
-						} else if (result == 0) {
-							if (!formedActions.contains(actionPred))
-								preGoal.incrementInactivity();
-						} else if (result == -1) {
-							throw new RuntimeException(
-									"Pre-goal states did not unify: " + preGoal
-											+ ", " + preGoalStringState);
+						// The actions become constants if possible
+						List<String> newConstants = new ArrayList<String>(
+								constants);
+						List<String> newStateTerms = new ArrayList<String>();
+						for (String actionTerm : actionTerms) {
+							newStateTerms.add(actionTerm);
+							// Ignore numerical terms and terms already added
+							if (!newConstants.contains(actionTerm))
+								newConstants.add(actionTerm);
 						}
+						Collection<String> preGoalStringState = inverselySubstitute(
+								preGoalState, actionTerms, newConstants);
+						removeUselessFacts(preGoalStringState);
 
-						formedActions.add(actionPred);
+						// Unify with the old state
+						PreGoalInformation preGoal = preGoals_
+								.get(actionSplit[0]);
+						if (preGoal == null) {
+							preGoals_.put(actionSplit[0],
+									new PreGoalInformation(
+											(List<String>) preGoalStringState,
+											newStateTerms));
+						} else {
+							// Unify the two states and check if it has changed
+							// at
+							// all.
+							int result = unifyStates(preGoal.getState(),
+									preGoalStringState, preGoal
+											.getActionTerms(), newStateTerms);
+
+							// If the states unified, reset the counter,
+							// otherwise
+							// increment.
+							if (result == 1) {
+								preGoal.resetInactivity();
+							} else if (result == 0) {
+								if (!formedActions.contains(actionPred))
+									preGoal.incrementInactivity();
+							} else if (result == -1) {
+								throw new RuntimeException(
+										"Pre-goal states did not unify: "
+												+ preGoal + ", "
+												+ preGoalStringState);
+							}
+
+							formedActions.add(actionPred);
+						}
 					}
 				}
 			}

@@ -17,7 +17,7 @@ public class ActionChoice {
 	 * The prioritised list of switched actions. Each rule may return a list of
 	 * actions.
 	 */
-	private ArrayList<List<String>> activeActions_;
+	private ArrayList<RuleAction> activeActions_;
 
 	/** The action preds used in this action choice. */
 	private ArrayList<String> actionPreds_;
@@ -26,7 +26,7 @@ public class ActionChoice {
 	 * A constructor for a new ActionChoice, which initialises the action array.
 	 */
 	public ActionChoice() {
-		activeActions_ = new ArrayList<List<String>>();
+		activeActions_ = new ArrayList<RuleAction>();
 		actionPreds_ = new ArrayList<String>();
 	}
 
@@ -36,28 +36,13 @@ public class ActionChoice {
 	 * @param actions
 	 *            The actions being switched on.
 	 */
-	public void switchOn(List<String> actions) {
+	public void switchOn(RuleAction actions) {
 		if ((actions != null) && (!actions.isEmpty())) {
 			activeActions_.add(actions);
-			String pred = StateSpec.splitFact(actions.get(0))[0];
+			String pred = actions.getRule().getActionPredicate();
 			if (!actionPreds_.contains(pred))
 				actionPreds_.add(pred);
 		}
-	}
-
-	/**
-	 * Switches on an action.
-	 * 
-	 * @param action
-	 *            The action being switched on.
-	 */
-	public void switchOn(String action) {
-		ArrayList<String> al = new ArrayList<String>();
-		al.add(action);
-		activeActions_.add(al);
-		String pred = StateSpec.splitFact(action)[0];
-		if (!actionPreds_.contains(pred))
-			actionPreds_.add(pred);
 	}
 
 	/**
@@ -72,7 +57,7 @@ public class ActionChoice {
 	 * 
 	 * @return The list of active actions, of arbitrary length.
 	 */
-	public ArrayList<List<String>> getActions() {
+	public ArrayList<RuleAction> getActions() {
 		return activeActions_;
 	}
 
@@ -82,7 +67,7 @@ public class ActionChoice {
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		for (List<String> actions : activeActions_) {
+		for (RuleAction actions : activeActions_) {
 			buffer.append(actions + "\n");
 		}
 		return buffer.toString();
@@ -105,18 +90,10 @@ public class ActionChoice {
 	}
 
 	public void replaceTerms(Map<String, String> replacements) {
-		for (int i = 0; i < activeActions_.size(); i++) {
-			ArrayList<String> modularActions = new ArrayList<String>();
+		for (RuleAction ruleAction : activeActions_) {
 			// Run through each action in the collection and replace
 			// constants with modular variables.
-			for (String action : activeActions_.get(i)) {
-				for (String constant : replacements.keySet()) {
-					action = action.replaceAll(" " + Pattern.quote(constant)
-							+ "(?=( |\\)))", " " + replacements.get(constant));
-				}
-				modularActions.add(action);
-			}
-			activeActions_.set(i, modularActions);
+			ruleAction.replaceTerms(replacements);
 		}
 	}
 
@@ -125,16 +102,7 @@ public class ActionChoice {
 	 * 
 	 * @return The first list of actions.
 	 */
-	public List<String> getFirstActionList() {
+	public RuleAction getFirstActionList() {
 		return activeActions_.get(0);
-	}
-
-	/**
-	 * Gets the first action.
-	 * 
-	 * @return The very first action.
-	 */
-	public String getFirstAction() {
-		return activeActions_.get(0).get(0);
 	}
 }

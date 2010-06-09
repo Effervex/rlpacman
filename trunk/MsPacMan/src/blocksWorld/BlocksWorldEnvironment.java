@@ -21,6 +21,7 @@ import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
+import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 
 /**
@@ -134,8 +135,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		List<String> actions = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
+		RuleAction ruleAction = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
 				.getFirstActionList();
+		List<String> actions = ruleAction.getTriggerActions();
 		String action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 

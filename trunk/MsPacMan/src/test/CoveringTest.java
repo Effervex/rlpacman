@@ -56,7 +56,6 @@ public class CoveringTest {
 				.generateValidActions(state);
 
 		List<GuidedRule> rules = sut_.coverState(state, validActions,
-				new MultiMap<String, GuidedRule>(),
 				new MultiMap<String, GuidedRule>());
 		assertEquals(rules.size(), 2);
 		for (GuidedRule gr : rules) {
@@ -126,8 +125,7 @@ public class CoveringTest {
 				"(on ?X ?) (above ?X ?) (clear ?X) "
 						+ "(highest ?X) (block ?X) => (moveFloor ?X)"));
 
-		rules = sut_.coverState(state, validActions, existingRules,
-				new MultiMap<String, GuidedRule>());
+		rules = sut_.coverState(state, validActions, existingRules);
 		assertEquals(rules.size(), 1);
 		assertEquals(existingRules.sizeTotal(), 2);
 		for (GuidedRule gr : existingRules.values()) {
@@ -160,11 +158,6 @@ public class CoveringTest {
 			}
 		}
 
-		// Test the rule refinement flag.
-		rules = sut_.coverState(state, validActions, new MultiMap<String, GuidedRule>(),
-				new MultiMap<String, GuidedRule>());
-		assertTrue(rules.isEmpty());
-
 		// Consecutive covering (w/ constants)
 		constants.add("a");
 		constants.add("b");
@@ -184,7 +177,7 @@ public class CoveringTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rules = sut_.coverState(state, validActions, new MultiMap<String, GuidedRule>(),
+		rules = sut_.coverState(state, validActions,
 				new MultiMap<String, GuidedRule>());
 		assertEquals(2, rules.size());
 		existingRules.clear();
@@ -242,8 +235,7 @@ public class CoveringTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rules = sut_.coverState(state, validActions, existingRules,
-				new MultiMap<String, GuidedRule>());
+		rules = sut_.coverState(state, validActions, existingRules);
 		assertEquals(2, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
@@ -299,8 +291,7 @@ public class CoveringTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rules = sut_.coverState(state, validActions, existingRules,
-				new MultiMap<String, GuidedRule>());
+		rules = sut_.coverState(state, validActions, existingRules);
 		assertEquals(2, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
@@ -356,7 +347,7 @@ public class CoveringTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rules = sut_.coverState(state, validActions, new MultiMap<String, GuidedRule>(),
+		rules = sut_.coverState(state, validActions,
 				new MultiMap<String, GuidedRule>());
 		assertEquals(2, rules.size());
 		for (GuidedRule gr : rules) {
@@ -409,8 +400,7 @@ public class CoveringTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rules = sut_.coverState(state, validActions, existingRules,
-				new MultiMap<String, GuidedRule>());
+		rules = sut_.coverState(state, validActions, existingRules);
 		assertEquals(1, rules.size());
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : rules) {

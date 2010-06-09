@@ -87,8 +87,8 @@ public class GameUI extends Canvas {
 		// the
 		// redraw last location of the player or the ghosts
 		for (PowerDot pd : m_gameModel.m_powerdots.values()) {
-			m_redrawHash.put(pd.m_locX + " "
-							+ pd.m_locY, new Point(pd.m_locX, pd.m_locY));
+			m_redrawHash.put(pd.m_locX + " " + pd.m_locY, new Point(pd.m_locX,
+					pd.m_locY));
 		}
 	}
 
@@ -142,8 +142,7 @@ public class GameUI extends Canvas {
 				}
 
 				// Blitz buffer onto screen
-				if (g != null)
-					g.drawImage(m_offImage, 0, 0, this);
+				g.drawImage(m_offImage, 0, 0, this);
 			}
 		} catch (Exception e) {
 			// e.printStackTrace();
@@ -195,8 +194,9 @@ public class GameUI extends Canvas {
 			drawHideoutDoor(m_offGraphics);
 
 			// Draw PacMan Player and Ghosts
-			for (int i = 0; i < m_gameModel.m_things.length; i++)
+			for (int i = 0; i < m_gameModel.m_things.length; i++) {
 				m_gameModel.m_things[i].draw(this, m_offGraphics);
+			}
 
 			// Draw the Ready string (seen right before playing starts)
 			if (m_bDrawReady)
@@ -556,20 +556,18 @@ public class GameUI extends Canvas {
 		g.setColor(wallColor);
 
 		gameCell = m_gameModel.m_gameState[x][y];
-		
-		
 
 		// Treat the Hideout door as a special case because it will
 		// be re-drawn last.
 		if (y == m_gameModel.m_doorLocY && x >= m_gameModel.m_doorLocX - 1
 				&& x <= m_gameModel.m_doorLocX + 2)
 			return;
-		
+
 		// TODO Debug drawing
-//		if (gameCell >= GameModel.PAL_BEND_TOPLEFT) {
-//			g.fillRect(x1, y1, CELL_LENGTH, CELL_LENGTH);
-//			return;
-//		}
+		// if (gameCell >= GameModel.PAL_BEND_TOPLEFT) {
+		// g.fillRect(x1, y1, CELL_LENGTH, CELL_LENGTH);
+		// return;
+		// }
 
 		// If we are in the intro, don't draw any walls.
 		if (m_bShowIntro == true)
@@ -766,7 +764,7 @@ public class GameUI extends Canvas {
 						WALL1 * 2, 180, 90);
 			}
 		}
-		Point location = new Point(x,y);
+		Point location = new Point(x, y);
 		if (m_gameModel.m_dots.get(location) != null) {
 			g.setColor(Color.pink);
 			g.fillOval(x1 + WALL2, y1 + WALL2, WALL1, WALL1);

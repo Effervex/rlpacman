@@ -24,6 +24,8 @@ public class Policy {
 	private List<GuidedRule> policyRules_;
 	/** The triggered rules in the policy */
 	private Set<GuidedRule> triggeredRules_;
+	/** Whether to add rules to the triggered rule set or not. */
+	private boolean noteTriggered_;
 
 	/**
 	 * A constructor for creating a new policy.
@@ -198,6 +200,7 @@ public class Policy {
 			MultiMap<String, String> validActions, ActionChoice actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
+		noteTriggered_ = noteTriggered;
 		actionSwitch.switchOffAll();
 		MultiMap<String, String> activatedActions = new MultiMap<String, String>();
 
@@ -226,9 +229,6 @@ public class Policy {
 
 				// If there is at least one result
 				if (results.next()) {
-					// Only add non-modular rules if we're noting rules.
-					if (!gr.isLoadedModuleRule() && noteTriggered)
-						triggeredRules_.add(gr);
 					List<String> actionsList = new ArrayList<String>();
 
 					// For each possible replacement
@@ -263,15 +263,18 @@ public class Policy {
 
 					// Trim down the action list as it may contain too many
 					// actions
-					if ((actionsFound + actionsList.size()) > actionsReturned) {
-						Collections.shuffle(actionsList);
-						actionsList = actionsList.subList(0, actionsReturned
-								- actionsFound);
+					if (actionsFound < actionsReturned) {
+						if ((actionsFound + actionsList.size()) > actionsReturned) {
+							Collections.shuffle(actionsList);
+							actionsList = actionsList.subList(0,
+									actionsReturned - actionsFound);
+						}
+
+						// Turn on the actions
+						actionSwitch.switchOn(new RuleAction(gr, actionsList,
+								this));
 					}
 					actionsFound += actionsList.size();
-
-					// Turn on the actions
-					actionSwitch.switchOn(actionsList);
 				}
 				results.close();
 			} catch (Exception e) {
@@ -307,5 +310,24 @@ public class Policy {
 		}
 
 		return actionSwitch;
+	}
+
+	/**
+	 * Adds a rule to the set of triggered rules. Some circumstances may forbid
+	 * the rule being added.
+	 * 
+	 * @param rule
+	 *            The rule to be added.
+	 * @return True if the rule was successfully added, or is already present.
+	 *         False if the rule was not allowed to be added.
+	 */
+	protected boolean addTriggeredRule(GuidedRule rule) {
+		// If the rule is a loaded module rule, or the agent isn't noting
+		// triggered rules, return false.
+		if (rule.isLoadedModuleRule() || !noteTriggered_)
+			return false;
+
+		triggeredRules_.add(rule);
+		return true;
 	}
 }
