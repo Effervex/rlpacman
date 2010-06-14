@@ -186,8 +186,9 @@ public class Module {
 	public static void saveModule(ArrayList<String> facts, String environment,
 			ProbabilityDistribution<Slot> generator) {
 		Module newModule = new Module(facts, generator);
-		nonExistantModules_.remove(facts);
-		loadedModules_.put(formName(facts), newModule);
+		String modName = formName(facts);
+		nonExistantModules_.remove(modName);
+		loadedModules_.put(modName, newModule);
 
 		try {
 			File modLocation = new File(MODULE_DIR + File.separatorChar

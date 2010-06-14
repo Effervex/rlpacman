@@ -132,13 +132,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 		environment_.simulateKeyPress(chooseLowAction(actions.getActions())
 				.getKey());
 
-		synchronized (environment_) {
-			int i = 0;
-			while ((i < model_.m_player.m_deltaMax * 2 - 1)
-					|| (!model_.isLearning())) {
-				environment_.tick(false);
-				i++;
-			}
+		int i = 0;
+		while ((i < model_.m_player.m_deltaMax * 2 - 1)
+				|| (!model_.isLearning())) {
+			environment_.tick(false);
+			i++;
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
@@ -223,10 +221,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_.m_state = GameModel.STATE_NEWGAME;
 		environment_.m_gameUI.m_bDrawPaused = false;
 
-		synchronized (environment_) {
-			while (!model_.isLearning()) {
-				environment_.tick(false);
-			}
+		while (!model_.isLearning()) {
+			environment_.tick(false);
 		}
 	}
 
@@ -469,10 +465,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private void distanceAssertions(PacPoint thing, String thingName)
 			throws JessException {
 		if (distanceGrid_[thing.m_locX][thing.m_locY] < Integer.MAX_VALUE / 2)
-			;
-		rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
-				+ " player " + thingName + " "
-				+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
+			rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
+					+ " player " + thingName + " "
+					+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
 	}
 
 	/**

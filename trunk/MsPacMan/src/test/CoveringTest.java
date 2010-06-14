@@ -18,6 +18,8 @@ import relationalFramework.ActionChoice;
 import relationalFramework.Covering;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
+import relationalFramework.Policy;
+import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 
 public class CoveringTest {
@@ -540,7 +542,13 @@ public class CoveringTest {
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 		ActionChoice ac = new ActionChoice();
-		ac.switchOn("(moveFloor a)");
+		List<String> actions = new ArrayList<String>();
+		actions.add("(moveFloor a)");
+		Policy policy = new Policy();
+		RuleAction ra = new RuleAction(new GuidedRule(
+				"(clear a) => (moveFloor a)"), actions, policy);
+		ra.getTriggerActions();
+		ac.switchOn(ra);
 		sut_
 				.formPreGoalState(facts, ac, StateSpec.getInstance()
 						.getConstants());
@@ -554,7 +562,12 @@ public class CoveringTest {
 		state.eval("(assert (clear b))");
 		facts = StateSpec.extractFacts(state);
 		ac = new ActionChoice();
-		ac.switchOn("(moveFloor b)");
+		actions.clear();
+		actions.add("(moveFloor b)");
+		ra = new RuleAction(new GuidedRule("(clear b) => (moveFloor b)"),
+				actions, policy);
+		ra.getTriggerActions();
+		ac.switchOn(ra);
 		sut_
 				.formPreGoalState(facts, ac, StateSpec.getInstance()
 						.getConstants());
@@ -581,7 +594,13 @@ public class CoveringTest {
 		StateSpec.getInstance().generateValidActions(state);
 		facts = StateSpec.extractFacts(state);
 		ac = new ActionChoice();
-		ac.switchOn("(move a b)");
+		actions.clear();
+		actions.add("(move a b)");
+		ra = new RuleAction(
+				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
+				policy);
+		ra.getTriggerActions();
+		ac.switchOn(ra);
 		sut_
 				.formPreGoalState(facts, ac, StateSpec.getInstance()
 						.getConstants());
@@ -618,7 +637,11 @@ public class CoveringTest {
 		StateSpec.getInstance().generateValidActions(state);
 		facts = StateSpec.extractFacts(state);
 		ac = new ActionChoice();
-		ac.switchOn("(move a b)");
+		ra = new RuleAction(
+				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
+				policy);
+		ra.getTriggerActions();
+		ac.switchOn(ra);
 		sut_
 				.formPreGoalState(facts, ac, StateSpec.getInstance()
 						.getConstants());
@@ -634,7 +657,13 @@ public class CoveringTest {
 
 		// Generalising the action
 		ac = new ActionChoice();
-		ac.switchOn("(move b a)");
+		actions.clear();
+		actions.add("(move b a)");
+		ra = new RuleAction(
+				new GuidedRule("(clear a) (clear b) => (move b a)"), actions,
+				policy);
+		ra.getTriggerActions();
+		ac.switchOn(ra);
 		sut_
 				.formPreGoalState(facts, ac, StateSpec.getInstance()
 						.getConstants());

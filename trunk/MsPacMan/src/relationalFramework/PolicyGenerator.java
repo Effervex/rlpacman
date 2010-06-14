@@ -716,6 +716,10 @@ public class PolicyGenerator {
 		return moduleGenerator_;
 	}
 
+	public boolean isSlotOptimiser() {
+		return slotOptimisation_;
+	}
+
 	/**
 	 * If the experiment should restart learning because the rules have changed.
 	 * When this method is called, the restart is no longer active until

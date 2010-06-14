@@ -233,7 +233,7 @@ public class LearningController {
 			}
 
 			// Determine the dynamic population, based on rule-base size
-			int population = determinePopulation();
+			int population = determinePopulation(localPolicy);
 
 			// Forming a population of solutions
 			List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
@@ -264,11 +264,11 @@ public class LearningController {
 					}
 				}
 
-				if (restart)
-					break;
-
 				score /= AVERAGE_ITERATIONS;
 				System.out.println(score);
+				
+				if (restart)
+					break;				
 
 				pol.parameterArgs(null);
 				PolicyValue thisPolicy = new PolicyValue(pol, score);
@@ -284,7 +284,7 @@ public class LearningController {
 						maxEpisodes_ * population, repetitions_, "experiment");
 
 				// Debug - Looking at rule values
-				printRuleWorths(localPolicy);
+				// printRuleWorths(localPolicy);
 			}
 
 			if (!restart) {
@@ -331,7 +331,7 @@ public class LearningController {
 	private void printRuleWorths(PolicyGenerator localPolicy) {
 		System.out.println("\tRULE WORTHS");
 		Comparator<GuidedRule> comp = new Comparator<GuidedRule>() {
-			
+
 			@Override
 			public int compare(GuidedRule o1, GuidedRule o2) {
 				// Bigger is better
@@ -482,11 +482,18 @@ public class LearningController {
 	/**
 	 * Determines the population of rules to use for optimisation.
 	 * 
+	 * @param policyGenerator
+	 *            The policy generator to determine the populations from.
 	 * @return A population of rules, large enough to reasonably test most
 	 *         combinations of rules.
 	 */
-	private int determinePopulation() {
-		// Currently just using 10 * the largest slot
+	private int determinePopulation(PolicyGenerator policyGenerator) {
+		// If the generator is just a slot optimiser, use 50 * slot number
+		if (policyGenerator.isSlotOptimiser()) {
+			return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
+					.size());
+		}
+		// Currently just using 50 * the largest slot
 		int largestSlot = 0;
 		for (Slot slot : PolicyGenerator.getInstance().getGenerator()) {
 			largestSlot = Math.max(largestSlot, slot.getGenerator().size());
