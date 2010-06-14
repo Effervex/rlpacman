@@ -248,19 +248,16 @@ class Ghost extends Thing {
 		// Alter the Ghost's color if Pacman ate a Powerup
 		if (!isEdible()) {
 			g2.setColor(m_color);
-			flashing_ = false;
 		} else {
 			// Check if the Powerup is almost out for this ghost,
 			// if so, flash white.
 			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay) {
-				flashing_ = true;
 				if ((m_nTicks2Flee % (200 / m_gameModel.m_pacMan.m_delay)) < (100 / m_gameModel.m_pacMan.m_delay)) {
 					g2.setColor(Color.WHITE);
 				} else {
 					g2.setColor(Color.BLUE);
 				}
 			} else {
-				flashing_ = false;
 				g2.setColor(Color.BLUE);
 			}
 		}
@@ -475,7 +472,14 @@ class Ghost extends Thing {
 				m_destinationX = -1;
 				m_destinationY = -1;
 			}
-		}
+			
+			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay) {
+				flashing_ = true;
+			} else {
+				flashing_ = false;
+			}
+		} else
+			flashing_ = false;
 
 		// If the ghost is located at the door and is ready to enter because
 		// he was eaten, then let him in.
