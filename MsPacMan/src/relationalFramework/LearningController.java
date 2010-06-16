@@ -564,7 +564,7 @@ public class LearningController {
 			System.out.println(score / AVERAGE_ITERATIONS + "\n");
 
 			System.out.println("For episode test: " + episode);
-			estimateETA(testStart, i + 1, expProg, run, TEST_ITERATIONS, runs,
+			estimateETA(testStart, i + 1, i + 1, 0, TEST_ITERATIONS, 1,
 					"test");
 			System.out.println();
 		}

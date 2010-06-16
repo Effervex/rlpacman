@@ -769,43 +769,6 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Save rules to a file in the format
-	 * 
-	 * @param ruleBaseFile
-	 *            The file to save the rules to.
-	 */
-	public static void saveRulesToFile(File ruleBaseFile) {
-		ProbabilityDistribution<Slot> policyGenerator = PolicyGenerator
-				.getInstance().getGenerator();
-
-		try {
-			if (!ruleBaseFile.exists())
-				ruleBaseFile.createNewFile();
-
-			FileWriter writer = new FileWriter(ruleBaseFile);
-			BufferedWriter bf = new BufferedWriter(writer);
-
-			bf.write(StateSpec.getInstance().getGoalState() + "\n");
-			// For each of the rule bases
-			for (Slot slot : policyGenerator) {
-				// For each of the rules
-				for (GuidedRule r : slot.getGenerator()) {
-					bf.write(StateSpec.getInstance().encodeRule(r)
-							+ RULE_DELIMITER);
-				}
-				bf.write("\n");
-			}
-
-			System.out.println("Random rulebases saved to: " + ruleBaseFile);
-
-			bf.close();
-			writer.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
 	 * Load the rules from a file.
 	 * 
 	 * @param ruleBaseFile
