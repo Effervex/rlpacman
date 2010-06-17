@@ -744,6 +744,20 @@ public class PolicyGenerator {
 	}
 
 	/**
+	 * Checks if a particular rule is present in the policy generator.
+	 * 
+	 * @param gr The rule to check.
+	 * @return True if the rule is contained within the generator.
+	 */
+	public boolean contains(GuidedRule gr) {
+		for (Slot slot : policyGenerator_) {
+			if (slot.getGenerator().contains(gr))
+				return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Adds LGG rules to this generator.
 	 * 
 	 * @param lggRules
