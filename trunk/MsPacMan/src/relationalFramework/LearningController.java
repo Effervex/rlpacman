@@ -16,8 +16,6 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
-import sun.reflect.generics.tree.Tree;
-
 /**
  * The cross entropy algorithm implementation.
  * 
@@ -38,6 +36,8 @@ public class LearningController {
 	private File performanceFile_;
 	/** The folder to store the temp files. */
 	private static final File TEMP_FOLDER = new File("temp/");
+	/** If this controller is using sliding window learning. */
+	private final boolean SLIDING_WINDOW = true;
 
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
@@ -55,6 +55,10 @@ public class LearningController {
 	public static final String INTERNAL_PREFIX = "internal";
 	/** The time that the experiment started. */
 	private long experimentStart_;
+	/** The time at which the learning started */
+	private long learningStartTime_;
+	/** The amount of time the experiment has taken, excluding testing. */
+	private long learningRunTime_ = 0;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
 	/** The maximum number of steps the agent can take. */
@@ -171,6 +175,7 @@ public class LearningController {
 	 */
 	public void runExperiment() {
 		experimentStart_ = System.currentTimeMillis();
+		learningStartTime_ = experimentStart_;
 
 		// Initialise the environment/agent
 		RLGlue.RL_init();
@@ -226,22 +231,38 @@ public class LearningController {
 		// The outer loop, for refinement episode by episode
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
 		int t = 0;
-		while ((t < maxEpisodes_) && (!localPolicy.isConverged())) {
+		// Forming a population of solutions
+		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
+		// Learn for a finite number of episodes, or until it is converged.
+		int finiteNum = 0;
+		if (SLIDING_WINDOW)
+			finiteNum = (int) (maxEpisodes_ / SELECTION_RATIO);
+		else
+			finiteNum = maxEpisodes_;
+
+		while ((t < finiteNum) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
 			}
 
+			int pvsSizeInitial = pvs.size();
+
 			// Determine the dynamic population, based on rule-base size
 			int population = determinePopulation(localPolicy);
 
-			// Forming a population of solutions
-			List<PolicyValue> pvs = new ArrayList<PolicyValue>(population);
-			int expProg = 0;
+			int samples = 0;
+			int maxSamples = population;
+			if (SLIDING_WINDOW) {
+				samples = pvs.size() - pvsSizeInitial;
+				maxSamples = population - pvsSizeInitial;
+			}
+			estimateETA(samples, maxSamples, t, finiteNum, run, repetitions_,
+					experimentStart_, true);
+
 			boolean restart = false;
-			estimateETA(experimentStart_, expProg, expProg, run, maxEpisodes_
-					* population, repetitions_, "experiment");
-			for (int i = 0; i < population; i++) {
+			// Fill the Policy Values list.
+			while (pvs.size() < population) {
 				Policy pol = localPolicy.generatePolicy();
 				System.out.println(pol);
 				// Send the agent a generated policy
@@ -266,9 +287,9 @@ public class LearningController {
 
 				score /= AVERAGE_ITERATIONS;
 				System.out.println(score);
-				
+
 				if (restart)
-					break;				
+					break;
 
 				pol.parameterArgs(null);
 				PolicyValue thisPolicy = new PolicyValue(pol, score);
@@ -279,9 +300,14 @@ public class LearningController {
 					bestPolicy = thisPolicy;
 
 				// Give an ETA
-				expProg = t * population + i + 1;
-				estimateETA(experimentStart_, expProg, expProg, run,
-						maxEpisodes_ * population, repetitions_, "experiment");
+				samples = pvs.size();
+				maxSamples = population;
+				if (SLIDING_WINDOW) {
+					samples = pvs.size() - pvsSizeInitial;
+					maxSamples = population - pvsSizeInitial;
+				}
+				estimateETA(samples, maxSamples, t, finiteNum, run,
+						repetitions_, experimentStart_, true);
 
 				// Debug - Looking at rule values
 				// printRuleWorths(localPolicy);
@@ -291,10 +317,22 @@ public class LearningController {
 				Collections.sort(pvs);
 				// Update the weights for all distributions using only the elite
 				// samples
-				updateWeights(pvs, (int) Math
-						.ceil(population * SELECTION_RATIO));
+				int numElite = (int) Math.ceil(population * SELECTION_RATIO);
+				double alphaUpdate = 1;
+				if (SLIDING_WINDOW)
+					alphaUpdate = STEP_SIZE * SELECTION_RATIO;
+				else
+					alphaUpdate = STEP_SIZE;
+				updateWeights(pvs, numElite, alphaUpdate);
+
+				// Remove the worst policy values
+				if (SLIDING_WINDOW)
+					pvs = pvs.subList(0, pvs.size() - numElite);
+				else
+					pvs.clear();
 
 				// Test the agent and record the performances
+				double expProg = t / finiteNum;
 				episodePerformances.add(testAgent(t, maxSteps_, run,
 						repetitions_, expProg));
 
@@ -322,8 +360,41 @@ public class LearningController {
 				localPolicy.postUpdateOperations();
 
 				t++;
+
 				// Clear the restart
 				localPolicy.shouldRestart();
+			} else {
+				// Instead of starting over, just remove any policies
+				// containing non-existant or recently changed rules.
+				filterPolicyValues(pvs, localPolicy);
+			}
+		}
+	}
+
+	/**
+	 * Filters out any policies containing rules that are no longer in the
+	 * policy generator.
+	 * 
+	 * @param pvs
+	 *            The list of policy values.
+	 */
+	private void filterPolicyValues(List<PolicyValue> pvs,
+			PolicyGenerator localPolicyGenerator) {
+		for (Iterator<PolicyValue> pvIter = pvs.iterator(); pvIter.hasNext();) {
+			PolicyValue pv = pvIter.next();
+			Collection<GuidedRule> policyRules = pv.policy_.getFiringRules();
+			boolean remove = false;
+			// Check each firing rule in the policy.
+			for (GuidedRule gr : policyRules) {
+				if (!localPolicyGenerator.contains(gr)) {
+					remove = true;
+					break;
+				}
+			}
+
+			// If the policy value was to be removed, remove it
+			if (remove) {
+				pvIter.remove();
 			}
 		}
 	}
@@ -533,8 +604,7 @@ public class LearningController {
 	 * @return The average performance of the agent.
 	 */
 	public float testAgent(int episode, int maxSteps, int run, int runs,
-			int expProg) {
-		long testStart = System.currentTimeMillis();
+			double expProg) {
 		System.out.println();
 		System.out.println("Beginning testing for episode " + episode + ".");
 		System.out.println();
@@ -562,11 +632,6 @@ public class LearningController {
 			averageScore += score;
 			pol.parameterArgs(null);
 			System.out.println(score / AVERAGE_ITERATIONS + "\n");
-
-			System.out.println("For episode test: " + episode);
-			estimateETA(testStart, i + 1, i + 1, 0, TEST_ITERATIONS, 1,
-					"test");
-			System.out.println();
 		}
 		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 
@@ -587,6 +652,8 @@ public class LearningController {
 		}
 
 		RLGlue.RL_env_message("unfreeze");
+		
+		learningStartTime_ = System.currentTimeMillis();
 		return averageScore;
 	}
 
@@ -594,12 +661,15 @@ public class LearningController {
 	 * Updates the weights in the probability distributions according to their
 	 * frequency within the 'elite' samples.
 	 * 
-	 * @param iter
-	 *            The iterator over the samples.
 	 * @param numElite
 	 *            The number of samples to form the 'elite' samples.
+	 * @param updateAlpha
+	 *            The amount of update the value changes by.
+	 * @param iter
+	 *            The iterator over the samples.
 	 */
-	private void updateWeights(List<PolicyValue> sortedPolicies, int numElite) {
+	private void updateWeights(List<PolicyValue> sortedPolicies, int numElite,
+			double updateAlpha) {
 		// Keep count of the rules seen (and slots used)
 		Map<Slot, Double> slotCounts = new HashMap<Slot, Double>();
 		Map<GuidedRule, Double> ruleCounts = new HashMap<GuidedRule, Double>();
@@ -607,7 +677,7 @@ public class LearningController {
 
 		// Apply the weights to the distributions
 		PolicyGenerator.getInstance().updateDistributions(numElite, slotCounts,
-				ruleCounts, STEP_SIZE);
+				ruleCounts, updateAlpha);
 	}
 
 	/**
@@ -660,42 +730,64 @@ public class LearningController {
 	}
 
 	/**
-	 * Prints out the percentage complete, time elapsed and estimated time to
-	 * completion.
+	 * Prints out the percentage complete, time elapsed and estimated time
+	 * remaining.
 	 * 
-	 * @param timeStart
-	 *            The start time.
-	 * @param currentProg
-	 *            The current progress.
+	 * @param samples
+	 *            The number of samples obtained before updating.
+	 * @param maxSamples
+	 *            The number of samples required for update.
+	 * @param iteration
+	 *            The current learning iteration of the run.
+	 * @param maxIteration
+	 *            The maximum number of iterations per run.
 	 * @param run
-	 *            The current run number.
-	 * @param totalProg
-	 *            The total amount of progress to cover.
-	 * @param runs
+	 *            The run number.
+	 * @param maxRuns
 	 *            The total number of runs.
+	 * @param startTime
+	 *            The time the experiment was started.
+	 * @param noteLearningTime
+	 *            Whether to note learning time or not.
 	 */
-	private void estimateETA(long timeStart, int currentProg, int expProg,
-			int run, int totalProg, int runs, String stringType) {
-		long elapsedTime = System.currentTimeMillis() - timeStart;
-		double percent = (currentProg * 1.0) / totalProg;
-		double totalPercent = (expProg * 1.0 + run * totalProg)
-				/ (totalProg * runs);
+	private void estimateETA(int samples, int maxSamples, int iteration,
+			int maxIteration, int run, int maxRuns, long startTime,
+			boolean noteLearningTime) {
+		if (noteLearningTime) {
+			learningRunTime_ += System.currentTimeMillis() - learningStartTime_;
+			learningStartTime_ = System.currentTimeMillis();
+		}
 
-		DecimalFormat formatter = new DecimalFormat("#0.000");
-		String percentStr = formatter.format(100 * percent) + "% " + stringType
-				+ " run complete.";
-
-		System.out.println(percentStr);
-		String totalPercentStr = formatter.format(100 * totalPercent) + "% "
-				+ stringType + " complete.";
+		long elapsedTime = System.currentTimeMillis() - startTime;
 		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
 				+ (elapsedTime / (1000 * 60)) % 60 + ":" + (elapsedTime / 1000)
 				% 60;
-		long remainingTime = (long) (elapsedTime / totalPercent - elapsedTime);
-		String remaining = "Remaining: " + remainingTime / (1000 * 60 * 60)
-				+ ":" + (remainingTime / (1000 * 60)) % 60 + ":"
-				+ (remainingTime / 1000) % 60;
-		System.out.println(totalPercentStr + " " + elapsed + ", " + remaining);
+		String learningElapsed = "Learning elapsed: " + learningRunTime_
+				/ (1000 * 60 * 60) + ":" + (learningRunTime_ / (1000 * 60))
+				% 60 + ":" + (learningRunTime_ / 1000) % 60;
+		System.out.println(elapsed + ", " + learningElapsed);
+
+		double percentIterComplete = (1.0 * samples) / maxSamples;
+		double percentRunComplete = (1.0 * iteration + percentIterComplete)
+				/ maxIteration;
+		double totalRunComplete = (1.0 * run + percentRunComplete) / maxRuns;
+
+		DecimalFormat formatter = new DecimalFormat("#0.0000");
+		String percentStr = formatter.format(100 * percentRunComplete)
+				+ "% experiment run complete.";
+		long runRemainingTime = (long) (elapsedTime / percentRunComplete - elapsedTime);
+		String runRemaining = "Remaining: " + runRemainingTime
+				/ (1000 * 60 * 60) + ":" + (runRemainingTime / (1000 * 60))
+				% 60 + ":" + (runRemainingTime / 1000) % 60;
+		System.out.println(percentStr + " " + runRemaining);
+
+		String totalPercentStr = formatter.format(100 * totalRunComplete)
+				+ "% experiment complete.";
+		long totalRemainingTime = (long) (elapsedTime / totalRunComplete - elapsedTime);
+		String totalRemaining = "Remaining: " + totalRemainingTime
+				/ (1000 * 60 * 60) + ":" + (totalRemainingTime / (1000 * 60))
+				% 60 + ":" + (totalRemainingTime / 1000) % 60;
+		System.out.println(totalPercentStr + " " + totalRemaining);
 	}
 
 	/**
