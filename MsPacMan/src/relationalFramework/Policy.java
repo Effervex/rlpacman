@@ -24,6 +24,8 @@ public class Policy {
 	private List<GuidedRule> policyRules_;
 	/** The triggered rules in the policy */
 	private Set<GuidedRule> triggeredRules_;
+	/** The number of rules added to this policy (excluding modular) */
+	private int policySize_;
 	/** Whether to add rules to the triggered rule set or not. */
 	private boolean noteTriggered_;
 
@@ -36,6 +38,7 @@ public class Policy {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
+		policySize_ = 0;
 	}
 
 	/**
@@ -54,6 +57,7 @@ public class Policy {
 			if (checkModular && PolicyGenerator.getInstance().useModules_)
 				checkModular(rule);
 			policyRules_.add(rule);
+			policySize_++;
 		}
 	}
 
@@ -129,6 +133,35 @@ public class Policy {
 	 */
 	public Collection<GuidedRule> getPolicyRules() {
 		return policyRules_;
+	}
+
+	/**
+	 * Returns the size of the policy (number of non-modular rules in it).
+	 * 
+	 * @return The size of the policy.
+	 */
+	public int size() {
+		return policySize_;
+	}
+
+	/**
+	 * Gets the non-modular index of a rule. So the position in the policy
+	 * ignoring modular rules.
+	 * 
+	 * @param rule
+	 *            The rule being searched for.
+	 * @return The index of the rule. No bigger than the policy size.
+	 */
+	public int getNonModularIndex(GuidedRule rule) {
+		int index = 0;
+		for (GuidedRule polRule : policyRules_) {
+			if (!polRule.isLoadedModuleRule()) {
+				if (polRule.equals(rule))
+					return index;
+				index++;
+			}
+		}
+		return -1;
 	}
 
 	/**
