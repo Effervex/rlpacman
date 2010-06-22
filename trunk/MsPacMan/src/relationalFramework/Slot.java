@@ -32,7 +32,8 @@ public class Slot {
 	 */
 	public Slot(String action) {
 		action_ = action;
-		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>();
+		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>(
+				PolicyGenerator.random_);
 	}
 
 	/**

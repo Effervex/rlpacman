@@ -49,8 +49,6 @@ public class LearningController {
 	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
-	/** The minimum value for weight updating. */
-	private static final double MIN_UPDATE = 0.1;
 	/** The internal prefix for messages to the agent regarding internal goal. */
 	public static final String INTERNAL_PREFIX = "internal";
 	/** The time that the experiment started. */
@@ -63,8 +61,6 @@ public class LearningController {
 	private String[] extraArgs_;
 	/** The maximum number of steps the agent can take. */
 	private int maxSteps_;
-	/** If we're using weighted elite samples. */
-	private boolean weightedElites_ = true;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -210,6 +206,9 @@ public class LearningController {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		System.out.println("Total learning time: "
+				+ toTimeFormat(learningRunTime_));
 	}
 
 	/**
@@ -318,12 +317,12 @@ public class LearningController {
 				// Update the weights for all distributions using only the elite
 				// samples
 				int numElite = (int) Math.ceil(population * SELECTION_RATIO);
-				double alphaUpdate = 1;
+				double alphaUpdate = 0;
 				if (SLIDING_WINDOW)
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO;
 				else
 					alphaUpdate = STEP_SIZE;
-				updateWeights(pvs, numElite, alphaUpdate);
+				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
 				// Remove the worst policy values
 				if (SLIDING_WINDOW)
@@ -382,7 +381,7 @@ public class LearningController {
 			PolicyGenerator localPolicyGenerator) {
 		for (Iterator<PolicyValue> pvIter = pvs.iterator(); pvIter.hasNext();) {
 			PolicyValue pv = pvIter.next();
-			Collection<GuidedRule> policyRules = pv.policy_.getFiringRules();
+			Collection<GuidedRule> policyRules = pv.getPolicy().getFiringRules();
 			boolean remove = false;
 			// Check each firing rule in the policy.
 			for (GuidedRule gr : policyRules) {
@@ -652,81 +651,9 @@ public class LearningController {
 		}
 
 		RLGlue.RL_env_message("unfreeze");
-		
+
 		learningStartTime_ = System.currentTimeMillis();
 		return averageScore;
-	}
-
-	/**
-	 * Updates the weights in the probability distributions according to their
-	 * frequency within the 'elite' samples.
-	 * 
-	 * @param numElite
-	 *            The number of samples to form the 'elite' samples.
-	 * @param updateAlpha
-	 *            The amount of update the value changes by.
-	 * @param iter
-	 *            The iterator over the samples.
-	 */
-	private void updateWeights(List<PolicyValue> sortedPolicies, int numElite,
-			double updateAlpha) {
-		// Keep count of the rules seen (and slots used)
-		Map<Slot, Double> slotCounts = new HashMap<Slot, Double>();
-		Map<GuidedRule, Double> ruleCounts = new HashMap<GuidedRule, Double>();
-		countRules(sortedPolicies.subList(0, numElite), slotCounts, ruleCounts);
-
-		// Apply the weights to the distributions
-		PolicyGenerator.getInstance().updateDistributions(numElite, slotCounts,
-				ruleCounts, updateAlpha);
-	}
-
-	/**
-	 * Counts the rules from the elite samples and stores their frequencies and
-	 * total score.
-	 * 
-	 * @param elites
-	 *            The elite samples to iterate through.
-	 * @param slotCounts
-	 *            The counts for the slots
-	 * @param ruleCounts
-	 *            The counts for the individual rules.
-	 * @return The average value of the elite samples.
-	 */
-	private void countRules(List<PolicyValue> elites,
-			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts) {
-		double gradient = 0;
-		double offset = 1;
-		if (weightedElites_) {
-			double diffValues = (elites.get(0).getValue() - elites.get(
-					elites.size() - 1).getValue());
-			if (diffValues != 0)
-				gradient = (1 - MIN_UPDATE) / diffValues;
-			offset = 1 - gradient * elites.get(0).getValue();
-		}
-
-		// Only selecting the top elite samples
-		for (PolicyValue pv : elites) {
-			Policy eliteSolution = pv.getPolicy();
-
-			// Count the occurrences of rules and slots in the policy
-			Collection<GuidedRule> firingRules = eliteSolution.getFiringRules();
-			for (GuidedRule rule : firingRules) {
-				double weight = pv.getValue() * gradient + offset;
-
-				// Slot counts
-				Slot ruleSlot = rule.getSlot();
-				Double count = slotCounts.get(ruleSlot);
-				if (count == null)
-					count = 0d;
-				slotCounts.put(ruleSlot, count + weight);
-
-				// Rule counts
-				count = ruleCounts.get(rule);
-				if (count == null)
-					count = 0d;
-				ruleCounts.put(rule, count + weight);
-			}
-		}
 	}
 
 	/**
@@ -759,12 +686,9 @@ public class LearningController {
 		}
 
 		long elapsedTime = System.currentTimeMillis() - startTime;
-		String elapsed = "Elapsed: " + elapsedTime / (1000 * 60 * 60) + ":"
-				+ (elapsedTime / (1000 * 60)) % 60 + ":" + (elapsedTime / 1000)
-				% 60;
-		String learningElapsed = "Learning elapsed: " + learningRunTime_
-				/ (1000 * 60 * 60) + ":" + (learningRunTime_ / (1000 * 60))
-				% 60 + ":" + (learningRunTime_ / 1000) % 60;
+		String elapsed = "Elapsed: " + toTimeFormat(elapsedTime);
+		String learningElapsed = "Learning elapsed: "
+				+ toTimeFormat(learningRunTime_);
 		System.out.println(elapsed + ", " + learningElapsed);
 
 		double percentIterComplete = (1.0 * samples) / maxSamples;
@@ -776,18 +700,28 @@ public class LearningController {
 		String percentStr = formatter.format(100 * percentRunComplete)
 				+ "% experiment run complete.";
 		long runRemainingTime = (long) (elapsedTime / percentRunComplete - elapsedTime);
-		String runRemaining = "Remaining: " + runRemainingTime
-				/ (1000 * 60 * 60) + ":" + (runRemainingTime / (1000 * 60))
-				% 60 + ":" + (runRemainingTime / 1000) % 60;
+		String runRemaining = "Remaining: " + toTimeFormat(runRemainingTime);
 		System.out.println(percentStr + " " + runRemaining);
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
 		long totalRemainingTime = (long) (elapsedTime / totalRunComplete - elapsedTime);
-		String totalRemaining = "Remaining: " + totalRemainingTime
-				/ (1000 * 60 * 60) + ":" + (totalRemainingTime / (1000 * 60))
-				% 60 + ":" + (totalRemainingTime / 1000) % 60;
+		String totalRemaining = "Remaining: "
+				+ toTimeFormat(totalRemainingTime);
 		System.out.println(totalPercentStr + " " + totalRemaining);
+	}
+
+	/**
+	 * Simple tool for converting long to a string of time.
+	 * 
+	 * @param time
+	 *            The time in millis.
+	 * @return A string representing the time.
+	 */
+	private String toTimeFormat(long time) {
+		String timeString = time / (1000 * 60 * 60) + ":"
+				+ (time / (1000 * 60)) % 60 + ":" + (time / 1000) % 60;
+		return timeString;
 	}
 
 	/**
@@ -942,108 +876,5 @@ public class LearningController {
 
 		controller.runExperiment();
 		System.exit(0);
-	}
-
-	/**
-	 * A simple class for binding a policy and a value together in a comparable
-	 * format. Also updates internal rule worth for rules within the policy.
-	 * 
-	 * @author Samuel J. Sarjant
-	 * 
-	 */
-	private class PolicyValue implements Comparable<PolicyValue> {
-		/** The policy. */
-		private Policy policy_;
-		/** The estimated value of the policy. */
-		private float value_;
-
-		/**
-		 * A constructor for storing the members.
-		 * 
-		 * @param pol
-		 *            The policy.
-		 * @param value
-		 *            The (estimated) value
-		 */
-		public PolicyValue(Policy pol, float value) {
-			policy_ = pol;
-			value_ = value;
-
-			updateInternalRuleValues(pol, value);
-		}
-
-		/**
-		 * Updates the internal rule values for the rules within the policy.
-		 * 
-		 * @param pol
-		 *            The policy with the active rules.
-		 * @param value
-		 *            The value the policy achieved
-		 */
-		private void updateInternalRuleValues(Policy pol, float value) {
-			for (GuidedRule rule : pol.getFiringRules()) {
-				rule.updateInternalValue(value);
-			}
-		}
-
-		/**
-		 * Gets the policy for this policy-value.
-		 * 
-		 * @return The policy.
-		 */
-		public Policy getPolicy() {
-			return policy_;
-		}
-
-		/**
-		 * Gets the value for this policy-value.
-		 * 
-		 * @return The value.
-		 */
-		public float getValue() {
-			return value_;
-		}
-
-		// @Override
-		public int compareTo(PolicyValue o) {
-			if ((o == null) || (!(o instanceof PolicyValue)))
-				return -1;
-			PolicyValue pv = o;
-			// If this value is bigger, it comes first
-			if (value_ > pv.value_) {
-				return -1;
-			} else if (value_ < pv.value_) {
-				// Else it is after
-				return 1;
-			} else {
-				// If all else fails, order by hash code
-				return Float.compare(hashCode(), o.hashCode());
-			}
-		}
-
-		// @Override
-		@Override
-		public boolean equals(Object obj) {
-			if ((obj == null) || (!(obj instanceof PolicyValue)))
-				return false;
-			PolicyValue pv = (PolicyValue) obj;
-			if (value_ == pv.value_) {
-				if (policy_ == pv.policy_) {
-					return true;
-				}
-			}
-			return false;
-		}
-
-		// @Override
-		@Override
-		public int hashCode() {
-			return (int) (value_ * policy_.hashCode());
-		}
-
-		@Override
-		public String toString() {
-			return "Policy Value: " + value_;
-		}
 	}
 }

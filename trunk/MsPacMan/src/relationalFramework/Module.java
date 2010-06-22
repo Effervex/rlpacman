@@ -55,11 +55,11 @@ public class Module {
 	 * 
 	 * @param facts
 	 *            The goal the agent was working towards.
-	 * @param slotDistribution
+	 * @param orderedDistribution
 	 *            The state of the distribution for the agent.
 	 */
 	private Module(ArrayList<String> facts,
-			ProbabilityDistribution<Slot> slotDistribution) {
+			OrderedDistribution<Slot> orderedDistribution) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = formName(facts);
@@ -73,9 +73,9 @@ public class Module {
 
 		// Add the rules by taking the most likely rule from the ordered slots.
 		moduleRules_ = new ArrayList<GuidedRule>();
-		ArrayList<Slot> orderedSlots = slotDistribution.getOrderedElements();
+		List<Slot> orderedSlots = orderedDistribution.getOrderedElements();
 		for (Slot slot : orderedSlots) {
-			GuidedRule rule = slot.getGenerator().getOrderedElements().get(0);
+			GuidedRule rule = slot.getGenerator().sample(true);
 			rule.setAsLoadedModuleRule(true);
 
 			moduleRules_.add(rule);
@@ -180,12 +180,12 @@ public class Module {
 	 *            The goal the module works towards.
 	 * @param environment
 	 *            The environment the module exists within.
-	 * @param generator
+	 * @param orderedDistribution
 	 *            The policy generator which solves the goal.
 	 */
 	public static void saveModule(ArrayList<String> facts, String environment,
-			ProbabilityDistribution<Slot> generator) {
-		Module newModule = new Module(facts, generator);
+			OrderedDistribution<Slot> orderedDistribution) {
+		Module newModule = new Module(facts, orderedDistribution);
 		String modName = formName(facts);
 		nonExistantModules_.remove(modName);
 		loadedModules_.put(modName, newModule);
