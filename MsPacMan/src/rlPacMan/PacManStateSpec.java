@@ -164,7 +164,7 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		for (String rule : rules)
-			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false);
+			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false, false);
 
 		return goodPolicy;
 	}

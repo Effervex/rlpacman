@@ -11,6 +11,8 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	private Policy policy_;
 	/** The estimated value of the policy. */
 	private float value_;
+	/** The iteration this policy value was created at. */
+	private double iteration_;
 
 	/**
 	 * A constructor for storing the members.
@@ -20,9 +22,10 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The (estimated) value
 	 */
-	public PolicyValue(Policy pol, float value) {
+	public PolicyValue(Policy pol, float value, double iteration) {
 		policy_ = pol;
 		value_ = value;
+		iteration_ = iteration;
 
 		updateInternalRuleValues(pol, value);
 	}
@@ -70,10 +73,16 @@ public class PolicyValue implements Comparable<PolicyValue> {
 		} else if (value_ < pv.value_) {
 			// Else it is after
 			return 1;
-		} else {
-			// If all else fails, order by hash code
-			return Float.compare(hashCode(), o.hashCode());
 		}
+		// If the values are equal, the more recent policy value is better to
+		// keep.
+		if (iteration_ < pv.iteration_)
+			return 1;
+		else if (iteration_ > pv.iteration_)
+			return -1;
+		// Otherwise, just compare by hashCode
+		return Float.compare(hashCode(), o.hashCode());
+
 	}
 
 	// @Override
@@ -83,8 +92,9 @@ public class PolicyValue implements Comparable<PolicyValue> {
 			return false;
 		PolicyValue pv = (PolicyValue) obj;
 		if (value_ == pv.value_) {
-			if (policy_ == pv.policy_) {
-				return true;
+			if (policy_.equals(pv.policy_)) {
+				if (iteration_ == pv.iteration_)
+					return true;
 			}
 		}
 		return false;
@@ -93,7 +103,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	// @Override
 	@Override
 	public int hashCode() {
-		return (int) (value_ * policy_.hashCode());
+		return (int) (value_ * policy_.hashCode() * (iteration_ + 165781));
 	}
 
 	@Override

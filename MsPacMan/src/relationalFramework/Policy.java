@@ -22,6 +22,8 @@ public class Policy {
 	public static final char DELIMITER = '#';
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<GuidedRule> policyRules_;
+	/** The LGG rules added to the end of the policy. */
+	private Set<GuidedRule> lggRules_;
 	/** The triggered rules in the policy */
 	private Set<GuidedRule> triggeredRules_;
 	/** The number of rules added to this policy (excluding modular) */
@@ -38,6 +40,7 @@ public class Policy {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
+		lggRules_ = new HashSet<GuidedRule>();
 		policySize_ = 0;
 	}
 
@@ -49,8 +52,10 @@ public class Policy {
 	 *            The rule to be added.
 	 * @param checkModular
 	 *            If we're checking for modular facts.
+	 * @param isLGGRule
+	 *            If the rule being added is an LGG rule added by default.
 	 */
-	public void addRule(GuidedRule rule, boolean checkModular) {
+	public void addRule(GuidedRule rule, boolean checkModular, boolean isLGGRule) {
 		if (!policyRules_.contains(rule)) {
 			// Check if the rule contains constant facts that could invoke
 			// modular rules.
@@ -58,6 +63,8 @@ public class Policy {
 				checkModular(rule);
 			policyRules_.add(rule);
 			policySize_++;
+			if (isLGGRule)
+				lggRules_.add(rule);
 		}
 	}
 
@@ -122,16 +129,39 @@ public class Policy {
 	 * 
 	 * @return The rules that fired in this policy
 	 */
-	public Collection<GuidedRule> getFiringRules() {
+	public Set<GuidedRule> getFiringRules() {
 		return triggeredRules_;
+	}
+
+	/**
+	 * Checks if a rule is an LGG rule added automatically to the end of
+	 * policies. Not necessarily if the rule is an LGG rule, as those can be
+	 * added manually too.
+	 * 
+	 * @param rule
+	 *            The rule being checked.
+	 * @return True if the rule was an automatically added LGG rule.
+	 */
+	public boolean isLGGRule(GuidedRule rule) {
+		return lggRules_.contains(rule);
 	}
 
 	/**
 	 * Gets the rules that this policy is made up of.
 	 * 
+	 * @param excludeModular
+	 *            If excluding the modular rules of the policy.
 	 * @return The rule for the policy.
 	 */
-	public Collection<GuidedRule> getPolicyRules() {
+	public List<GuidedRule> getPolicyRules(boolean excludeModular) {
+		if (excludeModular) {
+			List<GuidedRule> rules = new ArrayList<GuidedRule>();
+			for (GuidedRule gr : policyRules_) {
+				if (!gr.isLoadedModuleRule())
+					rules.add(gr);
+			}
+			return rules;
+		}
 		return policyRules_;
 	}
 
@@ -142,26 +172,6 @@ public class Policy {
 	 */
 	public int size() {
 		return policySize_;
-	}
-
-	/**
-	 * Gets the non-modular index of a rule. So the position in the policy
-	 * ignoring modular rules.
-	 * 
-	 * @param rule
-	 *            The rule being searched for.
-	 * @return The index of the rule. No bigger than the policy size.
-	 */
-	public int getNonModularIndex(GuidedRule rule) {
-		int index = 0;
-		for (GuidedRule polRule : policyRules_) {
-			if (!polRule.isLoadedModuleRule()) {
-				if (polRule.equals(rule))
-					return index;
-				index++;
-			}
-		}
-		return -1;
 	}
 
 	/**
@@ -189,6 +199,52 @@ public class Policy {
 		for (GuidedRule gr : policyRules_) {
 			gr.setParameters(params);
 		}
+	}
+	
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((lggRules_ == null) ? 0 : lggRules_.hashCode());
+		result = prime * result + (noteTriggered_ ? 1231 : 1237);
+		result = prime * result
+				+ ((policyRules_ == null) ? 0 : policyRules_.hashCode());
+		result = prime * result + policySize_;
+		result = prime * result
+				+ ((triggeredRules_ == null) ? 0 : triggeredRules_.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Policy other = (Policy) obj;
+		if (lggRules_ == null) {
+			if (other.lggRules_ != null)
+				return false;
+		} else if (!lggRules_.equals(other.lggRules_))
+			return false;
+		if (noteTriggered_ != other.noteTriggered_)
+			return false;
+		if (policyRules_ == null) {
+			if (other.policyRules_ != null)
+				return false;
+		} else if (!policyRules_.equals(other.policyRules_))
+			return false;
+		if (policySize_ != other.policySize_)
+			return false;
+		if (triggeredRules_ == null) {
+			if (other.triggeredRules_ != null)
+				return false;
+		} else if (!triggeredRules_.equals(other.triggeredRules_))
+			return false;
+		return true;
 	}
 
 	@Override

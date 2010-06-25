@@ -221,6 +221,7 @@ public class LearningController {
 	 *            The run number of the policy.
 	 */
 	private void developPolicy(PolicyGenerator localPolicy, int run) {
+		long runStart = System.currentTimeMillis();
 		PolicyValue bestPolicy = null;
 
 		// Run the preliminary action discovery phase, only to create an initial
@@ -234,10 +235,15 @@ public class LearningController {
 		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
 		// Learn for a finite number of episodes, or until it is converged.
 		int finiteNum = 0;
-		if (SLIDING_WINDOW)
+		// How many steps to wait for testing
+		int testingStep = 1;
+		if (SLIDING_WINDOW) {
 			finiteNum = (int) (maxEpisodes_ / SELECTION_RATIO);
-		else
+			testingStep = (int) (1 / SELECTION_RATIO);
+		} else {
 			finiteNum = maxEpisodes_;
+			testingStep = 1;
+		}
 
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
@@ -257,7 +263,7 @@ public class LearningController {
 				maxSamples = population - pvsSizeInitial;
 			}
 			estimateETA(samples, maxSamples, t, finiteNum, run, repetitions_,
-					experimentStart_, true);
+					runStart, true);
 
 			boolean restart = false;
 			// Fill the Policy Values list.
@@ -291,7 +297,7 @@ public class LearningController {
 					break;
 
 				pol.parameterArgs(null);
-				PolicyValue thisPolicy = new PolicyValue(pol, score);
+				PolicyValue thisPolicy = new PolicyValue(pol, score, t);
 				pvs.add(thisPolicy);
 				// Storing the best policy
 				if ((bestPolicy == null)
@@ -330,10 +336,17 @@ public class LearningController {
 				else
 					pvs.clear();
 
-				// Test the agent and record the performances
-				double expProg = t / finiteNum;
-				episodePerformances.add(testAgent(t, maxSteps_, run,
-						repetitions_, expProg));
+				// Only test the agent every number of steps, otherwise more
+				// time is spent testing than evaluating. (And at the first and
+				// last steps).
+				if (((t + 1) % testingStep == 0) || (t == finiteNum - 1)
+						|| (t == 0)) {
+					// Test the agent and record the performances
+					double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * run))
+							/ repetitions_;
+					episodePerformances.add(testAgent(t, maxSteps_, run,
+							repetitions_, expProg));
+				}
 
 				// Save the results at each episode
 				try {
@@ -381,7 +394,8 @@ public class LearningController {
 			PolicyGenerator localPolicyGenerator) {
 		for (Iterator<PolicyValue> pvIter = pvs.iterator(); pvIter.hasNext();) {
 			PolicyValue pv = pvIter.next();
-			Collection<GuidedRule> policyRules = pv.getPolicy().getFiringRules();
+			Collection<GuidedRule> policyRules = pv.getPolicy()
+					.getFiringRules();
 			boolean remove = false;
 			// Check each firing rule in the policy.
 			for (GuidedRule gr : policyRules) {
@@ -610,9 +624,13 @@ public class LearningController {
 		float averageScore = 0;
 		RLGlue.RL_env_message("freeze");
 
+		long startTime = System.currentTimeMillis();
+
 		// Run the agent through several test iterations, resampling the agent
 		// at each step
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
+			estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
+
 			Policy pol = PolicyGenerator.getInstance().generatePolicy();
 			System.out.println(pol);
 			// Send the agent a generated policy
@@ -654,6 +672,33 @@ public class LearningController {
 
 		learningStartTime_ = System.currentTimeMillis();
 		return averageScore;
+	}
+
+	private void estimateTestTime(int i, int testIterations, double expProg,
+			long startTime) {
+		// Test time elapsed, with static learning time
+		long testElapsedTime = System.currentTimeMillis() - startTime;
+		String elapsed = "Elapsed: " + toTimeFormat(testElapsedTime);
+		String learningElapsed = "Learning elapsed: "
+				+ toTimeFormat(learningRunTime_);
+		System.out.println(elapsed + ", " + learningElapsed);
+
+		// Test percent with ETA for test
+		DecimalFormat formatter = new DecimalFormat("#0.0000");
+		double testProg = (1.0 * i) / testIterations;
+		String percentStr = formatter.format(100 * testProg)
+				+ "% test complete.";
+		long testRemainingTime = (long) (testElapsedTime / testProg - testElapsedTime);
+		System.out.println(percentStr + " Remaining "
+				+ toTimeFormat(testRemainingTime));
+
+		// Experiment percent with ETA for experiment
+		long expElapsedTime = System.currentTimeMillis() - experimentStart_;
+		long totalRemainingTime = (long) (expElapsedTime / expProg - expElapsedTime);
+		String expStr = formatter.format(100 * expProg)
+				+ "% experiment complete.";
+		System.out.println(expStr + " Remaining "
+				+ toTimeFormat(totalRemainingTime));
 	}
 
 	/**
@@ -705,7 +750,7 @@ public class LearningController {
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
-		long totalRemainingTime = (long) (elapsedTime / totalRunComplete - elapsedTime);
+		long totalRemainingTime = (long) (experimentStart_ / totalRunComplete - experimentStart_);
 		String totalRemaining = "Remaining: "
 				+ toTimeFormat(totalRemainingTime);
 		System.out.println(totalPercentStr + " " + totalRemaining);

@@ -95,7 +95,7 @@ public class PolicyGenerator {
 
 	/** The delimiter character between rules within the same rule base. */
 	public static final String RULE_DELIMITER = "@";
-	
+
 	/** The minimum value for weight updating. */
 	private static final double MIN_UPDATE = 0.1;
 
@@ -131,14 +131,14 @@ public class PolicyGenerator {
 					frozen_);
 			GuidedRule gr = slot.getGenerator().sample(false);
 			if (gr != null)
-				policy.addRule(gr, true);
+				policy.addRule(gr, true, false);
 		}
 
 		// Append the general rules as well (if they aren't already in there) to
 		// ensure unnecessary covering isn't triggered.
 		for (GuidedRule coveredRule : coveredRules_.values()) {
 			if (!policy.contains(coveredRule))
-				policy.addRule(coveredRule, false);
+				policy.addRule(coveredRule, false, true);
 		}
 
 		return policy;
@@ -541,13 +541,13 @@ public class PolicyGenerator {
 		if (!slotOptimisation_) {
 			for (Slot slot : slotGenerator_) {
 				double slotCount = 0;
-				if (slotPositions.containsKey(slot))
-					slotCount = slotPositions.get(slot);
+				if (slotCounts.containsKey(slot))
+					slotCount = slotCounts.get(slot);
 				updateDifference_ += slot.getGenerator().updateDistribution(
 						slotCount, ruleCounts, stepSize);
 			}
 		}
-		
+
 		convergedValue_ = stepSize / 10;
 	}
 
@@ -585,33 +585,52 @@ public class PolicyGenerator {
 			Policy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
+			Collection<GuidedRule> policyRules = eliteSolution
+					.getPolicyRules(true);
 			Collection<GuidedRule> firingRules = eliteSolution.getFiringRules();
-			for (GuidedRule rule : firingRules) {
-				// Slot counts
+			int firedRuleIndex = 0;
+			for (GuidedRule rule : policyRules) {
 				Slot ruleSlot = rule.getSlot();
-				Double prevCount = slotCounts.get(ruleSlot);
-				if (prevCount == null)
-					prevCount = 0d;
-				slotCounts.put(ruleSlot, prevCount + weight);
-				Integer prevRawCount = rawSlotCounts.get(ruleSlot);
-				if (prevRawCount == null)
-					prevRawCount = 0;
-				rawSlotCounts.put(ruleSlot, prevRawCount + 1);
+				
+				// If the rule is in the fired rules
+				if (firingRules.contains(rule)) {
+					// Slot counts
+					Double prevCount = slotCounts.get(ruleSlot);
+					if (prevCount == null)
+						prevCount = 0d;
+					slotCounts.put(ruleSlot, prevCount + weight);
+					Integer prevRawCount = rawSlotCounts.get(ruleSlot);
+					if (prevRawCount == null)
+						prevRawCount = 0;
+					rawSlotCounts.put(ruleSlot, prevRawCount + 1);
 
-				// Slot ordering
-				double relValue = OrderedDistribution.getRelativePosition(
-						eliteSolution.getNonModularIndex(rule), eliteSolution
-								.size());
-				Double oldValue = slotPositions.get(ruleSlot);
-				if (oldValue == null)
-					oldValue = 0d;
-				slotPositions.put(ruleSlot, oldValue + relValue);
+					// Slot ordering
+					double relValue = OrderedDistribution.getRelativePosition(
+							firedRuleIndex, eliteSolution.size());
+					Double oldValue = slotPositions.get(ruleSlot);
+					if (oldValue == null)
+						oldValue = 0d;
+					slotPositions.put(ruleSlot, oldValue + relValue);
+					firedRuleIndex++;
 
-				// Rule counts
-				prevCount = ruleCounts.get(rule);
-				if (prevCount == null)
-					prevCount = 0d;
-				ruleCounts.put(rule, prevCount + weight);
+					// Rule counts
+					prevCount = ruleCounts.get(rule);
+					if (prevCount == null)
+						prevCount = 0d;
+					ruleCounts.put(rule, prevCount + weight);
+				} else if (!eliteSolution.isLGGRule(rule)) {
+					// If the rule didn't fire but isn't an automatically added
+					// LGG rule, set its slot position as 1
+					Integer prevRawCount = rawSlotCounts.get(ruleSlot);
+					if (prevRawCount == null)
+						prevRawCount = 0;
+					rawSlotCounts.put(ruleSlot, prevRawCount + 1);
+					
+					Double oldValue = slotPositions.get(ruleSlot);
+					if (oldValue == null)
+						oldValue = 0d;
+					slotPositions.put(ruleSlot, oldValue + 1.0);
+				}
 			}
 		}
 

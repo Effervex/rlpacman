@@ -121,7 +121,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new GuidedRule(parseRule(rules[i])), false);
+			optimal.addRule(new GuidedRule(parseRule(rules[i])), false, false);
 
 		return optimal;
 	}
