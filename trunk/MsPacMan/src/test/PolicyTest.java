@@ -27,17 +27,17 @@ public class PolicyTest {
 		// Basic rule adding
 		Policy pol = new Policy();
 		GuidedRule rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
-		pol.addRule(rule, false);
-		assertEquals(pol.getPolicyRules().size(), 1);
-		assertTrue(pol.getPolicyRules().contains(rule));
+		pol.addRule(rule, false, false);
+		assertEquals(pol.getPolicyRules(false).size(), 1);
+		assertTrue(pol.getPolicyRules(false).contains(rule));
 		assertTrue(pol.getFiringRules().isEmpty());
 
 		// Rule adding with modular check (but no module defined)
 		pol = new Policy();
 		rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
-		pol.addRule(rule, true);
-		assertEquals(pol.getPolicyRules().size(), 1);
-		assertTrue(pol.getPolicyRules().contains(rule));
+		pol.addRule(rule, true, false);
+		assertEquals(pol.getPolicyRules(false).size(), 1);
+		assertTrue(pol.getPolicyRules(false).contains(rule));
 
 		// Check the clear module exists
 		if (Module.loadModule("blocksWorld", "clear") == null)
@@ -48,10 +48,10 @@ public class PolicyTest {
 		// Rule adding with modular check (module fires)
 		pol = new Policy();
 		rule = new GuidedRule("(clear a) => (moveFloor a)");
-		pol.addRule(rule, true);
+		pol.addRule(rule, true, false);
 
-		assertEquals(pol.getPolicyRules().size(), clearRulesNum + 1);
-		assertTrue(pol.getPolicyRules().contains(rule));
+		assertEquals(pol.getPolicyRules(false).size(), clearRulesNum + 1);
+		assertTrue(pol.getPolicyRules(false).contains(rule));
 		List<String> queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
 		GuidedRule modRule = new GuidedRule(
@@ -59,7 +59,7 @@ public class PolicyTest {
 		List<String> params = new ArrayList<String>();
 		params.add("a");
 		modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(modRule));
+		assertTrue(pol.getPolicyRules(false).contains(modRule));
 		
 		if (Module.loadModule("blocksWorld", "clear&clear") == null)
 			fail("'clear&clear' module doesn't exist!");
@@ -67,11 +67,11 @@ public class PolicyTest {
 		// Rule adding with multiple modular check
 		pol = new Policy();
 		rule = new GuidedRule("(clear a) (clear b) => (moveFloor a)");
-		pol.addRule(rule, true);
-		assertEquals(pol.getPolicyRules().size(), clearRulesNum * 2 + 1);
-		assertTrue(pol.getPolicyRules().contains(rule));
+		pol.addRule(rule, true, false);
+		assertEquals(pol.getPolicyRules(false).size(), clearRulesNum * 2 + 1);
+		assertTrue(pol.getPolicyRules(false).contains(rule));
 		int i = 0;
-		for (GuidedRule gr : pol.getPolicyRules()) {
+		for (GuidedRule gr : pol.getPolicyRules(false)) {
 			if (i < clearRulesNum) {
 				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("a"));
@@ -93,9 +93,9 @@ public class PolicyTest {
 		// module calls clear module)
 		pol = new Policy();
 		rule = new GuidedRule("(on a b) => (moveFloor a)");
-		pol.addRule(rule, true);
-		assertEquals(pol.getPolicyRules().size(), 6);
-		assertTrue(pol.getPolicyRules().contains(rule));
+		pol.addRule(rule, true, false);
+		assertEquals(pol.getPolicyRules(false).size(), 6);
+		assertTrue(pol.getPolicyRules(false).contains(rule));
 		// Clear rules
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
@@ -106,11 +106,11 @@ public class PolicyTest {
 		params.add("a");
 		params.add("b");
 		modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(modRule));
+		assertTrue(pol.getPolicyRules(false).contains(modRule));
 		modRule = new GuidedRule(
 				"(above ?X ?_MOD_b) (clear ?X) => (moveFloor ?X)", queryParams);
 		modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(modRule));
+		assertTrue(pol.getPolicyRules(false).contains(modRule));
 		// On rule
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
@@ -122,7 +122,7 @@ public class PolicyTest {
 		params.add("a");
 		params.add("b");
 		modRule.setParameters(params);
-		assertTrue(pol.getPolicyRules().contains(modRule));
+		assertTrue(pol.getPolicyRules(false).contains(modRule));
 	}
 
 	@Test
