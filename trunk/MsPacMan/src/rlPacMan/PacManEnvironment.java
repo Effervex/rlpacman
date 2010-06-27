@@ -4,7 +4,6 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -64,7 +63,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	@Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
-			return 1000000 + "";
+			return 10000 + "";
 		} else if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
 			return null;
