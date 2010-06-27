@@ -144,17 +144,14 @@ public class PacManStateSpec extends StateSpec {
 							+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 			rules
 					.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 5)) "
-							+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
-							+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
+							+ "(pacman ?Player) (powerDot ?PowerDot) "
 							+ "=> (fromPowerDot ?PowerDot ?Dist0)");
 			rules
 					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
 							+ "(pacman ?Player) (ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
 			rules
-					.add("(aggressive ?Ghost) "
-							+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-							+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
-							+ "(pacman ?Player) (ghost ?Ghost) "
+					.add("(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
+							+ "(pacman ?Player) "
 							+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
 			rules
 					.add("(distanceFruit ?Player ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "

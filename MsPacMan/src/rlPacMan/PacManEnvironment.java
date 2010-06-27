@@ -4,6 +4,7 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -233,12 +234,16 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            with possible null elements.
 	 */
 	private void drawActions(ArrayList<RuleAction> actions) {
-		ArrayList<String> activeActions = new ArrayList<String>();
-		for (int i = 0; i < actions.size(); i++) {
-			activeActions.add(actions.get(i).toString());
+		if (!experimentMode_) {
+			ArrayList<String> activeActions = new ArrayList<String>();
+			activeActions.add("Actions:");
+			for (int i = 0; i < actions.size(); i++) {
+				activeActions.add("   "
+						+ actions.get(i).getRule().getActionPredicate());
+			}
+			environment_.m_bottomCanvas.setActionsList(activeActions
+					.toArray(new String[activeActions.size()]));
 		}
-		environment_.m_bottomCanvas.setActionsList(activeActions
-				.toArray(new String[activeActions.size()]));
 	}
 
 	/**
@@ -273,18 +278,25 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// upon.
 		for (RuleAction ruleAction : actions) {
 			double[] directionVote = new double[PacManLowAction.values().length];
+			List<String> actionStrings = ruleAction.getTriggerActions();
+			// Calculate the inverse weight of each action, based on the number
+			// of actions returned.
+			double inverseNumberWeight = 1;
+			if (!actionStrings.isEmpty())
+				inverseNumberWeight = 1.0 / actionStrings.size();
 			double best = 0;
 			double worst = 0;
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
-			for (String action : ruleAction.getTriggerActions()) {
+			for (String action : actionStrings) {
 				// For each rule, a list of actions are returned
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 						.getInstance()).applyAction(action, state);
 
 				// Use a linearly decreasing weight and the object proximity
 				double weighting = weightedDir.getWeight();
+				weighting *= inverseNumberWeight;
 				byte dir = (byte) Math.abs(weightedDir.getDirection());
 				// byte oppositeDir = (byte) (((dir % 2) == 1) ? dir + 1 :
 				// dir - 1);
