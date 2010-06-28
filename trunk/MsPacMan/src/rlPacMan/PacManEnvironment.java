@@ -36,6 +36,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private SortedSet<Junction> pacJunctions_;
 	private Point gridStart_;
 	private boolean experimentMode_ = false;
+	private PacManLowAction lastDirection_;
 
 	@Override
 	public void env_cleanup() {
@@ -221,6 +222,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_.m_state = GameModel.STATE_NEWGAME;
 		environment_.m_gameUI.m_bDrawPaused = false;
 
+		lastDirection_ = PacManLowAction.NOTHING;
+
 		while (!model_.isLearning()) {
 			environment_.tick(false);
 		}
@@ -276,16 +279,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// Run through each action, until a clear singular direction is arrived
 		// upon.
+		int i = 0;
+		double[] directionVote = new double[PacManLowAction.values().length];
+		double best = 0;
+		double worst = 0;
 		for (RuleAction ruleAction : actions) {
-			double[] directionVote = new double[PacManLowAction.values().length];
 			List<String> actionStrings = ruleAction.getTriggerActions();
 			// Calculate the inverse weight of each action, based on the number
 			// of actions returned.
 			double inverseNumberWeight = 1;
 			if (!actionStrings.isEmpty())
 				inverseNumberWeight = 1.0 / actionStrings.size();
-			double best = 0;
-			double worst = 0;
+
+			// Using position within the action list as a weighting influence
+			inverseNumberWeight *= (1.0 * (actions.size() - i))
+					/ actions.size();
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
@@ -298,8 +306,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				double weighting = weightedDir.getWeight();
 				weighting *= inverseNumberWeight;
 				byte dir = (byte) Math.abs(weightedDir.getDirection());
-				// byte oppositeDir = (byte) (((dir % 2) == 1) ? dir + 1 :
-				// dir - 1);
 				if (weightedDir.getDirection() > 0) {
 					directionVote[dir] += weighting;
 				} else if (weightedDir.getDirection() < 0) {
@@ -311,31 +317,48 @@ public class PacManEnvironment implements EnvironmentInterface {
 				worst = Math.min(worst, directionVote[dir]);
 			}
 
-			// Normalise the directionVote and remove any directions not
-			// significantly weighted.
-			ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(
-					directions);
-			for (int d = 0; d < directionVote.length; d++) {
-				directionVote[d] = (directionVote[d] - worst) / (best - worst);
-				// If the vote is less than 1 - # valid directions, then remove
-				// it.
-				if (directionVote[d] <= 1d - inverseDirs)
-					directions.remove(PacManLowAction.values()[d]);
-
-				// Resetting the direction vote
-				directionVote[d] = 0;
-			}
-
-			// If only a single direction left, return
-			if (directions.size() == 1)
-				return directions.get(0);
-
-			if (directions.isEmpty())
-				directions = backupDirections;
+			i++;
 		}
 
-		// Choose the first valid direction available.
-		return directions.get(0);
+		// Normalise the directionVote and remove any directions not
+		// significantly weighted.
+		ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(
+				directions);
+		for (int d = 0; d < directionVote.length; d++) {
+			directionVote[d] = (directionVote[d] - worst) / (best - worst);
+			// If the vote is less than 1 - # valid directions, then remove
+			// it.
+			if (directionVote[d] <= 1d - inverseDirs)
+				directions.remove(PacManLowAction.values()[d]);
+
+			// Resetting the direction vote
+			directionVote[d] = 0;
+		}
+		if (directions.isEmpty())
+			directions = backupDirections;
+		
+		// If only one direction left, use that
+		if (directions.size() == 1) {
+			lastDirection_ = directions.get(0);
+			return directions.get(0);
+		}
+
+		// If possible, continue with the last direction.
+		if (directions.contains(lastDirection_)) {
+			return lastDirection_;
+		}
+		
+		// Otherwise take a direction perpendicular to the last direction.
+		for (PacManLowAction dir : directions) {
+			if (dir != lastDirection_.opposite()) {
+				lastDirection_ = dir;
+				return dir;
+			}
+		}
+		
+		// Or just take the opposite direction.
+		lastDirection_ = lastDirection_.opposite();
+		return lastDirection_;
 	}
 
 	/**
