@@ -38,6 +38,8 @@ public class LearningController {
 	private static final File TEMP_FOLDER = new File("temp/");
 	/** If this controller is using sliding window learning. */
 	private final boolean SLIDING_WINDOW = true;
+	/** If this controller is using cross-entrobeam learning. */
+	private final boolean ENTROBEAM = true;
 
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
@@ -237,7 +239,11 @@ public class LearningController {
 		int finiteNum = 0;
 		// How many steps to wait for testing
 		int testingStep = 1;
-		if (SLIDING_WINDOW) {
+		if (ENTROBEAM) {
+			// TODO Sort this out.
+			finiteNum = (int) (maxEpisodes_ / (SELECTION_RATIO * SELECTION_RATIO));
+			testingStep = (int) (1 / (SELECTION_RATIO * SELECTION_RATIO));
+		} else if (SLIDING_WINDOW) {
 			finiteNum = (int) (maxEpisodes_ / SELECTION_RATIO);
 			testingStep = (int) (1 / SELECTION_RATIO);
 		} else {
@@ -255,6 +261,9 @@ public class LearningController {
 
 			// Determine the dynamic population, based on rule-base size
 			int population = determinePopulation(localPolicy);
+			// If entrobeam, only get the minimum number of samples.
+			if (ENTROBEAM)
+				population = (int) (SELECTION_RATIO * population);
 
 			int samples = 0;
 			int maxSamples = population;
@@ -267,7 +276,7 @@ public class LearningController {
 
 			boolean restart = false;
 			// Fill the Policy Values list.
-			while (pvs.size() < population) {
+			do {
 				Policy pol = localPolicy.generatePolicy();
 				System.out.println(pol);
 				// Send the agent a generated policy
@@ -316,7 +325,7 @@ public class LearningController {
 
 				// Debug - Looking at rule values
 				// printRuleWorths(localPolicy);
-			}
+			} while (pvs.size() < population);
 
 			if (!restart) {
 				Collections.sort(pvs);
@@ -324,14 +333,22 @@ public class LearningController {
 				// samples
 				int numElite = (int) Math.ceil(population * SELECTION_RATIO);
 				double alphaUpdate = 0;
-				if (SLIDING_WINDOW)
+				if (ENTROBEAM) {
+					numElite = population;
+					// TODO Try to use just sliding update param - this one is
+					// REALLY small
+					alphaUpdate = STEP_SIZE * SELECTION_RATIO / population;
+				} else if (SLIDING_WINDOW)
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO;
 				else
 					alphaUpdate = STEP_SIZE;
 				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
 				// Remove the worst policy values
-				if (SLIDING_WINDOW)
+				if (ENTROBEAM) {
+					if (pvs.size() > numElite)
+						pvs = pvs.subList(0, numElite);
+				} else if (SLIDING_WINDOW)
 					pvs = pvs.subList(0, pvs.size() - numElite);
 				else
 					pvs.clear();
@@ -346,26 +363,29 @@ public class LearningController {
 							/ repetitions_;
 					episodePerformances.add(testAgent(t, maxSteps_, run,
 							repetitions_, expProg));
-				}
 
-				// Save the results at each episode
-				try {
-					File tempGen = null;
-					if (PolicyGenerator.getInstance().isModuleGenerator())
-						tempGen = new File(Module.MODULE_DIR + "/"
-								+ TEMP_FOLDER + "/"
-								+ PolicyGenerator.getInstance().getModuleName()
-								+ generatorFile_.getName());
-					else
-						tempGen = new File(TEMP_FOLDER + "/"
-								+ generatorFile_.getName() + run);
-					tempGen.createNewFile();
-					PolicyGenerator.saveGenerators(tempGen);
-					saveBestPolicy(bestPolicy);
-					// Output the episode averages
-					savePerformance(episodePerformances, run);
-				} catch (Exception e) {
-					e.printStackTrace();
+					// Save the results at each episode
+					try {
+						File tempGen = null;
+						if (PolicyGenerator.getInstance().isModuleGenerator())
+							tempGen = new File(Module.MODULE_DIR
+									+ "/"
+									+ TEMP_FOLDER
+									+ "/"
+									+ PolicyGenerator.getInstance()
+											.getModuleName()
+									+ generatorFile_.getName());
+						else
+							tempGen = new File(TEMP_FOLDER + "/"
+									+ generatorFile_.getName() + run);
+						tempGen.createNewFile();
+						PolicyGenerator.saveGenerators(tempGen);
+						saveBestPolicy(bestPolicy);
+						// Output the episode averages
+						savePerformance(episodePerformances, run);
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
 				}
 
 				// Run the post update operations
@@ -586,7 +606,7 @@ public class LearningController {
 	}
 
 	/**
-	 * Run the agent over the environment until we have a single pre goal and
+	 * Run the agent over the environment until we have a single pre-goal and
 	 * some rules to work with.
 	 */
 	private void preliminaryProcessing() {
