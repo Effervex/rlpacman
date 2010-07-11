@@ -4,3 +4,4 @@ rlPacMan.PacMan
 bestPolicy.txt
 generatorOutput.txt
 performance.txt
+"20"

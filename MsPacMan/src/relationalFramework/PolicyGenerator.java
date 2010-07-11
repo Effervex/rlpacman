@@ -438,7 +438,7 @@ public class PolicyGenerator {
 		// Must have at least one pre-goal
 		if (!hasPreGoal())
 			return false;
-		// All pre-goals must be settled (or null)
+		// If checking pregoal, all pre-goals must be settled (or null)
 		if (checkPreGoal) {
 			for (String action : actionSet_.keySet()) {
 				if ((covering_.getPreGoalState(action) != null)

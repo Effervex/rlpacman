@@ -1,4 +1,4 @@
-package blocksWorld;
+package hanoi;
 
 import java.awt.Point;
 import java.util.ArrayList;
@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Stack;
 
 import jess.Rete;
 
@@ -29,55 +30,43 @@ import relationalFramework.StateSpec;
  * 
  * @author Sam Sarjant
  */
-public class BlocksWorldEnvironment implements EnvironmentInterface {
-	/** The constant for multiplying the number of steps the agent can take. */
+public class HanoiEnvironment implements EnvironmentInterface {
+	/** A constant for learning. */
 	public static final int STEP_CONSTANT = 2;
 
-	/** The minimal reward the agent can receive. */
-	private static final float MINIMAL_REWARD = -10;
+	/** The number of towers in the problem. */
+	public static final int NUM_TOWERS = 3;
 
-	/** The number of blocks. Default 5. */
-	private int numBlocks_ = 5;
+	/** The state of the hanoi problem. Start with just 3 towers. */
+	private HanoiState state_;
 
-	/** The state of the blocks world. */
-	private BlocksState state_;
+	/** The number of tiles the tower is made of. */
+	private int numTiles_ = 3;
 
 	/** The state of the blocks world in base predicates. */
 	private Rete rete_;
 
-	/** The blocks contained within the environment. */
-	private Block[] blocks_;
+	/** The number of steps the agent took. */
+	private int steps_ = 0;
 
-	/** The number of steps taken. */
-	private int steps_;
-
-	/** The optimal number of steps for a state to be solved. */
-	private Map<BlocksState, Integer> optimalMap_ = new HashMap<BlocksState, Integer>();
-
-	/** The optimal number of steps. */
-	private int optimalSteps_;
-
-	/** If we're running an optimal agent. */
-	private boolean optimal_ = false;
+	/** The minimum number of optimal steps to solve the environment. */
+	private int optimalSteps_ = 0;
 
 	// @Override
 	public void env_cleanup() {
 		rete_ = null;
 		state_ = null;
-		blocks_ = null;
 	}
 
 	// @Override
 	public String env_init() {
-		// Assign the blocks
-		blocks_ = createBlocks(numBlocks_);
 		return null;
 	}
 
 	// @Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
-			return (numBlocks_ * STEP_CONSTANT + 1) + "";
+			return (numTiles_ * STEP_CONSTANT + 1) + "";
 		if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
 			return null;
@@ -90,10 +79,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			StateSpec.reinitInstance(arg0.substring(5));
 		}
 		try {
-			numBlocks_ = Integer.parseInt(arg0);
-			// Assign the blocks
-			blocks_ = createBlocks(numBlocks_);
-			optimalMap_ = new HashMap<BlocksState, Integer>();
+			numTiles_ = Integer.parseInt(arg0);
 			return null;
 		} catch (Exception e) {
 
@@ -105,34 +91,31 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public Observation env_start() {
 		rete_ = StateSpec.getInstance().getRete();
 		// Generate a random blocks world
-		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
-				.getGoalState());
+		state_ = initialiseHanoi(numTiles_);
 		optimalSteps_ = optimalSteps();
 		if (PolicyGenerator.debugMode_) {
 			System.out.println("\tAgent:\n" + state_);
 		}
 		steps_ = 0;
 
-		return formObs_Start();
+		return formObservation();
 	}
 
 	/**
-	 * Forms the observation for the first step of the experiment.
+	 * Initialises the Hanoi state.
 	 * 
-	 * @return The (useless) observation. The real return is the singleton
-	 *         ObjectObservation.
+	 * @param numTiles
+	 *            The number of tiles in the Hanoi environment.
+	 * @return The Hanoi state with all tiles in one stack on the left.
 	 */
-	private Observation formObs_Start() {
-		Observation obs = new Observation();
-		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		ObjectObservations.getInstance().predicateKB = rete_;
-		return obs;
+	private HanoiState initialiseHanoi(int numTiles) {
+		return new HanoiState(numTiles);
 	}
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		RuleAction ruleAction = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
-				.getFirstActionList();
+		RuleAction ruleAction = ((ActionChoice) ObjectObservations
+				.getInstance().objectArray[0]).getFirstActionList();
 		List<String> actions = ruleAction.getTriggerActions();
 		String action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
@@ -170,6 +153,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				reward, obs, StateSpec.getInstance().isGoal(rete_));
 
 		return rot;
+	}
+	
+	/**
+	 * Form the (useless) observation object and rete object.
+	 * 
+	 * @return The (useless) observation.
+	 */
+	private Observation formObservation() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	/**
@@ -416,77 +409,74 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * 
 	 * @author Samuel J. Sarjant
 	 */
-	public class BlocksState {
-		private Integer[] intState_;
-		public int length;
+	public class HanoiState {
+		private Stack<Character>[] tileState_;
 
-		public BlocksState(Integer[] state) {
-			intState_ = state;
-			length = state.length;
-		}
+		public HanoiState(int numTiles) {
+			// TODO Could just have random start state
+			tileState_ = new Stack[NUM_TOWERS];
+			for (int i = 0; i < NUM_TOWERS; i++) {
+				tileState_[i] = new Stack<Character>();
 
-		public Integer[] getState() {
-			return intState_;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if ((obj != null) && (obj instanceof BlocksState)) {
-				BlocksState other = (BlocksState) obj;
-				if (Arrays.equals(intState_, other.intState_))
-					return true;
+				// Initial tower
+				if (i == 0) {
+					// Place each tile
+					for (int j = numTiles - 1; j >= 0; j--) {
+						char tile = (char) ('a' + j);
+						tileState_[i].push(tile);
+					}
+				}
 			}
-			return false;
 		}
 
-		@Override
-		public int hashCode() {
-			int sum = 0;
-			for (int i = 0; i < intState_.length; i++) {
-				sum += intState_[i] * 6451;
-			}
-			return sum;
-		}
-
-		@Override
-		public BlocksState clone() {
-			Integer[] cloneState = new Integer[intState_.length];
-			for (int i = 0; i < intState_.length; i++) {
-				cloneState[i] = intState_[i];
-			}
-			return new BlocksState(cloneState);
+		public Stack<Character>[] getState() {
+			return tileState_;
 		}
 
 		@Override
 		public String toString() {
-			// The last column of the blocksChars denotes if there is a block in
-			// the row.
-			char[][] blocksChars = new char[numBlocks_ + 1][numBlocks_];
-			Map<Integer, Point> posMap = new HashMap<Integer, Point>();
-			int column = 0;
-			int i = 0;
-			while (posMap.size() < numBlocks_) {
-				column = recursiveBuild(i, intState_, column, posMap,
-						blocksChars);
-				i++;
-			}
+			// Include the opening and closing brackets
+			int maxTileWidth = numTiles_ + 2;
 
-			// Print the char map
+			// Run through the stacks, from the top
 			StringBuffer buffer = new StringBuffer();
-			for (int y = numBlocks_ - 1; y >= 0; y--) {
-				if (blocksChars[numBlocks_][y] == '+') {
-					buffer.append("\t\t");
-					for (int x = 0; x < column; x++) {
-						if (blocksChars[x][y] == 0)
-							buffer.append("   ");
-						else
-							buffer.append("[" + blocksChars[x][y] + "]");
+			for (int n = numTiles_ - 1; n >= 0; n--) {
+				// Maintain a temp buffer - only used if there are any tiles at
+				// this height
+				StringBuffer tempBuffer = new StringBuffer();
+				boolean usedLevel = false;
+				for (int i = 0; i < NUM_TOWERS; i++) {
+					int charCount = 0;
+					if (tileState_[i].size() <= n) {
+						usedLevel = true;
+						tempBuffer.append('[');
+						char tile = tileState_[i].get(n);
+						int tileSize = tile - 'a';
+						tempBuffer.append(tile);
+
+						for (int s = 0; s < tileSize - 1; s++)
+							tempBuffer.append(' ');
+
+						tempBuffer.append(']');
+						charCount += tileSize + 2;
 					}
 
-					if (y != 0)
-						buffer.append("\n");
+					// Add empty space to buffer tiles
+					for (; charCount < maxTileWidth; charCount++)
+						tempBuffer.append(' ');
 				}
+
+				if (usedLevel)
+					buffer.append(tempBuffer + "\n");
 			}
+
+			// Adding the guidelines
+			for (int i = 0; i < NUM_TOWERS; i++) {
+				for (int s = 0; s < maxTileWidth - 1; s++)
+					buffer.append(' ');
+				buffer.append('|');
+			}
+
 			return buffer.toString();
 		}
 
