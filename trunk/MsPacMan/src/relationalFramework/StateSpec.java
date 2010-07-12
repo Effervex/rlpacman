@@ -436,8 +436,8 @@ public abstract class StateSpec {
 	 * @return A string array of the facts.
 	 */
 	public static String[] splitFact(String fact) {
-		Pattern p = Pattern.compile("((?:\\?[-\\w$*=+/<>_#.]+&:\\(.+?\\))"
-				+ "|(?:[-?\\w$*=+/<>_#.]+))(?= |\\)|$)");
+		Pattern p = Pattern.compile("((?:\\?[-\\w$*=+/<>_#.\\p{InGreek}]+&:\\(.+?\\))"
+				+ "|(?:[-?\\w$*=+/<>_#.\\p{InGreek}]+))(?= |\\)|$)");
 		Matcher m = p.matcher(fact);
 		ArrayList<String> matches = new ArrayList<String>();
 		while (m.find())
