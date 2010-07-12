@@ -36,6 +36,7 @@ public class HanoiStateSpec extends StateSpec {
 		// Move action
 		List<Class> structure = new ArrayList<Class>();
 		structure.add(Tile.class);
+		structure.add(Tower.class);
 		structure.add(Tile.class);
 		structure.add(Tower.class);
 		actions.putCollection("move", structure);
@@ -48,12 +49,11 @@ public class HanoiStateSpec extends StateSpec {
 		Map<String, String> bkMap = new HashMap<String, String>();
 
 		// TowerBase -> Tile
-		bkMap.put("towerBaseImplication", "(towerBase ?X) => (tile ?X)");
+		bkMap.put("towerBaseImplication", "(towerBase ?X) => (assert (tile ?X))");
 
 		// Block(Y) & !On(X,Y) -> Clear(Y)
-		bkMap
-				.put("clearRule",
-						"(tile ?Y) (tower ?T) (not (on ?X ?Y ?T)) => (assert (clear ?Y ?T))");
+		bkMap.put("clearTileRule", "(tile ?Y) (tower ?T) (on ?Y ? ?T) (not (on ? ?Y ?T)) "
+				+ "=> (assert (clear ?Y ?T))");
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", "(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))");
@@ -64,22 +64,32 @@ public class HanoiStateSpec extends StateSpec {
 
 		// Smaller(X,Y) rule
 		bkMap.put("smallerRule",
-				"(tile ?X) (tile ?Y&:(< ?X ?Y)) => (assert (smaller ?X ?Y))");
+				"(tile ?X) (not (towerBase ?X)) (tile ?Y&:(< ?X ?Y)) "
+						+ "=> (assert (smaller ?X ?Y))");
 
 		return bkMap;
 	}
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		return "(tower t2) (forall (tile ?X) (not (towerBase ?X)) (on ?X ? t2))";
+		return "(tower t2) (forall (tile ?X) (or (towerBase ?X) (on ?X ? t2)))";
 	}
 
 	@Override
 	protected Policy initialiseOptimalPolicy() {
 		Policy optimal = null;
 
-		// TODO Defining the optimal policy
-		String[] rules = null;
+		// Defining the optimal policy (has to be split for even/odd)
+		String[] rules = new String[3];
+		rules[0] = "(numTiles even) (tile ?X) (notLastMoved ?X) "
+				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
+				+ "(nextTower ?Ta ?Tb) => (move ?X ?Ta ?Y ?Tb)";
+		rules[1] = "(numTiles odd) (tile ?X) (notLastMoved ?X) "
+				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
+				+ "(prevTower ?Ta ?Tb) => (move ?X ?Ta ?Y ?Tb)";
+		rules[2] = "(tile ?X) (notLastMoved ?X) "
+				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
+				+ "=> (move ?X ?Ta ?Y ?Tb)";
 
 		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
@@ -111,22 +121,39 @@ public class HanoiStateSpec extends StateSpec {
 		structure.add(Tile.class);
 		structure.add(Tower.class);
 		predicates.putCollection("above", structure);
-		
+
 		// Smaller predicate
 		structure = new ArrayList<Class>();
 		structure.add(Tile.class);
 		structure.add(Tile.class);
 		predicates.putCollection("smaller", structure);
-		
+
 		// NumTiles predicate
 		structure = new ArrayList<Class>();
 		structure.add(EvenOdd.class);
 		predicates.putCollection("numTiles", structure);
-		
+
 		// LastMoved predicate
 		structure = new ArrayList<Class>();
 		structure.add(Tile.class);
 		predicates.putCollection("lastMoved", structure);
+		
+		// LastMoved predicate
+		structure = new ArrayList<Class>();
+		structure.add(Tile.class);
+		predicates.putCollection("notLastMoved", structure);
+
+		// NextTower predicate
+		structure = new ArrayList<Class>();
+		structure.add(Tower.class);
+		structure.add(Tower.class);
+		predicates.putCollection("nextTower", structure);
+
+		// PrevTower predicate
+		structure = new ArrayList<Class>();
+		structure.add(Tower.class);
+		structure.add(Tower.class);
+		predicates.putCollection("prevTower", structure);
 
 		return predicates;
 	}

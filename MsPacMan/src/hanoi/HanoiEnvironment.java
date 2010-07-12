@@ -37,11 +37,13 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	/** The number of towers in the problem. */
 	public static final int NUM_TOWERS = 3;
 
+	private static final int TOWER_BASE_CHAR_VALUE = 964;
+
 	/** The state of the hanoi problem. Start with just 3 towers. */
 	private HanoiState state_;
 
 	/** The number of tiles the tower is made of. */
-	private int numTiles_ = 3;
+	private int numTiles_ = 4;
 
 	/** The state of the blocks world in base predicates. */
 	private Rete rete_;
@@ -49,8 +51,13 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	/** The number of steps the agent took. */
 	private int steps_ = 0;
 
-	/** The minimum number of optimal steps to solve the environment. */
-	private int optimalSteps_ = 0;
+	/** The maximum number of steps for the agent to complete the task. */
+	private int maxSteps_;
+
+	/** If we're running an optimal agent. */
+	private boolean optimal_ = false;
+
+	private Character lastMoved_ = null;
 
 	// @Override
 	public void env_cleanup() {
@@ -60,13 +67,18 @@ public class HanoiEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public String env_init() {
+		maxSteps(numTiles_);
 		return null;
+	}
+
+	private void maxSteps(int numTiles) {
+		maxSteps_ = (int) (Math.pow(2, numTiles_) - 1) * STEP_CONSTANT + 1;
 	}
 
 	// @Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
-			return (numTiles_ * STEP_CONSTANT + 1) + "";
+			return maxSteps_ + "";
 		if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
 			return null;
@@ -75,11 +87,9 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
-		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
-			StateSpec.reinitInstance(arg0.substring(5));
-		}
 		try {
 			numTiles_ = Integer.parseInt(arg0);
+			maxSteps(numTiles_);
 			return null;
 		} catch (Exception e) {
 
@@ -92,7 +102,12 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		rete_ = StateSpec.getInstance().getRete();
 		// Generate a random blocks world
 		state_ = initialiseHanoi(numTiles_);
-		optimalSteps_ = optimalSteps();
+
+		// Run the optimal policy if it hasn't yet been run
+		if (!PolicyGenerator.getInstance().hasPreGoal()) {
+			optimalSteps();
+		}
+
 		if (PolicyGenerator.debugMode_) {
 			System.out.println("\tAgent:\n" + state_);
 		}
@@ -120,49 +135,103 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		String action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 
-		BlocksState newState = actOnAction(action, state_);
-		if (PolicyGenerator.debugMode_ && !optimal_) {
+		HanoiState newState = actOnAction(action, state_);
+		if (PolicyGenerator.debugMode_) {
 			if (action != null)
 				System.out.println("\t" + action + " ->\n" + newState);
 			else
 				System.out.println("\t\t\tNo action chosen.");
 		}
 
-		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
-			formState(state_.getState());
+			formObservation();
 		} else {
-			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
-					: 0;
 			ObjectObservations.getInstance().setNoPreGoal();
-			return new Reward_observation_terminal(MINIMAL_REWARD
-					+ (excess * -MINIMAL_REWARD) / nonOptimalSteps,
+			return new Reward_observation_terminal(-1 * maxSteps_ - steps_,
 					new Observation(), true);
 		}
 
 		steps_++;
-		ObjectObservations.getInstance().predicateKB = rete_;
 
-		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
-				/ nonOptimalSteps;
-		Reward_observation_terminal rot = new Reward_observation_terminal(
-				reward, obs, StateSpec.getInstance().isGoal(rete_));
+		Reward_observation_terminal rot = new Reward_observation_terminal(-1,
+				obs, StateSpec.getInstance().isGoal(rete_));
 
 		return rot;
 	}
-	
+
 	/**
 	 * Form the (useless) observation object and rete object.
 	 * 
 	 * @return The (useless) observation.
 	 */
 	private Observation formObservation() {
-		// TODO Auto-generated method stub
-		return null;
+		try {
+			rete_.reset();
+
+			// Make the initial observations
+			// Num tiles
+			if (numTiles_ % 2 == 0)
+				rete_.eval("(assert (numTiles even))");
+			else
+				rete_.eval("(assert (numTiles odd))");
+
+			// Towers
+			for (int i = 0; i < NUM_TOWERS; i++) {
+				rete_.eval("(assert (tower t" + i + "))");
+				rete_.eval("(assert (nextTower t" + i + " t"
+						+ ((i + 1) % NUM_TOWERS) + "))");
+				rete_.eval("(assert (prevTower t" + i + " t"
+						+ ((i + NUM_TOWERS - 1) % NUM_TOWERS) + "))");
+			}
+
+			// Tiles
+			Stack<Character>[] state = state_.getState();
+			for (int t = 0; t < state.length; t++) {
+				Stack<Character> tileStack = state[t];
+				for (int i = tileStack.size() - 1; i >= 0; i--) {
+					// On
+					String underneath = null;
+					if (i - 1 >= 0)
+						underneath = tileStack.get(i - 1).toString();
+					else
+						underneath = ((char) TOWER_BASE_CHAR_VALUE) + "" + t;
+
+					rete_.eval("(assert (tile " + tileStack.get(i) + "))");
+					rete_.eval("(assert (on " + tileStack.get(i) + " "
+							+ underneath + " t" + t + "))");
+
+					// Last Moved
+					if ((lastMoved_ != null)
+							&& (tileStack.get(i).equals(lastMoved_))) {
+						rete_.eval("(assert (lastMoved " + tileStack.get(i)
+								+ "))");
+					} else
+						rete_.eval("(assert (notLastMoved " + tileStack.get(i)
+								+ "))");
+				}
+
+				// Tower base
+				rete_.eval("(assert (towerBase " + (char) TOWER_BASE_CHAR_VALUE + "" + t
+						+ "))");
+				if (tileStack.isEmpty())
+					rete_.eval("(assert (clear " + (char) TOWER_BASE_CHAR_VALUE + "" + t
+							+ " t" + t + "))");
+			}
+
+			rete_.run();
+
+			// Adding the valid actions
+			ObjectObservations.getInstance().validActions = StateSpec
+					.getInstance().generateValidActions(rete_);
+			ObjectObservations.getInstance().predicateKB = rete_;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return new Observation();
 	}
 
 	/**
@@ -174,186 +243,36 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private BlocksState actOnAction(String action, BlocksState worldState) {
+	private HanoiState actOnAction(String action, HanoiState worldState) {
 		if (action == null)
 			return worldState;
 
-		Integer[] newState = new Integer[worldState.length];
-
 		String[] split = StateSpec.splitFact(action);
-
-		// Finding the block objects
-		int[] indices = null;
-		if (split[0].equals("move")) {
-			indices = new int[2];
-		} else {
-			indices = new int[1];
-		}
+		
+		HanoiState newState = worldState.clone();
 
 		// Convert the blocks to indices
-		Integer[] stateArray = worldState.getState();
-		for (int i = 0; i < indices.length; i++) {
-			indices[i] = (split[i + 1].charAt(0)) - ('a');
-			// In order to do either action, both blocks must be free
-			for (int j = 0; j < worldState.length; j++) {
-				newState[j] = stateArray[j];
-				// If something is on that index/block, return the unchanged
-				// state
-				if (stateArray[j] - 1 == indices[i])
-					return worldState;
-			}
-		}
-
-		// Perform the action
-		if (indices.length == 1) {
-			newState[indices[0]] = 0;
-		} else if (indices[0] != indices[1]) {
-			newState[indices[0]] = indices[1] + 1;
-		}
-
-		return new BlocksState(newState);
-	}
-
-	/**
-	 * Creates the block terms.
-	 * 
-	 * @param numBlocks
-	 *            The number of blocks.
-	 * @return The blocks array.
-	 */
-	private Block[] createBlocks(int numBlocks) {
-		Block[] blocks = new Block[numBlocks];
-		for (int i = 0; i < numBlocks; i++) {
-			String name = (char) ('a' + i) + "";
-			blocks[i] = new Block(name);
-		}
-
-		return blocks;
-	}
-
-	/**
-	 * Initialises the blocks world to a random, non-goal state.
-	 * 
-	 * @param numBlocks
-	 *            The number of blocks in the world.
-	 * @param goalState
-	 *            The goal state.
-	 * @return The newly initialised blocks world state.
-	 */
-	private BlocksState initialiseWorld(int numBlocks, String goalState) {
-		Random random = PolicyGenerator.random_;
-		Integer[] worldState = new Integer[numBlocks];
-		List<Double> contourState = new ArrayList<Double>();
-		contourState.add(0d);
-		List<Integer> blocksLeft = new ArrayList<Integer>();
-		for (int i = 1; i <= numBlocks; i++) {
-			blocksLeft.add(i);
-		}
-
-		while (!blocksLeft.isEmpty()) {
-			// Get a random block
-			Integer block = blocksLeft
-					.remove(random.nextInt(blocksLeft.size()));
-
-			// Put the block in a random position, influenced by the number of
-			// free blocks.
-			int index = random.nextInt(contourState.size());
-			worldState[block - 1] = contourState.get(index).intValue();
-			if (worldState[block - 1] == 0) {
-				contourState.add(new Double(block));
-			} else {
-				contourState.set(index, new Double(block));
-			}
-		}
-
-		// Check this isn't the goal state
-		formState(worldState);
-		if (StateSpec.getInstance().isGoal(rete_))
-			return initialiseWorld(numBlocks, goalState);
+		Stack<Character>[] stateStacks = newState.getState();
+		int fromIndex = Integer.parseInt(split[2].charAt(1) + "");
+		int toIndex = Integer.parseInt(split[4].charAt(1) + "");
+		Character from = stateStacks[fromIndex].pop();
+		Character to = null;
+		if (!stateStacks[toIndex].isEmpty())
+			to = stateStacks[toIndex].peek();
 		else
-			return new BlocksState(worldState);
-	}
+			to = TOWER_BASE_CHAR_VALUE;
 
-	/**
-	 * Forms the knowledge base of the state using the int array approximation.
-	 * 
-	 * @param worldState
-	 *            The state of the world in int form.
-	 */
-	private void formState(Integer[] worldState) {
-		try {
-			// Clear the old state
-			rete_.reset();
+		// Check the elements add up
+		if ((split[1].charAt(0) == from.charValue())
+				&& (split[3].charAt(0) == to.charValue()))
+			stateStacks[toIndex].push(from);
+		else
+			System.err
+					.println("The action argument doesn't add up to the state.");
+		
+		lastMoved_ = from;
 
-			// Scanning through, making predicates (On, OnFloor, and Highest)
-			int[] heightMap = new int[worldState.length];
-			int maxHeight = 0;
-			List<Block> highestBlocks = new ArrayList<Block>();
-			for (int i = 0; i < worldState.length; i++) {
-				// On the floor
-				if (worldState[i] == 0) {
-					rete_.eval("(assert (onFloor " + blocks_[i].getName()
-							+ "))");
-				} else {
-					// On another block
-					rete_.eval("(assert (on " + blocks_[i].getName() + " "
-							+ blocks_[worldState[i] - 1].getName() + "))");
-				}
-
-				// Finding the heights
-				int blockHeight = heightMap[i];
-				if (blockHeight == 0) {
-					blockHeight = recurseHeight(i, heightMap, worldState);
-				}
-				if (blockHeight > maxHeight) {
-					maxHeight = blockHeight;
-					highestBlocks.clear();
-				}
-				if (blockHeight == maxHeight) {
-					highestBlocks.add(blocks_[i]);
-				}
-
-				// Assert the blocks
-				rete_.eval("(assert (block " + blocks_[i].getName() + "))");
-			}
-
-			// Add the highest block/s
-			for (Block block : highestBlocks) {
-				rete_.eval("(assert (highest " + block.getName() + "))");
-			}
-
-			rete_.run();
-
-			// Adding the valid actions
-			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete_);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Finds the height of a block recursively by following a path. Stores the
-	 * values.
-	 * 
-	 * @param start
-	 *            The starting index to check.
-	 * @param heightMap
-	 *            The stored heightMap.
-	 * @param worldState
-	 *            The state of the world in block links.
-	 * @return The maximum height of the block stack.
-	 */
-	private int recurseHeight(int start, int[] heightMap, Integer[] worldState) {
-		if (worldState[start] == 0) {
-			heightMap[start] = 1;
-			return 1;
-		}
-
-		int below = worldState[start] - 1;
-		recurseHeight(below, heightMap, worldState);
-		heightMap[start] = heightMap[below] + 1;
-		return heightMap[start];
+		return newState;
 	}
 
 	/**
@@ -364,30 +283,18 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	private int optimalSteps() {
 		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
 		steps_ = 0;
-
-		// Check it hasn't already solved the state
-		if (optimalMap_.containsKey(state_)) {
-			// System.out.println("\t\t\tAlready calculated ("
-			// + optimalMap_.get(state_) + ")");
-			return optimalMap_.get(state_);
-		}
-
 		optimal_ = true;
-		BlocksState initialState = state_.clone();
+
 		// Run the policy through the environment until goal is satisfied.
 		PolicyActor optimalAgent = new PolicyActor();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
 		optimalAgent.agent_message("Policy");
-		Action act = optimalAgent.agent_start(formObs_Start());
+		Action act = optimalAgent.agent_start(formObservation());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = env_step(act);
 		while ((rot == null) || (!rot.isTerminal())) {
 			// Check if the optimal policy has already seen this state
-			if (optimalMap_.containsKey(state_)) {
-				steps_ += optimalMap_.get(state_);
-				break;
-			}
 			optimalAgent.agent_step(rot.r, rot.o);
 			rot = env_step(act);
 		}
@@ -397,9 +304,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			optimalAgent.agent_message("formPreGoal");
 
 		// Return the state to normal
-		state_ = initialState;
-		formState(state_.getState());
-		optimalMap_.put(state_, steps_);
+		state_ = new HanoiState(numTiles_);
 		optimal_ = false;
 		return steps_;
 	}
@@ -428,9 +333,25 @@ public class HanoiEnvironment implements EnvironmentInterface {
 				}
 			}
 		}
+		
+		private HanoiState() {
+			tileState_ = new Stack[NUM_TOWERS];
+			for (int i = 0; i < tileState_.length; i++) {
+				tileState_[i] = new Stack<Character>();
+			}
+		}
 
 		public Stack<Character>[] getState() {
 			return tileState_;
+		}
+		
+		public HanoiState clone() {
+			HanoiState clone = new HanoiState();
+			for (int i = 0; i < tileState_.length; i++) {
+				clone.tileState_[i] = (Stack) tileState_[i].clone();
+			}
+			
+			return clone;
 		}
 
 		@Override
@@ -447,11 +368,11 @@ public class HanoiEnvironment implements EnvironmentInterface {
 				boolean usedLevel = false;
 				for (int i = 0; i < NUM_TOWERS; i++) {
 					int charCount = 0;
-					if (tileState_[i].size() <= n) {
+					if (tileState_[i].size() - 1 >= n) {
 						usedLevel = true;
 						tempBuffer.append('[');
 						char tile = tileState_[i].get(n);
-						int tileSize = tile - 'a';
+						int tileSize = tile - 'a' + 1;
 						tempBuffer.append(tile);
 
 						for (int s = 0; s < tileSize - 1; s++)
@@ -472,50 +393,13 @@ public class HanoiEnvironment implements EnvironmentInterface {
 
 			// Adding the guidelines
 			for (int i = 0; i < NUM_TOWERS; i++) {
-				for (int s = 0; s < maxTileWidth - 1; s++)
-					buffer.append(' ');
+				buffer.append((char)TOWER_BASE_CHAR_VALUE + "" + i);
+				for (int s = 2; s < maxTileWidth - 1; s++)
+					buffer.append('-');
 				buffer.append('|');
 			}
 
 			return buffer.toString();
-		}
-
-		/**
-		 * Builds the blocks state recursively.
-		 * 
-		 * @param currBlock
-		 *            The current block index.
-		 * @param blocks
-		 *            The locations of the blocks, in block index form.
-		 * @param column
-		 *            The first empty column
-		 * @param posMap
-		 *            The position mapping for each block.
-		 * @param blocksChars
-		 *            The output character map, with an extra column for
-		 *            denoting if a row has any blocks in it.
-		 * @return The new value of column (same or + 1).
-		 */
-		private int recursiveBuild(int currBlock, Integer[] blocks, int column,
-				Map<Integer, Point> posMap, char[][] blocksChars) {
-			if (!posMap.containsKey(currBlock)) {
-				if (blocks[currBlock] == 0) {
-					posMap.put(currBlock, new Point(column, 0));
-					blocksChars[column][0] = (char) ('a' + currBlock);
-					blocksChars[blocks.length][0] = '+';
-					column++;
-				} else {
-					int underBlock = blocks[currBlock] - 1;
-					column = recursiveBuild(underBlock, blocks, column, posMap,
-							blocksChars);
-					Point pos = new Point(posMap.get(underBlock));
-					pos.y++;
-					posMap.put(currBlock, pos);
-					blocksChars[pos.x][pos.y] = (char) ('a' + currBlock);
-					blocksChars[blocks.length][pos.y] = '+';
-				}
-			}
-			return column;
 		}
 	}
 }

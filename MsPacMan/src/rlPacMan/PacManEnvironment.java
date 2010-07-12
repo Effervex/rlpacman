@@ -356,7 +356,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			}
 		}
 		
-		// Or just take the opposite direction.
+		// Or just take the opposite direction. (Shouldn't get this far...)
 		lastDirection_ = lastDirection_.opposite();
 		return lastDirection_;
 	}
