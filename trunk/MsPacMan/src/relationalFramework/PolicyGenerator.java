@@ -9,12 +9,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jess.Fact;
 import jess.Rete;
@@ -92,9 +93,6 @@ public class PolicyGenerator {
 
 	/** The element delimiter between elements in the generator files. */
 	public static final String ELEMENT_DELIMITER = ",";
-
-	/** The delimiter character between rules within the same rule base. */
-	public static final String RULE_DELIMITER = "@";
 
 	/** The minimum value for weight updating. */
 	private static final double MIN_UPDATE = 0.1;
@@ -591,7 +589,7 @@ public class PolicyGenerator {
 			int firedRuleIndex = 0;
 			for (GuidedRule rule : policyRules) {
 				Slot ruleSlot = rule.getSlot();
-				
+
 				// If the rule is in the fired rules
 				if (firingRules.contains(rule)) {
 					// Slot counts
@@ -625,7 +623,7 @@ public class PolicyGenerator {
 					if (prevRawCount == null)
 						prevRawCount = 0;
 					rawSlotCounts.put(ruleSlot, prevRawCount + 1);
-					
+
 					Double oldValue = slotPositions.get(ruleSlot);
 					if (oldValue == null)
 						oldValue = 0d;
@@ -872,65 +870,6 @@ public class PolicyGenerator {
 	}
 
 	/**
-	 * Load the rules from a file.
-	 * 
-	 * @param ruleBaseFile
-	 *            The file to load the rules from.
-	 * @param actGenerator
-	 *            The actions generator.
-	 * @param condGenerator
-	 *            The conditions generator.
-	 * @return The rules loaded in.
-	 */
-	public static ProbabilityDistribution<Slot> loadRulesFromFile(
-			File ruleBaseFile) {
-		ProbabilityDistribution<Slot> ruleBases = new ProbabilityDistribution<Slot>(
-				random_);
-
-		try {
-			FileReader reader = new FileReader(ruleBaseFile);
-			BufferedReader bf = new BufferedReader(reader);
-
-			// Checking the environment goals match.
-			String input = bf.readLine();
-			if (!input
-					.equals(StateSpec.getInstance().getGoalState().toString())) {
-				System.err
-						.println("Environment goal does not match! Crashing...");
-				return null;
-			}
-
-			// Read in a line of rules, all infering the same slot.
-			while (((input = bf.readLine()) != null) && (!input.equals(""))) {
-				Slot slot = null;
-				// Split the base into rules
-				String[] split = input.split(RULE_DELIMITER);
-				// For each rule, add it to the rulebase
-				for (int i = 0; i < split.length; i++) {
-					String rule = StateSpec.getInstance().parseRule(split[i]);
-					if (slot == null) {
-						slot = new Slot(StateSpec.splitFact(rule
-								.split(StateSpec.INFERS_ACTION)[1].trim())[0]);
-					}
-
-					GuidedRule gr = new GuidedRule(rule, slot);
-					slot.getGenerator().add(gr);
-				}
-				slot.getGenerator().normaliseProbs();
-				ruleBases.add(slot);
-			}
-
-			bf.close();
-			reader.close();
-
-			return ruleBases;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
-
-	/**
 	 * Saves the generators/distributions to file.
 	 * 
 	 * @param output
@@ -938,7 +877,7 @@ public class PolicyGenerator {
 	 * @throws Exception
 	 *             Should something go awry.
 	 */
-	public static void saveGenerators(File output) throws Exception {
+	public void saveGenerators(File output) throws Exception {
 		OrderedDistribution<Slot> policyGenerator = PolicyGenerator
 				.getInstance().getGenerator();
 
@@ -962,7 +901,7 @@ public class PolicyGenerator {
 	 * @param output
 	 *            The file to output the human readable generators to.
 	 */
-	public static void saveHumanGenerators(File output) throws Exception {
+	public void saveHumanGenerators(File output) throws Exception {
 		OrderedDistribution<Slot> policyGenerator = PolicyGenerator
 				.getInstance().getGenerator();
 
@@ -997,33 +936,68 @@ public class PolicyGenerator {
 	 *            The file to load from.
 	 * @return The policy generator to load to.
 	 */
-	public static ProbabilityDistribution<Slot> loadGenerators(File input) {
-		ProbabilityDistribution<Slot> dist = new ProbabilityDistribution<Slot>(
+	public void loadGenerators(File input) {
+		OrderedDistribution<Slot> loadedDist = new OrderedDistribution<Slot>(
 				random_);
+		MultiMap<String, GuidedRule> coveredRules = new MultiMap<String, GuidedRule>();
+
 		try {
 			FileReader reader = new FileReader(input);
 			BufferedReader buf = new BufferedReader(reader);
 
-			// Parse the slots
+			// Parse the slots, line by line
 			String in = null;
 			while ((in = buf.readLine()) != null) {
-				// Get the slot string, ignoring the () brackets
-				String slotString = in.substring(1, in
-						.lastIndexOf(ELEMENT_DELIMITER) - 1);
-				Slot slot = Slot.parseSlotString(slotString);
-				Double prob = Double.parseDouble(in.substring(in
-						.lastIndexOf(ELEMENT_DELIMITER) + 1));
+				// Slot action, rules, and slot ordering
+				// e.g. (move{((on a b) (cat c) => (move c))}),0.6532
+				Pattern p = Pattern
+						.compile("\\((\\w+)" // (move
+						// {((on a b) (cat c) => (move c))}
+								+ "\\{((?:(?:\\(\\(.+?\\) )+=> \\(.+?\\):[\\d.E-]+\\))+)\\}"
+								+ "\\),([\\d.E-]+)"); // ),0.6532
+				Matcher m = p.matcher(in);
 
-				// Parse the rules
-				dist.add(slot, prob);
+				if (m.find()) {
+					// Split the input up
+					Slot slot = new Slot(m.group(1));
+					String rules = m.group(2);
+					Double slotOrder = Double.parseDouble(m.group(3));
+
+					// Add the rules to the slot
+					Pattern rp = Pattern
+							.compile("\\(((?:\\(.+?\\) )+=> \\(.+?\\))" // Rule
+									+ ":([\\d.E-]+)\\)"); // Rule Prob
+					Matcher rm = rp.matcher(rules);
+					boolean firstCoveredRule = true;
+					while (m.find()) {
+						GuidedRule rule = new GuidedRule(StateSpec
+								.getInstance().parseRule(rm.group(1)));
+						Double ruleProb = Double.parseDouble(rm.group(2));
+						
+						slot.addRule(rule, ruleProb);
+						
+						if (firstCoveredRule)
+							coveredRules.put(slot.getAction(), rule);
+						firstCoveredRule = false;
+					}
+
+					// Add the slot to the distribution.
+					loadedDist.add(slot, slotOrder);
+				} else {
+					System.err
+							.println("Error parsing generator file. Not loading generator.");
+				}
 			}
 
 			buf.close();
 			reader.close();
 		} catch (Exception e) {
+			System.err
+					.println("Error parsing generator file. Not loading generator.");
 			e.printStackTrace();
 		}
-
-		return dist;
+		
+		slotGenerator_ = loadedDist;
+		coveredRules_ = coveredRules;
 	}
 }

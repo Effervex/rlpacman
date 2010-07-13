@@ -59,6 +59,20 @@ public class Slot {
 	}
 
 	/**
+	 * Adds a rule to the slot with a set probability. Used when loading
+	 * existing generators.
+	 * 
+	 * @param guidedRule
+	 *            The rule being loaded.
+	 * @param ruleProb
+	 *            The probability of the rule.
+	 */
+	public void addRule(GuidedRule guidedRule, double ruleProb) {
+		ruleGenerator_.add(guidedRule, ruleProb);
+		guidedRule.setSlot(this);
+	}
+
+	/**
 	 * Adds a new rule to the slot with an given probability of being selected.
 	 * 
 	 * @param guidedRule

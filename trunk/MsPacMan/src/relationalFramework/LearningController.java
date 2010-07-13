@@ -104,11 +104,20 @@ public class LearningController {
 					generatorFile, performanceFile, extraArgsList
 							.toArray(new String[extraArgsList.size()]));
 
-			Arrays.sort(args);
-			if (Arrays.binarySearch(args, "-d") >= 0)
-				PolicyGenerator.debugMode_ = true;
-			if (Arrays.binarySearch(args, "-e") >= 0)
-				RLGlue.RL_env_message("-e");
+			for (int i = 1; i < args.length; i++) {
+				if (args[i].equals("-d"))
+					// Enable debug mode
+					PolicyGenerator.debugMode_ = true;
+				else if (args[i].equals("-e"))
+					// Set the environment to experiment mode
+					RLGlue.RL_env_message("-e");
+				else if (args[i].equals("-g")) {
+					// Load a generator file
+					i++;
+					File loadedGenerator = new File(args[i]);
+					PolicyGenerator.getInstance().loadGenerators(loadedGenerator);
+				}
+			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -379,7 +388,7 @@ public class LearningController {
 							tempGen = new File(TEMP_FOLDER + "/"
 									+ generatorFile_.getName() + run);
 						tempGen.createNewFile();
-						PolicyGenerator.saveGenerators(tempGen);
+						PolicyGenerator.getInstance().saveGenerators(tempGen);
 						saveBestPolicy(bestPolicy);
 						// Output the episode averages
 						savePerformance(episodePerformances, run);
@@ -683,7 +692,7 @@ public class LearningController {
 				output = new File(TEMP_FOLDER + "/"
 						+ humanGeneratorFile_.getName() + run);
 			output.createNewFile();
-			PolicyGenerator.saveHumanGenerators(output);
+			PolicyGenerator.getInstance().saveHumanGenerators(output);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
