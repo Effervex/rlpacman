@@ -63,6 +63,8 @@ public class LearningController {
 	private String[] extraArgs_;
 	/** The maximum number of steps the agent can take. */
 	private int maxSteps_;
+	/** The generator file to load. */
+	private File loadedGeneratorFile_;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -114,8 +116,7 @@ public class LearningController {
 				else if (args[i].equals("-g")) {
 					// Load a generator file
 					i++;
-					File loadedGenerator = new File(args[i]);
-					PolicyGenerator.getInstance().loadGenerators(loadedGenerator);
+					loadedGeneratorFile_ = new File(args[i]);
 				}
 			}
 
@@ -199,6 +200,8 @@ public class LearningController {
 		for (; run < repetitions_; run++) {
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
+			if (loadedGeneratorFile_ != null)
+				localPolicy.loadGenerators(loadedGeneratorFile_);
 
 			developPolicy(localPolicy, run);
 
