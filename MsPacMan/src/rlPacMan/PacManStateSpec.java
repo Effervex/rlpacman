@@ -28,6 +28,11 @@ public class PacManStateSpec extends StateSpec {
 		preconds.put("toFruit", "(fruit ?X) (distanceFruit player ?X ?Y)");
 		preconds.put("toGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
 		preconds.put("fromGhost", "(ghost ?X) (distanceGhost player ?X ?Y)");
+		preconds.put("toGhostCentre",
+				"(ghostCentre ?X) (distanceGhostCentre player ?X ?Y)");
+		preconds.put("fromGhostCentre",
+				"(ghostCentre ?X) (distanceGhostCentre player ?X ?Y)");
+		preconds.put("toJunction", "(junction ?X) (junctionSafety ?X ?Y)");
 
 		return preconds;
 	}
@@ -72,6 +77,21 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Integer.class);
 		actions.putCollection("fromGhost", structure);
 
+		structure = new ArrayList<Class>();
+		structure.add(GhostCentre.class);
+		structure.add(Double.class);
+		actions.putCollection("toGhostCentre", structure);
+
+		structure = new ArrayList<Class>();
+		structure.add(GhostCentre.class);
+		structure.add(Double.class);
+		actions.putCollection("fromGhostCentre", structure);
+
+		structure = new ArrayList<Class>();
+		structure.add(Junction.class);
+		structure.add(Integer.class);
+		actions.putCollection("toJunction", structure);
+
 		return actions;
 	}
 
@@ -86,7 +106,7 @@ public class PacManStateSpec extends StateSpec {
 	protected String initialiseGoalState(List<String> constants) {
 		// constants.add("player");
 		// Actual goal condition
-		//return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
+		// return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
 
 		// Score maximisation
 		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
@@ -236,9 +256,20 @@ public class PacManStateSpec extends StateSpec {
 
 		structure = new ArrayList<Class>();
 		structure.add(Player.class);
+		structure.add(GhostCentre.class);
+		structure.add(Double.class);
+		predicates.putCollection("distanceGhostCentre", structure);
+
+		structure = new ArrayList<Class>();
+		structure.add(Player.class);
 		structure.add(Fruit.class);
 		structure.add(Integer.class);
 		predicates.putCollection("distanceFruit", structure);
+
+		structure = new ArrayList<Class>();
+		structure.add(Junction.class);
+		structure.add(Integer.class);
+		predicates.putCollection("junctionSafety", structure);
 
 		return predicates;
 	}
@@ -252,6 +283,8 @@ public class PacManStateSpec extends StateSpec {
 		typeMap.put(PowerDot.class, "powerDot");
 		typeMap.put(Ghost.class, "ghost");
 		typeMap.put(Fruit.class, "fruit");
+		typeMap.put(GhostCentre.class, "ghostCentre");
+		typeMap.put(Junction.class, "junction");
 
 		return typeMap;
 	}
@@ -319,6 +352,20 @@ public class PacManStateSpec extends StateSpec {
 		} else if (actionSplit[0].equals("toFruit")) {
 			return new WeightedDirection((byte) followPath(
 					state.getFruit().m_locX, state.getFruit().m_locY,
+					state.getDistanceGrid()).ordinal(), weight);
+		} else if (actionSplit[0].equals("toJunction")) {
+			// Modify the distances such that a higher safety has a lower
+			// positive value
+			double normalisedSafety = state.getSafestJunction() + 1;
+			int juncVal = Integer.parseInt(actionSplit[2]);
+			if (juncVal < 0 && normalisedSafety > 0)
+				normalisedSafety *= -1;
+			normalisedSafety -= juncVal;
+
+			weight = determineWeight(normalisedSafety);
+			String[] coords = actionSplit[1].split("_");
+			return new WeightedDirection((byte) followPath(
+					Integer.parseInt(coords[1]), Integer.parseInt(coords[2]),
 					state.getDistanceGrid()).ordinal(), weight);
 		} else {
 			int ghostIndex = 0;

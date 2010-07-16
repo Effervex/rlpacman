@@ -101,8 +101,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 		resetEnvironment();
 
 		// Run the optimal policy if it hasn't yet been run
-		if (!PolicyGenerator.getInstance().hasPreGoal()) {
-			optimalPolicy();
+		if (!PolicyGenerator.getInstance().hasPreGoal()
+				&& !PolicyGenerator.getInstance().isFrozen()) {
+			//optimalPolicy();
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
@@ -115,7 +116,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.m_gameUI.m_bRedrawAll = false;
 		}
 
-		return calculateObservations(rete_);
+		return formObservations(rete_);
 	}
 
 	@Override
@@ -153,7 +154,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 		environment_.m_gameUI.m_bRedrawAll = false;
 
-		Observation obs = calculateObservations(rete_);
+		Observation obs = formObservations(rete_);
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				calculateReward(), obs, isTerminal(obs));
 		return rot;
@@ -171,7 +172,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 			optimalAgent.agent_message("Optimal");
 			optimalAgent.agent_message("Policy");
-			Action act = optimalAgent.agent_start(calculateObservations(rete_));
+			Action act = optimalAgent.agent_start(formObservations(rete_));
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);
 			while ((rot == null) || !rot.isTerminal()) {
@@ -274,7 +275,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 		double inverseDirs = 1d / directions.size();
 
 		// Compile the state
-		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_ };
+		int safestJunction = -Integer.MAX_VALUE;
+		for (Junction junc : pacJunctions_)
+			safestJunction = Math.max(safestJunction, junc.getSafety());
+		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_,
+				safestJunction };
 		PacManState state = new PacManState(stateObjs);
 
 		// Run through each action, until a clear singular direction is arrived
@@ -336,7 +341,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 		if (directions.isEmpty())
 			directions = backupDirections;
-		
+
 		// If only one direction left, use that
 		if (directions.size() == 1) {
 			lastDirection_ = directions.get(0);
@@ -347,7 +352,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (directions.contains(lastDirection_)) {
 			return lastDirection_;
 		}
-		
+
 		// Otherwise take a direction perpendicular to the last direction.
 		for (PacManLowAction dir : directions) {
 			if (dir != lastDirection_.opposite()) {
@@ -355,7 +360,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				return dir;
 			}
 		}
-		
+
 		// Or just take the opposite direction. (Shouldn't get this far...)
 		lastDirection_ = lastDirection_.opposite();
 		return lastDirection_;
@@ -400,7 +405,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The rete object to add observations to.
 	 * @return An observation of the current state
 	 */
-	private Observation calculateObservations(Rete rete) {
+	private Observation formObservations(Rete rete) {
 		try {
 			rete.reset();
 
@@ -411,6 +416,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			pacJunctions_ = searchMaze(model_.m_player);
 
 			// Ghosts
+			boolean junctionsNoted = false;
 			for (Ghost ghost : model_.m_ghosts) {
 				// Don't note ghost if it is running back to hideout or if it is
 				// in hideout
@@ -431,27 +437,58 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 					// Distances from pacman to ghost
 					distanceAssertions(ghost, ghost.toString());
+
+					// Junction distance
+					for (Junction junc : pacJunctions_) {
+						if (!junctionsNoted) {
+							// Assert types
+							rete_.eval("(assert (junction " + junc + "))");
+						}
+
+						// Junction Safety
+						int safety = distanceGrid_.length;
+						if (!ghost.isEdible()) {
+							int ghostDistance = (int) (Math.ceil(Point
+									.distance(junc.m_locX, junc.m_locY,
+											ghost.m_locX, ghost.m_locY)));
+							safety = ghostDistance - junc.getDistance();
+						}
+
+						if (safety < junc.getSafety())
+							junc.setSafety(safety);
+					}
+					junctionsNoted = true;
 				}
+			}
+
+			// Assert junctions if no ghosts are attacking
+			for (Junction junc : pacJunctions_) {
+				if (!junctionsNoted) {
+					// Assert types
+					rete_.eval("(assert (junction " + junc + "))");
+					// Max safety
+					junc.setSafety(distanceGrid_.length);
+				}
+
+				// Assert safety
+				rete_.eval("(assert (junctionSafety " + junc + " "
+						+ junc.getSafety() + "))");
 			}
 
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
-				String dotName = "dot_" + dot.m_locX + "_" + dot.m_locY;
-
-				rete_.eval("(assert (dot " + dotName + "))");
+				rete_.eval("(assert (dot " + dot + "))");
 
 				// Distances
-				distanceAssertions(dot, dotName);
+				distanceAssertions(dot, dot.toString());
 			}
 
 			// Powerdots
 			for (PowerDot powerdot : model_.m_powerdots.values()) {
-				String pdotName = "powerDot_" + powerdot.m_locX + "_"
-						+ powerdot.m_locY;
-				rete_.eval("(assert (powerDot " + pdotName + "))");
+				rete_.eval("(assert (powerDot " + powerdot + "))");
 
 				// Distances
-				distanceAssertions(powerdot, pdotName);
+				distanceAssertions(powerdot, powerdot.toString());
 			}
 
 			// Fruit
@@ -557,21 +594,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 				}
 			}
 
-			// Calculate the centre of the dots
-			int dotX = 0;
-			int dotY = 0;
-			int i = 0;
-			for (Dot dot : dots) {
-				i++;
-				dotX += dot.m_locX;
-				dotY += dot.m_locY;
-			}
-			// Special case if player eats all dots
-			if (i == 0) {
-				i = 1;
-				dotX = model_.m_player.m_locX;
-				dotY = model_.m_player.m_locY;
-			}
 			return closeJunctions;
 		}
 		return pacJunctions_;

@@ -950,11 +950,9 @@ public class PolicyGenerator {
 			while ((in = buf.readLine()) != null) {
 				// Slot action, rules, and slot ordering
 				// e.g. (move{((on a b) (cat c) => (move c))}),0.6532
-				Pattern p = Pattern
-						.compile("\\((\\w+)" // (move
-						// {((on a b) (cat c) => (move c))}
-								+ "\\{((?:(?:\\(\\(.+?\\) )+=> \\(.+?\\):[\\d.E-]+\\))+)\\}"
-								+ "\\),([\\d.E-]+)"); // ),0.6532
+				Pattern p = Pattern.compile("\\((\\w+)" // (move
+						+ "\\{(.*?)\\}" // {((on a b) (cat c) => (move c))}
+						+ "\\),([\\d.E-]+)"); // ),0.6532
 				Matcher m = p.matcher(in);
 
 				if (m.find()) {
@@ -969,13 +967,13 @@ public class PolicyGenerator {
 									+ ":([\\d.E-]+)\\)"); // Rule Prob
 					Matcher rm = rp.matcher(rules);
 					boolean firstCoveredRule = true;
-					while (m.find()) {
+					while (rm.find()) {
 						GuidedRule rule = new GuidedRule(StateSpec
 								.getInstance().parseRule(rm.group(1)));
 						Double ruleProb = Double.parseDouble(rm.group(2));
-						
+
 						slot.addRule(rule, ruleProb);
-						
+
 						if (firstCoveredRule)
 							coveredRules.put(slot.getAction(), rule);
 						firstCoveredRule = false;
@@ -996,7 +994,7 @@ public class PolicyGenerator {
 					.println("Error parsing generator file. Not loading generator.");
 			e.printStackTrace();
 		}
-		
+
 		slotGenerator_ = loadedDist;
 		coveredRules_ = coveredRules;
 	}

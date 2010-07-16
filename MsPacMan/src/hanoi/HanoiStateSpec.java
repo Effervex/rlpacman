@@ -49,11 +49,13 @@ public class HanoiStateSpec extends StateSpec {
 		Map<String, String> bkMap = new HashMap<String, String>();
 
 		// TowerBase -> Tile
-		bkMap.put("towerBaseImplication", "(towerBase ?X) => (assert (tile ?X))");
+		bkMap.put("towerBaseImplication",
+				"(towerBase ?X) => (assert (tile ?X))");
 
 		// Block(Y) & !On(X,Y) -> Clear(Y)
-		bkMap.put("clearTileRule", "(tile ?Y) (tower ?T) (on ?Y ? ?T) (not (on ? ?Y ?T)) "
-				+ "=> (assert (clear ?Y ?T))");
+		bkMap.put("clearTileRule",
+				"(tile ?Y) (tower ?T) (on ?Y ? ?T) (not (on ? ?Y ?T)) "
+						+ "=> (assert (clear ?Y ?T))");
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", "(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))");
@@ -63,9 +65,9 @@ public class HanoiStateSpec extends StateSpec {
 				"(on ?X ?Y ?T) (above ?Y ?Z ?T) => (assert (above ?X ?Z ?T))");
 
 		// Smaller(X,Y) rule
-		bkMap.put("smallerRule",
-				"(tile ?X) (not (towerBase ?X)) (tile ?Y&:(< ?X ?Y)) "
-						+ "=> (assert (smaller ?X ?Y))");
+		bkMap.put("smallerRule", "(tile ?X) (not (towerBase ?X)) "
+				+ "(or (tile ?Y&:(< ?X ?Y)) (towerBase ?Y))"
+				+ "=> (assert (smaller ?X ?Y))");
 
 		return bkMap;
 	}
@@ -137,7 +139,7 @@ public class HanoiStateSpec extends StateSpec {
 		structure = new ArrayList<Class>();
 		structure.add(Tile.class);
 		predicates.putCollection("lastMoved", structure);
-		
+
 		// LastMoved predicate
 		structure = new ArrayList<Class>();
 		structure.add(Tile.class);

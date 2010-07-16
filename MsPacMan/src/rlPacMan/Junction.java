@@ -65,23 +65,8 @@ public class Junction extends PacPoint implements
 	}
 
 	@Override
-	public String toString() {
-		String dir = null;
-		switch (direction_) {
-		case Thing.UP:
-			dir = "UP";
-			break;
-		case Thing.DOWN:
-			dir = "DOWN";
-			break;
-		case Thing.LEFT:
-			dir = "LEFT";
-			break;
-		case Thing.RIGHT:
-			dir = "RIGHT";
-			break;
-		}
-		return "Junction: " + m_locX + "," + m_locY + " " + dir;
+	public String getObjectName() {
+		return "junction";
 	}
 
 	public int getDistance() {
