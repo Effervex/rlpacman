@@ -125,7 +125,8 @@ public class Covering {
 	 * Unifies two states together. This is more than simply a retainAll
 	 * operation, as it can also generalise constants into variables during the
 	 * unification process. This process does not keep useless facts around
-	 * (facts using only anonymous terms).
+	 * (facts using only anonymous terms). It also removes facts known to
+	 * already by true (on ?X ?Y) implies (on ?X ?) is also true.
 	 * 
 	 * This process performs special unification on numerical variables, by
 	 * creating a range function under which the variables fall.
@@ -458,17 +459,13 @@ public class Covering {
 					}
 				}
 
-				// Format the action
-				if (constants.contains(terms[i]))
-					action[i + 1] = terms[i];
-				else
-					action[i + 1] = getVariableTermString(i);
+				action[i + 1] = terms[i];
 			}
 
 			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = new GuidedRule(inverselySubstitute(
-					actionFacts, terms, constants), StateSpec
-					.reformFact(action), false);
+			GuidedRule inverseSubbed = new GuidedRule(
+					convertFactsToStrings(actionFacts), StateSpec
+							.reformFact(action), false);
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -596,6 +593,22 @@ public class Covering {
 				substitution.add(reformedFact);
 		}
 		return substitution;
+	}
+
+	/**
+	 * A method which simply converts a List of Facts into a Collection of
+	 * Strings of the same facts.
+	 * 
+	 * @param facts
+	 *            The list of facts to be converted into strings.
+	 * @return A collection of strings of the same facts.
+	 */
+	private Collection<String> convertFactsToStrings(List<Fact> facts) {
+		Collection<String> strings = new ArrayList<String>();
+		for (Fact fact : facts) {
+			strings.add(fact.toString().replaceAll("\\(.+?::", "("));
+		}
+		return strings;
 	}
 
 	/**
@@ -1031,15 +1044,13 @@ public class Covering {
 											newStateTerms));
 						} else {
 							// Unify the two states and check if it has changed
-							// at
-							// all.
+							// at all.
 							int result = unifyStates(preGoal.getState(),
 									preGoalStringState, preGoal
 											.getActionTerms(), newStateTerms);
 
 							// If the states unified, reset the counter,
-							// otherwise
-							// increment.
+							// otherwise increment.
 							if (result == 1) {
 								preGoal.resetInactivity();
 							} else if (result == 0) {

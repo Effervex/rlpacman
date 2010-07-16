@@ -37,7 +37,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	/** The number of towers in the problem. */
 	public static final int NUM_TOWERS = 3;
 
-	private static final int TOWER_BASE_CHAR_VALUE = 964;
+	private static final String TOWER_BASE_PREFIX = "base";
 
 	/** The state of the hanoi problem. Start with just 3 towers. */
 	private HanoiState state_;
@@ -198,7 +198,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 					if (i - 1 >= 0)
 						underneath = tileStack.get(i - 1).toString();
 					else
-						underneath = ((char) TOWER_BASE_CHAR_VALUE) + "" + t;
+						underneath = TOWER_BASE_PREFIX + t;
 
 					rete_.eval("(assert (tile " + tileStack.get(i) + "))");
 					rete_.eval("(assert (on " + tileStack.get(i) + " "
@@ -215,11 +215,12 @@ public class HanoiEnvironment implements EnvironmentInterface {
 				}
 
 				// Tower base
-				rete_.eval("(assert (towerBase " + (char) TOWER_BASE_CHAR_VALUE + "" + t
-						+ "))");
+				rete_
+						.eval("(assert (towerBase " + TOWER_BASE_PREFIX + t
+								+ "))");
 				if (tileStack.isEmpty())
-					rete_.eval("(assert (clear " + (char) TOWER_BASE_CHAR_VALUE + "" + t
-							+ " t" + t + "))");
+					rete_.eval("(assert (clear " + TOWER_BASE_PREFIX + t + " t"
+							+ t + "))");
 			}
 
 			rete_.run();
@@ -248,7 +249,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			return worldState;
 
 		String[] split = StateSpec.splitFact(action);
-		
+
 		HanoiState newState = worldState.clone();
 
 		// Convert the blocks to indices
@@ -256,20 +257,20 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		int fromIndex = Integer.parseInt(split[2].charAt(1) + "");
 		int toIndex = Integer.parseInt(split[4].charAt(1) + "");
 		Character from = stateStacks[fromIndex].pop();
-		Character to = null;
+		String to = null;
 		if (!stateStacks[toIndex].isEmpty())
-			to = stateStacks[toIndex].peek();
+			to = stateStacks[toIndex].peek() + "";
 		else
-			to = TOWER_BASE_CHAR_VALUE;
+			to = TOWER_BASE_PREFIX;
 
 		// Check the elements add up
 		if ((split[1].charAt(0) == from.charValue())
-				&& (split[3].charAt(0) == to.charValue()))
+				&& (split[3].substring(0, to.length()).equals(to)))
 			stateStacks[toIndex].push(from);
 		else
 			System.err
 					.println("The action argument doesn't add up to the state.");
-		
+
 		lastMoved_ = from;
 
 		return newState;
@@ -333,7 +334,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 				}
 			}
 		}
-		
+
 		private HanoiState() {
 			tileState_ = new Stack[NUM_TOWERS];
 			for (int i = 0; i < tileState_.length; i++) {
@@ -344,13 +345,13 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		public Stack<Character>[] getState() {
 			return tileState_;
 		}
-		
+
 		public HanoiState clone() {
 			HanoiState clone = new HanoiState();
 			for (int i = 0; i < tileState_.length; i++) {
 				clone.tileState_[i] = (Stack) tileState_[i].clone();
 			}
-			
+
 			return clone;
 		}
 
@@ -393,8 +394,8 @@ public class HanoiEnvironment implements EnvironmentInterface {
 
 			// Adding the guidelines
 			for (int i = 0; i < NUM_TOWERS; i++) {
-				buffer.append((char)TOWER_BASE_CHAR_VALUE + "" + i);
-				for (int s = 2; s < maxTileWidth - 1; s++)
+				buffer.append(TOWER_BASE_PREFIX + i);
+				for (int s = TOWER_BASE_PREFIX.length() + 1; s < maxTileWidth - 1; s++)
 					buffer.append('-');
 				buffer.append('|');
 			}

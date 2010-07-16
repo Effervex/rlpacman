@@ -200,8 +200,10 @@ public class LearningController {
 		for (; run < repetitions_; run++) {
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
-			if (loadedGeneratorFile_ != null)
+			if (loadedGeneratorFile_ != null) {
 				localPolicy.loadGenerators(loadedGeneratorFile_);
+				localPolicy.freeze(true);
+			}
 
 			developPolicy(localPolicy, run);
 
@@ -240,7 +242,8 @@ public class LearningController {
 
 		// Run the preliminary action discovery phase, only to create an initial
 		// number of rules.
-		preliminaryProcessing();
+		if (loadedGeneratorFile_ == null)
+			preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
@@ -768,7 +771,8 @@ public class LearningController {
 				+ toTimeFormat(learningRunTime_);
 		System.out.println(elapsed + ", " + learningElapsed);
 
-		double percentIterComplete = (1.0 * samples) / maxSamples;
+		double percentIterComplete = (maxSamples > 0) ? (1.0 * samples)
+				/ maxSamples : 1;
 		double percentRunComplete = (1.0 * iteration + percentIterComplete)
 				/ maxIteration;
 		double totalRunComplete = (1.0 * run + percentRunComplete) / maxRuns;

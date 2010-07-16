@@ -305,7 +305,7 @@ public class CoveringTest {
 				assertFalse(gr.getConditions(false).contains("(on ?X b)"));
 				assertFalse(gr.getConditions(false).contains("(above ?X b)"));
 				assertTrue(gr.getConditions(false).contains("(above ?X a)"));
-				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
+				assertFalse(gr.getConditions(false).contains("(above ?X ?)"));
 				assertTrue(gr.getConditions(false).contains("(block a)"));
 				assertEquals("(moveFloor ?X)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
@@ -1004,7 +1004,7 @@ public class CoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(on ? ?Y)"));
+		assertFalse(oldState.contains("(on ? ?Y)"));
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));

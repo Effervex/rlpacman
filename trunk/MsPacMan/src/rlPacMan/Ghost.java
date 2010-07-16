@@ -977,6 +977,10 @@ class Ghost extends Thing {
 		pixelShrink_ = -pixelSize_ / 4;
 	}
 	
+	public String getObjectName() {
+		return "ghost";
+	}
+	
 	@Override
 	public String toString() {
 		String ghostString = null;

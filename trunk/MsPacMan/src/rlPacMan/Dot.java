@@ -32,13 +32,12 @@ public class Dot extends Thing {
 	public int getValue() {
 		return value_;
 	}
+	
+	public String getObjectName() {
+		return "dot";
+	}
 
 	@Override
 	protected void updatePixelVals(GameUI gameUI) {
-	}
-	
-	@Override
-	public String toString() {
-		return "Dot: " + m_locX + "," + m_locY;
 	}
 }

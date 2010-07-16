@@ -9,9 +9,11 @@ package rlPacMan;
 public abstract class PacPoint {
 	public int m_locX;
 	public int m_locY;
+	
+	public abstract String getObjectName();
 
 	@Override
 	public String toString() {
-		return "Point: " + m_locX + "," + m_locY;
+		return getObjectName() + "_" + m_locX + "_" + m_locY;
 	}
 }

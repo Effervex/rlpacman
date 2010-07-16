@@ -247,6 +247,10 @@ class Fruit extends Thing {
 		pixelShrink_ = 0;
 	}
 	
+	public String getObjectName() {
+		return "fruit";
+	}
+	
 	@Override
 	public String toString() {
 		return "fruit";

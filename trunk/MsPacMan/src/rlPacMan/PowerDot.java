@@ -25,20 +25,8 @@ public class PowerDot extends Thing {
 	}
 	
 	@Override
-	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		if (m_locY < (m_gameModel.m_gameSizeY / 2))
-			buffer.append("N");
-		else
-			buffer.append("S");
-		
-		if (m_locX < (m_gameModel.m_gameSizeX / 2))
-			buffer.append("W");
-		else
-			buffer.append("E");
-		
-		buffer.append(" Powerdot");
-		return buffer.toString();
+	public String getObjectName() {
+		return "powerDot";
 	}
 	
 	/**
