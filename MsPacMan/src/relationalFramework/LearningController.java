@@ -286,8 +286,6 @@ public class LearningController {
 				samples = pvs.size() - pvsSizeInitial;
 				maxSamples = population - pvsSizeInitial;
 			}
-			estimateETA(samples, maxSamples, t, finiteNum, run, repetitions_,
-					runStart, true);
 
 			boolean restart = false;
 			// Fill the Policy Values list.
