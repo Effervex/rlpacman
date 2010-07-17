@@ -237,7 +237,6 @@ public class LearningController {
 	 *            The run number of the policy.
 	 */
 	private void developPolicy(PolicyGenerator localPolicy, int run) {
-		long runStart = System.currentTimeMillis();
 		PolicyValue bestPolicy = null;
 
 		// Run the preliminary action discovery phase, only to create an initial
@@ -357,14 +356,9 @@ public class LearningController {
 					alphaUpdate = STEP_SIZE;
 				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
-				// Remove the worst policy values
-				if (ENTROBEAM) {
-					if (pvs.size() > numElite)
-						pvs = pvs.subList(0, numElite);
-				} else if (SLIDING_WINDOW)
-					pvs = pvs.subList(0, pvs.size() - numElite);
-				else
-					pvs.clear();
+				// Clean up the policy values
+				pvs = cleanPolicyValues(pvs, numElite, t, population
+						/ SELECTION_RATIO);
 
 				// Only test the agent every number of steps, otherwise more
 				// time is spent testing than evaluating. (And at the first and
@@ -414,6 +408,45 @@ public class LearningController {
 				filterPolicyValues(pvs, localPolicy);
 			}
 		}
+	}
+
+	/**
+	 * Cleans the elite policy values up by removing stale policy values and
+	 * keeping the number of values low.
+	 * 
+	 * @param pvs
+	 *            The policy values list.
+	 * @param numElite
+	 *            The number of values there should be maximum.
+	 * @param iteration
+	 *            The current iteration.
+	 * @param staleValue
+	 *            The number of iterations to pass before a policy value becomes
+	 *            stale.
+	 * @return The cleaned list of policy values.
+	 */
+	private List<PolicyValue> cleanPolicyValues(List<PolicyValue> pvs,
+			int numElite, int iteration, double staleValue) {
+		// Remove any stale policies
+		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
+			PolicyValue pv = iter.next();
+			if (iteration - pv.getIteration() >= staleValue) {
+				iter.remove();
+			}
+		}
+
+		// If the collection is too big, remove the worst policy values
+		if (ENTROBEAM) {
+			// TODO Remove sublist op and replace with remove.
+			if (pvs.size() > numElite) {
+				for (int i = numElite; i < pvs.size(); i++)
+					pvs.remove(i);
+			}
+		} else if (SLIDING_WINDOW)
+			pvs = pvs.subList(0, pvs.size() - numElite);
+		else
+			pvs.clear();
+		return pvs;
 	}
 
 	/**
@@ -758,12 +791,13 @@ public class LearningController {
 	private void estimateETA(int samples, int maxSamples, int iteration,
 			int maxIteration, int run, int maxRuns, long startTime,
 			boolean noteLearningTime) {
+		long currentTime = System.currentTimeMillis();
 		if (noteLearningTime) {
-			learningRunTime_ += System.currentTimeMillis() - learningStartTime_;
-			learningStartTime_ = System.currentTimeMillis();
+			learningRunTime_ += currentTime - learningStartTime_;
+			learningStartTime_ = currentTime;
 		}
 
-		long elapsedTime = System.currentTimeMillis() - startTime;
+		long elapsedTime = currentTime - startTime;
 		String elapsed = "Elapsed: " + toTimeFormat(elapsedTime);
 		String learningElapsed = "Learning elapsed: "
 				+ toTimeFormat(learningRunTime_);
@@ -784,7 +818,8 @@ public class LearningController {
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
-		long totalRemainingTime = (long) (experimentStart_ / totalRunComplete - experimentStart_);
+		long totalRemainingTime = (long) ((currentTime - experimentStart_)
+				/ totalRunComplete - (currentTime - experimentStart_));
 		String totalRemaining = "Remaining: "
 				+ toTimeFormat(totalRemainingTime);
 		System.out.println(totalPercentStr + " " + totalRemaining);

@@ -12,7 +12,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	/** The estimated value of the policy. */
 	private float value_;
 	/** The iteration this policy value was created at. */
-	private double iteration_;
+	private int iteration_;
 
 	/**
 	 * A constructor for storing the members.
@@ -22,7 +22,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The (estimated) value
 	 */
-	public PolicyValue(Policy pol, float value, double iteration) {
+	public PolicyValue(Policy pol, float value, int iteration) {
 		policy_ = pol;
 		value_ = value;
 		iteration_ = iteration;
@@ -60,6 +60,15 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 */
 	public float getValue() {
 		return value_;
+	}
+	
+	/**
+	 * Gets the iteration the policy value was create at.
+	 * 
+	 * @return The iteration the value was created at.
+	 */
+	public int getIteration() {
+		return iteration_;
 	}
 
 	// @Override
