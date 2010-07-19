@@ -2,7 +2,6 @@ package rlPacMan;
 
 import java.awt.Point;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -103,7 +102,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Run the optimal policy if it hasn't yet been run
 		if (!PolicyGenerator.getInstance().hasPreGoal()
 				&& !PolicyGenerator.getInstance().isFrozen()) {
-			//optimalPolicy();
+			optimalPolicy();
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
@@ -140,6 +139,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.tick(false);
 			i++;
 		}
+		model_.m_player.m_deltaLocX = 0;
+		model_.m_player.m_deltaLocY = 0;
 
 		// If we're not in full experiment mode, redraw the scene.
 		if (!experimentMode_) {
@@ -285,20 +286,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Run through each action, until a clear singular direction is arrived
 		// upon.
 		int i = 0;
-		double[] directionVote = new double[PacManLowAction.values().length];
-		double best = 0;
-		double worst = 0;
+		double[] globalDirectionVote = new double[PacManLowAction.values().length];
+		double globalBest = 0;
 		for (RuleAction ruleAction : actions) {
+			double[] directionVote = new double[PacManLowAction.values().length];
+			double worst = 0;
+			double bestWeight = 0;
 			List<String> actionStrings = ruleAction.getTriggerActions();
-			// Calculate the inverse weight of each action, based on the number
-			// of actions returned.
-			double inverseNumberWeight = 1;
-			if (!actionStrings.isEmpty())
-				inverseNumberWeight = 1.0 / actionStrings.size();
-
-			// Using position within the action list as a weighting influence
-			inverseNumberWeight *= (1.0 * (actions.size() - i))
-					/ actions.size();
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
@@ -309,7 +303,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 				// Use a linearly decreasing weight and the object proximity
 				double weighting = weightedDir.getWeight();
-				weighting *= inverseNumberWeight;
+				bestWeight = Math.max(bestWeight, Math.abs(weighting));
 				byte dir = (byte) Math.abs(weightedDir.getDirection());
 				if (weightedDir.getDirection() > 0) {
 					directionVote[dir] += weighting;
@@ -318,26 +312,46 @@ public class PacManEnvironment implements EnvironmentInterface {
 				}
 
 				// Recording best and worst
-				best = Math.max(best, directionVote[dir]);
 				worst = Math.min(worst, directionVote[dir]);
+			}
+
+			// Normalise the values
+			double sum = 0;
+			for (int j = 1; j < directionVote.length; j++) {
+				// Making all values positive
+				directionVote[j] -= worst;
+				sum += directionVote[j];
+			}
+
+			// Using position within the action list as a weighting influence
+			double inverseNumberWeight = (1.0 * (actions.size() - i))
+					/ actions.size();
+			inverseNumberWeight *= inverseNumberWeight;
+
+			// Add to the global direction vote
+			for (int j = 1; j < directionVote.length; j++) {
+				// Add to the global weight, using the position within the
+				// policy and the highest weight as factors.
+				directionVote[j] /= sum;
+				globalDirectionVote[j] += directionVote[j]
+						* inverseNumberWeight * bestWeight;
+				if (globalDirectionVote[j] > globalBest)
+					globalBest = globalDirectionVote[j];
 			}
 
 			i++;
 		}
 
-		// Normalise the directionVote and remove any directions not
+		// Normalise the globalDirectionVote and remove any directions not
 		// significantly weighted.
 		ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(
 				directions);
-		for (int d = 0; d < directionVote.length; d++) {
-			directionVote[d] = (directionVote[d] - worst) / (best - worst);
+		for (int d = 0; d < globalDirectionVote.length; d++) {
+			globalDirectionVote[d] /= globalBest;
 			// If the vote is less than 1 - # valid directions, then remove
 			// it.
-			if (directionVote[d] <= 1d - inverseDirs)
+			if (globalDirectionVote[d] <= 1d - inverseDirs)
 				directions.remove(PacManLowAction.values()[d]);
-
-			// Resetting the direction vote
-			directionVote[d] = 0;
 		}
 		if (directions.isEmpty())
 			directions = backupDirections;
@@ -443,14 +457,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 						if (!junctionsNoted) {
 							// Assert types
 							rete_.eval("(assert (junction " + junc + "))");
+							// Max safety
+							junc.setSafety(distanceGrid_.length);
 						}
 
 						// Junction Safety
 						int safety = distanceGrid_.length;
 						if (!ghost.isEdible()) {
-							int ghostDistance = (int) (Math.ceil(Point
-									.distance(junc.m_locX, junc.m_locY,
-											ghost.m_locX, ghost.m_locY)));
+							int ghostDistance = calculateDistance(ghost, junc
+									.getLocation());
 							safety = ghostDistance - junc.getDistance();
 						}
 
@@ -551,7 +566,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	public SortedSet<Junction> searchMaze(Thing thing) {
 		SortedSet<Junction> closeJunctions = new TreeSet<Junction>();
-		Collection<Dot> dots = model_.m_dots.values();
 
 		Point playerLoc = new Point(thing.m_locX, thing.m_locY);
 
@@ -694,6 +708,64 @@ public class PacManEnvironment implements EnvironmentInterface {
 			return isJunct;
 		}
 		return new HashSet<Junction>();
+	}
+
+	/**
+	 * Calculates the distance for a thing to a point
+	 * 
+	 * @param ghost
+	 *            The ghost that is being calculated for.
+	 * @param p
+	 *            The point the thing is going to.
+	 * @return The distance the ghost must travel to get to the destination
+	 *         point.
+	 */
+	private int calculateDistance(Ghost ghost, Point p) {
+		// Create a duplicate and move it greedily towards the destination
+		Ghost duplicate = (Ghost) ghost.clone();
+		// Setting up greedy behaviour
+		duplicate.m_bCanFollow = true;
+		duplicate.m_bCanUseNextBest = false;
+		duplicate.m_bInsaneAI = true;
+		duplicate.m_bChaseMode = true;
+		duplicate.m_bOldChaseMode = true;
+		duplicate.m_deltaMax = 1;
+		duplicate.m_deltaStartX = 0;
+		duplicate.m_destinationX = -1;
+		duplicate.m_destinationY = -1;
+		duplicate.m_lastDirection = Thing.STILL;
+		duplicate.m_targetX = p.x;
+		duplicate.m_targetY = p.y;
+
+		int distance = 0;
+		// While the ghost has not arrived at the destination
+		while (!((duplicate.m_locX == p.x) && (duplicate.m_locY == p.y))) {
+			duplicate.m_deltaMax = 1;
+			duplicate.m_deltaLocX = 0;
+			duplicate.m_deltaLocY = 0;
+			if ((duplicate.m_locX == 13) && (duplicate.m_locY <= 14)
+					&& (duplicate.m_locY >= 12)) {
+				duplicate.m_lastLocX = duplicate.m_locX;
+				duplicate.m_lastLocY = duplicate.m_locY;
+				duplicate.m_destinationX = -1;
+				duplicate.m_destinationY = -1;
+				duplicate.m_locY--;
+				duplicate.m_bInsideRoom = false;
+				duplicate.m_bEnteringDoor = false;
+				duplicate.m_bEaten = false;
+			} else {
+				duplicate.tickThing(model_.m_pacMan.m_gameUI);
+				model_.m_pacMan.Move(duplicate);
+			}
+			distance++;
+
+			// Break if something goes wrong
+			if (distance > 99) {
+				distance = -99;
+				break;
+			}
+		}
+		return distance;
 	}
 
 	/**
