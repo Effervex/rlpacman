@@ -312,16 +312,16 @@ public class PacManStateSpec extends StateSpec {
 		while (distanceGrid[x][y] != 0) {
 			int currentVal = distanceGrid[x][y];
 			// Check all directions
-			if (distanceGrid[(x + 1) % width][y] == currentVal - 1) {
+			if (distanceGrid[(x + 1) % width][y] <= currentVal - 1) {
 				x = (x + 1) % width;
 				prevLocation = PacManLowAction.LEFT;
-			} else if (distanceGrid[(x - 1 + width) % width][y] == currentVal - 1) {
+			} else if (distanceGrid[(x - 1 + width) % width][y] <= currentVal - 1) {
 				x = (x - 1 + width) % width;
 				prevLocation = PacManLowAction.RIGHT;
-			} else if (distanceGrid[x][(y + 1) % height] == currentVal - 1) {
+			} else if (distanceGrid[x][(y + 1) % height] <= currentVal - 1) {
 				y = (y + 1) % height;
 				prevLocation = PacManLowAction.UP;
-			} else if (distanceGrid[x][(y - 1 + height) % height] == currentVal - 1) {
+			} else if (distanceGrid[x][(y - 1 + height) % height] <= currentVal - 1) {
 				y = (y - 1 + height) % height;
 				prevLocation = PacManLowAction.DOWN;
 			} else {
@@ -345,13 +345,16 @@ public class PacManStateSpec extends StateSpec {
 		// Move towards static points (dots, powerdots, junctions)
 		if ((actionSplit[0].equals("toDot"))
 				|| (actionSplit[0].equals("toPowerDot"))
-				|| (actionSplit[0].equals("fromPowerDot"))) {
+				|| (actionSplit[0].equals("fromPowerDot"))
+				|| (actionSplit[0].equals("toGhostCentre"))
+				|| (actionSplit[0].equals("fromGhostCentre"))) {
 			// To Dot, to/from powerdot
 			String[] coords = actionSplit[1].split("_");
 			byte path = (byte) followPath(Integer.parseInt(coords[1]),
 					Integer.parseInt(coords[2]), state.getDistanceGrid())
 					.ordinal();
-			if (actionSplit[0].equals("fromPowerDot"))
+			if ((actionSplit[0].equals("fromPowerDot"))
+					|| (actionSplit[0].equals("fromGhostCentre")))
 				path *= -1;
 			return new WeightedDirection(path, weight);
 
@@ -385,7 +388,7 @@ public class PacManStateSpec extends StateSpec {
 
 			normalisedSafety /= juncVal;
 
-			weight = determineWeight(normalisedSafety) / 50;
+			weight = determineWeight(normalisedSafety);
 			return new WeightedDirection((byte) followPath(
 					Integer.parseInt(coords[1]), Integer.parseInt(coords[2]),
 					state.getDistanceGrid()).ordinal(), weight);
@@ -426,7 +429,7 @@ public class PacManStateSpec extends StateSpec {
 			distance = 1;
 		if (distance <= 0 && distance > -1)
 			distance = -1;
-		
+
 		return 1.0 / distance;
 	}
 }

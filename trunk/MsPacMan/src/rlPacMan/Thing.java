@@ -105,21 +105,35 @@ public abstract class Thing extends PacPoint {
 	public void setPaused(boolean bPaused) {
 		m_bPaused = bPaused;
 	}
-
-	// This method will take the specified location and direction and determine
-	// for the given location if the thing moved in that direction, what the
-	// next possible turning location would be.
-	public static boolean getDestination(int direction, int locX, int locY,
-			Point point, GameModel model) {
+	
+	/**
+	 * Checks if a movement is valid.
+	 * 
+	 * @param direction The direction to move in.
+	 * @param locX The x location.
+	 * @param locY The y location.
+	 * @param model The game model.
+	 * @return True if the movement is allowed, false otherwise.
+	 */
+	public static boolean isValidMove(int direction, int locX, int locY, GameModel model) {
 		// If the request direction is blocked by a wall, then just return the
 		// current location
 		if ((direction == UP && (model.m_gameState[locX][locY] & GameModel.GS_NORTH) != 0)
 				|| (direction == LEFT && (model.m_gameState[locX][locY] & GameModel.GS_WEST) != 0)
 				|| (direction == DOWN && (model.m_gameState[locX][locY] & GameModel.GS_SOUTH) != 0)
 				|| (direction == RIGHT && (model.m_gameState[locX][locY] & GameModel.GS_EAST) != 0)) {
-			point.setLocation(locX, locY);
 			return false;
 		}
+		return true;
+	}
+
+	// This method will take the specified location and direction and determine
+	// for the given location if the thing moved in that direction, what the
+	// next possible turning location would be.
+	public static boolean getDestination(int direction, int locX, int locY,
+			Point point, GameModel model) {
+		if (!isValidMove(direction, locX, locY, model))
+			return false;
 
 		// Start off by advancing one in direction for specified location
 		switch (direction) {
@@ -138,7 +152,6 @@ public abstract class Thing extends PacPoint {
 		}
 
 		locX = (locX + model.m_gameSizeX) % model.m_gameSizeX;
-		locY = (locY + model.m_gameSizeY) % model.m_gameSizeY;
 
 		// If we violate the grid boundary,
 		// then return false.

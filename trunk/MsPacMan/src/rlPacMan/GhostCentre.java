@@ -1,9 +1,11 @@
 package rlPacMan;
 
+import java.awt.Point;
+
 public class GhostCentre extends PacPoint {
-	@Override
-	public String toString() {
-		return "ghostCentre";
+	public GhostCentre(Point centrePoint) {
+		this.m_locX = centrePoint.x;
+		this.m_locY = centrePoint.y;
 	}
 
 	@Override
