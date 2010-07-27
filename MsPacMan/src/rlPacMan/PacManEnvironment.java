@@ -2,6 +2,7 @@ package rlPacMan;
 
 import java.awt.Point;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,11 +32,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private PacMan environment_;
 	private int prevScore_;
 	private GameModel model_;
-	private int[][] distanceGrid_;
-	private SortedSet<Junction> pacJunctions_;
-	private Point gridStart_;
+	private DistanceGridCache distanceGridCache_;
 	private boolean experimentMode_ = false;
 	private PacManLowAction lastDirection_;
+	private int[][] distanceGrid_;
+	private Collection<Junction> closeJunctions_;
 
 	@Override
 	public void env_cleanup() {
@@ -50,7 +51,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_ = environment_.getGameModel();
 
 		// Initialise the observations
-		resetDistanceGrid();
+		cacheDistanceGrids();
 
 		try {
 			Thread.sleep(512);
@@ -207,10 +208,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 		rete_ = StateSpec.getInstance().getRete();
 
 		// Initialise the observations
-		resetDistanceGrid();
+		cacheDistanceGrids();
 
 		prevScore_ = 0;
-		gridStart_ = null;
 
 		// Letting the thread 'sleep' when not experiment mode, so it's
 		// watchable for humans.
@@ -240,14 +240,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private void drawActions(ArrayList<RuleAction> actions) {
 		if (!experimentMode_) {
-			ArrayList<String> activeActions = new ArrayList<String>();
-			activeActions.add("Actions:");
-			for (int i = 0; i < actions.size(); i++) {
-				activeActions.add("   "
-						+ actions.get(i).getRule().getActionPredicate());
-			}
-			environment_.m_bottomCanvas.setActionsList(activeActions
-					.toArray(new String[activeActions.size()]));
+			environment_.m_bottomCanvas.setActionsList(actions
+					.toArray(new RuleAction[actions.size()]));
 		}
 	}
 
@@ -262,25 +256,24 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private PacManLowAction chooseLowAction(ArrayList<RuleAction> actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
-		Point blag = new Point();
 		int x = model_.m_player.m_locX;
 		int y = model_.m_player.m_locY;
-		if (Thing.getDestination(Thing.UP, x, y, blag, model_))
+		if (Thing.isValidMove(Thing.UP, x, y, model_))
 			directions.add(PacManLowAction.UP);
-		if (Thing.getDestination(Thing.DOWN, x, y, blag, model_))
+		if (Thing.isValidMove(Thing.DOWN, x, y, model_))
 			directions.add(PacManLowAction.DOWN);
-		if (Thing.getDestination(Thing.LEFT, x, y, blag, model_))
+		if (Thing.isValidMove(Thing.LEFT, x, y, model_))
 			directions.add(PacManLowAction.LEFT);
-		if (Thing.getDestination(Thing.RIGHT, x, y, blag, model_))
+		if (Thing.isValidMove(Thing.RIGHT, x, y, model_))
 			directions.add(PacManLowAction.RIGHT);
 		double inverseDirs = 1d / directions.size();
 
 		// Compile the state
 		int safestJunction = -Integer.MAX_VALUE;
-		for (Junction junc : pacJunctions_)
+		for (Junction junc : closeJunctions_)
 			safestJunction = Math.max(safestJunction, junc.getSafety());
 		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_,
-				safestJunction };
+				safestJunction, model_.m_player };
 		PacManState state = new PacManState(stateObjs);
 
 		// Run through each action, until a clear singular direction is arrived
@@ -426,9 +419,23 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Player
 			rete_.eval("(assert (pacman player))");
 
-			// Calculate the distances and junctions
-			pacJunctions_ = searchMaze(model_.m_player);
+			// Load distance grid measures
+			distanceGrid_ = distanceGridCache_.getGrid(model_.m_stage,
+					model_.m_player.m_locX, model_.m_player.m_locY);
+			closeJunctions_ = distanceGridCache_.getCloseJunctions(
+					model_.m_stage, model_.m_player.m_locX,
+					model_.m_player.m_locY);
 
+			// Ghost Centre. Note that the centre can shift based on how the
+			// ghosts are positioned, as the warp points make the map
+			// continuous.
+			int ghostCount = 0;
+			Point naturalCentre = new Point(0, 0);
+			Point natPrevGhost = null;
+			double naturalDist = 0;
+			Point offsetCentre = new Point(0, 0);
+			double offsetDist = 0;
+			Point offPrevGhost = null;
 			// Ghosts
 			boolean junctionsNoted = false;
 			for (Ghost ghost : model_.m_ghosts) {
@@ -450,39 +457,63 @@ public class PacManEnvironment implements EnvironmentInterface {
 					}
 
 					// Distances from pacman to ghost
-					distanceAssertions(ghost, ghost.toString());
+					distanceAssertions(ghost, ghost.toString(), model_.m_player);
 
 					// Junction distance
-					for (Junction junc : pacJunctions_) {
+					for (Junction junc : closeJunctions_) {
 						if (!junctionsNoted) {
 							// Assert types
 							rete_.eval("(assert (junction " + junc + "))");
 							// Max safety
-							junc.setSafety(distanceGrid_.length);
+							junc.setSafety(model_.m_gameSizeX);
 						}
 
 						// Junction Safety
-						int safety = distanceGrid_.length;
+						int safety = model_.m_gameSizeX;
 						if (!ghost.isEdible()) {
-							int ghostDistance = calculateDistance(ghost, junc
-									.getLocation());
-							safety = ghostDistance - junc.getDistance();
+							int[][] ghostGrid = distanceGridCache_.getGrid(
+									model_.m_stage, ghost.m_locX, ghost.m_locY);
+							// If the ghost is in the ghost area or otherwise
+							// not accessible by PacMan, ignore it.
+							if (ghostGrid != null) {
+								int ghostDistance = ghostGrid[junc.m_locX][junc.m_locY];
+								if (ghostDistance >= 0)
+									safety = ghostDistance - junc.getDistance();
+							}
 						}
 
 						if (safety < junc.getSafety())
 							junc.setSafety(safety);
 					}
 					junctionsNoted = true;
+
+					// Ghost Centre calcs
+					ghostCount++;
+					Point natPoint = new Point(ghost.m_locX, ghost.m_locY);
+					naturalCentre.x += natPoint.x;
+					naturalCentre.y += natPoint.y;
+					if (natPrevGhost != null)
+						naturalDist += natPoint.distance(natPrevGhost);
+					natPrevGhost = natPoint;
+
+					Point offPoint = new Point(
+							(ghost.m_locX + model_.m_gameSizeX / 2)
+									% model_.m_gameSizeX, ghost.m_locY);
+					offsetCentre.x += offPoint.x;
+					offsetCentre.y += offPoint.y;
+					if (offPrevGhost != null)
+						offsetDist += offPoint.distance(offPrevGhost);
+					offPrevGhost = offPoint;
 				}
 			}
 
-			// Assert junctions if no ghosts are attacking
-			for (Junction junc : pacJunctions_) {
+			// Assert junctions
+			for (Junction junc : closeJunctions_) {
 				if (!junctionsNoted) {
 					// Assert types
 					rete_.eval("(assert (junction " + junc + "))");
 					// Max safety
-					junc.setSafety(distanceGrid_.length);
+					junc.setSafety(model_.m_gameSizeX);
 				}
 
 				// Assert safety
@@ -490,12 +521,32 @@ public class PacManEnvironment implements EnvironmentInterface {
 						+ junc.getSafety() + "))");
 			}
 
+			// Assert ghost centres
+			if (ghostCount > 0) {
+				Point centrePoint = null;
+				if (naturalDist <= offsetDist)
+					centrePoint = naturalCentre;
+				else {
+					// Reset the offset centre
+					offsetCentre.x = (offsetCentre.x - model_.m_gameSizeX / 2 + model_.m_gameSizeX)
+							% model_.m_gameSizeX;
+					centrePoint = offsetCentre;
+				}
+				centrePoint.x /= ghostCount;
+				centrePoint.y /= ghostCount;
+				GhostCentre gc = new GhostCentre(centrePoint);
+
+				rete_.eval("(assert (ghostCentre " + gc + "))");
+
+				distanceAssertions(gc, gc.toString(), model_.m_player);
+			}
+
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
 				rete_.eval("(assert (dot " + dot + "))");
 
 				// Distances
-				distanceAssertions(dot, dot.toString());
+				distanceAssertions(dot, dot.toString(), model_.m_player);
 			}
 
 			// Powerdots
@@ -503,7 +554,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 				rete_.eval("(assert (powerDot " + powerdot + "))");
 
 				// Distances
-				distanceAssertions(powerdot, powerdot.toString());
+				distanceAssertions(powerdot, powerdot.toString(),
+						model_.m_player);
 			}
 
 			// Fruit
@@ -511,7 +563,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 				rete_.eval("(assert (fruit " + model_.m_fruit + "))");
 
 				// Distances
-				distanceAssertions(model_.m_fruit, model_.m_fruit.toString());
+				distanceAssertions(model_.m_fruit, model_.m_fruit.toString(),
+						model_.m_player);
 			}
 
 			// Score, level, lives, highScore
@@ -545,263 +598,32 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The thing as arg2 of the distance.
 	 * @param thingName
 	 *            The JESS name of the thing.
+	 * @param pacMan
 	 * @throws JessException
 	 *             If Jess goes wrong.
 	 */
-	private void distanceAssertions(PacPoint thing, String thingName)
-			throws JessException {
-		if (distanceGrid_[thing.m_locX][thing.m_locY] < Integer.MAX_VALUE / 2)
+	private void distanceAssertions(PacPoint thing, String thingName,
+			Player pacMan) throws JessException {
+		if (distanceGrid_[thing.m_locX][thing.m_locY] < Integer.MAX_VALUE / 2) {
+			// Use Ms. PacMan's natural distance (manhatten)
 			rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
 					+ " player " + thingName + " "
 					+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
-	}
-
-	/**
-	 * Searches the maze for observations. Does this by expanding outwards in
-	 * junctions, recording the distance to each.
-	 * 
-	 * @param thing
-	 *            The searching from.
-	 * @return A mapping of minimal distances to junctions, given by points.
-	 */
-	public SortedSet<Junction> searchMaze(Thing thing) {
-		SortedSet<Junction> closeJunctions = new TreeSet<Junction>();
-
-		Point playerLoc = new Point(thing.m_locX, thing.m_locY);
-
-		// If Pacman has moved, update the distance grid.
-		if ((gridStart_ == null) || (!gridStart_.equals(playerLoc))) {
-			gridStart_ = playerLoc;
-			// Redoing the observations
-			resetDistanceGrid();
-
-			// Update the distance grid
-			Set<Point> knownJunctions = new HashSet<Point>();
-			// Check for junctions here.
-			Set<Junction> thisLoc = isJunction(playerLoc, 0);
-			if (thisLoc != null) {
-				Point p = thisLoc.iterator().next().getLocation();
-				knownJunctions.add(p);
-			}
-
-			SortedSet<Junction> junctionStack = new TreeSet<Junction>();
-			// Add the initial junction points to the stack
-			junctionStack.add(new Junction(playerLoc, Thing.UP, 0));
-			junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0));
-			junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0));
-			junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0));
-			distanceGrid_[playerLoc.x][playerLoc.y] = 0;
-
-			// Keep following junctions until all have been found
-			while (!junctionStack.isEmpty()) {
-				Junction point = junctionStack.first();
-				junctionStack.remove(point);
-
-				Set<Junction> nextJunction = searchToJunction(point,
-						knownJunctions);
-				junctionStack.addAll(nextJunction);
-
-				// Checking for the immediate junctions
-				if ((!nextJunction.isEmpty())
-						&& (point.getLocation().equals(playerLoc))) {
-					closeJunctions.add(nextJunction.iterator().next());
-				}
-			}
-
-			return closeJunctions;
-		}
-		return pacJunctions_;
-	}
-
-	/**
-	 * A method for searching for the shortest distance from junction to
-	 * junction.
-	 * 
-	 * @param startingPoint
-	 *            The starting point for the junction search.
-	 * @param knownJunctions
-	 *            The known junctions.
-	 * @return The set of starting points for the next found junction or an
-	 *         empty set.
-	 */
-	private Set<Junction> searchToJunction(Junction startingPoint,
-			Set<Point> knownJunctions) {
-		byte direction = startingPoint.getDirection();
-		int x = startingPoint.getLocation().x;
-		int y = startingPoint.getLocation().y;
-		int distance = startingPoint.getDistance();
-
-		// Checking for an invalid request to move
-		if (!Thing.getDestination(direction, x, y, new Point(), model_)) {
-			return new HashSet<Junction>();
-		}
-
-		// Move in the direction
-		byte oldDir = 0;
-		Set<Junction> isJunct = null;
-		boolean changed = false;
-		do {
-			changed = false;
-			switch (direction) {
-			case Thing.UP:
-				y--;
-				oldDir = Thing.DOWN;
-				break;
-			case Thing.DOWN:
-				y++;
-				oldDir = Thing.UP;
-				break;
-			case Thing.LEFT:
-				x--;
-				oldDir = Thing.RIGHT;
-				break;
-			case Thing.RIGHT:
-				x++;
-				oldDir = Thing.LEFT;
-				break;
-			}
-			// Modulus the coordinates for the warp paths
-			x = (x + model_.m_gameSizeX) % model_.m_gameSizeX;
-			y = (y + model_.m_gameSizeY) % model_.m_gameSizeY;
-
-			// Note the distance
-			distance++;
-			if (distance < distanceGrid_[x][y]) {
-				changed = true;
-				distanceGrid_[x][y] = distance;
-			}
-
-			// Check if the new position is a junction
-			isJunct = isJunction(new Point(x, y), distance);
-
-			// If not, find the next direction
-			if (isJunct == null) {
-				for (byte d = 1; d <= 4; d++) {
-					// If the direction isn't the direction came from
-					if (d != oldDir) {
-						if (Thing.getDestination(d, x, y, new Point(), model_)) {
-							direction = d;
-							break;
-						}
-					}
-				}
-			}
-		} while (isJunct == null);
-
-		// Post-process the junction to remove the old direction scan
-		Junction removal = null;
-		for (Junction jp : isJunct) {
-			if (jp.getDirection() == oldDir) {
-				removal = jp;
-				break;
-			}
-		}
-		isJunct.remove(removal);
-
-		// Check if the junction has been found
-		Point junction = isJunct.iterator().next().getLocation();
-		if (knownJunctions.contains(junction)) {
-			if (changed)
-				return isJunct;
 		} else {
-			knownJunctions.add(junction);
-			return isJunct;
+			// Use Euclidean distance, rounding
+			int distance = (int) Math.round(Point.distance(thing.m_locX,
+					thing.m_locY, pacMan.m_locX, pacMan.m_locY));
+			rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
+					+ " player " + thingName + " " + distance + "))");
 		}
-		return new HashSet<Junction>();
-	}
-
-	/**
-	 * Calculates the distance for a thing to a point
-	 * 
-	 * @param ghost
-	 *            The ghost that is being calculated for.
-	 * @param p
-	 *            The point the thing is going to.
-	 * @return The distance the ghost must travel to get to the destination
-	 *         point.
-	 */
-	private int calculateDistance(Ghost ghost, Point p) {
-		// Create a duplicate and move it greedily towards the destination
-		Ghost duplicate = (Ghost) ghost.clone();
-		// Setting up greedy behaviour
-		duplicate.m_bCanFollow = true;
-		duplicate.m_bCanUseNextBest = false;
-		duplicate.m_bInsaneAI = true;
-		duplicate.m_bChaseMode = true;
-		duplicate.m_bOldChaseMode = true;
-		duplicate.m_deltaMax = 1;
-		duplicate.m_deltaStartX = 0;
-		duplicate.m_destinationX = -1;
-		duplicate.m_destinationY = -1;
-		duplicate.m_lastDirection = Thing.STILL;
-		duplicate.m_targetX = p.x;
-		duplicate.m_targetY = p.y;
-
-		int distance = 0;
-		// While the ghost has not arrived at the destination
-		while (!((duplicate.m_locX == p.x) && (duplicate.m_locY == p.y))) {
-			duplicate.m_deltaMax = 1;
-			duplicate.m_deltaLocX = 0;
-			duplicate.m_deltaLocY = 0;
-			if ((duplicate.m_locX == 13) && (duplicate.m_locY <= 14)
-					&& (duplicate.m_locY >= 12)) {
-				duplicate.m_lastLocX = duplicate.m_locX;
-				duplicate.m_lastLocY = duplicate.m_locY;
-				duplicate.m_destinationX = -1;
-				duplicate.m_destinationY = -1;
-				duplicate.m_locY--;
-				duplicate.m_bInsideRoom = false;
-				duplicate.m_bEnteringDoor = false;
-				duplicate.m_bEaten = false;
-			} else {
-				duplicate.tickThing(model_.m_pacMan.m_gameUI);
-				model_.m_pacMan.Move(duplicate);
-			}
-			distance++;
-
-			// Break if something goes wrong
-			if (distance > 99) {
-				distance = -99;
-				break;
-			}
-		}
-		return distance;
-	}
-
-	/**
-	 * Checks if the coordinates are a junction. If they are, returns a bitwise
-	 * representation of the directions to go.
-	 * 
-	 * @param loc
-	 *            The location of the possible junction.
-	 * @param distance
-	 *            The current distance of the junction.
-	 * @return A list of the possible directions the junction goes or null if no
-	 *         junction.
-	 */
-	private Set<Junction> isJunction(Point loc, int distance) {
-		Set<Junction> dirs = new HashSet<Junction>();
-		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_NORTH) == 0)
-			dirs.add(new Junction(loc, Thing.UP, distance));
-		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_SOUTH) == 0)
-			dirs.add(new Junction(loc, Thing.DOWN, distance));
-		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_EAST) == 0)
-			dirs.add(new Junction(loc, Thing.RIGHT, distance));
-		if ((model_.m_gameState[loc.x][loc.y] & GameModel.GS_WEST) == 0)
-			dirs.add(new Junction(loc, Thing.LEFT, distance));
-
-		if (dirs.size() > 2)
-			return dirs;
-		return null;
 	}
 
 	/**
 	 * Resets the observation and distance grid array.
 	 */
-	private void resetDistanceGrid() {
-		distanceGrid_ = new int[model_.m_gameSizeX][model_.m_gameSizeY];
-		for (int x = 0; x < distanceGrid_.length; x++)
-			Arrays.fill(distanceGrid_[x], Integer.MAX_VALUE);
+	private void cacheDistanceGrids() {
+		distanceGridCache_ = new DistanceGridCache(model_,
+				model_.m_player.m_startX, model_.m_player.m_startY);
 	}
 
 	/**
@@ -813,9 +635,5 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 	public int[][] getDistanceGrid() {
 		return distanceGrid_;
-	}
-
-	public void resetGridStart() {
-		gridStart_ = null;
 	}
 }

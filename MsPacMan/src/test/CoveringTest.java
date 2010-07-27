@@ -186,16 +186,16 @@ public class CoveringTest {
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
 			if (gr.getAction().contains("moveFloor")) {
-				assertTrue(gr.getConditions(false).contains("(highest ?X)"));
-				assertTrue(gr.getConditions(false).contains("(clear ?X)"));
-				assertTrue(gr.getConditions(false).contains("(on ?X b)"));
-				assertTrue(gr.getConditions(false).contains("(above ?X b)"));
-				assertTrue(gr.getConditions(false).contains("(above ?X a)"));
-				assertTrue(gr.getConditions(false).contains("(above ?X c)"));
+				assertTrue(gr.getConditions(false).contains("(highest d)"));
+				assertTrue(gr.getConditions(false).contains("(clear d)"));
+				assertTrue(gr.getConditions(false).contains("(on d b)"));
+				assertTrue(gr.getConditions(false).contains("(above d b)"));
+				assertTrue(gr.getConditions(false).contains("(above d a)"));
+				assertTrue(gr.getConditions(false).contains("(above d c)"));
 				assertTrue(gr.getConditions(false).contains("(block a)"));
 				assertTrue(gr.getConditions(false).contains("(block b)"));
 				assertTrue(gr.getConditions(false).contains("(block c)"));
-				assertEquals("(moveFloor ?X)", gr.getAction());
+				assertEquals("(moveFloor d)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
@@ -305,7 +305,7 @@ public class CoveringTest {
 				assertFalse(gr.getConditions(false).contains("(on ?X b)"));
 				assertFalse(gr.getConditions(false).contains("(above ?X b)"));
 				assertTrue(gr.getConditions(false).contains("(above ?X a)"));
-				assertFalse(gr.getConditions(false).contains("(above ?X ?)"));
+				assertTrue(gr.getConditions(false).contains("(above ?X ?)"));
 				assertTrue(gr.getConditions(false).contains("(block a)"));
 				assertEquals("(moveFloor ?X)", gr.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
@@ -1004,7 +1004,7 @@ public class CoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertFalse(oldState.contains("(on ? ?Y)"));
+		assertTrue(oldState.contains("(on ? ?Y)"));
 		assertTrue(oldState.contains("(on ?X ?Y)"));
 		assertTrue(oldTerms.contains("?X"));
 		assertTrue(oldTerms.contains("?Y"));

@@ -13,6 +13,7 @@ public class PacManState extends State {
 	public static final int FRUIT = 1;
 	public static final int DISTANCE_GRID = 2;
 	public static final int SAFEST_JUNCTION = 3;
+	public static final int PLAYER = 4;
 
 	/**
 	 * A constructor for a pacman state.
@@ -38,5 +39,9 @@ public class PacManState extends State {
 
 	public int getSafestJunction() {
 		return (Integer) getStateArray()[SAFEST_JUNCTION];
+	}
+
+	public Player getPlayer() {
+		return (Player) getStateArray()[PLAYER];
 	}
 }

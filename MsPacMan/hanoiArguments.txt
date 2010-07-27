@@ -1,0 +1,6 @@
+hanoi.Hanoi
+10
+50
+bestHanoiPolicy.txt
+generatorHanoiOutput.txt
+hanoiPerformance.txt

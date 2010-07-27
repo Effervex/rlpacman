@@ -2,6 +2,8 @@ package rlPacMan;
 
 import java.awt.*;
 
+import relationalFramework.RuleAction;
+
 // Top Right Canvas which is repainted many times because
 // it contains the Score string.
 class TopCanvas extends Canvas {
@@ -86,7 +88,7 @@ class BottomCanvas extends Canvas {
 	Graphics m_offGraphics;
 	Dimension m_offDim;
 
-	private String[] actionList_;
+	private RuleAction[] actionList_;
 
 	public BottomCanvas(PacMan pacMan, GameModel gameModel, int width,
 			int height) {
@@ -156,9 +158,16 @@ class BottomCanvas extends Canvas {
 			y += fm.getAscent() + fm.getDescent();
 			m_offGraphics.drawString("\'A\' for About", x, y);
 		} else {
+			m_offGraphics.drawString("Actions:", x, y);
+			y += fm.getAscent() + fm.getDescent();
 			// Draw the agent's actions
-			for (String action : actionList_) {
-				m_offGraphics.drawString(action, x, y);
+			for (RuleAction action : actionList_) {
+				if (action.getUtilisedActions() != null)
+					m_offGraphics.setColor(Color.white);
+				else
+					m_offGraphics.setColor(Color.gray);
+				String actionStr = action.getRule().getActionPredicate();
+				m_offGraphics.drawString("  " + actionStr, x, y);
 				y += fm.getAscent() + fm.getDescent();
 			}
 		}
@@ -181,7 +190,7 @@ class BottomCanvas extends Canvas {
 	 * 
 	 * @param actionList The agent's action list. 
 	 */
-	public void setActionsList(String[] actionList) {
+	public void setActionsList(RuleAction[] actionList) {
 		actionList_ = actionList;
 	}
 }

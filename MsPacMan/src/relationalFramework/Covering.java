@@ -55,7 +55,7 @@ public class Covering {
 	 * @param state
 	 *            The state of the environment, containing the valid actions.
 	 * @param validActions
-	 *            The set of valid actions ot choose from.
+	 *            The set of valid actions to choose from.
 	 * @param coveredRules
 	 *            A starting point for the rules, if any exist.
 	 * @return A list of guided rules, one for each action type.
@@ -683,9 +683,9 @@ public class Covering {
 		PreGoalInformation preGoal = preGoals_.get(actionPred);
 
 		// If we have a pre goal state
+		List<String> ruleConditions = rule.getConditions(true);
 		if (preGoal != null) {
 			List<String> preGoalState = preGoal.getState();
-			List<String> ruleConditions = rule.getConditions(true);
 
 			// Form a replacement terms map.
 			Map<String, String> replacementTerms = new HashMap<String, String>();
@@ -754,10 +754,209 @@ public class Covering {
 					}
 				}
 			}
+		} else if (!rule.isMutant()) {
+			mutants.addAll(splitRanges(ruleConditions, rule.getAction(), rule
+					.getQueryParameters(), null, 0));
 		}
 
 		rule.checkInequals();
 		return mutants;
+	}
+
+	/**
+	 * Splits any ranges in a rule into a number of smaller uniform sub-ranges.
+	 * 
+	 * @param ruleConditions
+	 *            The original conditions of the rule.
+	 * @param ruleAction
+	 *            The original action of the rule. Shouldn't need to change.
+	 * @param queryParameters
+	 *            The query parameters the rule may take.
+	 * @param preGoalSplit
+	 *            The split term in the pre-goal matching a ranged condition in
+	 *            the rule. Can be null.
+	 * @param numericalIndex
+	 *            The index in the pre-goal split of the numerical value. Not
+	 *            used if preGoalSplit is null.
+	 * @return A collection of any sub-ranged mutants created from the rule.
+	 */
+	private Collection<GuidedRule> splitRanges(List<String> ruleConditions,
+			String ruleAction, List<String> queryParameters,
+			String[] preGoalSplit, int numericalIndex) {
+		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
+
+		// Run through each condition
+		for (int c = 0; c < ruleConditions.size(); c++) {
+			String[] condSplit = StateSpec.splitFact(ruleConditions.get(c));
+			for (int i = 1; i < condSplit.length; i++) {
+				String origCond = condSplit[i];
+				int suchThatIndex = condSplit[i].indexOf("&:");
+
+				if (suchThatIndex != -1) {
+					// We have a range
+					String[] betweenRangeSplit = StateSpec
+							.splitFact(condSplit[i]
+									.substring(suchThatIndex + 2));
+					// Find the values
+					double min = Double.parseDouble(betweenRangeSplit[2]);
+					double max = Double.parseDouble(betweenRangeSplit[3]);
+					double rangeSplit = (max - min) / NUM_DISCRETE_RANGES;
+
+					// Check if the pre-goal matches the value
+					if ((preGoalSplit != null)
+							&& (condSplit[0].equals(preGoalSplit[0]))) {
+						// Split the range into chunks of max size rangeSplit,
+						// using pre-goal start and end points as start and end
+						// points of the range.
+						if (preGoalSplit[numericalIndex]
+								.contains(StateSpec.BETWEEN_RANGE)) {
+							// Mutate to a pre-goal range
+							int preGoalSuchThatIndex = preGoalSplit[numericalIndex]
+									.indexOf("&:");
+							String[] preGoalRangeSplit = StateSpec
+									.splitFact(preGoalSplit[numericalIndex]
+											.substring(preGoalSuchThatIndex + 2));
+							double startPoint = Double
+									.parseDouble(preGoalRangeSplit[2]);
+							double endPoint = Double
+									.parseDouble(preGoalRangeSplit[3]);
+
+							// Determine the ranges
+							int beforePointIntervals = (int) Math
+									.ceil((startPoint - min) / rangeSplit);
+							double beforeRange = (startPoint - min)
+									/ beforePointIntervals;
+							int midPointIntervals = (int) Math
+									.ceil((endPoint - startPoint) / rangeSplit);
+							double midRange = (endPoint - startPoint)
+									/ midPointIntervals;
+							int afterPointIntervals = (int) Math
+									.ceil((max - endPoint) / rangeSplit);
+							double afterRange = (max - endPoint)
+									/ afterPointIntervals;
+							
+							// Create the ranges.
+							subranges.addAll(createRangedMutations(
+									ruleConditions, ruleAction,
+									queryParameters, c, condSplit, i,
+									betweenRangeSplit[1], min, beforeRange,
+									beforePointIntervals));
+							subranges.addAll(createRangedMutations(
+									ruleConditions, ruleAction,
+									queryParameters, c, condSplit, i,
+									betweenRangeSplit[1], startPoint, midRange,
+									midPointIntervals));
+							subranges.addAll(createRangedMutations(
+									ruleConditions, ruleAction,
+									queryParameters, c, condSplit, i,
+									betweenRangeSplit[1], endPoint, afterRange,
+									afterPointIntervals));
+						} else {
+							double point = Double
+									.parseDouble(preGoalSplit[numericalIndex]);
+							// Mutate to a single point
+							// Determine the ranges
+							int beforePointIntervals = (int) Math
+									.ceil((point - min) / rangeSplit);
+							double beforeRange = (point - min)
+									/ beforePointIntervals;
+							int afterPointIntervals = (int) Math
+									.ceil((max - point) / rangeSplit);
+							double afterRange = (max - point)
+									/ afterPointIntervals;
+							// Create the ranges.
+							subranges.addAll(createRangedMutations(
+									ruleConditions, ruleAction,
+									queryParameters, c, condSplit, i,
+									betweenRangeSplit[1], min, beforeRange,
+									beforePointIntervals));
+							subranges.addAll(createRangedMutations(
+									ruleConditions, ruleAction,
+									queryParameters, c, condSplit, i,
+									betweenRangeSplit[1], point, afterRange,
+									afterPointIntervals));
+
+							// Create the point mutant itself
+							condSplit[i] = point + "";
+							String fullCondition = StateSpec
+									.reformFact(condSplit);
+							List<String> cloneConds = new ArrayList<String>(
+									ruleConditions);
+							cloneConds.set(c, fullCondition);
+
+							String newAction = ruleAction.replaceAll(Pattern
+									.quote(betweenRangeSplit[1]), point + "");
+							GuidedRule mutant = new GuidedRule(cloneConds,
+									newAction, true);
+							mutant.setQueryParams(queryParameters);
+							mutant.expandConditions();
+							subranges.add(mutant);
+						}
+					} else {
+						subranges.addAll(createRangedMutations(ruleConditions,
+								ruleAction, queryParameters, c, condSplit, i,
+								betweenRangeSplit[1], min, rangeSplit,
+								NUM_DISCRETE_RANGES));
+					}
+
+					condSplit[i] = origCond;
+				}
+			}
+		}
+
+		return subranges;
+	}
+
+	/**
+	 * Create a number of ranged mutations between two points.
+	 * 
+	 * @param ruleConditions
+	 *            The rule conditions clone and modify.
+	 * @param ruleAction
+	 *            The rule action.
+	 * @param queryParameters
+	 *            The query parameters.
+	 * @param condIndex
+	 *            The index of the condition within the rule.
+	 * @param condSplit
+	 *            The split condition.
+	 * @param condSplitIndex
+	 *            The index within the split condition being modified.
+	 * @param rangeVariable
+	 *            The variable used to represent the range.
+	 * @param min
+	 *            The minimum value.
+	 * @param rangeSplit
+	 *            The size of the range.
+	 * @param numRanges
+	 *            The number of ranges.
+	 * @return A collection of mutated rules, each representing a portion of the
+	 *         range given. The number of rules equals the numebr of ranges.
+	 */
+	private Collection<GuidedRule> createRangedMutations(
+			List<String> ruleConditions, String ruleAction,
+			List<String> queryParameters, int condIndex, String[] condSplit,
+			int condSplitIndex, String rangeVariable, double min,
+			double rangeSplit, int numRanges) {
+		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
+
+		// Create NUM_DISCRETE_RANGES mutants per range
+		for (int j = 0; j < numRanges; j++) {
+			condSplit[condSplitIndex] = rangeVariable + "&:("
+					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " "
+					+ (min + rangeSplit * j) + " "
+					+ (min + rangeSplit * (j + 1)) + ")";
+			String fullCondition = StateSpec.reformFact(condSplit);
+			List<String> cloneConds = new ArrayList<String>(ruleConditions);
+			cloneConds.set(condIndex, fullCondition);
+
+			GuidedRule mutant = new GuidedRule(cloneConds, ruleAction, true);
+			mutant.setQueryParams(queryParameters);
+			mutant.expandConditions();
+			subranges.add(mutant);
+		}
+
+		return subranges;
 	}
 
 	/**
@@ -811,10 +1010,7 @@ public class Covering {
 			boolean ceaseMutation = false;
 			for (int i = 1; i < condSplit.length; i++) {
 				// Refining ranged numerical variables
-				int suchThatIndex = preGoalSplit[i].indexOf("&:");
 				String preGoalITerm = preGoalSplit[i];
-				if (suchThatIndex != -1)
-					preGoalITerm = preGoalSplit[i].substring(0, suchThatIndex);
 
 				// Finding the replacement term
 				String replacedTerm = (replacementTerms
@@ -880,48 +1076,23 @@ public class Covering {
 					replActionTerms.set(replActionTerms.indexOf(condSplit[i]),
 							reverseReplacementTerms.get(condSplit[i]));
 
-					// If we're dealing with a numerical term
-					if (suchThatIndex != -1) {
-						String[] betweenRangeSplit = preGoalSplit[i].split(" ");
-						// Find the values
-						double min = Double.parseDouble(betweenRangeSplit[2]);
-						double max = Double
-								.parseDouble(betweenRangeSplit[3].substring(0,
-										betweenRangeSplit[3].length() - 1));
-						double rangeSplit = (max - min) / NUM_DISCRETE_RANGES;
-						// Create a mutant for each range
-						for (int r = 0; r < NUM_DISCRETE_RANGES; r++) {
-							String replacementTerm = preGoalITerm
-									+ "&:("
-									+ StateSpec.BETWEEN_RANGE
-									+ " "
-									+ preGoalITerm
-									+ " "
-									+ (min + rangeSplit * r)
-									+ " "
-									+ (max - rangeSplit
-											* (NUM_DISCRETE_RANGES - r - 1))
-									+ ")";
-							GuidedRule mutant = replaceActionTerm(actionPred,
-									preGoalState, preGoalTerms, ruleConditions,
-									condSplit[i], replacementTerm,
-									replActionTerms, false);
-							if (mutant != null)
-								mutants.add(mutant);
-						}
-					} else {
-						GuidedRule mutant = replaceActionTerm(actionPred,
-								preGoalState, preGoalTerms, ruleConditions,
-								condSplit[i], reverseReplacementTerms
-										.get(condSplit[i]), replActionTerms,
-								true);
-						if (mutant != null)
-							mutants.add(mutant);
-					}
+					GuidedRule mutant = replaceActionTerm(actionPred,
+							preGoalState, preGoalTerms, ruleConditions,
+							condSplit[i], reverseReplacementTerms
+									.get(condSplit[i]), replActionTerms, true);
+					if (mutant != null)
+						mutants.add(mutant);
 
 					// Whatever the outcome, remove the reverse replacement
 					// as it has already been tested.
 					reverseReplacementTerms.remove(condSplit[i]);
+				}
+
+				// If the condSplit is a numerical range, create a number of
+				// sub-ranged mutations, using the range found in the pre-goal.
+				if (condSplit[i].contains(StateSpec.BETWEEN_RANGE)) {
+					mutants.addAll(splitRanges(ruleConditions, ruleAction,
+							queryParameters, preGoalSplit, i));
 				}
 			}
 		}

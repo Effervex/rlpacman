@@ -10,6 +10,7 @@ import java.util.Map;
 // operations, looking up and manipulating the gamestate can be done
 // quickly.
 public class GameModel {
+	public static final int MAX_LEVELS = 10;
 	// Gamestate Values
 	// GS_**** where in this location, a wall exists in the **** direction.
 	static final int GS_NORTH = 1 << 0;
@@ -286,7 +287,7 @@ public class GameModel {
 		m_powerdots.clear();
 		// There are five different game boards which are
 		// rotated after a board is completed twice
-		switch (m_stage % 10) {
+		switch (m_stage % MAX_LEVELS) {
 		case 1:
 		case 2:
 			loadPacManMaze();
