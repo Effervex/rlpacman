@@ -32,8 +32,8 @@ public class PacMan {
 		// Create canvases and layout
 		m_gameModel = new GameModel(this);
 		m_gameUI = new GameUI(this, m_gameModel, 409, 450);
-		m_topCanvas = new TopCanvas(m_gameModel, 400, 200);
-		m_bottomCanvas = new BottomCanvas(this, m_gameModel, 400, 250);
+		m_topCanvas = new TopCanvas(m_gameModel, 150, 150);
+		m_bottomCanvas = new BottomCanvas(this, m_gameModel, 150, 300);
 
 		keyAdapter_ = new PacManKeyAdapter(this);
 		if (!experimentMode) {

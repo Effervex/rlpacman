@@ -67,8 +67,8 @@ public class PacManCoveringTest {
 			sut_.setPreGoal("(toDot ?X " + point + ")", pregoal);
 
 			rule = new GuidedRule(
-					"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
-							+ "(dot ?X) (pacman player) => (toDot ?X ?__Num0)");
+					"(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
+							+ "(dot ?X) (pacman player) => (toDot ?X ?__Num3)");
 			rule.expandConditions();
 			results = sut_.specialiseToPreGoal(rule);
 			assertTrue(results.size() >= Covering.NUM_DISCRETE_RANGES + 1);
@@ -81,11 +81,11 @@ public class PacManCoveringTest {
 			for (int i = 0; i < beforeIntervals; i++)
 				assertTrue(results
 						.contains(new GuidedRule(
-								"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+								"(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 "
 										+ (beforeInterval * i)
 										+ " "
 										+ (beforeInterval * (i + 1))
-										+ ") (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+										+ ") (dot ?X) (pacman player) => (toDot ?X ?__Num3)",
 								false, true, null)));
 
 			// The point itself
@@ -98,11 +98,11 @@ public class PacManCoveringTest {
 			for (int i = 0; i < afterIntervals; i++)
 				assertTrue(results
 						.contains(new GuidedRule(
-								"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+								"(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 "
 										+ (point + afterInterval * i)
 										+ " "
 										+ (point + afterInterval * (i + 1))
-										+ ") (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+										+ ") (dot ?X) (pacman player) => (toDot ?X ?__Num3)",
 								false, true, null)));
 		}
 
@@ -115,9 +115,9 @@ public class PacManCoveringTest {
 			pregoal.add("(dot ?X)");
 			pregoal.add("(pacman player)");
 			pregoal
-					.add("(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+					.add("(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 "
 							+ startPoint + " " + endPoint + "))");
-			sut_.setPreGoal("(toDot ?X ?__Num0)", pregoal);
+			sut_.setPreGoal("(toDot ?X ?__Num3)", pregoal);
 			
 			rule = new GuidedRule(
 					"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
