@@ -616,7 +616,7 @@ public class PolicyGenerator {
 					if (prevCount == null)
 						prevCount = 0d;
 					ruleCounts.put(rule, prevCount + weight);
-				} else if (!eliteSolution.isLGGRule(rule)) {
+				} else if (!eliteSolution.isCoveredRule(rule)) {
 					// If the rule didn't fire but isn't an automatically added
 					// LGG rule, set its slot position as 1
 					Integer prevRawCount = rawSlotCounts.get(ruleSlot);

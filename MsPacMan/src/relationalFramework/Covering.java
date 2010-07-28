@@ -818,8 +818,12 @@ public class Covering {
 											.substring(preGoalSuchThatIndex + 2));
 							double startPoint = Double
 									.parseDouble(preGoalRangeSplit[2]);
+							if (startPoint < min)
+								startPoint = min;
 							double endPoint = Double
 									.parseDouble(preGoalRangeSplit[3]);
+							if (endPoint > max)
+								endPoint = max;
 
 							// Determine the ranges
 							int beforePointIntervals = (int) Math
@@ -834,7 +838,7 @@ public class Covering {
 									.ceil((max - endPoint) / rangeSplit);
 							double afterRange = (max - endPoint)
 									/ afterPointIntervals;
-							
+
 							// Create the ranges.
 							subranges.addAll(createRangedMutations(
 									ruleConditions, ruleAction,
@@ -854,6 +858,10 @@ public class Covering {
 						} else {
 							double point = Double
 									.parseDouble(preGoalSplit[numericalIndex]);
+							if (point < min)
+								point = min;
+							if (point > max)
+								point = max;
 							// Mutate to a single point
 							// Determine the ranges
 							int beforePointIntervals = (int) Math
@@ -1019,47 +1027,52 @@ public class Covering {
 
 				// 5. Replacing variable terms
 				if (condSplit[i].charAt(0) == '?') {
-					String backup = condSplit[i];
-					// The pregoal term is not anonymous
-					if (!ceaseMutation
-							&& !preGoalITerm.equals(StateSpec.ANONYMOUS)) {
-						// 5a. If the cond term is ? and the preds match, use
-						// the fact term
-						boolean continueCreation = true;
-						// If the condition is anonymous, replace it with any
-						// term
-						if (condSplit[i].equals(StateSpec.ANONYMOUS))
-							condSplit[i] = replacedTerm;
-						// Otherwise, a variable can be replaced with a
-						// non-action constant
-						else if (!preGoalTerms.contains(preGoalITerm))
-							condSplit[i] = preGoalITerm;
-						// Otherwise, we're looking at two non-mutatable
-						// actions.
-						else {
-							continueCreation = false;
-							// If the actions are different, cease mutation
-							if (!condSplit[i].equals(replacedTerm))
-								ceaseMutation = true;
-						}
-
-						if (continueCreation) {
-							// Create the mutant
-							String newCond = StateSpec.reformFact(condSplit);
-							if (!ruleConditions.contains(newCond)) {
-								List<String> mutatedConditions = new ArrayList<String>(
-										ruleConditions);
-								mutatedConditions.set(mutatedConditions
-										.indexOf(cond), newCond);
-								GuidedRule mutant = new GuidedRule(
-										mutatedConditions, ruleAction, true);
-								mutant.setQueryParams(queryParameters);
-								mutant.expandConditions();
-								mutants.add(mutant);
+					if (!condSplit[i].contains("&:")) {
+						String backup = condSplit[i];
+						// The pregoal term is not anonymous
+						if (!ceaseMutation
+								&& !preGoalITerm.equals(StateSpec.ANONYMOUS)) {
+							// 5a. If the cond term is ? and the preds match,
+							// use
+							// the fact term
+							boolean continueCreation = true;
+							// If the condition is anonymous, replace it with
+							// any
+							// term
+							if (condSplit[i].equals(StateSpec.ANONYMOUS))
+								condSplit[i] = replacedTerm;
+							// Otherwise, a variable can be replaced with a
+							// non-action constant
+							else if (!preGoalTerms.contains(preGoalITerm))
+								condSplit[i] = preGoalITerm;
+							// Otherwise, we're looking at two non-mutatable
+							// actions.
+							else {
+								continueCreation = false;
+								// If the actions are different, cease mutation
+								if (!condSplit[i].equals(replacedTerm))
+									ceaseMutation = true;
 							}
 
-							// Revert the cond split back
-							condSplit[i] = backup;
+							if (continueCreation) {
+								// Create the mutant
+								String newCond = StateSpec
+										.reformFact(condSplit);
+								if (!ruleConditions.contains(newCond)) {
+									List<String> mutatedConditions = new ArrayList<String>(
+											ruleConditions);
+									mutatedConditions.set(mutatedConditions
+											.indexOf(cond), newCond);
+									GuidedRule mutant = new GuidedRule(
+											mutatedConditions, ruleAction, true);
+									mutant.setQueryParams(queryParameters);
+									mutant.expandConditions();
+									mutants.add(mutant);
+								}
+
+								// Revert the cond split back
+								condSplit[i] = backup;
+							}
 						}
 					}
 				} else if (!condSplit[i].equals(replacedTerm)) {

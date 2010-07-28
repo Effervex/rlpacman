@@ -142,7 +142,7 @@ public class Policy {
 	 *            The rule being checked.
 	 * @return True if the rule was an automatically added LGG rule.
 	 */
-	public boolean isLGGRule(GuidedRule rule) {
+	public boolean isCoveredRule(GuidedRule rule) {
 		return lggRules_.contains(rule);
 	}
 
@@ -200,7 +200,7 @@ public class Policy {
 			gr.setParameters(params);
 		}
 	}
-	
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -255,7 +255,8 @@ public class Policy {
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
-				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
+				if (!isCoveredRule(rule))
+					buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
 			} else {
 				buffer.append("MODULAR: "
 						+ StateSpec.getInstance().encodeRule(rule) + "\n");
@@ -293,10 +294,10 @@ public class Policy {
 		actionSwitch.switchOffAll();
 		MultiMap<String, String> activatedActions = new MultiMap<String, String>();
 
-		if (actionsReturned == -1)
-			actionsReturned = Integer.MAX_VALUE;
-
-		// Check every slot, from top-to-bottom until one activates
+		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
+				: actionsReturned;
+		// Check every slot, from top-to-bottom until enough have activated (as
+		// per actionsReturned)
 		int actionsFound = 0;
 		Iterator<GuidedRule> iter = policyRules_.iterator();
 		while (iter.hasNext()) {
@@ -347,21 +348,23 @@ public class Policy {
 						activatedActions.putContains(split[0], args.toString());
 
 						// Use the found action set as a result.
-						actionsList.add(actBuffer.toString());
+						if (canAddRule(gr, actionsFound, actionsReturned))
+							actionsList.add(actBuffer.toString());
 					} while (results.next());
 
 					// Trim down the action list as it may contain too many
 					// actions
-					if (actionsFound < actionsReturned) {
-						if ((actionsFound + actionsList.size()) > actionsReturned) {
+					if (actionsFound < actionsReturnedModified) {
+						if ((actionsFound + actionsList.size()) > actionsReturnedModified) {
 							Collections.shuffle(actionsList);
 							actionsList = actionsList.subList(0,
-									actionsReturned - actionsFound);
+									actionsReturnedModified - actionsFound);
 						}
 
 						// Turn on the actions
-						actionSwitch.switchOn(new RuleAction(gr, actionsList,
-								this));
+						if (canAddRule(gr, actionsFound, actionsReturned))
+							actionSwitch.switchOn(new RuleAction(gr,
+									actionsList, this));
 					}
 					actionsFound += actionsList.size();
 				}
@@ -378,7 +381,7 @@ public class Policy {
 		// If the policy didn't generate enough rules, cover a set of new rules
 		// for each action.
 		if (!alreadyCovered) {
-			if (actionsFound < actionsReturned) {
+			if (actionsFound < actionsReturnedModified) {
 				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
 						.triggerCovering(state, validActions, activatedActions,
 								true);
@@ -399,6 +402,38 @@ public class Policy {
 		}
 
 		return actionSwitch;
+	}
+
+	/**
+	 * Checks if a rule can be added to the actions switch, which involves
+	 * whether it is an automatically added covered rule or not or if the number
+	 * of actions returned is already full. If it is an covered rule, it will
+	 * only be added if no other rules have been added (also, further covered
+	 * rules will be added in this way too).
+	 * 
+	 * @param gr
+	 *            The rule being possibly added.
+	 * @param actionsFound
+	 *            The number of actions found.
+	 * @param actionsReturned
+	 *            the number of actions returned.
+	 * @return True if the rule can be added, false otherwise.
+	 */
+	private boolean canAddRule(GuidedRule gr, int actionsFound,
+			int actionsReturned) {
+		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
+				: actionsReturned;
+		// If we already have enough actions, don't add it.
+		if (actionsFound >= actionsReturnedModified)
+			return false;
+
+		// If adding a covered rule to an infinite action list, don't add it if
+		// other actions have been.
+		if (isCoveredRule(gr) && (actionsReturned <= -1) && (actionsFound > 0)) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
