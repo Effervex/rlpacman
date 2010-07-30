@@ -44,8 +44,12 @@ public class Covering {
 	/** A suffix numbered variable to use when defining new ranged variables. */
 	private int rangeIndex_ = 0;
 
+	/** A recorded map of maximum ranges for each action and condition. */
+	private MultiMap<String, RangedCondition> actionRanges_;
+
 	public Covering(int numActions) {
 		clearPreGoalState(numActions);
+		actionRanges_ = new MultiMap<String, RangedCondition>();
 	}
 
 	/**
@@ -728,7 +732,8 @@ public class Covering {
 							actionPred, preGoalState, ruleConditions,
 							replacementTerms, reverseReplacementTerms,
 							ruleTerms, preGoalTerms, preGoalSplit, cond,
-							condSplit, rule.getQueryParameters());
+							condSplit, rule.getQueryParameters(), rule
+									.isMutant());
 				}
 
 				// 3. If the fact pred isn't in the cond preds, add it,
@@ -754,9 +759,10 @@ public class Covering {
 					}
 				}
 			}
-		} else if (!rule.isMutant()) {
+		} else {
 			mutants.addAll(splitRanges(ruleConditions, rule.getAction(), rule
-					.getQueryParameters(), null, 0));
+					.getQueryParameters(), rule.getActionPredicate(), null, 0,
+					rule.isMutant()));
 		}
 
 		rule.checkInequals();
@@ -765,6 +771,8 @@ public class Covering {
 
 	/**
 	 * Splits any ranges in a rule into a number of smaller uniform sub-ranges.
+	 * Only mutates rules which are either covered rules, or mutants with ranges
+	 * equal to the covered rules.
 	 * 
 	 * @param ruleConditions
 	 *            The original conditions of the rule.
@@ -772,18 +780,24 @@ public class Covering {
 	 *            The original action of the rule. Shouldn't need to change.
 	 * @param queryParameters
 	 *            The query parameters the rule may take.
+	 * @param actionPred
+	 *            The action predicate.
 	 * @param preGoalSplit
 	 *            The split term in the pre-goal matching a ranged condition in
 	 *            the rule. Can be null.
 	 * @param numericalIndex
 	 *            The index in the pre-goal split of the numerical value. Not
 	 *            used if preGoalSplit is null.
+	 * @param isRuleMutant
+	 *            If the rule is a mutant or not.
 	 * @return A collection of any sub-ranged mutants created from the rule.
 	 */
 	private Collection<GuidedRule> splitRanges(List<String> ruleConditions,
-			String ruleAction, List<String> queryParameters,
-			String[] preGoalSplit, int numericalIndex) {
+			String ruleAction, List<String> queryParameters, String actionPred,
+			String[] preGoalSplit, int numericalIndex, boolean isRuleMutant) {
 		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
+
+		// For now, if a rule is a mutant, don't mutate it
 
 		// Run through each condition
 		for (int c = 0; c < ruleConditions.size(); c++) {
@@ -801,118 +815,140 @@ public class Covering {
 					double min = Double.parseDouble(betweenRangeSplit[2]);
 					double max = Double.parseDouble(betweenRangeSplit[3]);
 					double rangeSplit = (max - min) / NUM_DISCRETE_RANGES;
+					RangedCondition rc = new RangedCondition(condSplit[0], min,
+							max);
 
-					// Check if the pre-goal matches the value
-					if ((preGoalSplit != null)
-							&& (condSplit[0].equals(preGoalSplit[0]))) {
-						// Split the range into chunks of max size rangeSplit,
-						// using pre-goal start and end points as start and end
-						// points of the range.
-						if (preGoalSplit[numericalIndex]
-								.contains(StateSpec.BETWEEN_RANGE)) {
-							// Mutate to a pre-goal range
-							int preGoalSuchThatIndex = preGoalSplit[numericalIndex]
-									.indexOf("&:");
-							String[] preGoalRangeSplit = StateSpec
-									.splitFact(preGoalSplit[numericalIndex]
-											.substring(preGoalSuchThatIndex + 2));
-							double startPoint = Double
-									.parseDouble(preGoalRangeSplit[2]);
-							if (startPoint < min)
-								startPoint = min;
-							double endPoint = Double
-									.parseDouble(preGoalRangeSplit[3]);
-							if (endPoint > max)
-								endPoint = max;
-
-							// Determine the ranges
-							int beforePointIntervals = (int) Math
-									.ceil((startPoint - min) / rangeSplit);
-							double beforeRange = (startPoint - min)
-									/ beforePointIntervals;
-							int midPointIntervals = (int) Math
-									.ceil((endPoint - startPoint) / rangeSplit);
-							double midRange = (endPoint - startPoint)
-									/ midPointIntervals;
-							int afterPointIntervals = (int) Math
-									.ceil((max - endPoint) / rangeSplit);
-							double afterRange = (max - endPoint)
-									/ afterPointIntervals;
-
-							// Create the ranges.
-							subranges.addAll(createRangedMutations(
-									ruleConditions, ruleAction,
-									queryParameters, c, condSplit, i,
-									betweenRangeSplit[1], min, beforeRange,
-									beforePointIntervals));
-							subranges.addAll(createRangedMutations(
-									ruleConditions, ruleAction,
-									queryParameters, c, condSplit, i,
-									betweenRangeSplit[1], startPoint, midRange,
-									midPointIntervals));
-							subranges.addAll(createRangedMutations(
-									ruleConditions, ruleAction,
-									queryParameters, c, condSplit, i,
-									betweenRangeSplit[1], endPoint, afterRange,
-									afterPointIntervals));
-						} else {
-							double point = Double
-									.parseDouble(preGoalSplit[numericalIndex]);
-							if (point < min)
-								point = min;
-							if (point > max)
-								point = max;
-							// Mutate to a single point
-							// Determine the ranges
-							int beforePointIntervals = (int) Math
-									.ceil((point - min) / rangeSplit);
-							double beforeRange = (point - min)
-									/ beforePointIntervals;
-							int afterPointIntervals = (int) Math
-									.ceil((max - point) / rangeSplit);
-							double afterRange = (max - point)
-									/ afterPointIntervals;
-							// Create the ranges.
-							subranges.addAll(createRangedMutations(
-									ruleConditions, ruleAction,
-									queryParameters, c, condSplit, i,
-									betweenRangeSplit[1], min, beforeRange,
-									beforePointIntervals));
-							subranges.addAll(createRangedMutations(
-									ruleConditions, ruleAction,
-									queryParameters, c, condSplit, i,
-									betweenRangeSplit[1], point, afterRange,
-									afterPointIntervals));
-
-							// Create the point mutant itself
-							condSplit[i] = point + "";
-							String fullCondition = StateSpec
-									.reformFact(condSplit);
-							List<String> cloneConds = new ArrayList<String>(
-									ruleConditions);
-							cloneConds.set(c, fullCondition);
-
-							String newAction = ruleAction.replaceAll(Pattern
-									.quote(betweenRangeSplit[1]), point + "");
-							GuidedRule mutant = new GuidedRule(cloneConds,
-									newAction, true);
-							mutant.setQueryParams(queryParameters);
-							mutant.expandConditions();
-							subranges.add(mutant);
-						}
+					// If dealing with a covered rule, record rule details
+					boolean mutate = false;
+					if (!isRuleMutant) {
+						mutate = true;
+						actionRanges_.putReplace(actionPred, rc);
 					} else {
-						subranges.addAll(createRangedMutations(ruleConditions,
-								ruleAction, queryParameters, c, condSplit, i,
-								betweenRangeSplit[1], min, rangeSplit,
-								NUM_DISCRETE_RANGES));
+						// Test to see if the range matches the action range.
+						if (actionRanges_.containsKey(actionPred)) {
+							int index = actionRanges_.get(actionPred).indexOf(
+									rc);
+							if (index != -1) {
+								// There is an action range
+								RangedCondition coveredRange = actionRanges_
+										.getIndex(actionPred, index);
+								if (rc.equalRange(coveredRange)) {
+									mutate = true;
+								}
+							}
+						}
 					}
 
-					condSplit[i] = origCond;
+					// Check if the pre-goal matches the value
+					if (mutate) {
+						determineRanges(ruleConditions, ruleAction,
+								queryParameters, preGoalSplit, numericalIndex,
+								subranges, c, condSplit, i,
+								betweenRangeSplit[1], min, max, rangeSplit);
+
+						condSplit[i] = origCond;
+					}
 				}
 			}
 		}
 
 		return subranges;
+	}
+
+	/**
+	 * Determines the ranges and creates mutants for them.
+	 * 
+	 * @param ruleConditions
+	 *            The rule conditions.
+	 * @param ruleAction
+	 *            The rule action.
+	 * @param queryParameters
+	 *            The rule's possible query parameters.
+	 * @param preGoalSplit
+	 *            The possibly null pre-goal split condition.
+	 * @param numericalIndex
+	 *            The index of the range in the pre-goal split.
+	 * @param subranges
+	 *            The collection of rules to add to.
+	 * @param c
+	 *            The condition index.
+	 * @param condSplit
+	 *            The split condition.
+	 * @param i
+	 *            The index of the split condition.
+	 * @param rangeVariable
+	 *            the range variable.
+	 * @param min
+	 *            The minimum value of the range.
+	 * @param max
+	 *            The maximum value of the range.
+	 * @param rangeSplit
+	 *            The size of the subranges.
+	 */
+	private void determineRanges(List<String> ruleConditions,
+			String ruleAction, List<String> queryParameters,
+			String[] preGoalSplit, int numericalIndex,
+			Collection<GuidedRule> subranges, int c, String[] condSplit, int i,
+			String rangeVariable, double min, double max, double rangeSplit) {
+		ArrayList<Double> values = new ArrayList<Double>();
+		values.add(min);
+		values.add(max);
+
+		// If the ranges go through 0, add that as a stopping point.
+		if (min * max < 0)
+			values.add(0d);
+
+		// If we have a pre-goal and the current split is the same condition.
+		if ((preGoalSplit != null) && (condSplit[0].equals(preGoalSplit[0]))) {
+			// Split the range into chunks of max size rangeSplit, using
+			// pre-goal start and end points as start and end points of the
+			// range.
+			if (preGoalSplit[numericalIndex].contains(StateSpec.BETWEEN_RANGE)) {
+				// Mutate to a pre-goal range
+				int preGoalSuchThatIndex = preGoalSplit[numericalIndex]
+						.indexOf("&:");
+				String[] preGoalRangeSplit = StateSpec
+						.splitFact(preGoalSplit[numericalIndex]
+								.substring(preGoalSuchThatIndex + 2));
+				double startPoint = Double.parseDouble(preGoalRangeSplit[2]);
+				if (startPoint < min)
+					startPoint = min;
+				double endPoint = Double.parseDouble(preGoalRangeSplit[3]);
+				if (endPoint > max)
+					endPoint = max;
+
+				// Determine the ranges
+				values.add(startPoint);
+				values.add(endPoint);
+			} else {
+				double point = Double.parseDouble(preGoalSplit[numericalIndex]);
+				if (point < min)
+					point = min;
+				if (point > max)
+					point = max;
+				// Mutate to a single point
+				// Determine the ranges
+				values.add(point);
+
+				// Create the point mutant itself
+				condSplit[i] = point + "";
+				String fullCondition = StateSpec.reformFact(condSplit);
+				List<String> cloneConds = new ArrayList<String>(ruleConditions);
+				cloneConds.set(c, fullCondition);
+
+				String newAction = ruleAction.replaceAll(Pattern
+						.quote(rangeVariable), point + "");
+				GuidedRule mutant = new GuidedRule(cloneConds, newAction, true);
+				mutant.setQueryParams(queryParameters);
+				mutant.expandConditions();
+				subranges.add(mutant);
+			}
+		}
+
+		Collections.sort(values);
+		subranges.addAll(createRangedMutations(ruleConditions, ruleAction,
+				queryParameters, c, condSplit, i, rangeVariable, values
+						.toArray(new Double[values.size()]), rangeSplit));
 	}
 
 	/**
@@ -932,36 +968,47 @@ public class Covering {
 	 *            The index within the split condition being modified.
 	 * @param rangeVariable
 	 *            The variable used to represent the range.
-	 * @param min
-	 *            The minimum value.
-	 * @param rangeSplit
-	 *            The size of the range.
-	 * @param numRanges
-	 *            The number of ranges.
+	 * @param values
+	 *            The values to create ranges in between.
+	 * @param normalRange
+	 *            The normal range to split by.
 	 * @return A collection of mutated rules, each representing a portion of the
-	 *         range given. The number of rules equals the numebr of ranges.
+	 *         range given. The number of rules equals the number of ranges.
 	 */
 	private Collection<GuidedRule> createRangedMutations(
 			List<String> ruleConditions, String ruleAction,
 			List<String> queryParameters, int condIndex, String[] condSplit,
-			int condSplitIndex, String rangeVariable, double min,
-			double rangeSplit, int numRanges) {
+			int condSplitIndex, String rangeVariable, Double[] values,
+			double normalRange) {
 		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
 
-		// Create NUM_DISCRETE_RANGES mutants per range
-		for (int j = 0; j < numRanges; j++) {
-			condSplit[condSplitIndex] = rangeVariable + "&:("
-					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " "
-					+ (min + rangeSplit * j) + " "
-					+ (min + rangeSplit * (j + 1)) + ")";
-			String fullCondition = StateSpec.reformFact(condSplit);
-			List<String> cloneConds = new ArrayList<String>(ruleConditions);
-			cloneConds.set(condIndex, fullCondition);
+		// Run through each range
+		for (int i = 0; i < values.length - 1; i++) {
+			double min = values[i];
+			double max = values[i + 1];
+			int numRanges = (int) Math.ceil((max - min) / normalRange);
 
-			GuidedRule mutant = new GuidedRule(cloneConds, ruleAction, true);
-			mutant.setQueryParams(queryParameters);
-			mutant.expandConditions();
-			subranges.add(mutant);
+			if (numRanges > 0) {
+				double rangeSplit = (max - min) / numRanges;
+
+				// Create NUM_DISCRETE_RANGES mutants per range
+				for (int j = 0; j < numRanges; j++) {
+					condSplit[condSplitIndex] = rangeVariable + "&:("
+							+ StateSpec.BETWEEN_RANGE + " " + rangeVariable
+							+ " " + (min + rangeSplit * j) + " "
+							+ (min + rangeSplit * (j + 1)) + ")";
+					String fullCondition = StateSpec.reformFact(condSplit);
+					List<String> cloneConds = new ArrayList<String>(
+							ruleConditions);
+					cloneConds.set(condIndex, fullCondition);
+
+					GuidedRule mutant = new GuidedRule(cloneConds, ruleAction,
+							true);
+					mutant.setQueryParams(queryParameters);
+					mutant.expandConditions();
+					subranges.add(mutant);
+				}
+			}
 		}
 
 		return subranges;
@@ -999,6 +1046,8 @@ public class Covering {
 	 *            The split form of the cond.
 	 * @param queryParameters
 	 *            The query parameters of the parent rule, if any.
+	 * @param isRuleMutant
+	 *            If the rule is a mutant oir not.
 	 * @return True if the cond and pre-goal fact match.
 	 */
 	private boolean factMutation(String ruleAction, Set<GuidedRule> mutants,
@@ -1007,7 +1056,7 @@ public class Covering {
 			Map<String, String> reverseReplacementTerms,
 			List<String> ruleTerms, List<String> preGoalTerms,
 			String[] preGoalSplit, String cond, String[] condSplit,
-			List<String> queryParameters) {
+			List<String> queryParameters, boolean isRuleMutant) {
 		// 4a. If the fact pred matches the rule pred, try replacing all
 		// occurrences of each cond term with the fact term in every cond
 		boolean hasPred = false;
@@ -1105,7 +1154,8 @@ public class Covering {
 				// sub-ranged mutations, using the range found in the pre-goal.
 				if (condSplit[i].contains(StateSpec.BETWEEN_RANGE)) {
 					mutants.addAll(splitRanges(ruleConditions, ruleAction,
-							queryParameters, preGoalSplit, i));
+							queryParameters, actionPred, preGoalSplit, i,
+							isRuleMutant));
 				}
 			}
 		}
@@ -1417,6 +1467,95 @@ public class Covering {
 		@Override
 		public String toString() {
 			return state_.toString() + " : " + actionTerms_.toString();
+		}
+	}
+
+	/**
+	 * A class to represent a range of values for a condition. Used for
+	 * recording the maximum values recorded by the covered rules.
+	 * 
+	 * @author Sam Sarjant
+	 */
+	private class RangedCondition {
+		/** The condition (distanceDot, etc) */
+		private String condition_;
+		/** The minimum value. */
+		private double minimum_;
+
+		/** The maximum value */
+		private double maximum_;
+
+		/**
+		 * The ranged condition constructor.
+		 * 
+		 * @param condition
+		 *            The condition.
+		 * @param minimum
+		 *            The minimum value.
+		 * @param maximum
+		 *            The maximum value.
+		 */
+		public RangedCondition(String condition, double minimum, double maximum) {
+			condition_ = condition;
+			minimum_ = minimum;
+			maximum_ = maximum;
+		}
+
+		public String getCondition() {
+			return condition_;
+		}
+
+		public double getMinimum() {
+			return minimum_;
+		}
+
+		public double getMaximum() {
+			return maximum_;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result
+					+ ((condition_ == null) ? 0 : condition_.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			RangedCondition other = (RangedCondition) obj;
+			if (condition_ == null) {
+				if (other.condition_ != null)
+					return false;
+			} else if (!condition_.equals(other.condition_))
+				return false;
+			return true;
+		}
+
+		/**
+		 * Checks if the ranges of two RangedConditions are equal.
+		 * 
+		 * @param coveredRange
+		 *            The other ranged condition.
+		 * @return True if the ranges are equal, false otherwise.
+		 */
+		public boolean equalRange(RangedCondition coveredRange) {
+			if ((coveredRange.minimum_ == minimum_)
+					&& (coveredRange.maximum_ == maximum_))
+				return true;
+			return false;
+		}
+
+		@Override
+		public String toString() {
+			return condition_ + " {" + minimum_ + "-" + maximum_ + "}";
 		}
 	}
 }

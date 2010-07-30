@@ -249,6 +249,16 @@ public class Policy {
 
 	@Override
 	public String toString() {
+		return toString(true);
+	}
+	
+	/**
+	 * A method for displaying the policy with optional modular rules.
+	 * 
+	 * @param withModules If displaying modules.
+	 * @return The policy in string format.
+	 */
+	public String toString(boolean withModules) {
 		if (policyRules_.isEmpty())
 			return "<EMPTY POLICY>";
 
@@ -257,7 +267,7 @@ public class Policy {
 			if (!rule.isLoadedModuleRule()) {
 				if (!isCoveredRule(rule))
 					buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
-			} else {
+			} else if (withModules) {
 				buffer.append("MODULAR: "
 						+ StateSpec.getInstance().encodeRule(rule) + "\n");
 			}
