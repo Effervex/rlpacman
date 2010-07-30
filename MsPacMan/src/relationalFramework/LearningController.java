@@ -387,7 +387,7 @@ public class LearningController {
 									+ generatorFile_.getName() + run);
 						tempGen.createNewFile();
 						PolicyGenerator.getInstance().saveGenerators(tempGen);
-						saveBestPolicy(bestPolicy);
+						saveElitePolicies(pvs);
 						// Output the episode averages
 						savePerformance(episodePerformances, run);
 					} catch (Exception e) {
@@ -437,7 +437,6 @@ public class LearningController {
 
 		// If the collection is too big, remove the worst policy values
 		if (ENTROBEAM) {
-			// TODO Remove sublist op and replace with remove.
 			if (pvs.size() > numElite) {
 				for (int i = numElite; i < pvs.size(); i++)
 					pvs.remove(i);
@@ -839,17 +838,19 @@ public class LearningController {
 	}
 
 	/**
-	 * Saves the best policy to a file.
+	 * Saves the elite policies to file.
 	 * 
-	 * @param bestPolicy
+	 * @param elites
 	 *            The best policy, in string format.
 	 */
-	private void saveBestPolicy(PolicyValue bestPolicy) throws Exception {
+	private void saveElitePolicies(List<PolicyValue> elites) throws Exception {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		buf.write(bestPolicy.getPolicy().toString() + "\n");
-		buf.write(bestPolicy.getValue() + "\n");
+		for (PolicyValue pv : elites) {
+			buf.write(pv.getPolicy().toString(false) + "\n");
+			buf.write(pv.getValue() + "\n\n");
+		}
 
 		buf.close();
 		wr.close();

@@ -285,6 +285,21 @@ public class MultiMap<K, V> {
 	}
 
 	/**
+	 * Explicitly replaces a value if it is equal to the value being added.
+	 * 
+	 * @param key The key to place the value under.
+	 * @param value The object that is guaranteed to be added to the collection.
+	 */
+	public void putReplace(K key, V value) {
+		List<V> resultantCollection = initialiseGetList(key);
+		
+		if (resultantCollection.contains(value))
+			resultantCollection.set(resultantCollection.indexOf(value), value);
+		else
+			resultantCollection.add(value);
+	}
+
+	/**
 	 * Removes a key from the multimap and returns the list contained under the
 	 * key.
 	 * 
