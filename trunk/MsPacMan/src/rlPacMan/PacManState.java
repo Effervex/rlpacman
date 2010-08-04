@@ -33,8 +33,8 @@ public class PacManState extends State {
 		return (Fruit) getStateArray()[FRUIT];
 	}
 
-	public int[][] getDistanceGrid() {
-		return (int[][]) getStateArray()[DISTANCE_GRID];
+	public DistanceDir[][] getDistanceGrid() {
+		return (DistanceDir[][]) getStateArray()[DISTANCE_GRID];
 	}
 
 	public int getSafestJunction() {

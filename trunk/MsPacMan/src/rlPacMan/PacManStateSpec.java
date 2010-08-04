@@ -290,48 +290,6 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	/**
-	 * Follows a path from a particular location back to point 0: where Pacman
-	 * currently is. This procedure thereby finds the quickest path to a point
-	 * by giving the initial direction that Pacman needs to take to get to the
-	 * goal.
-	 * 
-	 * @param x
-	 *            The x location of the point.
-	 * @param y
-	 *            The y location of the point.
-	 * @param distanceGrid
-	 *            The distance grid for the player, where a value of 0 is the
-	 *            player position.
-	 * @return The initial direction to take to follow the path.
-	 */
-	private PacManLowAction followPath(int x, int y, int[][] distanceGrid) {
-		PacManLowAction prevLocation = PacManLowAction.NOTHING;
-		// Repeat until the distance grid coords are equal to 0
-		int width = distanceGrid.length;
-		int height = distanceGrid[x].length;
-		while (distanceGrid[x][y] != 0) {
-			int currentVal = distanceGrid[x][y];
-			// Check all directions
-			if (distanceGrid[(x + 1) % width][y] <= currentVal - 1) {
-				x = (x + 1) % width;
-				prevLocation = PacManLowAction.LEFT;
-			} else if (distanceGrid[(x - 1 + width) % width][y] <= currentVal - 1) {
-				x = (x - 1 + width) % width;
-				prevLocation = PacManLowAction.RIGHT;
-			} else if (distanceGrid[x][(y + 1) % height] <= currentVal - 1) {
-				y = (y + 1) % height;
-				prevLocation = PacManLowAction.UP;
-			} else if (distanceGrid[x][(y - 1 + height) % height] <= currentVal - 1) {
-				y = (y - 1 + height) % height;
-				prevLocation = PacManLowAction.DOWN;
-			} else {
-				return prevLocation;
-			}
-		}
-		return prevLocation;
-	}
-
-	/**
 	 * Applies an action and returns a direction to move towards/from.
 	 * 
 	 * @param action
@@ -350,9 +308,11 @@ public class PacManStateSpec extends StateSpec {
 				|| (actionSplit[0].equals("fromGhostCentre"))) {
 			// To Dot, to/from powerdot
 			String[] coords = actionSplit[1].split("_");
-			byte path = (byte) followPath(Integer.parseInt(coords[1]),
-					Integer.parseInt(coords[2]), state.getDistanceGrid())
-					.ordinal();
+			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
+					.parseInt(coords[1])][Integer.parseInt(coords[2])];
+			if (distanceGrid == null)
+				return null;
+			byte path = distanceGrid.getDirection();
 			if ((actionSplit[0].equals("fromPowerDot"))
 					|| (actionSplit[0].equals("fromGhostCentre")))
 				path *= -1;
@@ -360,9 +320,11 @@ public class PacManStateSpec extends StateSpec {
 
 		} else if (actionSplit[0].equals("toFruit")) {
 			// To fruit
-			return new WeightedDirection((byte) followPath(
-					state.getFruit().m_locX, state.getFruit().m_locY,
-					state.getDistanceGrid()).ordinal(), weight);
+			DistanceDir distanceGrid = state.getDistanceGrid()[state.getFruit().m_locX][state
+					.getFruit().m_locY];
+			if (distanceGrid == null)
+				return null;
+			return new WeightedDirection(distanceGrid.getDirection(), weight);
 
 		} else if (actionSplit[0].equals("toJunction")) {
 			String[] coords = actionSplit[1].split("_");
@@ -380,18 +342,17 @@ public class PacManStateSpec extends StateSpec {
 			int juncVal = Integer.parseInt(actionSplit[2]);
 			// If the junction has safety 0, there is neither weight towards,
 			// nor from it.
+			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
+					.parseInt(coords[1])][Integer.parseInt(coords[2])];
+			if (distanceGrid == null)
+				return null;
 			if (juncVal == 0)
-				return new WeightedDirection((byte) followPath(
-						Integer.parseInt(coords[1]),
-						Integer.parseInt(coords[2]), state.getDistanceGrid())
-						.ordinal(), 0);
+				return new WeightedDirection(distanceGrid.getDirection(), 0);
 
 			normalisedSafety /= juncVal;
 
 			weight = determineWeight(normalisedSafety);
-			return new WeightedDirection((byte) followPath(
-					Integer.parseInt(coords[1]), Integer.parseInt(coords[2]),
-					state.getDistanceGrid()).ordinal(), weight);
+			return new WeightedDirection(distanceGrid.getDirection(), weight);
 
 		} else if ((actionSplit[0].equals("toGhost"))
 				|| (actionSplit[0].equals("fromGhost"))) {
@@ -405,9 +366,11 @@ public class PacManStateSpec extends StateSpec {
 			else if (actionSplit[1].equals("clyde"))
 				ghostIndex = Ghost.CLYDE;
 
-			byte path = (byte) followPath(state.getGhosts()[ghostIndex].m_locX,
-					state.getGhosts()[ghostIndex].m_locY,
-					state.getDistanceGrid()).ordinal();
+			DistanceDir distanceGrid = state.getDistanceGrid()[state
+					.getGhosts()[ghostIndex].m_locX][state.getGhosts()[ghostIndex].m_locY];
+			if (distanceGrid == null)
+				return null;
+			byte path = distanceGrid.getDirection();
 			if (actionSplit[0].equals("toGhost"))
 				return new WeightedDirection(path, weight);
 			else

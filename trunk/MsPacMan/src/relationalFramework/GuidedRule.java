@@ -45,6 +45,9 @@ public class GuidedRule {
 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
+	
+	/** The number of times this rule has been used in a policy. */
+	private int ruleUses_ = 0;
 
 	/** If this rule is assured to be without inequals preds. */
 	private boolean withoutInequals_ = false;
@@ -389,6 +392,10 @@ public class GuidedRule {
 		return Math.sqrt(internalS_ / (internalCount_ - 1));
 	}
 
+	public int getUses() {
+		return ruleUses_;
+	}
+
 	public Slot getSlot() {
 		return slot_;
 	}
@@ -433,6 +440,7 @@ public class GuidedRule {
 		hasSpawned_ = false;
 		statesSeen_ = 0;
 		ruleConditions_ = conditions;
+		ruleUses_ = 0;
 		findConstants();
 		return true;
 	}
@@ -577,6 +585,10 @@ public class GuidedRule {
 	public void incrementStatesCovered() {
 		if (statesSeen_ <= SETTLED_RULE_STATES)
 			statesSeen_++;
+	}
+
+	public void incrementRuleUses() {
+		ruleUses_++;
 	}
 
 	/**

@@ -2,17 +2,19 @@ package rlPacMan;
 
 import java.awt.Point;
 
-public class Junction extends PacPoint implements
-		Comparable<Junction> {
+public class Junction extends PacPoint implements Comparable<Junction> {
 	private byte direction_;
+	/** The original direction followed to get to this junction. */
+	private byte origDirection_;
 	private int distance_;
 	private int safety_ = Integer.MAX_VALUE;
 
-	public Junction(Point loc, byte dir, int dist) {
+	public Junction(Point loc, byte dir, int dist, byte origDir) {
 		m_locX = loc.x;
 		m_locY = loc.y;
 		direction_ = dir;
 		distance_ = dist;
+		origDirection_ = origDir;
 	}
 
 	// @Override
@@ -87,5 +89,9 @@ public class Junction extends PacPoint implements
 
 	public int getSafety() {
 		return safety_;
+	}
+
+	public byte getOrigDirection() {
+		return origDirection_;
 	}
 }

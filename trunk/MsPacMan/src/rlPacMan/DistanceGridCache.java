@@ -59,9 +59,7 @@ public class DistanceGridCache {
 				// valid position.
 				while ((iter == null) || (iter.hasNext())) {
 					// Initialise a new distance grid.
-					int[][] distanceGrid = new int[model.m_gameSizeX][model.m_gameSizeY];
-					for (int[] gridLine : distanceGrid)
-						Arrays.fill(gridLine, Integer.MAX_VALUE);
+					DistanceDir[][] distanceGrid = new DistanceDir[model.m_gameSizeX][model.m_gameSizeY];
 					SortedSet<Junction> closeJunctions = null;
 
 					Point origin = null;
@@ -113,7 +111,7 @@ public class DistanceGridCache {
 	 * @return The closest immediate junctions to the origin point.
 	 */
 	public SortedSet<Junction> searchMaze(int originX, int originY,
-			int[][] distanceGrid, Collection<Point> validLocations,
+			DistanceDir[][] distanceGrid, Collection<Point> validLocations,
 			GameModel model) {
 		SortedSet<Junction> closeJunctions = new TreeSet<Junction>();
 
@@ -122,7 +120,7 @@ public class DistanceGridCache {
 		// Update the distance grid
 		Set<Point> knownJunctions = new HashSet<Point>();
 		// Check for junctions here.
-		Set<Junction> thisLoc = isJunction(playerLoc, 0, model);
+		Set<Junction> thisLoc = isJunction(playerLoc, 0, model, Thing.STILL);
 		if (thisLoc != null) {
 			Point p = thisLoc.iterator().next().getLocation();
 			knownJunctions.add(p);
@@ -130,11 +128,11 @@ public class DistanceGridCache {
 
 		SortedSet<Junction> junctionStack = new TreeSet<Junction>();
 		// Add the initial junction points to the stack
-		junctionStack.add(new Junction(playerLoc, Thing.UP, 0));
-		junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0));
-		junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0));
-		junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0));
-		distanceGrid[playerLoc.x][playerLoc.y] = 0;
+		junctionStack.add(new Junction(playerLoc, Thing.UP, 0, Thing.UP));
+		junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0, Thing.DOWN));
+		junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0, Thing.LEFT));
+		junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0, Thing.RIGHT));
+		distanceGrid[playerLoc.x][playerLoc.y] = new DistanceDir(0, Thing.STILL);
 
 		// Keep following junctions until all have been found
 		while (!junctionStack.isEmpty()) {
@@ -173,9 +171,10 @@ public class DistanceGridCache {
 	 *         empty set.
 	 */
 	private Set<Junction> searchToJunction(Junction startingPoint,
-			Set<Point> knownJunctions, GameModel model, int[][] distanceGrid,
-			Collection<Point> validPositions) {
+			Set<Point> knownJunctions, GameModel model,
+			DistanceDir[][] distanceGrid, Collection<Point> validPositions) {
 		byte direction = startingPoint.getDirection();
+		byte origDirection = startingPoint.getOrigDirection();
 		int x = startingPoint.getLocation().x;
 		int y = startingPoint.getLocation().y;
 		int distance = startingPoint.getDistance();
@@ -220,13 +219,15 @@ public class DistanceGridCache {
 
 			// Note the distance
 			distance++;
-			if (distance < distanceGrid[x][y]) {
+			if ((distanceGrid[x][y] == null)
+					|| (distance < distanceGrid[x][y].getDistance())) {
 				changed = true;
-				distanceGrid[x][y] = distance;
+				distanceGrid[x][y] = new DistanceDir(distance, origDirection);
 			}
 
 			// Check if the new position is a junction
-			isJunct = isJunction(new Point(x, y), distance, model);
+			isJunct = isJunction(new Point(x, y), distance, model,
+					startingPoint.getOrigDirection());
 
 			// If not, find the next direction
 			if (isJunct == null) {
@@ -277,16 +278,23 @@ public class DistanceGridCache {
 	 * @return A list of the possible directions the junction goes or null if no
 	 *         junction.
 	 */
-	private Set<Junction> isJunction(Point loc, int distance, GameModel model) {
+	private Set<Junction> isJunction(Point loc, int distance, GameModel model,
+			byte origDir) {
 		Set<Junction> dirs = new HashSet<Junction>();
-		if ((model.m_gameState[loc.x][loc.y] & GameModel.GS_NORTH) == 0)
-			dirs.add(new Junction(loc, Thing.UP, distance));
-		if ((model.m_gameState[loc.x][loc.y] & GameModel.GS_SOUTH) == 0)
-			dirs.add(new Junction(loc, Thing.DOWN, distance));
-		if ((model.m_gameState[loc.x][loc.y] & GameModel.GS_EAST) == 0)
-			dirs.add(new Junction(loc, Thing.RIGHT, distance));
-		if ((model.m_gameState[loc.x][loc.y] & GameModel.GS_WEST) == 0)
-			dirs.add(new Junction(loc, Thing.LEFT, distance));
+		int[] modelDirs = { GameModel.GS_NORTH, GameModel.GS_SOUTH,
+				GameModel.GS_EAST, GameModel.GS_WEST };
+		byte[] actionDirs = { Thing.UP, Thing.DOWN, Thing.RIGHT, Thing.LEFT };
+		for (int i = 0; i < modelDirs.length; i++) {
+			if ((model.m_gameState[loc.x][loc.y] & modelDirs[i]) == 0) {
+				if (origDir == Thing.STILL)
+					dirs.add(new Junction(loc, actionDirs[i], distance,
+							actionDirs[i]));
+				else
+					dirs
+							.add(new Junction(loc, actionDirs[i], distance,
+									origDir));
+			}
+		}
 
 		if (dirs.size() > 2)
 			return dirs;
@@ -304,7 +312,7 @@ public class DistanceGridCache {
 	 *            The y origin point
 	 * @return The distance grid for the given parameters.
 	 */
-	public int[][] getGrid(int level, int originX, int originY) {
+	public DistanceDir[][] getGrid(int level, int originX, int originY) {
 		DistanceGrid grid = grids_.get(level)[originX][originY];
 		if (grid == null)
 			return null;
@@ -326,7 +334,7 @@ public class DistanceGridCache {
 			int originY) {
 		return grids_.get(level)[originX][originY].getCloseJunctions();
 	}
-	
+
 	/**
 	 * A debug feature that allows visual inspection of the distance grid.
 	 */
@@ -344,7 +352,7 @@ public class DistanceGridCache {
 			}
 			buffer.append("\n");
 		}
-		
+
 		System.out.println(buffer);
 	}
 
@@ -355,7 +363,7 @@ public class DistanceGridCache {
 	 */
 	private class DistanceGrid {
 		/** The actual distance grid for this position. */
-		private int[][] distanceGrid_;
+		private DistanceDir[][] distanceGrid_;
 
 		/** The closest junctions to the origin. */
 		private Collection<Junction> closeJunctions_;
@@ -368,13 +376,13 @@ public class DistanceGridCache {
 		 * @param closeJunctions
 		 *            The closest junctions to the origin location.
 		 */
-		public DistanceGrid(int[][] distanceGrid,
+		public DistanceGrid(DistanceDir[][] distanceGrid,
 				Collection<Junction> closeJunctions) {
 			distanceGrid_ = distanceGrid;
 			closeJunctions_ = closeJunctions;
 		}
 
-		public int[][] getDistanceGrid() {
+		public DistanceDir[][] getDistanceGrid() {
 			return distanceGrid_;
 		}
 

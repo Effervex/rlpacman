@@ -119,6 +119,41 @@ public class Slot {
 	}
 
 	/**
+	 * Creates an influenced distribution which is more likely to sample rules
+	 * used few or none times. If all rules have been used a reasonable number
+	 * of times, then the distribution is identical.
+	 * 
+	 * @param influenceThreshold
+	 *            The coefficient for determining the influence threshold.
+	 * @param influenceBoost
+	 *            The boost coefficient influenced rules receive.
+	 * @return A probability distribution, differing from the normal
+	 *         distribution only if some rules are under the influence
+	 *         threshold.
+	 */
+	public ProbabilityDistribution<GuidedRule> getInfluencedDistribution(
+			double influenceThreshold, double influenceBoost) {
+		ProbabilityDistribution<GuidedRule> influencedDistribution = ruleGenerator_
+				.clone();
+
+		int threshold = (int) (influenceThreshold * influencedDistribution
+				.size());
+		// Run through the elements, modifying probabilities if necessary
+		for (int i = 0; i < influencedDistribution.size(); i++) {
+			int uses = influencedDistribution.getElement(i).getUses();
+			if (uses < threshold) {
+				double newProb = influencedDistribution.getProb(i)
+						* (threshold + 1 - uses) / influenceThreshold
+						* influenceBoost;
+				influencedDistribution.set(i, newProb);
+			}
+		}
+
+		influencedDistribution.normaliseProbs();
+		return influencedDistribution;
+	}
+
+	/**
 	 * Gets the action this slot covers.
 	 * 
 	 * @return The action the slot covers.
