@@ -77,7 +77,7 @@ public class PolicyGenerator {
 	private boolean restart_ = false;
 
 	/** If we're using weighted elite samples. */
-	private boolean weightedElites_ = true;
+	private boolean weightedElites_ = false;
 
 	/**
 	 * The maximum amount of change between the slots before it is considered
@@ -98,6 +98,17 @@ public class PolicyGenerator {
 	private static final double MIN_UPDATE = 0.1;
 
 	/**
+	 * The threshold coefficient relative to distribution size at which rules
+	 * have extra influence.
+	 */
+	private static final double INFLUENCE_THRESHOLD = 1.0;
+
+	/**
+	 * The coefficient towards extra influence the rules gain when lowly tested.
+	 */
+	private static final double INFLUENCE_BOOST = 1.0;
+
+	/**
 	 * The constructor for creating a new Policy Generator.
 	 */
 	public PolicyGenerator() {
@@ -114,10 +125,12 @@ public class PolicyGenerator {
 	 * Generates a random policy using the weights present in the probability
 	 * distribution.
 	 * 
+	 * @param influenceUntestedRules
+	 *            Influence selection of rules towards untested rules.
 	 * @return A new policy, formed using weights from the probability
 	 *         distributions.
 	 */
-	public Policy generatePolicy() {
+	public Policy generatePolicy(boolean influenceUntestedRules) {
 		Policy policy = new Policy();
 
 		// Sample each slot from the policy with removal, forming a
@@ -127,7 +140,16 @@ public class PolicyGenerator {
 			// Sample with removal, getting the most likely if frozen.
 			Slot slot = removalDist.sampleWithRemoval(i, slotGenerator_.size(),
 					frozen_);
-			GuidedRule gr = slot.getGenerator().sample(false);
+
+			// If influencing towards untested rules, skew the slot distribution
+			// towards lesser used rules.
+			GuidedRule gr = null;
+			if (influenceUntestedRules) {
+				gr = slot.getInfluencedDistribution(INFLUENCE_THRESHOLD,
+						INFLUENCE_BOOST).sample(false);
+				gr.incrementRuleUses();
+			} else
+				gr = slot.getGenerator().sample(false);
 			if (gr != null)
 				policy.addRule(gr, true, false);
 		}
@@ -546,7 +568,10 @@ public class PolicyGenerator {
 			}
 		}
 
-		convergedValue_ = stepSize / 10;
+		if (slotOptimisation_)
+			convergedValue_ = stepSize / 100;
+		else
+			convergedValue_ = stepSize / 10;
 	}
 
 	/**

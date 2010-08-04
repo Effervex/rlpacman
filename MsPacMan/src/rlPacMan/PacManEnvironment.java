@@ -35,7 +35,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private DistanceGridCache distanceGridCache_;
 	private boolean experimentMode_ = false;
 	private PacManLowAction lastDirection_;
-	private int[][] distanceGrid_;
+	private DistanceDir[][] distanceGrid_;
 	private Collection<Junction> closeJunctions_;
 
 	@Override
@@ -294,18 +294,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 						.getInstance()).applyAction(action, state);
 
-				// Use a linearly decreasing weight and the object proximity
-				double weighting = weightedDir.getWeight();
-				bestWeight = Math.max(bestWeight, Math.abs(weighting));
-				byte dir = (byte) Math.abs(weightedDir.getDirection());
-				if (weightedDir.getDirection() > 0) {
-					directionVote[dir] += weighting;
-				} else if (weightedDir.getDirection() < 0) {
-					directionVote[dir] -= weighting;
-				}
+				if (weightedDir != null) {
+					// Use a linearly decreasing weight and the object proximity
+					double weighting = weightedDir.getWeight();
+					bestWeight = Math.max(bestWeight, Math.abs(weighting));
+					byte dir = (byte) Math.abs(weightedDir.getDirection());
+					if (weightedDir.getDirection() > 0) {
+						directionVote[dir] += weighting;
+					} else if (weightedDir.getDirection() < 0) {
+						directionVote[dir] -= weighting;
+					}
 
-				// Recording best and worst
-				worst = Math.min(worst, directionVote[dir]);
+					// Recording best and worst
+					worst = Math.min(worst, directionVote[dir]);
+				}
 			}
 
 			// Normalise the values
@@ -471,12 +473,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 						// Junction Safety
 						int safety = model_.m_gameSizeX;
 						if (!ghost.isEdible()) {
-							int[][] ghostGrid = distanceGridCache_.getGrid(
-									model_.m_stage, ghost.m_locX, ghost.m_locY);
+							DistanceDir[][] ghostGrid = distanceGridCache_
+									.getGrid(model_.m_stage, ghost.m_locX,
+											ghost.m_locY);
 							// If the ghost is in the ghost area or otherwise
 							// not accessible by PacMan, ignore it.
 							if (ghostGrid != null) {
-								int ghostDistance = ghostGrid[junc.m_locX][junc.m_locY];
+								int ghostDistance = ghostGrid[junc.m_locX][junc.m_locY]
+										.getDistance();
 								if (ghostDistance >= 0)
 									safety = ghostDistance - junc.getDistance();
 							}
@@ -604,11 +608,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 */
 	private void distanceAssertions(PacPoint thing, String thingName,
 			Player pacMan) throws JessException {
-		if (distanceGrid_[thing.m_locX][thing.m_locY] < Integer.MAX_VALUE / 2) {
+		if (distanceGrid_[thing.m_locX][thing.m_locY] != null) {
 			// Use Ms. PacMan's natural distance (manhatten)
 			rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
 					+ " player " + thingName + " "
-					+ distanceGrid_[thing.m_locX][thing.m_locY] + "))");
+					+ distanceGrid_[thing.m_locX][thing.m_locY].getDistance()
+					+ "))");
 		} else {
 			// Use Euclidean distance, rounding
 			int distance = (int) Math.round(Point.distance(thing.m_locX,
@@ -633,7 +638,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		return model_;
 	}
 
-	public int[][] getDistanceGrid() {
+	public DistanceDir[][] getDistanceGrid() {
 		return distanceGrid_;
 	}
 }

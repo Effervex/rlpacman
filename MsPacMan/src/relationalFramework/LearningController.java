@@ -289,7 +289,7 @@ public class LearningController {
 			boolean restart = false;
 			// Fill the Policy Values list.
 			do {
-				Policy pol = localPolicy.generatePolicy();
+				Policy pol = localPolicy.generatePolicy(true);
 				System.out.println(pol);
 				// Send the agent a generated policy
 				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -656,7 +656,7 @@ public class LearningController {
 	 */
 	private void preliminaryProcessing() {
 		while (!PolicyGenerator.getInstance().isSettled(false)) {
-			Policy pol = PolicyGenerator.getInstance().generatePolicy();
+			Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
 			System.out.println(pol);
 			// Send the agent a generated policy
 			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -696,7 +696,7 @@ public class LearningController {
 		for (int i = 0; i < TEST_ITERATIONS; i++) {
 			estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
 
-			Policy pol = PolicyGenerator.getInstance().generatePolicy();
+			Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
 			System.out.println(pol);
 			// Send the agent a generated policy
 			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
