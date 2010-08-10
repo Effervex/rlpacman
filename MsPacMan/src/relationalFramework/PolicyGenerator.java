@@ -17,6 +17,10 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.math.stat.descriptive.SummaryStatistics;
+import org.apache.commons.math.stat.descriptive.moment.Mean;
+import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
+
 import jess.Fact;
 import jess.Rete;
 
@@ -61,9 +65,6 @@ public class PolicyGenerator {
 	/** The goal this generator is working towards if modular. */
 	private ArrayList<String> moduleGoal_;
 
-	/** If modules are being used. */
-	public boolean useModules_ = true;
-
 	/**
 	 * If this policy generator only updates the ordering of slots - no rule
 	 * creation or modification.
@@ -71,13 +72,19 @@ public class PolicyGenerator {
 	private boolean slotOptimisation_ = false;
 
 	/**
-	 * If the experiment should restart due to new rules being introduced
-	 * mid-learning.
+	 * A flag for when the experiment needs to restart (due to new rules being
+	 * added/removed)
 	 */
 	private boolean restart_ = false;
 
 	/** If we're using weighted elite samples. */
-	private boolean weightedElites_ = false;
+	public boolean weightedElites_ = false;
+
+	/** If modules are being used. */
+	public boolean useModules_ = true;
+
+	/** If the slots can be dynamically added/removed. */
+	public boolean dynamicSlotNumber_ = true;
 
 	/**
 	 * The maximum amount of change between the slots before it is considered
@@ -133,25 +140,48 @@ public class PolicyGenerator {
 	public Policy generatePolicy(boolean influenceUntestedRules) {
 		Policy policy = new Policy();
 
-		// Sample each slot from the policy with removal, forming a
-		// deterministic policy.
-		OrderedDistribution<Slot> removalDist = slotGenerator_.clone();
-		for (int i = 0; i < slotGenerator_.size(); i++) {
-			// Sample with removal, getting the most likely if frozen.
-			Slot slot = removalDist.sampleWithRemoval(i, slotGenerator_.size(),
-					frozen_);
+		// Clone the ordered distribution so slots and rules from slots can be
+		// removed without consequence.
+		OrderedDistribution<Slot> removalDist = new OrderedDistribution<Slot>(
+				random_);
+		for (Slot slot : slotGenerator_) {
+			removalDist.add(slot.clone(), slotGenerator_.getOrdering(slot));
+		}
 
-			// If influencing towards untested rules, skew the slot distribution
-			// towards lesser used rules.
-			GuidedRule gr = null;
-			if (influenceUntestedRules) {
-				gr = slot.getInfluencedDistribution(INFLUENCE_THRESHOLD,
-						INFLUENCE_BOOST).sample(false);
-				gr.incrementRuleUses();
-			} else
-				gr = slot.getGenerator().sample(false);
-			if (gr != null)
-				policy.addRule(gr, true, false);
+		int i = 0;
+		while (!removalDist.isEmpty()) {
+			Slot slot = null;
+			if (!dynamicSlotNumber_) {
+				// Sample with removal, getting the most likely if frozen.
+				slot = removalDist.sampleWithRemoval(i, slotGenerator_.size(),
+						frozen_);
+			} else {
+				slot = removalDist.sample(i, slotGenerator_.size(), frozen_);
+				boolean[] useSlot = slot.shouldUseSlot(random_, frozen_);
+				// If we are removing the slot, remove it
+				if (!useSlot[1])
+					removalDist.remove(slot);
+				// If we aren't using the slot, set it to null.
+				if (!useSlot[0])
+					slot = null;
+			}
+
+			if ((slot != null) && (!slot.isEmpty())) {
+				// If influencing towards untested rules, skew the slot
+				// distribution towards lesser used rules.
+				GuidedRule gr = null;
+				if (influenceUntestedRules) {
+					gr = slot.getInfluencedDistribution(INFLUENCE_THRESHOLD,
+							INFLUENCE_BOOST).sample(false);
+					gr.incrementRuleUses();
+				} else
+					gr = slot.getGenerator().sample(false);
+				if (gr != null) {
+					policy.addRule(gr, true, false);
+					slot.getGenerator().remove(gr);
+					slot.getGenerator().normaliseProbs();
+				}
+			}
 		}
 
 		// Append the general rules as well (if they aren't already in there) to
@@ -547,24 +577,22 @@ public class PolicyGenerator {
 	public void updateDistributions(List<PolicyValue> sortedPolicies,
 			int numElite, double stepSize) {
 		// Keep count of the rules seen (and slots used)
-		Map<Slot, Double> slotPositions = new HashMap<Slot, Double>();
-		Map<Slot, Double> slotCounts = new HashMap<Slot, Double>();
-		Map<GuidedRule, Double> ruleCounts = new HashMap<GuidedRule, Double>();
-		countRules(sortedPolicies.subList(0, numElite), slotCounts, ruleCounts,
-				slotPositions);
+		ElitesData ed = countRules(sortedPolicies.subList(0, numElite));
 
 		// Update the slot distribution
-		updateDifference_ = slotGenerator_.updateDistribution(slotPositions,
-				stepSize);
+		updateDifference_ = slotGenerator_.updateDistribution(ed
+				.getSlotPositions(), stepSize);
 
-		// Update the rule distributions
+		// Update the rule distributions and slot activation probability
 		if (!slotOptimisation_) {
 			for (Slot slot : slotGenerator_) {
-				double slotCount = 0;
-				if (slotCounts.containsKey(slot))
-					slotCount = slotCounts.get(slot);
+				// Slot selection values
+				double mean = ed.getSlotNumeracyMean(slot);
+				double sd = ed.getSlotNumeracySD(slot);
+				slot.updateSelectionValues(mean, sd, stepSize);
+
 				updateDifference_ += slot.getGenerator().updateDistribution(
-						slotCount, ruleCounts, stepSize);
+						ed.getSlotCount(slot), ed.getRuleCounts(), stepSize);
 			}
 		}
 
@@ -588,9 +616,9 @@ public class PolicyGenerator {
 	 *            The relative positions of slots within the elite policies.
 	 * @return The average value of the elite samples.
 	 */
-	private void countRules(List<PolicyValue> elites,
-			Map<Slot, Double> slotCounts, Map<GuidedRule, Double> ruleCounts,
-			Map<Slot, Double> slotPositions) {
+	private ElitesData countRules(List<PolicyValue> elites) {
+		ElitesData ed = new ElitesData();
+
 		double gradient = 0;
 		double offset = 1;
 		if (weightedElites_) {
@@ -602,8 +630,9 @@ public class PolicyGenerator {
 		}
 
 		// Only selecting the top elite samples
-		Map<Slot, Integer> rawSlotCounts = new HashMap<Slot, Integer>();
+		MultiMap<Slot, Double> slotNumeracy = new MultiMap<Slot, Double>();
 		for (PolicyValue pv : elites) {
+			Map<Slot, Integer> policySlotCounts = new HashMap<Slot, Integer>();
 			double weight = pv.getValue() * gradient + offset;
 			Policy eliteSolution = pv.getPolicy();
 
@@ -618,50 +647,50 @@ public class PolicyGenerator {
 				// If the rule is in the fired rules
 				if (firingRules.contains(rule)) {
 					// Slot counts
-					Double prevCount = slotCounts.get(ruleSlot);
-					if (prevCount == null)
-						prevCount = 0d;
-					slotCounts.put(ruleSlot, prevCount + weight);
-					Integer prevRawCount = rawSlotCounts.get(ruleSlot);
-					if (prevRawCount == null)
-						prevRawCount = 0;
-					rawSlotCounts.put(ruleSlot, prevRawCount + 1);
+					ed.addSlotCount(ruleSlot, weight);
 
 					// Slot ordering
 					double relValue = OrderedDistribution.getRelativePosition(
 							firedRuleIndex, eliteSolution.size());
-					Double oldValue = slotPositions.get(ruleSlot);
-					if (oldValue == null)
-						oldValue = 0d;
-					slotPositions.put(ruleSlot, oldValue + relValue);
+					ed.addSlotOrdering(ruleSlot, relValue);
 					firedRuleIndex++;
 
 					// Rule counts
-					prevCount = ruleCounts.get(rule);
-					if (prevCount == null)
-						prevCount = 0d;
-					ruleCounts.put(rule, prevCount + weight);
-				} else if (!eliteSolution.isCoveredRule(rule)) {
-					// If the rule didn't fire but isn't an automatically added
-					// LGG rule, set its slot position as 1
-					Integer prevRawCount = rawSlotCounts.get(ruleSlot);
-					if (prevRawCount == null)
-						prevRawCount = 0;
-					rawSlotCounts.put(ruleSlot, prevRawCount + 1);
+					ed.addRuleCount(rule, weight);
 
-					Double oldValue = slotPositions.get(ruleSlot);
-					if (oldValue == null)
-						oldValue = 0d;
-					slotPositions.put(ruleSlot, oldValue + 1.0);
+					// Note the slot count within the policy
+					Integer policySlotCount = policySlotCounts.get(ruleSlot);
+					if (policySlotCount == null)
+						policySlotCount = 0;
+					policySlotCounts.put(ruleSlot, policySlotCount + 1);
+
 				}
+			}
+
+			// Add to the slot numeracy multimap
+			for (Slot slot : policySlotCounts.keySet()) {
+				slotNumeracy
+						.put(slot, policySlotCounts.get(slot).doubleValue());
 			}
 		}
 
-		// Averaging the positions
-		for (Slot slot : slotPositions.keySet()) {
-			slotPositions.put(slot, slotPositions.get(slot)
-					/ rawSlotCounts.get(slot));
+		// Calculate the slot numeracy data.
+		for (Slot slot : slotNumeracy.keySet()) {
+			// Each slot should have elites number of counts
+			double[] slotCounts = new double[elites.size()];
+			int i = 0;
+			for (Double val : slotNumeracy.get(slot)) {
+				slotCounts[i] = val;
+				i++;
+			}
+
+			Mean mean = new Mean();
+			StandardDeviation sd = new StandardDeviation();
+			double meanVal = mean.evaluate(slotCounts);
+			ed.setUsageStats(slot, meanVal, sd.evaluate(slotCounts, meanVal));
 		}
+
+		return ed;
 	}
 
 	/**
@@ -912,8 +941,12 @@ public class PolicyGenerator {
 		// For each of the rule generators
 		for (Slot slot : policyGenerator) {
 			buf.write("(" + slot.toParsableString() + ")" + ELEMENT_DELIMITER
-					+ policyGenerator.getOrdering(slot) + "\n");
+					+ policyGenerator.getOrdering(slot) + ELEMENT_DELIMITER
+					+ slot.getSelectionProbability() + ELEMENT_DELIMITER
+					+ slot.getSelectionSD() + "\n");
 		}
+		buf.write("Total Update Size: " + updateDifference_ + "\n");
+		buf.write("Converged Value: " + convergedValue_);
 
 		buf.close();
 		wr.close();
@@ -938,16 +971,27 @@ public class PolicyGenerator {
 		// Go through each slot, writing out those that fire
 		List<Slot> orderedElements = policyGenerator.getOrderedElements();
 		for (Slot slot : orderedElements) {
-			// Output every non-zero rule
-			boolean single = true;
-			for (GuidedRule rule : slot.getGenerator()
-					.getNonZeroOrderedElements()) {
-				if (!single)
-					buf.write(" / ");
-				buf.write(StateSpec.getInstance().encodeRule(rule));
-				single = false;
+			// Output each slot a number of times based on its selection
+			// probability.
+			double repetitions = Math.round(slot.getSelectionProbability());
+			StringBuffer slotOutput = null;
+			for (int i = 0; i < repetitions; i++) {
+				if (slotOutput == null) {
+					slotOutput = new StringBuffer();
+					// Output every non-zero rule
+					boolean single = true;
+					for (GuidedRule rule : slot.getGenerator()
+							.getNonZeroOrderedElements()) {
+						if (!single)
+							slotOutput.append(" / ");
+						slotOutput.append(StateSpec.getInstance().encodeRule(rule));
+						single = false;
+					}
+					slotOutput.append("\n");
+				}
+				
+				buf.write(slotOutput.toString());
 			}
-			buf.write("\n");
 		}
 
 		buf.close();
@@ -977,7 +1021,7 @@ public class PolicyGenerator {
 				// e.g. (move{((on a b) (cat c) => (move c))}),0.6532
 				Pattern p = Pattern.compile("\\((\\w+)" // (move
 						+ "\\{(.*?)\\}" // {((on a b) (cat c) => (move c))}
-						+ "\\),([\\d.E-]+)"); // ),0.6532
+						+ "\\),([\\d.E-]+),([\\d.E-]+),([\\d.E-]+)"); // ),0.6532,1.3,0.4
 				Matcher m = p.matcher(in);
 
 				if (m.find()) {
@@ -985,6 +1029,8 @@ public class PolicyGenerator {
 					Slot slot = new Slot(m.group(1));
 					String rules = m.group(2);
 					Double slotOrder = Double.parseDouble(m.group(3));
+					slot.setSelectionProb(Double.parseDouble(m.group(4)));
+					slot.setSelectionSD(Double.parseDouble(m.group(5)));
 
 					// Add the rules to the slot
 					Pattern rp = Pattern
@@ -1006,9 +1052,6 @@ public class PolicyGenerator {
 
 					// Add the slot to the distribution.
 					loadedDist.add(slot, slotOrder);
-				} else {
-					System.err
-							.println("Error parsing generator file. Not loading generator.");
 				}
 			}
 

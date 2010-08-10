@@ -123,8 +123,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 		List<T> orderedElements = new ArrayList<T>();
 		OrderedDistribution<T> cloneDist = clone();
 		for (int i = 0; i < size(); i++) {
-			orderedElements.add(cloneDist.sampleWithRemoval(i,
-					size(), true));
+			orderedElements.add(cloneDist.sampleWithRemoval(i, size(), true));
 		}
 		return orderedElements;
 	}
@@ -142,19 +141,20 @@ public class OrderedDistribution<T> implements Collection<T> {
 			double stepSize) {
 		double diff = 0;
 		for (ItemProb<T> element : elements_) {
-			// Get the old value
-			double oldValue = element.getProbability();
+			if (elementPositions.containsKey(element.getItem())) {
+				// Get the old value
+				double oldValue = element.getProbability();
 
-			// If the element doesn't exist, it has an order of 1 (last)
-			double newOrder = 1;
-			if (elementPositions.containsKey(element.getItem()))
-				newOrder = elementPositions.get(element.getItem());
-			// Generate the new value
-			double newValue = stepSize * newOrder + (1 - stepSize) * oldValue;
+				// If the element doesn't exist, it has an order of 1 (last)
+				double newOrder = elementPositions.get(element.getItem());
+				// Generate the new value
+				double newValue = stepSize * newOrder + (1 - stepSize)
+						* oldValue;
 
-			element.setProbability(newValue);
+				element.setProbability(newValue);
 
-			diff += Math.abs(oldValue - newValue);
+				diff += Math.abs(oldValue - newValue);
+			}
 		}
 		return diff;
 	}
@@ -239,14 +239,14 @@ public class OrderedDistribution<T> implements Collection<T> {
 
 	@Override
 	public boolean contains(Object o) {
-		if (find((T)o) != null)
+		if (find((T) o) != null)
 			return false;
 		return true;
 	}
 
 	@Override
 	public boolean containsAll(Collection<?> c) {
-		for (Iterator iter = c.iterator(); iter.hasNext(); ) {
+		for (Iterator iter = c.iterator(); iter.hasNext();) {
 			if (!contains(iter.next()))
 				return false;
 		}
@@ -269,7 +269,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 
 	@Override
 	public boolean remove(Object o) {
-		ItemProb<T> element = find((T)o);
+		ItemProb<T> element = find((T) o);
 		if (element == null)
 			return false;
 		return elements_.remove(element);
@@ -288,7 +288,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 	public boolean retainAll(Collection<?> c) {
 		if (c == null)
 			throw new NullPointerException();
-		
+
 		int size = elements_.size();
 		for (Iterator<ItemProb<T>> iter = elements_.iterator(); iter.hasNext();) {
 			ItemProb<T> element = iter.next();
@@ -331,7 +331,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 			return ip.getProbability();
 		return -1;
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer("[");

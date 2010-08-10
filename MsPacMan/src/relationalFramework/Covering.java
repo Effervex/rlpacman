@@ -275,7 +275,8 @@ public class Covering {
 		// be present)
 		int generalisation = Integer.MAX_VALUE;
 		// Check against each item in the unity state,
-		// TODO Speed this up by assigning the facts to a map so tey are quickly
+		// TODO Speed this up by assigning the facts to a map so they are
+		// quickly
 		// accessible.
 		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
 			String[] unitySplit = StateSpec.splitFact(iter.next());
@@ -679,6 +680,8 @@ public class Covering {
 	 *         pre-goal state.
 	 */
 	public Collection<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+		// TODO Filter rules to remove unnecessary conditions ((a X Y) (a X ?)
+		// -> (a X Y))
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 
 		// Get a single fact or variable specialisation from the pre goal for
