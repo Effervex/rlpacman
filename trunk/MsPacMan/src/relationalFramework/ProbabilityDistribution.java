@@ -609,17 +609,28 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if ((obj != null) && (obj instanceof ProbabilityDistribution)) {
-			ProbabilityDistribution pd = (ProbabilityDistribution) obj;
-			if (itemProbs_.equals(pd.itemProbs_))
-				return true;
-		}
-		return false;
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((itemProbs_ == null) ? 0 : itemProbs_.hashCode());
+		return result;
 	}
 
 	@Override
-	public int hashCode() {
-		return itemProbs_.hashCode();
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ProbabilityDistribution other = (ProbabilityDistribution) obj;
+		if (itemProbs_ == null) {
+			if (other.itemProbs_ != null)
+				return false;
+		} else if (!itemProbs_.equals(other.itemProbs_))
+			return false;
+		return true;
 	}
 }

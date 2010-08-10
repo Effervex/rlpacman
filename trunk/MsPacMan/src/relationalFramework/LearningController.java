@@ -53,12 +53,16 @@ public class LearningController {
 	private static final double STEP_SIZE = 0.6;
 	/** The internal prefix for messages to the agent regarding internal goal. */
 	public static final String INTERNAL_PREFIX = "internal";
+	/** The marker for the end of a successfully completed performance file. */
+	private static final String END_PERFORMANCE = "<--END-->";
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The time at which the learning started */
 	private long learningStartTime_;
 	/** The amount of time the experiment has taken, excluding testing. */
 	private long learningRunTime_ = 0;
+	/** The time the run started. */
+	private long runStart_;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
 	/** The maximum number of steps the agent can take. */
@@ -194,10 +198,15 @@ public class LearningController {
 
 		// Determine the initial run (as previous runs may have already been
 		// done in a previous experiment)
-		int run = checkFiles();
+		int[] startPoint = checkFiles();
+		int run = startPoint[0];
+		// TODO Load the temp generators with all the necessary info
+		// (pre-goal too)
+		int iteration = -1;// startPoint[1];
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < repetitions_; run++) {
+			runStart_ = System.currentTimeMillis();
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
 			if (loadedGeneratorFile_ != null) {
@@ -205,7 +214,7 @@ public class LearningController {
 				localPolicy.freeze(true);
 			}
 
-			developPolicy(localPolicy, run);
+			developPolicy(localPolicy, run, iteration);
 
 			// Flushing the rete object.
 			StateSpec.reinitInstance();
@@ -235,8 +244,11 @@ public class LearningController {
 	 *            The local policy to develop.
 	 * @param run
 	 *            The run number of the policy.
+	 * @param startIteration
+	 *            The iteration point to start from.
 	 */
-	private void developPolicy(PolicyGenerator localPolicy, int run) {
+	private void developPolicy(PolicyGenerator localPolicy, int run,
+			int startIteration) {
 		PolicyValue bestPolicy = null;
 
 		// Run the preliminary action discovery phase, only to create an initial
@@ -246,7 +258,7 @@ public class LearningController {
 
 		// The outer loop, for refinement episode by episode
 		ArrayList<Float> episodePerformances = new ArrayList<Float>();
-		int t = 0;
+
 		// Forming a population of solutions
 		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
 		// Learn for a finite number of episodes, or until it is converged.
@@ -254,7 +266,6 @@ public class LearningController {
 		// How many steps to wait for testing
 		int testingStep = 1;
 		if (ENTROBEAM) {
-			// TODO Sort this out.
 			finiteNum = (int) (maxEpisodes_ / (SELECTION_RATIO * SELECTION_RATIO));
 			testingStep = (int) (1 / (SELECTION_RATIO * SELECTION_RATIO));
 		} else if (SLIDING_WINDOW) {
@@ -264,6 +275,11 @@ public class LearningController {
 			finiteNum = maxEpisodes_;
 			testingStep = 1;
 		}
+
+		// Determining the start point;
+		int t = 0;
+		if (startIteration >= 0)
+			t = startIteration * testingStep + 1;
 
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
@@ -347,8 +363,6 @@ public class LearningController {
 				double alphaUpdate = 0;
 				if (ENTROBEAM) {
 					numElite = population;
-					// TODO Try to use just sliding update param - this one is
-					// REALLY small
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO / population;
 				} else if (SLIDING_WINDOW)
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO;
@@ -389,7 +403,7 @@ public class LearningController {
 						PolicyGenerator.getInstance().saveGenerators(tempGen);
 						saveElitePolicies(pvs);
 						// Output the episode averages
-						savePerformance(episodePerformances, run);
+						savePerformance(episodePerformances, run, false);
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -407,6 +421,12 @@ public class LearningController {
 				// containing non-existant or recently changed rules.
 				filterPolicyValues(pvs, localPolicy);
 			}
+		}
+
+		try {
+			savePerformance(episodePerformances, run, true);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -604,7 +624,7 @@ public class LearningController {
 							policyGenerator, internalGoal.getFacts());
 				}
 				developPolicy(modularGenerator, -modularFacts.size()
-						+ modsComplete);
+						+ modsComplete, 0);
 
 				// Save the module
 				Module.saveModule(internalGoal.getFacts(), StateSpec
@@ -861,9 +881,11 @@ public class LearningController {
 	 * 
 	 * @param episodeAverage
 	 *            The saved episode average performances.
+	 * @param finalWrite
+	 *            If this write was the final write for the run.
 	 */
-	private void savePerformance(ArrayList<Float> episodeAverage, int run)
-			throws Exception {
+	private void savePerformance(ArrayList<Float> episodeAverage, int run,
+			boolean finalWrite) throws Exception {
 		File tempPerf = null;
 		if (PolicyGenerator.getInstance().isModuleGenerator())
 			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
@@ -882,6 +904,12 @@ public class LearningController {
 			System.out.println(perf);
 		}
 
+		if (finalWrite) {
+			buf.write(END_PERFORMANCE + "\n");
+			buf.write("Total run time: "
+					+ toTimeFormat(System.currentTimeMillis() - runStart_));
+		}
+
 		buf.close();
 		wr.close();
 	}
@@ -890,18 +918,50 @@ public class LearningController {
 	 * Checks the files for pre-existing versions so runs do not have to be
 	 * re-run.
 	 * 
-	 * @return The run number that the files stopped at.
+	 * @return The run number that the files stopped at and the point at which
+	 *         the experiment stopped.
 	 */
-	private int checkFiles() {
+	private int[] checkFiles() {
 		// Check the performance files
-		int run = -1;
-		File tempPerf = null;
-		do {
+		int[] result = new int[2];
+		// Find the last file created
+		int run = 0;
+		File lastPerf = null;
+		File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
+				+ run);
+		while (tempPerf.exists()) {
 			run++;
+			lastPerf = tempPerf;
 			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
 					+ run);
-		} while (tempPerf.exists());
-		return run;
+		}
+
+		// If there aren't any performance files, return 0,0
+		if (lastPerf == null)
+			return result;
+
+		// Otherwise, scan the last file for how far in it got through
+		try {
+			FileReader reader = new FileReader(lastPerf);
+			BufferedReader br = new BufferedReader(reader);
+			int iteration = -1;
+			String input = null;
+			// Read lines until end performance marker, or null lines.
+			while ((input = br.readLine()) != null) {
+				if (input.equals(END_PERFORMANCE)) {
+					result[0] = run;
+					result[1] = -1;
+					return result;
+				}
+				iteration++;
+			}
+
+			result[0] = run - 1;
+			result[1] = iteration;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
 	}
 
 	/**
@@ -926,12 +986,16 @@ public class LearningController {
 			// For every value within the performance file
 			float sum = 0;
 			float val = 0;
+			boolean noNote = false;
 			for (int e = 0; e < maxEpisodes_; e++) {
 				// Some performance files may be cut off, so just use the last
 				// recorded value.
 				String input = buf.readLine();
-				if (input != null)
+				if ((input == null) || (input.equals(END_PERFORMANCE)))
+					noNote = true;
+				if (!noNote) {
 					val = Float.parseFloat(input);
+				}
 				performances[e][i] = val;
 				sum += val;
 			}
@@ -962,6 +1026,12 @@ public class LearningController {
 					+ performances[e][minIndex] + "\t"
 					+ performances[e][maxIndex] + "\n");
 		}
+
+		buf.write("Total Run Time: "
+				+ toTimeFormat(System.currentTimeMillis() - experimentStart_)
+				+ "\n");
+		buf.write("Total Learning Time: " + toTimeFormat(learningRunTime_)
+				+ "\n");
 
 		buf.close();
 		writer.close();
