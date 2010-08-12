@@ -93,7 +93,7 @@ public class PolicyGenerator {
 	private double convergedValue_ = 0;
 
 	/** The random number generator. */
-	public static Random random_ = new Random(1);
+	public static Random random_ = new Random();
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -151,7 +151,7 @@ public class PolicyGenerator {
 		int i = 0;
 		while (!removalDist.isEmpty()) {
 			Slot slot = null;
-			if (!dynamicSlotNumber_) {
+			if (!dynamicSlotNumber_ || slotOptimisation_) {
 				// Sample with removal, getting the most likely if frozen.
 				slot = removalDist.sampleWithRemoval(i, slotGenerator_.size(),
 						frozen_);
@@ -343,6 +343,8 @@ public class PolicyGenerator {
 				// If the rule isn't a mutant rule, we have mutants and have
 				// already created temp mutants, run through the mutations and
 				// remove unnecessary temp mutants.
+				// TODO Perhaps be a bit more careful with this part, as it
+				// could remove potentially useful rules.
 				if (!baseRule.isMutant() && !mutants.isEmpty()
 						&& (mutatedRules_.get(actionPred) != null)) {
 					// Run through the rules in the slot, removing any mutants
@@ -596,10 +598,10 @@ public class PolicyGenerator {
 			}
 		}
 
-		if (slotOptimisation_)
-			convergedValue_ = stepSize / 100;
-		else
-			convergedValue_ = stepSize / 10;
+		// if (slotOptimisation_)
+		// convergedValue_ = stepSize / 100;
+		// else
+		convergedValue_ = stepSize / 10;
 	}
 
 	/**
@@ -984,12 +986,13 @@ public class PolicyGenerator {
 							.getNonZeroOrderedElements()) {
 						if (!single)
 							slotOutput.append(" / ");
-						slotOutput.append(StateSpec.getInstance().encodeRule(rule));
+						slotOutput.append(StateSpec.getInstance().encodeRule(
+								rule));
 						single = false;
 					}
 					slotOutput.append("\n");
 				}
-				
+
 				buf.write(slotOutput.toString());
 			}
 		}

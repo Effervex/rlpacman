@@ -75,10 +75,17 @@ public class Module {
 		moduleRules_ = new ArrayList<GuidedRule>();
 		List<Slot> orderedSlots = orderedDistribution.getOrderedElements();
 		for (Slot slot : orderedSlots) {
-			GuidedRule rule = slot.getGenerator().sample(true);
-			rule.setAsLoadedModuleRule(true);
+			Slot removalSlot = slot.clone();
+			double repetitions = Math.round(slot.getSelectionProbability());
+			for (int i = 0; i < repetitions; i++) {
+				if (!removalSlot.isEmpty()) {
+					GuidedRule rule = removalSlot.getGenerator()
+							.sampleWithRemoval(true);
+					rule.setAsLoadedModuleRule(true);
 
-			moduleRules_.add(rule);
+					moduleRules_.add(rule);
+				}
+			}
 		}
 	}
 

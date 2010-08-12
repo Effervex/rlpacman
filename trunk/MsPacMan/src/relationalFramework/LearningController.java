@@ -363,6 +363,7 @@ public class LearningController {
 				double alphaUpdate = 0;
 				if (ENTROBEAM) {
 					numElite = population;
+					// TODO This may be the problem here...
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO / population;
 				} else if (SLIDING_WINDOW)
 					alphaUpdate = STEP_SIZE * SELECTION_RATIO;

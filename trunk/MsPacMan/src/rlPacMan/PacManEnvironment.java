@@ -207,9 +207,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_.noPowerDots_ = noPowerDots;
 		rete_ = StateSpec.getInstance().getRete();
 
-		// Initialise the observations
-		cacheDistanceGrids();
-
 		prevScore_ = 0;
 
 		// Letting the thread 'sleep' when not experiment mode, so it's

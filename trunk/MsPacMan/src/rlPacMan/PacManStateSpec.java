@@ -106,10 +106,10 @@ public class PacManStateSpec extends StateSpec {
 	protected String initialiseGoalState(List<String> constants) {
 		// constants.add("player");
 		// Actual goal condition
-		// return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
+		return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
 
 		// Score maximisation
-		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
+		//return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
 	}
 
 	@Override
