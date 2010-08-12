@@ -1,5 +1,6 @@
 package rlPacMan;
 
+import java.awt.Color;
 import java.awt.Point;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,11 +42,11 @@ public class DistanceGridCache {
 		model.loadNextLevel();
 
 		// For each stage
-		int[][] prevGameState = null;
+		Color prevLevelColor = null;
 		for (int stage = 0; stage < GameModel.MAX_LEVELS; stage++) {
-			// If this level is the same as the last, use the last level's
-			// calculations.
-			if (model.m_gameState.equals(prevGameState)) {
+			// If this level is the same as the last (determined by colour), use
+			// the last level's calculations.
+			if (model.m_pacMan.m_gameUI.m_wallColor.equals(prevLevelColor)) {
 				grids_.put(stage, grids_.get(stage - 1));
 			} else {
 				DistanceGrid[][] grids = new DistanceGrid[model.m_gameSizeX][model.m_gameSizeY];
@@ -86,10 +87,9 @@ public class DistanceGridCache {
 
 				// Add the grids
 				grids_.put(stage, grids);
-
-				prevGameState = model.m_gameState;
-				model.loadNextLevel();
 			}
+			prevLevelColor = model.m_pacMan.m_gameUI.m_wallColor;
+			model.loadNextLevel();
 		}
 	}
 
@@ -313,7 +313,7 @@ public class DistanceGridCache {
 	 * @return The distance grid for the given parameters.
 	 */
 	public DistanceDir[][] getGrid(int level, int originX, int originY) {
-		DistanceGrid grid = grids_.get(level)[originX][originY];
+		DistanceGrid grid = grids_.get(level - 1)[originX][originY];
 		if (grid == null)
 			return null;
 		return grid.getDistanceGrid();
@@ -332,7 +332,7 @@ public class DistanceGridCache {
 	 */
 	public Collection<Junction> getCloseJunctions(int level, int originX,
 			int originY) {
-		return grids_.get(level)[originX][originY].getCloseJunctions();
+		return grids_.get(level - 1)[originX][originY].getCloseJunctions();
 	}
 
 	/**
