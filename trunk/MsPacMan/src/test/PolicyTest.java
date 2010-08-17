@@ -19,7 +19,7 @@ public class PolicyTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		PolicyGenerator.newInstance();
+		PolicyGenerator.newInstance(0);
 	}
 
 	@Test

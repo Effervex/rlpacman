@@ -92,6 +92,9 @@ public class PolicyGenerator {
 	 */
 	private double convergedValue_ = 0;
 
+	/** The number of times in a row the updates have been convergent. */
+	private int convergedStrike_ = 0;
+
 	/** The random number generator. */
 	public static Random random_ = new Random();
 
@@ -114,6 +117,12 @@ public class PolicyGenerator {
 	 * The coefficient towards extra influence the rules gain when lowly tested.
 	 */
 	private static final double INFLUENCE_BOOST = 1.0;
+
+	/**
+	 * The converged must remain converged for X updates before considered
+	 * converged.
+	 */
+	private static final int NUM_COVERGED_UPDATES = 10;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -560,9 +569,13 @@ public class PolicyGenerator {
 	 * @return True if the generator is converged, false otherwise.
 	 */
 	public boolean isConverged() {
-		if (updateDifference_ < convergedValue_) {
+		if (updateDifference_ < convergedValue_)
+			convergedStrike_++;
+		else
+			convergedStrike_ = 0;
+
+		if (convergedStrike_ >= NUM_COVERGED_UPDATES)
 			return true;
-		}
 		return false;
 	}
 
@@ -598,9 +611,6 @@ public class PolicyGenerator {
 			}
 		}
 
-		// if (slotOptimisation_)
-		// convergedValue_ = stepSize / 100;
-		// else
 		convergedValue_ = stepSize / 10;
 	}
 
@@ -786,7 +796,8 @@ public class PolicyGenerator {
 	 * 
 	 * @return The new PolicyGenerator.
 	 */
-	public static PolicyGenerator newInstance() {
+	public static PolicyGenerator newInstance(int randSeed) {
+		random_ = new Random(randSeed);
 		instance_ = new PolicyGenerator();
 		instance_.moduleGenerator_ = false;
 		return instance_;
