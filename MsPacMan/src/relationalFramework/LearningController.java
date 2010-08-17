@@ -46,7 +46,7 @@ public class LearningController {
 	/** The number of times to repeat the experiment. */
 	private int repetitions_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 50;
+	private static final double POPULATION_CONSTANT = 10;
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
@@ -208,7 +208,7 @@ public class LearningController {
 		for (; run < repetitions_; run++) {
 			runStart_ = System.currentTimeMillis();
 			// Initialise a new policy generator.
-			PolicyGenerator localPolicy = PolicyGenerator.newInstance();
+			PolicyGenerator localPolicy = PolicyGenerator.newInstance(run);
 			if (loadedGeneratorFile_ != null) {
 				localPolicy.loadGenerators(loadedGeneratorFile_);
 				localPolicy.freeze(true);
@@ -261,26 +261,27 @@ public class LearningController {
 
 		// Forming a population of solutions
 		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
-		// Learn for a finite number of episodes, or until it is converged.
-		int finiteNum = 0;
 		// How many steps to wait for testing
 		int testingStep = 1;
 		if (ENTROBEAM) {
-			finiteNum = (int) (maxEpisodes_ / (SELECTION_RATIO * SELECTION_RATIO));
 			testingStep = (int) (1 / (SELECTION_RATIO * SELECTION_RATIO));
 		} else if (SLIDING_WINDOW) {
-			finiteNum = (int) (maxEpisodes_ / SELECTION_RATIO);
 			testingStep = (int) (1 / SELECTION_RATIO);
 		} else {
-			finiteNum = maxEpisodes_;
 			testingStep = 1;
 		}
+		// Learn for a finite number of episodes, or until it is converged.
+		int finiteNum = maxEpisodes_ * testingStep;
+		if (maxEpisodes_ < 0)
+			finiteNum = Integer.MAX_VALUE;
 
 		// Determining the start point;
 		int t = 0;
 		if (startIteration >= 0)
 			t = startIteration * testingStep + 1;
 
+		// A value to track how many intervals since the last test.
+		int sinceLastTest = 0;
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_) {
 				// Check if the agent needs to drop into learning a module
@@ -292,8 +293,14 @@ public class LearningController {
 			// Determine the dynamic population, based on rule-base size
 			int population = determinePopulation(localPolicy);
 			// If entrobeam, only get the minimum number of samples.
-			if (ENTROBEAM)
-				population = (int) (SELECTION_RATIO * population);
+			if (ENTROBEAM) {
+				testingStep = population;
+				finiteNum = maxEpisodes_ * testingStep;
+				if (maxEpisodes_ < 0)
+					finiteNum = Integer.MAX_VALUE;
+				population = (int) Math.max(SELECTION_RATIO * population,
+						POPULATION_CONSTANT);
+			}
 
 			int samples = 0;
 			int maxSamples = population;
@@ -360,15 +367,10 @@ public class LearningController {
 				// Update the weights for all distributions using only the elite
 				// samples
 				int numElite = (int) Math.ceil(population * SELECTION_RATIO);
-				double alphaUpdate = 0;
+				double alphaUpdate = STEP_SIZE / testingStep;
 				if (ENTROBEAM) {
 					numElite = population;
-					// TODO This may be the problem here...
-					alphaUpdate = STEP_SIZE * SELECTION_RATIO / population;
-				} else if (SLIDING_WINDOW)
-					alphaUpdate = STEP_SIZE * SELECTION_RATIO;
-				else
-					alphaUpdate = STEP_SIZE;
+				}
 				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
 				// Clean up the policy values
@@ -378,42 +380,18 @@ public class LearningController {
 				// Only test the agent every number of steps, otherwise more
 				// time is spent testing than evaluating. (And at the first and
 				// last steps).
-				if (((t + 1) % testingStep == 0) || (t == finiteNum - 1)
+				if ((sinceLastTest >= testingStep) || (t == finiteNum - 1)
 						|| (t == 0)) {
-					// Test the agent and record the performances
-					double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * run))
-							/ repetitions_;
-					episodePerformances.add(testAgent(t, maxSteps_, run,
-							repetitions_, expProg));
-
-					// Save the results at each episode
-					try {
-						File tempGen = null;
-						if (PolicyGenerator.getInstance().isModuleGenerator())
-							tempGen = new File(Module.MODULE_DIR
-									+ "/"
-									+ TEMP_FOLDER
-									+ "/"
-									+ PolicyGenerator.getInstance()
-											.getModuleName()
-									+ generatorFile_.getName());
-						else
-							tempGen = new File(TEMP_FOLDER + "/"
-									+ generatorFile_.getName() + run);
-						tempGen.createNewFile();
-						PolicyGenerator.getInstance().saveGenerators(tempGen);
-						saveElitePolicies(pvs);
-						// Output the episode averages
-						savePerformance(episodePerformances, run, false);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
+					testRecordAgent(localPolicy, run, episodePerformances, pvs,
+							finiteNum, t);
+					sinceLastTest = 0;
 				}
 
 				// Run the post update operations
 				localPolicy.postUpdateOperations();
 
 				t++;
+				sinceLastTest++;
 
 				// Clear the restart
 				localPolicy.shouldRestart();
@@ -424,8 +402,59 @@ public class LearningController {
 			}
 		}
 
+		// If the agent finished prematurely, note the results.
+		if (sinceLastTest > 0) {
+			testRecordAgent(localPolicy, run, episodePerformances, pvs,
+					finiteNum, t);
+		}
+
 		try {
 			savePerformance(episodePerformances, run, true);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Tests and records the agent's progress.
+	 * 
+	 * @param localPolicy
+	 *            The local PolicyGenerator.
+	 * @param run
+	 *            The current run.
+	 * @param episodePerformances
+	 *            The previous episode performances.
+	 * @param pvs
+	 *            The elite policy values.
+	 * @param finiteNum
+	 *            The maximum number of iterations to learn in.
+	 * @param t
+	 *            The current progress of the iterations.
+	 */
+	private void testRecordAgent(PolicyGenerator localPolicy, int run,
+			ArrayList<Float> episodePerformances, List<PolicyValue> pvs,
+			int finiteNum, int t) {
+		// Test the agent and record the performances
+		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * run))
+				/ repetitions_;
+		episodePerformances.add(testAgent(t, maxSteps_, run, repetitions_,
+				expProg));
+
+		// Save the results at each episode
+		try {
+			File tempGen = null;
+			if (localPolicy.isModuleGenerator())
+				tempGen = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
+						+ localPolicy.getModuleName()
+						+ generatorFile_.getName());
+			else
+				tempGen = new File(TEMP_FOLDER + "/" + generatorFile_.getName()
+						+ run);
+			tempGen.createNewFile();
+			localPolicy.saveGenerators(tempGen);
+			saveElitePolicies(pvs);
+			// Output the episode averages
+			savePerformance(episodePerformances, run, false);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -664,11 +693,12 @@ public class LearningController {
 					.size());
 		}
 		// Currently just using 50 * the largest slot
-		int largestSlot = 0;
-		for (Slot slot : PolicyGenerator.getInstance().getGenerator()) {
-			largestSlot = Math.max(largestSlot, slot.getGenerator().size());
+		int sumSlot = 0;
+		for (Slot slot : policyGenerator.getGenerator()) {
+			sumSlot += slot.getGenerator().size();
 		}
-		return (int) (POPULATION_CONSTANT * largestSlot);
+		return (int) (POPULATION_CONSTANT * (1.0 * sumSlot / policyGenerator
+				.getGenerator().size()));
 	}
 
 	/**
@@ -689,7 +719,7 @@ public class LearningController {
 
 	/**
 	 * Tests the agent at its current state. This is achieved by 'freezing' the
-	 * generators and trialing the agent several times over the environment to
+	 * generators and trialling the agent several times over the environment to
 	 * get an idea of the average performance at this point.
 	 * 
 	 * @param maxSteps
