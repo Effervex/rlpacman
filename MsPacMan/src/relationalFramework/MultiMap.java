@@ -98,7 +98,7 @@ public class MultiMap<K, V> {
 	 * Gets the list of values under the multimap key.
 	 * 
 	 * @param key
-	 *            The key to retrive values from.
+	 *            The key to retrieve values from.
 	 * @return The list under the key, or null.
 	 */
 	public List<V> get(Object key) {

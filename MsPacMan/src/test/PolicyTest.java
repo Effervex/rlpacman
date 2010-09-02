@@ -125,14 +125,4 @@ public class PolicyTest {
 		assertTrue(pol.getPolicyRules(false).contains(modRule));
 	}
 
-	@Test
-	public void testGetFiringRules() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testEvaluatePolicy() {
-		fail("Not yet implemented");
-	}
-
 }

@@ -6,8 +6,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.sun.org.apache.bcel.internal.generic.ISUB;
 
 /**
  * A class that keeps track of the guided predicates that make up the rule
@@ -23,7 +27,7 @@ public class GuidedRule {
 	private static final int SETTLED_RULE_STATES = 50;
 
 	/** The conditions of the rule. */
-	private List<String> ruleConditions_;
+	private SortedSet<String> ruleConditions_;
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
 	private List<String> constantConditions_;
@@ -41,16 +45,13 @@ public class GuidedRule {
 	private boolean mutant_ = false;
 
 	/** If this rule has spawned any mutant rules yet. */
-	private boolean hasSpawned_ = false;
+	private Integer hasSpawned_ = null;
 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
-	
+
 	/** The number of times this rule has been used in a policy. */
 	private int ruleUses_ = 0;
-
-	/** If this rule is assured to be without inequals preds. */
-	private boolean withoutInequals_ = false;
 
 	/** The query parameters associated with this rule. */
 	private List<String> queryParams_;
@@ -77,7 +78,7 @@ public class GuidedRule {
 	 *            The rule this rule represents
 	 */
 	public GuidedRule(String ruleString) {
-		String[] split = ruleString.split("=>");
+		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
 		ruleConditions_ = splitConditions(split[0]);
 		ruleAction_ = split[1].trim();
 		actionTerms_ = findTerms(ruleAction_);
@@ -96,9 +97,15 @@ public class GuidedRule {
 	 * @param mutant
 	 *            If this rule is a mutant rule.
 	 */
+	@SuppressWarnings("unchecked")
 	public GuidedRule(Collection<String> conditions, String action,
 			boolean mutant) {
-		ruleConditions_ = new ArrayList<String>(conditions);
+		if (!(conditions instanceof SortedSet)) {
+			ruleConditions_ = new TreeSet<String>(ConditionComparator
+					.getInstance());
+			ruleConditions_.addAll(conditions);
+		} else
+			ruleConditions_ = (SortedSet<String>) conditions;
 		ruleAction_ = action;
 		actionTerms_ = findTerms(ruleAction_);
 		mutant_ = mutant;
@@ -209,8 +216,9 @@ public class GuidedRule {
 	 *            The condition string to be split.
 	 * @return The facts of the string in segments.
 	 */
-	private List<String> splitConditions(String conditionString) {
-		List<String> conds = new ArrayList<String>();
+	public static SortedSet<String> splitConditions(String conditionString) {
+		SortedSet<String> conds = new TreeSet<String>(ConditionComparator
+				.getInstance());
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(conditionString);
 		while (m.find())
@@ -219,35 +227,63 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Remove inequality preds
-	 */
-	private void removeInequals() {
-		if (!withoutInequals_) {
-			for (Iterator<String> condIter = ruleConditions_.iterator(); condIter
-					.hasNext();) {
-				String cond = condIter.next();
-				if (cond.matches("\\(test \\(<> .+?\\)\\)")) {
-					condIter.remove();
-				}
-			}
-			withoutInequals_ = true;
-		}
-	}
-
-	/**
 	 * Expands the conditions by parsing the base definitions of the condition
 	 * into a fully type and inequal'ed condition.
 	 */
+	@SuppressWarnings("unchecked")
 	public void expandConditions() {
-		ruleConditions_ = splitConditions(StateSpec.getInstance().parseRule(
-				toString()).split(StateSpec.INFERS_ACTION)[0]);
-		withoutInequals_ = false;
+		Set<String> addedConditions = new TreeSet<String>();
+		Set<String> removedConditions = new TreeSet<String>();
+
+		Set<String> variableTerms = new TreeSet<String>();
+		Set<String> constantTerms = new TreeSet<String>();
+		for (String condition : ruleConditions_) {
+			String[] condSplit = StateSpec.splitFact(condition);
+
+			if (StateSpec.getInstance().isUsefulPredicate(condSplit[0])) {
+				MultiMap<String, Class> predicates = StateSpec.getInstance()
+						.getPredicates();
+				int termIndex = (condSplit[0].equals("not")) ? 2 : 1;
+				String predName = condSplit[termIndex - 1];
+
+				// Adding the terms
+				for (int i = termIndex; i < condSplit.length; i++) {
+					// Ignore numerical terms
+					if ((predicates.get(predName) == null)
+							|| (!Number.class.isAssignableFrom(predicates.get(
+									predName).get(i - termIndex)))) {
+						// Adding variable terms
+						if (condSplit[i].charAt(0) == '?') {
+							if (condSplit[i].length() > 1)
+								variableTerms.add(condSplit[i]);
+						} else {
+							// Adding constant terms
+							constantTerms.add(condSplit[i]);
+						}
+					}
+				}
+
+				// Adding the type arguments
+				addedConditions.addAll(StateSpec.getInstance().createTypeConds(
+						condSplit, termIndex));
+			} else {
+				removedConditions.add(condition);
+			}
+		}
+
+		ruleConditions_.removeAll(removedConditions);
+
+		ruleConditions_.addAll(addedConditions);
+		// Adding the inequality predicates
+		ruleConditions_.addAll(StateSpec.createInequalityTests(variableTerms,
+				constantTerms));
 	}
 
 	/**
 	 * Finds the constants in the rule conditions.
 	 */
 	private void findConstants() {
+		// TODO Speed up this method
 		List<String> constants = new ArrayList<String>();
 		for (String cond : ruleConditions_) {
 			String[] condSplit = StateSpec.splitFact(cond);
@@ -278,14 +314,6 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Checks if inequals is present (i.e. rule is fully expanded.)
-	 */
-	public void checkInequals() {
-		if (withoutInequals_)
-			expandConditions();
-	}
-
-	/**
 	 * Determines the LGG status of this rule. Also has the option of removing
 	 * unnecessary rules as it runs through the rules.
 	 * 
@@ -295,7 +323,7 @@ public class GuidedRule {
 	 * @return 1 if the rule is minimal, 0 if not minimal, and -1 if invalid
 	 *         (too few conditions).
 	 */
-	private int determineLGGStatus(List<String> conditions,
+	private int determineLGGStatus(SortedSet<String> conditions,
 			boolean removeUnnecessaryFacts) {
 		if (conditions.isEmpty()) {
 			System.err.println("Conditions have been over-shrunk: "
@@ -401,16 +429,12 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Gets the conditions, with or without inequality predicates.
+	 * Gets the conditions in a sorted order, including the inequals predicate.
 	 * 
-	 * @param withoutInequals
-	 *            Whether to exclude inequal preds or not.
-	 * @return The conditions, with or without inequal predicates.
+	 * @return The conditions of the rule.
 	 */
-	public List<String> getConditions(boolean withoutInequals) {
-		if (withoutInequals)
-			removeInequals();
-		return new ArrayList<String>(ruleConditions_);
+	public SortedSet<String> getConditions() {
+		return new TreeSet<String>(ruleConditions_);
 	}
 
 	/**
@@ -423,7 +447,7 @@ public class GuidedRule {
 	 *            the action terms should be removed.
 	 * @return True if the newly set conditions are valid.
 	 */
-	public boolean setConditions(List<String> conditions,
+	public boolean setConditions(SortedSet<String> conditions,
 			boolean removeUnnecessaryFacts) {
 		// If the conditions are the same, return true.
 		if (conditions.equals(ruleConditions_)) {
@@ -437,7 +461,7 @@ public class GuidedRule {
 		}
 
 		// Reset the states seen, as the rule has changed.
-		hasSpawned_ = false;
+		hasSpawned_ = null;
 		statesSeen_ = 0;
 		ruleConditions_ = conditions;
 		ruleUses_ = 0;
@@ -456,7 +480,8 @@ public class GuidedRule {
 		if (i == 0)
 			return;
 
-		List<String> modConditions = new ArrayList<String>();
+		SortedSet<String> modConditions = new TreeSet<String>(
+				ConditionComparator.getInstance());
 		for (String cond : ruleConditions_) {
 			for (int j = 0; j < queryParams_.size(); j++) {
 				cond = cond.replaceAll(Pattern.quote(Module
@@ -465,7 +490,7 @@ public class GuidedRule {
 				modConditions.add(cond);
 			}
 		}
-		
+
 		ruleConditions_ = modConditions;
 
 		findConstants();
@@ -566,17 +591,32 @@ public class GuidedRule {
 	public boolean isMutant() {
 		return mutant_;
 	}
-	
+
 	public void setMutant(boolean mutant) {
 		mutant_ = mutant;
 	}
 
-	public void setSpawned(boolean spawned) {
-		hasSpawned_ = spawned;
+	/**
+	 * Sets the rules spawned to this pre-goal hash, or null if unspawned.
+	 * 
+	 * @param preGoalHash
+	 *            The hash of the pre-goal the rules spawned to.
+	 */
+	public void setSpawned(Integer preGoalHash) {
+		hasSpawned_ = preGoalHash;
 	}
 
-	public boolean hasSpawned() {
-		return hasSpawned_;
+	/**
+	 * Checks if this rule has spawned to the current pre-goal.
+	 * 
+	 * @param preGoalHash
+	 *            The hash of the pre-goal.
+	 * @return True if the rule has spawned to this pre-goal, false otherwise.
+	 */
+	public boolean hasSpawned(int preGoalHash) {
+		if (hasSpawned_ == null)
+			return false;
+		return hasSpawned_.equals(preGoalHash);
 	}
 
 	/**
@@ -611,7 +651,6 @@ public class GuidedRule {
 	public Object clone() {
 		GuidedRule clone = new GuidedRule(ruleConditions_, ruleAction_, mutant_);
 		clone.hasSpawned_ = hasSpawned_;
-		clone.withoutInequals_ = withoutInequals_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
 		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
@@ -633,8 +672,10 @@ public class GuidedRule {
 		int result = 1;
 		result = prime * result
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
-		result = prime * result
-				+ ((ruleConditions_ == null) ? 0 : ruleConditions_.hashCode());
+		int conditionResult = 0;
+		for (String condition : ruleConditions_)
+			conditionResult += condition.hashCode();
+		result = prime * result + conditionResult;
 		result = prime * result
 				+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
 		return result;

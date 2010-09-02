@@ -143,7 +143,6 @@ public class Slot {
 	 */
 	public boolean[] shouldUseSlot(Random random, boolean frozen) {
 		boolean[] useSlot = new boolean[2];
-		Math.random();
 		if (currentSelectionProb_ <= 0) {
 			// The slot has not been sampled yet and needs to set a selection
 			// probability.

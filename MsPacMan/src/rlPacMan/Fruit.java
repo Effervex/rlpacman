@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.awt.*;
+import java.util.Random;
 
 class Fruit extends Thing {
 	Color m_color;
@@ -17,9 +18,10 @@ class Fruit extends Thing {
 	double m_bounceY = 0;
 
 	Fruit(GameModel gameModel, byte type, int startX, int startY,
-			boolean bMiddleX) {
+			boolean bMiddleX, Random random) {
 		super(gameModel, startX, startY, bMiddleX);
 		m_deltaMax = 5;
+		random_ = random;
 	}
 
 	// Overriden to draw Fruit
@@ -139,7 +141,7 @@ class Fruit extends Thing {
 		// Simple algorithm that keeps picking random directions until one
 		// is acceptable for the fruit to travel in.
 		while (true) {
-			double randomNum = Math.random();
+			double randomNum = random_.nextDouble();
 			if (randomNum < .25
 					&& prevDirection != DOWN
 					&& (m_gameModel.m_gameState[m_locX][m_locY] & GameModel.GS_NORTH) == 0) {

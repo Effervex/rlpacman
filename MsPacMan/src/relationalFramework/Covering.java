@@ -10,8 +10,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Fact;
 import jess.Rete;
@@ -25,7 +30,7 @@ public class Covering {
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */
-	private static final char MODULO_CHAR = 'Z' + 1;
+	private static final char MODULO_LETTERS = 26;
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
 	/** The amount of state inactivity until it is considered settled. */
@@ -41,6 +46,21 @@ public class Covering {
 	 */
 	private Map<String, PreGoalInformation> preGoals_;
 
+	/** The hash codes for each pre-goal. */
+	private Map<String, Integer> mutationHashs;
+
+	/**
+	 * The conditions that have been observed to be true at least for each
+	 * action.
+	 */
+	private MultiMap<String, String> actionConditions_;
+
+	/** The set of conditions that are always true. */
+	private Collection<String> environmentInvariants;
+	// TODO Set up environment invariants
+	/** The number of states the invariants have remained the same. */
+	private int stableInvariants_ = 0;
+
 	/** A suffix numbered variable to use when defining new ranged variables. */
 	private int rangeIndex_ = 0;
 
@@ -50,6 +70,7 @@ public class Covering {
 	public Covering(int numActions) {
 		clearPreGoalState(numActions);
 		actionRanges_ = new MultiMap<String, RangedCondition>();
+		actionConditions_ = new MultiMap<String, String>();
 	}
 
 	/**
@@ -70,7 +91,7 @@ public class Covering {
 		List<String> constants = StateSpec.getInstance().getConstants();
 
 		// The relevant facts which contain the key term
-		MultiMap<String, Fact> relevantConditions = compileRelevantConditionMap(state);
+		MultiMap<String, String> relevantConditions = compileRelevantConditionMap(state);
 
 		// Maintain a mapping for each action, to be used in unification between
 		// actions
@@ -84,7 +105,9 @@ public class Covering {
 				previousRules = new ArrayList<GuidedRule>();
 
 			// Cover the state, using the previous rules and/or newly created
-			// rules
+			// rules while noting valid conditions for later rule mutation
+			// TODO Simplify the rules to remove unnecessary background
+			// conditions.
 			List<GuidedRule> actionRules = unifyActionRules(validActions
 					.get(action), relevantConditions, action, previousRules,
 					constants);
@@ -151,22 +174,74 @@ public class Covering {
 	 *         remained the same, -1 if the states did not unify and returned
 	 *         the empty set.
 	 */
-	public int unifyStates(List<String> oldState, Collection<String> newState,
-			List<String> oldTerms, List<String> newTerms) {
-		boolean hasChanged = false;
-
+	public int unifyStates(Collection<String> oldState,
+			Collection<String> newState, List<String> oldTerms,
+			List<String> newTerms) {
 		// If the terms don't match up, create a replacement map
-		Map<String, String> oldReplacementMap = new HashMap<String, String>();
-		Map<String, String> newReplacementMap = new HashMap<String, String>();
+		BidiMap oldReplacementMap = new DualHashBidiMap();
+		BidiMap newReplacementMap = new DualHashBidiMap();
 		if (!createReplacementMaps(oldTerms, newTerms, oldReplacementMap,
 				newReplacementMap))
 			return -1;
 
+		return unifyStates(oldState, newState, oldTerms, false,
+				oldReplacementMap, newReplacementMap);
+	}
+
+	/**
+	 * Unifies two states together but in this method neither state has terms
+	 * affiliated with it. This method attempts to unify the new state with the
+	 * old state by dynamically replacing terms with old state terms for
+	 * matching purposes. Note that the terms may not be replaced in a manner
+	 * that maximises conditions unified, but if terms are replaced, then at
+	 * least one condition will be unified with.
+	 * 
+	 * @param oldState
+	 *            The old state to unify with.
+	 * @param newState
+	 *            The flexible new state which can have terms replaced.
+	 * @param replacementMap
+	 *            The replacement map to fill.
+	 * @return -1 if the states cannot unify, 0 if they unified perfectly, 1 if
+	 *         they unified but the old state was changed. In the two latter
+	 *         cases, the replacement map will contain replacement terms.
+	 */
+	public int unifyStates(Collection<String> oldState,
+			Collection<String> newState, BidiMap replacementMap) {
+		return unifyStates(oldState, newState, new ArrayList<String>(), true,
+				new DualHashBidiMap(), replacementMap);
+	}
+
+	/**
+	 * The actual unify state method used by the two outer methods.
+	 * 
+	 * @param oldState
+	 *            The old state to be unified with.
+	 * @param newState
+	 *            The new state for unifying. May possibly have flexible terms.
+	 * @param oldTerms
+	 *            The terms used in the old state, if any.
+	 * @param flexibleReplacement
+	 *            If the replacement map can be modified dynamically to match
+	 *            the old state.
+	 * @param oldReplacementMap
+	 *            The replacement map for the old state.
+	 * @param newReplacementMap
+	 *            The replacement map for the new state. May be flexible.
+	 * @return -1 if no unification possible, 0 if perfect unification, 1 if
+	 *         unification with old state changed.
+	 */
+	private int unifyStates(Collection<String> oldState,
+			Collection<String> newState, List<String> oldTerms,
+			boolean flexibleReplacement, BidiMap oldReplacementMap,
+			BidiMap newReplacementMap) {
 		// For each item in the old state, see if it is present in the new state
+		boolean hasChanged = false;
 		List<String> oldStateRepl = new ArrayList<String>();
 		for (String oldStateFact : oldState) {
 			Collection<String> modFacts = unifyFact(oldStateFact, newState,
-					oldReplacementMap, newReplacementMap, oldTerms);
+					oldReplacementMap, newReplacementMap, oldTerms,
+					flexibleReplacement);
 
 			if (modFacts.isEmpty())
 				hasChanged = true;
@@ -211,8 +286,8 @@ public class Covering {
 	 * @return False if replacement is impossible, true otherwise.
 	 */
 	private boolean createReplacementMaps(List<String> oldTerms,
-			List<String> newTerms, Map<String, String> oldReplacementMap,
-			Map<String, String> newReplacementMap) {
+			List<String> newTerms, BidiMap oldReplacementMap,
+			BidiMap newReplacementMap) {
 		for (int i = 0; i < oldTerms.size(); i++) {
 			// If this index of terms don't match up
 			String oldTerm = oldTerms.get(i);
@@ -225,7 +300,6 @@ public class Covering {
 				// Replace old term if necessary
 				if (oldTerm.charAt(0) != '?') {
 					oldReplacementMap.put(oldTerm, variable);
-					// hasChanged = true;
 					bothVariables = false;
 				}
 				if (newTerm.charAt(0) != '?') {
@@ -259,13 +333,17 @@ public class Covering {
 	 * @param factTerms
 	 *            The terms of the action. To be modified, depending on the
 	 *            resultant string.
+	 * @param flexibleReplacement
+	 *            If the replacement maps can be filled dynamically to match
+	 *            terms.
 	 * @return The unified version of the fact (possibly more general than the
 	 *         input fact) or null if no unification.
 	 */
+	@SuppressWarnings("unchecked")
 	private Collection<String> unifyFact(String fact,
-			Collection<String> unityFacts,
-			Map<String, String> factReplacementMap,
-			Map<String, String> unityReplacementMap, List<String> factTerms) {
+			Collection<String> unityFacts, BidiMap factReplacementMap,
+			BidiMap unityReplacementMap, List<String> factTerms,
+			boolean flexibleReplacement) {
 		Collection<String> result = new ArrayList<String>();
 
 		// Split the fact up and apply the replacements
@@ -274,28 +352,36 @@ public class Covering {
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
 		int generalisation = Integer.MAX_VALUE;
-		// Check against each item in the unity state,
+		// Check against each item in the unity state.
 		// TODO Speed this up by assigning the facts to a map so they are
-		// quickly
-		// accessible.
+		// quickly accessible.
 		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
 			String[] unitySplit = StateSpec.splitFact(iter.next());
 
 			// Check it if the same fact
-			if (factSplit[0].equals(unitySplit[0])) {
+			boolean sameFact = factSplit[0].equals(unitySplit[0]);
+			int compareIndex = 1;
+			if (sameFact && factSplit[0].equals("not")) {
+				sameFact = factSplit[1].equals(unitySplit[1]);
+				compareIndex++;
+			}
+
+			if (sameFact) {
 				String[] unification = new String[factSplit.length];
 				int thisGeneralness = 0;
 				boolean notAnonymous = false;
+				BidiMap tempUnityReplacementMap = new DualHashBidiMap();
 
 				// Unify each term
-				for (int i = 1; i < factSplit.length; i++) {
+				for (int i = compareIndex; i < factSplit.length; i++) {
 					// Apply the replacements
-					String factTerm = (factReplacementMap
+					String factTerm = (String) ((factReplacementMap
 							.containsKey(factSplit[i])) ? factReplacementMap
-							.get(factSplit[i]) : factSplit[i];
-					String unityTerm = (unityReplacementMap
-							.containsKey(unitySplit[i])) ? unityReplacementMap
-							.get(unitySplit[i]) : unitySplit[i];
+							.get(factSplit[i]) : factSplit[i]);
+					String unityTerm = findUnityReplacement(
+							unityReplacementMap, unitySplit[i],
+							flexibleReplacement, tempUnityReplacementMap,
+							factTerm);
 
 					// If either are anonymous, the unification must be
 					// anonymous
@@ -324,7 +410,15 @@ public class Covering {
 					}
 					if (thisGeneralness == generalisation) {
 						unification[0] = factSplit[0];
+						if (factSplit[0].equals("not"))
+							unification[1] = factSplit[1];
 						result.add(StateSpec.reformFact(unification));
+
+						// If we're using flexible replacements, store any
+						// temporary replacements created
+						if (flexibleReplacement) {
+							unityReplacementMap.putAll(tempUnityReplacementMap);
+						}
 					}
 				}
 			}
@@ -332,12 +426,55 @@ public class Covering {
 
 		if (!result.isEmpty()) {
 			// Setting the fact terms
-			for (String factKey : factReplacementMap.keySet())
-				Collections.replaceAll(factTerms, factKey, factReplacementMap
-						.get(factKey));
+			for (Object factKey : factReplacementMap.keySet())
+				Collections.replaceAll(factTerms, (String) factKey,
+						(String) factReplacementMap.get(factKey));
 		}
 
 		return result;
+	}
+
+	/**
+	 * A method which finds the replacement term for a unity variable if there
+	 * is one available. If the terms are flexible though, a replacement term
+	 * could be created to match the fact term.
+	 * 
+	 * @param unityReplacementMap
+	 *            The mapping for terms to be replaced.
+	 * @param unityTerm
+	 *            The term to possibly be replaced.
+	 * @param flexibleReplacement
+	 *            If allowing flexible replacements.
+	 * @param tempUnityReplacementMap
+	 *            The temporary replacement map to fill is a flexible
+	 *            replacement is created.
+	 * @param factTerm
+	 *            The term the fact is using.
+	 * @return The replacement term, or the same term if no replacement
+	 *         used/created.
+	 */
+	private String findUnityReplacement(BidiMap unityReplacementMap,
+			String unityTerm, boolean flexibleReplacement,
+			BidiMap tempUnityReplacementMap, String factTerm) {
+		// If the temp already has a replacement, then replace.
+		if (tempUnityReplacementMap.containsKey(unityTerm))
+			return (String) tempUnityReplacementMap.get(unityTerm);
+		// If the unity map already has a replacement, then replace
+		if (unityReplacementMap.containsKey(unityTerm))
+			return (String) unityReplacementMap.get(unityTerm);
+		// If we're allowing flexible replacements, create a replacement and use
+		// the replacement
+		if (flexibleReplacement) {
+			// If the fact term hasn't already been mapped to another unity term
+			if (!unityReplacementMap.containsValue(factTerm)
+					&& !tempUnityReplacementMap.containsValue(factTerm)) {
+				tempUnityReplacementMap.put(unityTerm, factTerm);
+				return factTerm;
+			}
+		}
+
+		// Otherwise return the term.
+		return unityTerm;
 	}
 
 	/**
@@ -422,7 +559,9 @@ public class Covering {
 	}
 
 	/**
-	 * Unifies action rules together into one general all-covering rule.
+	 * Unifies action rules together into one general all-covering rule. Also
+	 * notes down conditions which are true/not always true for use in later
+	 * rule specialisation.
 	 * 
 	 * @param argsList
 	 *            A heuristically sorted list of actions for a single predicate.
@@ -438,7 +577,7 @@ public class Covering {
 	 * @return All rules representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
-			MultiMap<String, Fact> relevantConditions, String actionPred,
+			MultiMap<String, String> relevantConditions, String actionPred,
 			List<GuidedRule> previousRules, List<String> constants) {
 		// The terms in the action
 		String[] action = new String[1 + StateSpec.getInstance().getActions()
@@ -451,14 +590,14 @@ public class Covering {
 		// 2) Every rule is not yet minimal
 		while (argIter.hasNext()) {
 			String arg = argIter.next();
-			List<Fact> actionFacts = new ArrayList<Fact>();
+			List<String> actionFacts = new ArrayList<String>();
 
 			String[] terms = arg.split(" ");
 			// Find the facts containing the same (useful) terms in the action
 			for (int i = 0; i < terms.length; i++) {
-				List<Fact> termFacts = relevantConditions.get(terms[i]);
+				List<String> termFacts = relevantConditions.get(terms[i]);
 				if (termFacts != null) {
-					for (Fact termFact : termFacts) {
+					for (String termFact : termFacts) {
 						if (!actionFacts.contains(termFact))
 							actionFacts.add(termFact);
 					}
@@ -468,9 +607,8 @@ public class Covering {
 			}
 
 			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = new GuidedRule(
-					convertFactsToStrings(actionFacts), StateSpec
-							.reformFact(action), false);
+			GuidedRule inverseSubbed = new GuidedRule(convertAndNoteFacts(
+					actionFacts, action), StateSpec.reformFact(action), false);
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -483,10 +621,10 @@ public class Covering {
 					GuidedRule prev = previousRules.get(i);
 
 					// Unify the prev rule and the inverse subbed rule
-					List<String> ruleConditions = prev.getConditions(true);
+					SortedSet<String> ruleConditions = prev.getConditions();
 					List<String> ruleTerms = prev.getActionTerms();
 					int changed = unifyStates(ruleConditions, inverseSubbed
-							.getConditions(false), ruleTerms, inverseSubbed
+							.getConditions(), ruleTerms, inverseSubbed
 							.getActionTerms());
 
 					if (changed == 1) {
@@ -508,10 +646,38 @@ public class Covering {
 
 		// Return the old, possibly modified rules and any new ones.
 		for (GuidedRule prev : previousRules) {
+			simplifyRule(prev);
 			prev.expandConditions();
 			prev.incrementStatesCovered();
 		}
 		return previousRules;
+	}
+
+	/**
+	 * Simplifies a rule by running through background conditions and removing
+	 * any unnecessary conditions.
+	 * 
+	 * @param rule
+	 *            The rule to simplify.
+	 */
+	private void simplifyRule(GuidedRule rule) {
+		SortedSet<String> ruleConds = rule.getConditions();
+		boolean changed = false;
+		for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
+				.getBackgroundKnowledgeConditions()) {
+			BidiMap replacementTerms = new DualHashBidiMap();
+			int result = unifyStates(bckKnow.getAllConditions(), ruleConds,
+					replacementTerms);
+			// If all conditions are present, remove the action
+			if (result == 0) {
+				String cond = bckKnow.getPostCond(replacementTerms);
+				ruleConds.remove(cond);
+				changed = true;
+			}
+		}
+
+		if (changed)
+			rule.setConditions(ruleConds, false);
 	}
 
 	/**
@@ -606,12 +772,43 @@ public class Covering {
 	 * 
 	 * @param facts
 	 *            The list of facts to be converted into strings.
+	 * @param actionTerms
+	 *            The action split into terms.
 	 * @return A collection of strings of the same facts.
 	 */
-	private Collection<String> convertFactsToStrings(List<Fact> facts) {
+	private Collection<String> convertAndNoteFacts(List<String> facts,
+			String[] actionTerms) {
 		Collection<String> strings = new ArrayList<String>();
-		for (Fact fact : facts) {
-			strings.add(fact.toString().replaceAll("\\(.+?::", "("));
+		for (String fact : facts) {
+			strings.add(fact);
+
+			// Replace variables
+			String[] factSplit = StateSpec.splitFact(fact);
+			for (int i = 1; i < factSplit.length; i++) {
+				if (StateSpec.isNumber(factSplit[i]))
+					factSplit[i] = "?";
+				else {
+					boolean replaced = false;
+					// Replace each action term present in the fact with a
+					// variable
+					for (int j = 1; j < actionTerms.length; j++) {
+						if (factSplit[i].equals(actionTerms[j])) {
+							factSplit[i] = Covering
+									.getVariableTermString(j - 1);
+							replaced = true;
+							break;
+						}
+					}
+					// Replace all else with anonymous
+					if (!replaced)
+						factSplit[i] = "?";
+				}
+			}
+			fact = StateSpec.reformFact(factSplit);
+
+			// Note down the conditions that can exist for the action
+			// TODO This needs to be move alongside the invariants
+			actionConditions_.putContains(actionTerms[0], fact);
 		}
 		return strings;
 	}
@@ -652,21 +849,30 @@ public class Covering {
 	 * @return The relevant conditions multimap.
 	 */
 	@SuppressWarnings("unchecked")
-	private MultiMap<String, Fact> compileRelevantConditionMap(Rete state) {
-		MultiMap<String, Fact> relevantConditions = new MultiMap<String, Fact>();
+	private MultiMap<String, String> compileRelevantConditionMap(Rete state) {
+		MultiMap<String, String> relevantConditions = new MultiMap<String, String>();
+		Collection<String> stateConds = new HashSet<String>();
 
 		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
 			Fact stateFact = factIter.next();
 			// Ignore the type, inequal and actions pred
 			String[] split = StateSpec.splitFact(stateFact.toString());
 			if (StateSpec.getInstance().isUsefulPredicate(split[0])) {
+				String fact = StateSpec.reformFact(split);
+				stateConds.add(fact);
 				for (int i = 1; i < split.length; i++) {
 					// Ignore numerical terms
 					if (!StateSpec.isNumber(split[i]))
-						relevantConditions.putContains(split[i], stateFact);
+						relevantConditions.putContains(split[i], fact);
 				}
 			}
 		}
+
+		// Noting the always true conditions
+		if (environmentInvariants == null)
+			environmentInvariants = stateConds;
+		else if (!environmentInvariants.isEmpty())
+			environmentInvariants.retainAll(stateConds);
 
 		return relevantConditions;
 	}
@@ -679,9 +885,7 @@ public class Covering {
 	 * @return All single-step mutations the rule can take towards matching the
 	 *         pre-goal state.
 	 */
-	public Collection<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
-		// TODO Filter rules to remove unnecessary conditions ((a X Y) (a X ?)
-		// -> (a X Y))
+	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 
 		// Get a single fact or variable specialisation from the pre goal for
@@ -690,7 +894,7 @@ public class Covering {
 		PreGoalInformation preGoal = preGoals_.get(actionPred);
 
 		// If we have a pre goal state
-		List<String> ruleConditions = rule.getConditions(true);
+		SortedSet<String> ruleConditions = rule.getConditions();
 		if (preGoal != null) {
 			List<String> preGoalState = preGoal.getState();
 
@@ -751,25 +955,143 @@ public class Covering {
 
 					// If the fact isn't in the rule, we have a mutation
 					if (!ruleConditions.contains(preGoalFact)) {
-						List<String> mutatedConditions = new ArrayList<String>(
+						SortedSet<String> mutatedConditions = new TreeSet<String>(
 								ruleConditions);
-						mutatedConditions.add(preGoalFact);
-						GuidedRule mutant = new GuidedRule(mutatedConditions,
-								rule.getAction(), true);
-						mutant.setQueryParams(rule.getQueryParameters());
-						mutant.expandConditions();
-						mutants.add(mutant);
+						if (isLegalRule(mutatedConditions, preGoalFact, null)) {
+							mutatedConditions.add(preGoalFact);
+							GuidedRule mutant = new GuidedRule(
+									mutatedConditions, rule.getAction(), true);
+							mutant.setQueryParams(rule.getQueryParameters());
+							mutant.expandConditions();
+							mutants.add(mutant);
+						}
 					}
 				}
 			}
 		} else {
+			// Split any ranges up
 			mutants.addAll(splitRanges(ruleConditions, rule.getAction(), rule
 					.getQueryParameters(), rule.getActionPredicate(), null, 0,
 					rule.isMutant()));
 		}
 
-		rule.checkInequals();
 		return mutants;
+	}
+
+	/**
+	 * Specialise a rule by adding a condition to it which includes a term used
+	 * in the action.
+	 * 
+	 * @param rule
+	 *            The rule to specialise.
+	 * @return A collection of possible specialisations of the rule.
+	 */
+	public Set<GuidedRule> specialiseRule(GuidedRule rule) {
+		Set<GuidedRule> specialisations = new HashSet<GuidedRule>();
+
+		String actionPred = rule.getActionPredicate();
+		if (!actionConditions_.containsKey(actionPred))
+			return specialisations;
+		SortedSet<String> conditions = rule.getConditions();
+		String action = rule.getAction();
+		List<String> actionTerms = rule.getActionTerms();
+
+		// Add conditions, one-by-one, using both negation and regular
+		for (String condition : actionConditions_.get(actionPred)) {
+			// Modify the condition arguments to match the action arguments.
+			String[] condSplit = StateSpec.splitFact(condition);
+			for (int i = 1; i < condSplit.length; i++) {
+				int termIndex = getVariableTermIndex(condSplit[i]);
+				if (termIndex != -1)
+					condSplit[i] = actionTerms.get(termIndex);
+			}
+			condition = StateSpec.reformFact(condSplit);
+			String negCondition = "(not " + condition + ")";
+
+			// If the rule doesn't contain either the condition of the negated
+			// condition, add both.
+			if (isLegalRule(conditions, condition, negCondition)) {
+				SortedSet<String> speConditions = new TreeSet<String>(
+						conditions);
+
+				// Add the condition and check if it exists
+				speConditions.add(condition);
+				GuidedRule specialisation = new GuidedRule(speConditions,
+						action, true);
+				if (!specialisations.contains(specialisation))
+					specialisations.add(specialisation);
+
+				speConditions = new TreeSet<String>(conditions);
+
+				// Add the condition and check if it exists
+				speConditions.add(negCondition);
+				specialisation = new GuidedRule(speConditions, action, true);
+				if (!specialisations.contains(specialisation))
+					specialisations.add(specialisation);
+			}
+		}
+
+		return specialisations;
+	}
+
+	/**
+	 * Checks if a rule is legal/useful based on logical negation and inference.
+	 * 
+	 * @param conditions
+	 *            The existing conditions of a rule.
+	 * @param condition
+	 *            The condition that is to be added.
+	 * @param negCondition
+	 *            The negation of the condition to be added.
+	 * @return True if the added condition is legal/not useless.
+	 */
+	private boolean isLegalRule(SortedSet<String> conditions, String condition,
+			String negCondition) {
+		Collection<String> unification = unifyFact(condition, conditions,
+				new DualHashBidiMap(), new DualHashBidiMap(),
+				new ArrayList<String>(), true);
+		if (!unification.isEmpty())
+			return false;
+		if (negCondition != null) {
+			Collection<String> negUnification = unifyFact(negCondition,
+					conditions, new DualHashBidiMap(), new DualHashBidiMap(),
+					new ArrayList<String>(), true);
+			if (!negUnification.isEmpty())
+				return false;
+		}
+
+		// Checking background knowledge preventable rules
+		Collection<String> checkedConds = new ArrayList<String>();
+		checkedConds.add(condition);
+		if (negCondition != null)
+			checkedConds.add(negCondition);
+		for (String condAdded : checkedConds) {
+			Collection<String> addedConditionCol = new TreeSet<String>(
+					conditions);
+			addedConditionCol.add(condAdded);
+			for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
+					.getBackgroundKnowledgeConditions()) {
+				// Pointless specialisations
+				Collection<String> knowledgeConditions = bckKnow
+						.getAllConditions();
+				int result = unifyStates(knowledgeConditions,
+						addedConditionCol, new DualHashBidiMap());
+				// If the state remained the same, then the rule has pointless
+				// assertions in it.
+				if (result == 0)
+					return false;
+
+				// Illegal specialisations
+				knowledgeConditions = bckKnow.getConjugatedConditions();
+				result = unifyStates(knowledgeConditions, addedConditionCol,
+						new DualHashBidiMap());
+				// If the state remained the same, then the rule is illegal
+				if (result == 0)
+					return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -795,16 +1117,16 @@ public class Covering {
 	 *            If the rule is a mutant or not.
 	 * @return A collection of any sub-ranged mutants created from the rule.
 	 */
-	private Collection<GuidedRule> splitRanges(List<String> ruleConditions,
-			String ruleAction, List<String> queryParameters, String actionPred,
+	private Collection<GuidedRule> splitRanges(
+			Collection<String> ruleConditions, String ruleAction,
+			List<String> queryParameters, String actionPred,
 			String[] preGoalSplit, int numericalIndex, boolean isRuleMutant) {
 		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
 
-		// For now, if a rule is a mutant, don't mutate it
-
 		// Run through each condition
-		for (int c = 0; c < ruleConditions.size(); c++) {
-			String[] condSplit = StateSpec.splitFact(ruleConditions.get(c));
+		int c = 0;
+		for (String condition : ruleConditions) {
+			String[] condSplit = StateSpec.splitFact(condition);
 			for (int i = 1; i < condSplit.length; i++) {
 				String origCond = condSplit[i];
 				int suchThatIndex = condSplit[i].indexOf("&:");
@@ -888,11 +1210,12 @@ public class Covering {
 	 * @param rangeSplit
 	 *            The size of the subranges.
 	 */
-	private void determineRanges(List<String> ruleConditions,
+	private void determineRanges(Collection<String> ruleConditions,
 			String ruleAction, List<String> queryParameters,
 			String[] preGoalSplit, int numericalIndex,
 			Collection<GuidedRule> subranges, int c, String[] condSplit, int i,
 			String rangeVariable, double min, double max, double rangeSplit) {
+		// Add the default ranged split
 		ArrayList<Double> values = new ArrayList<Double>();
 		values.add(min);
 		values.add(max);
@@ -901,11 +1224,18 @@ public class Covering {
 		if (min * max < 0)
 			values.add(0d);
 
+		Collections.sort(values);
+		subranges
+				.addAll(createRangedMutations(ruleConditions, ruleAction,
+						queryParameters, c, condSplit, i, rangeVariable, values
+								.toArray(new Double[values.size()]),
+						rangeSplit, false));
+
 		// If we have a pre-goal and the current split is the same condition.
 		if ((preGoalSplit != null) && (condSplit[0].equals(preGoalSplit[0]))) {
-			// Split the range into chunks of max size rangeSplit, using
-			// pre-goal start and end points as start and end points of the
-			// range.
+			values.clear();
+
+			// Split the pre-goal range into chunks of max size rangeSplit
 			if (preGoalSplit[numericalIndex].contains(StateSpec.BETWEEN_RANGE)) {
 				// Mutate to a pre-goal range
 				int preGoalSuchThatIndex = preGoalSplit[numericalIndex]
@@ -920,18 +1250,25 @@ public class Covering {
 				if (endPoint > max)
 					endPoint = max;
 
+				if (startPoint * endPoint < 0)
+					values.add(0d);
+
 				// Determine the ranges
 				values.add(startPoint);
 				values.add(endPoint);
+
+				Collections.sort(values);
+				subranges.addAll(createRangedMutations(ruleConditions,
+						ruleAction, queryParameters, c, condSplit, i,
+						rangeVariable, values
+								.toArray(new Double[values.size()]),
+						rangeSplit, true));
 			} else {
 				double point = Double.parseDouble(preGoalSplit[numericalIndex]);
 				if (point < min)
 					point = min;
 				if (point > max)
 					point = max;
-				// Mutate to a single point
-				// Determine the ranges
-				values.add(point);
 
 				// Create the point mutant itself
 				condSplit[i] = point + "";
@@ -943,15 +1280,9 @@ public class Covering {
 						.quote(rangeVariable), point + "");
 				GuidedRule mutant = new GuidedRule(cloneConds, newAction, true);
 				mutant.setQueryParams(queryParameters);
-				mutant.expandConditions();
 				subranges.add(mutant);
 			}
 		}
-
-		Collections.sort(values);
-		subranges.addAll(createRangedMutations(ruleConditions, ruleAction,
-				queryParameters, c, condSplit, i, rangeVariable, values
-						.toArray(new Double[values.size()]), rangeSplit));
 	}
 
 	/**
@@ -975,21 +1306,24 @@ public class Covering {
 	 *            The values to create ranges in between.
 	 * @param normalRange
 	 *            The normal range to split by.
+	 * @param createMaxRange
+	 *            If a maximum all encompassing range should be created as well.
 	 * @return A collection of mutated rules, each representing a portion of the
 	 *         range given. The number of rules equals the number of ranges.
 	 */
 	private Collection<GuidedRule> createRangedMutations(
-			List<String> ruleConditions, String ruleAction,
+			Collection<String> ruleConditions, String ruleAction,
 			List<String> queryParameters, int condIndex, String[] condSplit,
 			int condSplitIndex, String rangeVariable, Double[] values,
-			double normalRange) {
+			double normalRange, boolean createMaxRange) {
 		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
 
 		// Run through each range
+		int numRanges = 0;
 		for (int i = 0; i < values.length - 1; i++) {
 			double min = values[i];
 			double max = values[i + 1];
-			int numRanges = (int) Math.ceil((max - min) / normalRange);
+			numRanges = (int) Math.ceil((max - min) / normalRange);
 
 			if (numRanges > 0) {
 				double rangeSplit = (max - min) / numRanges;
@@ -1008,10 +1342,24 @@ public class Covering {
 					GuidedRule mutant = new GuidedRule(cloneConds, ruleAction,
 							true);
 					mutant.setQueryParams(queryParameters);
-					mutant.expandConditions();
 					subranges.add(mutant);
 				}
 			}
+		}
+
+		// If we're creating a range from min to max value and it hasn't already
+		// been created (only 1 range)
+		if (createMaxRange && (numRanges > 1)) {
+			condSplit[condSplitIndex] = rangeVariable + "&:("
+					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " "
+					+ values[0] + " " + values[values.length - 1] + ")";
+			String fullCondition = StateSpec.reformFact(condSplit);
+			List<String> cloneConds = new ArrayList<String>(ruleConditions);
+			cloneConds.set(condIndex, fullCondition);
+
+			GuidedRule mutant = new GuidedRule(cloneConds, ruleAction, true);
+			mutant.setQueryParams(queryParameters);
+			subranges.add(mutant);
 		}
 
 		return subranges;
@@ -1055,7 +1403,8 @@ public class Covering {
 	 */
 	private boolean factMutation(String ruleAction, Set<GuidedRule> mutants,
 			String actionPred, List<String> preGoalState,
-			List<String> ruleConditions, Map<String, String> replacementTerms,
+			Collection<String> ruleConditions,
+			Map<String, String> replacementTerms,
 			Map<String, String> reverseReplacementTerms,
 			List<String> ruleTerms, List<String> preGoalTerms,
 			String[] preGoalSplit, String cond, String[] condSplit,
@@ -1118,6 +1467,8 @@ public class Covering {
 									GuidedRule mutant = new GuidedRule(
 											mutatedConditions, ruleAction, true);
 									mutant.setQueryParams(queryParameters);
+									// Here, needs to add inequals and types
+									// that may not be present.
 									mutant.expandConditions();
 									mutants.add(mutant);
 								}
@@ -1188,23 +1539,26 @@ public class Covering {
 	 */
 	private GuidedRule replaceActionTerm(String actionPred,
 			List<String> preGoalState, List<String> preGoalTerms,
-			List<String> ruleConditions, String replacedTerm,
+			Collection<String> ruleConditions, String replacedTerm,
 			String replacementTerm, List<String> replActionTerms,
 			boolean requireUnification) {
 		// Replace the variables with their replacements.
-		List<String> replacementConds = new ArrayList<String>(ruleConditions
-				.size());
+		SortedSet<String> replacementConds = new TreeSet<String>(
+				ConditionComparator.getInstance());
 		for (String condition : ruleConditions) {
-			// Replace variables
-			String replCond = condition.replaceAll(" "
-					+ Pattern.quote(replacedTerm) + "(?=( |\\)))", " "
-					+ replacementTerm);
-			replacementConds.add(replCond);
+			// Exclude inequals checks
+			if ((condition.length() <= 5)
+					|| (!condition.substring(0, 5).equals("(test"))) {
+				// Replace variables
+				String replCond = condition.replaceAll(" "
+						+ Pattern.quote(replacedTerm) + "(?=( |\\)))", " "
+						+ replacementTerm);
+				replacementConds.add(replCond);
+			}
 		}
 
 		// 4b. If the new cond is valid (through unification),
-		// keep
-		// it and note that the replacement has occurred
+		// keep it and note that the replacement has occurred
 		if (!requireUnification
 				|| (unifyStates(replacementConds, preGoalState,
 						replActionTerms, preGoalTerms) == 0)) {
@@ -1217,6 +1571,7 @@ public class Covering {
 
 			// Adding the mutated rule
 			GuidedRule mutant = new GuidedRule(replacementConds, action, true);
+			// Should only need to add inequals here.
 			mutant.expandConditions();
 			return mutant;
 		}
@@ -1279,6 +1634,7 @@ public class Covering {
 									new PreGoalInformation(
 											(List<String>) preGoalStringState,
 											newStateTerms));
+							calculateMutationHash(actionSplit[0]);
 						} else {
 							// Unify the two states and check if it has changed
 							// at all.
@@ -1290,6 +1646,7 @@ public class Covering {
 							// otherwise increment.
 							if (result == 1) {
 								preGoal.resetInactivity();
+								calculateMutationHash(actionSplit[0]);
 							} else if (result == 0) {
 								if (!formedActions.contains(actionPred))
 									preGoal.incrementInactivity();
@@ -1316,10 +1673,32 @@ public class Covering {
 	}
 
 	/**
+	 * Calculates the hash value for a pre-goal and stores it.
+	 * 
+	 * @param action
+	 *            The action for the pre-goal.
+	 */
+	private void calculateMutationHash(String action) {
+		PreGoalInformation pgi = preGoals_.get(action);
+		int hash = 0;
+		if (pgi != null)
+			hash = pgi.hashCode();
+
+		int actionHash = 0;
+		if (actionConditions_.containsKey(action))
+			for (String actionCond : actionConditions_.get(action))
+				actionHash += actionCond.hashCode();
+
+		int prime = 17;
+		mutationHashs.put(action, prime * hash + actionHash);
+	}
+
+	/**
 	 * Clears the pregoal state.
 	 */
 	public void clearPreGoalState(int numActions) {
 		preGoals_ = new HashMap<String, PreGoalInformation>(numActions);
+		mutationHashs = new HashMap<String, Integer>(numActions);
 	}
 
 	/**
@@ -1337,6 +1716,22 @@ public class Covering {
 		for (int i = 1; i < split.length; i++)
 			terms.add(split[i]);
 		preGoals_.put(split[0], new PreGoalInformation(preGoal, terms));
+		calculateMutationHash(split[0]);
+	}
+
+	/**
+	 * Sets the individual conditions that have been observed to be true for
+	 * executing an action. Should just be used for testing.
+	 * 
+	 * @param action
+	 *            The action to set the conditions for.
+	 * @param conditions
+	 *            The conditions that have been observed to be true for the
+	 *            action.
+	 */
+	public void setAllowedActionConditions(String action,
+			Collection<String> conditions) {
+		actionConditions_.putContains(action, conditions);
 	}
 
 	/**
@@ -1395,6 +1790,20 @@ public class Covering {
 	}
 
 	/**
+	 * Gets the hash code for the current pre-goal.
+	 * 
+	 * @param actionPredicate
+	 *            The action predicate for the pre-goal.
+	 * @return An integer hash code corresponding to the pre-goal state.
+	 */
+	public int getMutationHash(String actionPredicate) {
+		Integer hash = mutationHashs.get(actionPredicate);
+		if (hash == null)
+			return 0;
+		return hash;
+	}
+
+	/**
 	 * Generates a variable term string from the index given.
 	 * 
 	 * @param i
@@ -1404,12 +1813,26 @@ public class Covering {
 	 */
 	public static String getVariableTermString(int i) {
 		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
-				% (MODULO_CHAR - FIRST_CHAR));
+				% MODULO_LETTERS);
 		return "?" + variable;
 	}
 
-	public static String getConstantTermString(Object obj) {
-		return "[" + obj + "]";
+	/**
+	 * The opposite of getVariableTermString, this method gets the integer the
+	 * variable corresponds to, or -1 if invalid.
+	 * 
+	 * @param variable
+	 *            The variable string to check.
+	 * @return An integer corresponding to the position in the action the
+	 *         variable refers to or -1 if invalid.
+	 */
+	private static int getVariableTermIndex(String variable) {
+		if (variable.length() < 2)
+			return -1;
+
+		int termIndex = (variable.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
+				% MODULO_LETTERS;
+		return termIndex;
 	}
 
 	/**
@@ -1470,6 +1893,54 @@ public class Covering {
 		@Override
 		public String toString() {
 			return state_.toString() + " : " + actionTerms_.toString();
+		}
+
+		private Covering getOuterType() {
+			return Covering.this;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + getOuterType().hashCode();
+			int actionResult = 0;
+			for (String condition : actionTerms_)
+				actionResult += condition.hashCode();
+			result = prime * result + actionResult;
+			int stateResult = 0;
+			for (String condition : state_)
+				stateResult += condition.hashCode();
+			result = prime * result + stateResult;
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			PreGoalInformation other = (PreGoalInformation) obj;
+			if (!getOuterType().equals(other.getOuterType()))
+				return false;
+			if (actionTerms_ == null) {
+				if (other.actionTerms_ != null)
+					return false;
+			} else if (!actionTerms_.containsAll(other.actionTerms_))
+				return false;
+			else if (!other.actionTerms_.containsAll(actionTerms_))
+				return false;
+			if (state_ == null) {
+				if (other.state_ != null)
+					return false;
+			} else if (!state_.containsAll(other.state_))
+				return false;
+			else if (!other.state_.containsAll(state_))
+				return false;
+			return true;
 		}
 	}
 

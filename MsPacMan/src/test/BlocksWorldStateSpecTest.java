@@ -41,189 +41,179 @@ public class BlocksWorldStateSpecTest {
 	}
 
 	@Test
-	public void testParseRule() {
+	public void testRuleCreation() {
 		// Basic variable test
-		String rule = spec_.parseRule("(clear ?X) => (moveFloor ?X)");
-		String body = rule.split("=>")[0];
-		int condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		String head = rule.split("=>")[1];
+		GuidedRule rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
 		// 2 assertions in the body: clear, and block
-		assertEquals(condCount, 2);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 2);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("block"));
+		assertTrue(rule.getAction().equals("(moveFloor ?X)"));
 
 		// Test for a constant
-		rule = spec_.parseRule("(clear a) => (moveFloor a)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(clear a) => (moveFloor a)");
 		// 2 assertions in the body: clear, and block, with a constant
 		// variable
-		assertEquals(condCount, 2);
-		assertTrue(body.contains("(clear a)"));
-		assertTrue(body.contains("(block a)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor a)"));
+		assertEquals(rule.getConditions().size(), 2);
+		assertTrue(rule.getConditions().contains("(clear a)"));
+		assertTrue(rule.getConditions().contains("(block a)"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor a)");
 
 		// Test for constants (no inequals)
-		rule = spec_.parseRule("(clear a) (clear b) => (moveFloor a)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(clear a) (clear b) => (moveFloor a)");
 		// 4 assertions in the body: 2 clears, and 2 blocks, without an
 		// inequality test
-		assertEquals(condCount, 4);
-		assertTrue(body.contains("(clear a)"));
-		assertTrue(body.contains("(block a)"));
-		assertTrue(body.contains("(clear b)"));
-		assertTrue(body.contains("(block b)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor a)"));
+		assertEquals(rule.getConditions().size(), 4);
+		assertTrue(rule.getConditions().contains("(clear a)"));
+		assertTrue(rule.getConditions().contains("(block a)"));
+		assertTrue(rule.getConditions().contains("(clear b)"));
+		assertTrue(rule.getConditions().contains("(block b)"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor a)");
 
 		// Multiple conditions, one term
-		rule = spec_.parseRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
 		// 3 assertions in the body: clear, highest, and a single block
-		assertEquals(condCount, 3);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(highest ?X)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 3);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(highest ?X)"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Multiple conditions, two terms
-		rule = spec_.parseRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
-		assertEquals(condCount, 5);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(highest ?Y)"));
-		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y))"));
-		assertTrue(body.indexOf("clear") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 5);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(highest ?Y)"));
+		assertTrue(rule.getConditions().contains("(block ?Y)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Y ?X))"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Variables and constants
-		rule = spec_.parseRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
-		assertEquals(condCount, 8);
-		assertTrue(body.contains("(on ?X a)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(block a)"));
-		assertTrue(body.contains("(above b ?Y)"));
-		assertTrue(body.contains("(block b)"));
-		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X a b ?Y))"));
-		assertTrue(body.contains("(test (<> ?Y a b))"));
-		assertTrue(body.indexOf("clear") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 8);
+		assertTrue(rule.getConditions().contains("(on ?X a)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(block a)"));
+		assertTrue(rule.getConditions().contains("(above b ?Y)"));
+		assertTrue(rule.getConditions().contains("(block b)"));
+		assertTrue(rule.getConditions().contains("(block ?Y)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Y ?X a b))"));
+		assertTrue(rule.getConditions().contains("(test (<> ?X a b))"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Test anonymous variable
-		rule = spec_.parseRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
-		assertEquals(condCount, 3);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(on ?X ?)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 3);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(on ?X ?)"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Test anonymous variables
-		rule = spec_
-				.parseRule("(clear ?X) (on ?X ?) (on ?Y ?) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
+		rule = new GuidedRule(
+				"(clear ?X) (on ?X ?) (on ?Y ?) => (moveFloor ?X)");
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
 		// Note no inequals between ?1 and ?2
-		assertEquals(condCount, 6);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(on ?X ?)"));
-		assertTrue(body.contains("(on ?Y ?)"));
-		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y))"));
-		assertTrue(body.indexOf("clear") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("block"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		assertEquals(rule.getConditions().size(), 6);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(on ?X ?)"));
+		assertTrue(rule.getConditions().contains("(on ?Y ?)"));
+		assertTrue(rule.getConditions().contains("(block ?Y)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Y ?X))"));
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("block"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Test type predicate
-		rule = spec_.parseRule("(block ?X) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
-		assertEquals(condCount, 1);
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		rule = new GuidedRule("(block ?X) => (moveFloor ?X)");
+		assertEquals(rule.getConditions().size(), 1);
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Test inequal type predicates
-		rule = spec_.parseRule("(block ?X) (block ?Y) => (move ?X ?Y)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
-		assertEquals(condCount, 3);
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y))"));
-		assertTrue(head.contains("(move ?X ?Y)"));
+		rule = new GuidedRule("(block ?X) (block ?Y) => (move ?X ?Y)");
+		assertEquals(rule.getConditions().size(), 3);
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?Y)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Y ?X))"));
+		assertEquals(rule.getAction(), "(move ?X ?Y)");
 
 		// Test existing type predicate
-		rule = spec_.parseRule("(clear ?X) (block ?X) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
-		assertEquals(condCount, 2);
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(head.contains("(moveFloor ?X)"));
+		rule = new GuidedRule("(clear ?X) (block ?X) => (moveFloor ?X)");
+		assertEquals(rule.getConditions().size(), 2);
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
 
 		// Test inequals parsing
-		rule = spec_
-				.parseRule("(clear ?X) (clear ?Y) (test (<> ?X ?Y)) (block ?X) (block ?Y) => (move ?X ?Y)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
-		assertEquals(condCount, 5);
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(clear ?Y)"));
-		assertTrue(body.contains("(test (<> ?X ?Y))"));
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(block ?Y)"));
-		assertTrue(head.contains("(move ?X ?Y)"));
-		assertTrue(body.indexOf("clear") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("block"));
+		rule = new GuidedRule(
+				"(clear ?X) (clear ?Y) (test (<> ?Y ?X)) (block ?X) (block ?Y) => (move ?X ?Y)");
+		assertEquals(rule.getConditions().size(), 5);
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(clear ?Y)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Y ?X))"));
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?Y)"));
+		assertEquals(rule.getAction(), "(move ?X ?Y)");
+		assertTrue(rule.getStringConditions().indexOf("clear") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("block"));
 
 		// Testing module syntax
-		rule = spec_.parseRule("(above ?X ?*a*) (clear ?X) => (moveFloor ?X)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
-		assertTrue(body.contains("(block ?X)"));
-		assertTrue(body.contains("(block ?*a*)"));
-		assertTrue(body.contains("(above ?X ?*a*)"));
-		assertTrue(body.contains("(clear ?X)"));
-		assertTrue(body.contains("(test (<> ?X ?*a*))"));
-		assertTrue(head.contains("(moveFloor ?X)"));
-		assertEquals(condCount, 5);
+		rule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(block ?_MOD_a)"));
+		assertTrue(rule.getConditions().contains("(above ?X ?_MOD_a)"));
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?_MOD_a ?X))"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
+		assertEquals(rule.getConditions().size(), 5);
+
+		// Testing negation
+		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(not (highest ?X))"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
+		assertEquals(rule.getConditions().size(), 3);
+		
+		// Testing negation (with extra terms)
+		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		assertTrue(rule.getConditions().contains("(block ?X)"));
+		assertTrue(rule.getConditions().contains("(clear ?X)"));
+		assertTrue(rule.getConditions().contains("(not (highest ?X))"));
+		assertEquals(rule.getAction(), "(moveFloor ?X)");
+		assertEquals(rule.getConditions().size(), 3);
 	}
 
 	@Test

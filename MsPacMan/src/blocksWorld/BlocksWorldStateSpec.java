@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import relationalFramework.BackgroundKnowledge;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
@@ -48,20 +49,36 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<String, String> initialiseBackgroundKnowledge() {
-		Map<String, String> bkMap = new HashMap<String, String>();
+	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
+		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
 
-		// Block(Y) & !On(X,Y) -> Clear(Y)
-		bkMap.put("clearRule",
-				"(block ?Y) (not (on ?X ?Y)) => (assert (clear ?Y))");
+		// Block(Y) & !On(?,Y) -> Clear(Y)
+		bkMap.put("clearRule", new BackgroundKnowledge(
+				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
+
+		// Block(X) & !On(X,?) -> OnFloor(X)
+		bkMap.put("onFloorRule1", new BackgroundKnowledge(
+				"(block ?X) (not (on ?X ?)) => (onFloor ?X)", false));
+
+		// Block(X) & On(X,?) -> !OnFloor(X)
+		bkMap.put("onFloorRule2", new BackgroundKnowledge(
+				"(block ?X) (on ?X ?) => (not (onFloor ?X))", false));
+
+		// Block(Z) & On(X,Y) -> !On(X,Z)
+		bkMap.put("onRule", new BackgroundKnowledge(
+				"(block ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
+
+		// Highest(X) -> Clear(X)
+		bkMap.put("highestRule", new BackgroundKnowledge(
+				"(highest ?X) => (clear ?X)", false));
 
 		// On(X,Y) -> Above(X,Y)
-		bkMap.put("aboveRule1",
-				"(on ?X ?Y) => (assert (above ?X ?Y))");
+		bkMap.put("aboveRule1", new BackgroundKnowledge(
+				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
-		bkMap.put("aboveRule2",
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))");
+		bkMap.put("aboveRule2", new BackgroundKnowledge(
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
 
 		return bkMap;
 	}
@@ -70,7 +87,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected String initialiseGoalState(List<String> constants) {
 		if (envParameter_ == null)
 			envParameter_ = "onab";
-		
+
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
 			constants.add("a");
@@ -93,7 +110,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			constants.add("a");
 			return "(clear a)";
 		}
-		
+
 		return null;
 	}
 
@@ -121,7 +138,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new GuidedRule(parseRule(rules[i])), false, false);
+			optimal.addRule(new GuidedRule(rules[i]), false, false);
 
 		return optimal;
 	}

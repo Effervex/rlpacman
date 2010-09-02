@@ -3,6 +3,7 @@ package rlPacMan;
 import java.awt.*;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
+import java.util.Random;
 
 class Ghost extends Thing {
 	// Blinky (Red) behaviour (Aggressive)
@@ -67,7 +68,7 @@ class Ghost extends Thing {
 	private boolean flashing_;
 
 	Ghost(GameModel gameModel, byte type, int startX, int startY,
-			boolean bMiddle, int nExitMilliSec) {
+			boolean bMiddle, int nExitMilliSec, Random random) {
 		super(gameModel, startX, startY, bMiddle);
 		m_deltaMax = m_ghostDeltaMax;
 		m_destinationX = -1;
@@ -103,6 +104,7 @@ class Ghost extends Thing {
 		m_bInsideRoom = true;
 		m_nExitMilliSec = nExitMilliSec;
 		m_nTicks2Exit = m_nExitMilliSec / gameModel.m_pacMan.m_delay;
+		random_ = random;
 	}
 
 	/**
@@ -113,7 +115,7 @@ class Ghost extends Thing {
 	@Override
 	public Object clone() {
 		Ghost clone = new Ghost(m_gameModel, Ghost.BLINKY, m_locX, m_locY,
-				true, m_nExitMilliSec);
+				true, m_nExitMilliSec, random_);
 		clone.m_lastDirection = m_lastDirection;
 		clone.m_destinationX = m_destinationX;
 		clone.m_destinationY = m_destinationY;
@@ -643,20 +645,20 @@ class Ghost extends Thing {
 		// direction first.
 		// This will keep the ghosts from following each other and to trap
 		// Pacman.
-		if (!m_bInsaneAI && m_bCanUseNextBest && Math.random() < .2) {
+		if (!m_bInsaneAI && m_bCanUseNextBest && random_.nextDouble() < .2) {
 			ArrayList<Byte> directions = new ArrayList<Byte>();
 			directions.add(UP);
 			directions.add(DOWN);
 			directions.add(RIGHT);
 			directions.add(LEFT);
 			bestDirection[0] = directions
-					.remove((int) (Math.random() * directions.size()));
+					.remove((int) (random_.nextDouble() * directions.size()));
 			bestDirection[1] = directions
-					.remove((int) (Math.random() * directions.size()));
+					.remove((int) (random_.nextDouble() * directions.size()));
 			bestDirection[2] = directions
-					.remove((int) (Math.random() * directions.size()));
+					.remove((int) (random_.nextDouble() * directions.size()));
 			bestDirection[3] = directions
-					.remove((int) (Math.random() * directions.size()));
+					.remove((int) (random_.nextDouble() * directions.size()));
 		}
 
 		// If the ghost is fleeing and not eaten, then reverse the array of best
@@ -865,7 +867,7 @@ class Ghost extends Thing {
 
 		// This will allow ghosts to often
 		// clump together for easier eating
-		dRandom = Math.random();
+		dRandom = random_.nextDouble();
 		if (!m_bInsaneAI && dRandom < .90) {
 			// if (m_bInsaneAI && dRandom < .25)
 			// return false;

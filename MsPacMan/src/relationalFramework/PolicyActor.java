@@ -242,7 +242,7 @@ public class PolicyActor implements AgentInterface {
 				}
 			}
 
-			Collections.shuffle(possibleGoals_);
+			Collections.shuffle(possibleGoals_, PolicyGenerator.random_);
 			GoalState chosenGoal = null;
 			for (int i = 0; i < possibleGoals_.size(); i++) {
 				chosenGoal = possibleGoals_.get(i);

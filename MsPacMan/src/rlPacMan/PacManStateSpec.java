@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import relationalFramework.BackgroundKnowledge;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
@@ -96,8 +97,11 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<String, String> initialiseBackgroundKnowledge() {
-		Map<String, String> bckKnowledge = new HashMap<String, String>();
+	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
+		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
+
+		bckKnowledge.put("blinkingRule", new BackgroundKnowledge(
+				"(blinking ?X) => (edible ?X)", false));
 
 		return bckKnowledge;
 	}
@@ -123,14 +127,14 @@ public class PacManStateSpec extends StateSpec {
 			// Good policy for no dots play
 			rules
 					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-							+ "(pacman ?Player) (aggressive ?Ghost) (ghost ?Ghost) "
+							+ "(pacman ?Player) (not (edible ?Ghost)) (ghost ?Ghost) "
 							+ "=> (fromGhost ?Ghost ?Dist0)");
 			rules
 					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-							+ "(edible ?Ghost) (nonblinking ?Ghost) (pacman ?Player) "
+							+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
 							+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 			rules
-					.add("(aggressive ?Ghost) "
+					.add("(not (edible ?Ghost)) "
 							+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
 							+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
 							+ "(pacman ?Player) (ghost ?Ghost) "
@@ -161,20 +165,24 @@ public class PacManStateSpec extends StateSpec {
 			// Good policy for regular play
 			rules
 					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-							+ "(pacman ?Player) (aggressive ?Ghost) (ghost ?Ghost) "
+							+ "(pacman ?Player) (not (edible ?Ghost)) (ghost ?Ghost) "
+							+ "=> (fromGhost ?Ghost ?Dist0)");
+			rules
+					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
+							+ "(pacman ?Player) (not (edible ?Ghost)) (ghost ?Ghost) "
 							+ "=> (fromGhost ?Ghost ?Dist0)");
 			rules
 					.add("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-							+ "(edible ?Ghost) (nonblinking ?Ghost) (pacman ?Player) "
+							+ "(edible ?Ghost) (not (blinking ?Ghost)) (pacman ?Player) "
 							+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
 			rules
-					.add("(aggressive ?Ghost) "
+					.add("(not (edible ?Ghost)) "
 							+ "(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
 							+ "(distancePowerDot ?Player ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
 							+ "(pacman ?Player) (ghost ?Ghost) "
 							+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
 			rules
-					.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 2)) "
+					.add("(distancePowerDot ?Player ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 3)) "
 							+ "(distanceGhost ?Player ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
 							+ "(edible ?Ghost) (pacman ?Player) (powerDot ?PowerDot) "
 							+ "=> (fromPowerDot ?PowerDot ?Dist0)");
@@ -186,7 +194,7 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		for (String rule : rules)
-			goodPolicy.addRule(new GuidedRule(parseRule(rule)), false, false);
+			goodPolicy.addRule(new GuidedRule(rule), false, false);
 
 		return goodPolicy;
 	}
@@ -220,20 +228,10 @@ public class PacManStateSpec extends StateSpec {
 		structure.add(Ghost.class);
 		predicates.putCollection("edible", structure);
 
-		// Aggressive
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		predicates.putCollection("aggressive", structure);
-
 		// Blinking
 		structure = new ArrayList<Class>();
 		structure.add(Ghost.class);
 		predicates.putCollection("blinking", structure);
-
-		// Nonblinking
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		predicates.putCollection("nonblinking", structure);
 
 		// Distance Metrics
 		structure = new ArrayList<Class>();

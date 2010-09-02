@@ -45,6 +45,11 @@ public class LearningController {
 	private int maxEpisodes_;
 	/** The number of times to repeat the experiment. */
 	private int repetitions_ = 1;
+	/**
+	 * The specific run number this experiment is saving to, or -1 if ignoring
+	 * this.
+	 */
+	private int runNumber_ = -1;
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double POPULATION_CONSTANT = 10;
 	/** The ratio of samples to use as 'elite' samples. */
@@ -88,7 +93,10 @@ public class LearningController {
 			BufferedReader bf = new BufferedReader(reader);
 
 			String environmentClass = bf.readLine();
-			Integer repetitions = Integer.parseInt(bf.readLine());
+			String[] repetitionsStr = bf.readLine().split(",");
+			Integer repetitions = Integer.parseInt(repetitionsStr[0]);
+			Integer runNumber = (repetitionsStr.length == 2) ? Integer
+					.parseInt(repetitionsStr[1]) : -1;
 			Integer episodes = Integer.parseInt(bf.readLine());
 			String policyFile = bf.readLine();
 			String generatorFile = bf.readLine();
@@ -106,8 +114,8 @@ public class LearningController {
 			bf.close();
 			reader.close();
 
-			initialise(environmentClass, repetitions, episodes, policyFile,
-					generatorFile, performanceFile, extraArgsList
+			initialise(environmentClass, repetitions, runNumber, episodes,
+					policyFile, generatorFile, performanceFile, extraArgsList
 							.toArray(new String[extraArgsList.size()]));
 
 			for (int i = 1; i < args.length; i++) {
@@ -137,6 +145,9 @@ public class LearningController {
 	 *            The name of the environment class files.
 	 * @param repetitions
 	 *            The number of times to repeat the experiment.
+	 * @param runNumber
+	 *            The run number for this experiment to save to, or -1 if doing
+	 *            all.
 	 * @param episodeCount
 	 *            The number of episodes to perform.
 	 * @param policyFile
@@ -149,9 +160,10 @@ public class LearningController {
 	 *            The extra arguments for the environment to take.
 	 */
 	private void initialise(String environmentClass, int repetitions,
-			int episodeCount, String policyFile, String generatorFile,
-			String performanceFile, String[] extraArgs) {
+			int runNumber, int episodeCount, String policyFile,
+			String generatorFile, String performanceFile, String[] extraArgs) {
 		repetitions_ = repetitions;
+		runNumber_ = runNumber;
 		maxEpisodes_ = episodeCount;
 
 		// Create the output files if necessary
@@ -200,6 +212,8 @@ public class LearningController {
 		// done in a previous experiment)
 		int[] startPoint = checkFiles();
 		int run = startPoint[0];
+		if (runNumber_ != -1)
+			run = runNumber_;
 		// TODO Load the temp generators with all the necessary info
 		// (pre-goal too)
 		int iteration = -1;// startPoint[1];
@@ -221,15 +235,20 @@ public class LearningController {
 
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();
+
+			if (runNumber_ != -1)
+				break;
 		}
 
 		RLGlue.RL_cleanup();
 
-		try {
-			combineGenerators(repetitions_);
-			compilePerformanceAverage(repetitions_);
-		} catch (Exception e) {
-			e.printStackTrace();
+		if (runNumber_ == -1) {
+			try {
+				combineGenerators(repetitions_);
+				compilePerformanceAverage(repetitions_);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		System.out.println("Total learning time: "
@@ -374,8 +393,7 @@ public class LearningController {
 				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
 				// Clean up the policy values
-				pvs = cleanPolicyValues(pvs, numElite, t, population
-						/ SELECTION_RATIO);
+				pvs = cleanPolicyValues(pvs, numElite, t, testingStep);
 
 				// Only test the agent every number of steps, otherwise more
 				// time is spent testing than evaluating. (And at the first and
@@ -388,7 +406,7 @@ public class LearningController {
 				}
 
 				// Run the post update operations
-				localPolicy.postUpdateOperations();
+				localPolicy.postUpdateOperations(population);
 
 				t++;
 				sinceLastTest++;
@@ -478,12 +496,12 @@ public class LearningController {
 	private List<PolicyValue> cleanPolicyValues(List<PolicyValue> pvs,
 			int numElite, int iteration, double staleValue) {
 		// Remove any stale policies
-		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
-			PolicyValue pv = iter.next();
-			if (iteration - pv.getIteration() >= staleValue) {
-				iter.remove();
-			}
-		}
+		// for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
+		// PolicyValue pv = iter.next();
+		// if (iteration - pv.getIteration() >= staleValue) {
+		// iter.remove();
+		// }
+		// }
 
 		// If the collection is too big, remove the worst policy values
 		if (ENTROBEAM) {
