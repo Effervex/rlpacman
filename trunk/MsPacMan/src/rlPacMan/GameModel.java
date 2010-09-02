@@ -3,6 +3,7 @@ package rlPacMan;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 // GameState is primarly maintained by the int[][] m_gameState
 // 2D array where each integer is a location in the maze.  Integers
@@ -106,6 +107,8 @@ public class GameModel {
 	private int scatterChaseIndex_ = 0;
 	public boolean noDots_ = false;
 	public boolean noPowerDots_ = false;
+	
+	private Random random_ = new Random();
 
 	GameModel(PacMan pacMan) {
 		m_pacMan = pacMan;
@@ -121,17 +124,27 @@ public class GameModel {
 		// Ghosts and Pacman
 		m_player = new Player(this, Thing.PACMAN, 13, 23, false);
 		m_ghosts = new Ghost[4];
-		m_ghosts[Ghost.BLINKY] = new Ghost(this, Ghost.BLINKY, 13, 11, true, 0);
+		m_ghosts[Ghost.BLINKY] = new Ghost(this, Ghost.BLINKY, 13, 11, true, 0, random_);
 		m_ghosts[Ghost.PINKY] = new Ghost(this, Ghost.PINKY, 12, 14, false,
-				2000);
-		m_ghosts[Ghost.INKY] = new Ghost(this, Ghost.INKY, 13, 14, true, 4000);
+				2000, random_);
+		m_ghosts[Ghost.INKY] = new Ghost(this, Ghost.INKY, 13, 14, true, 4000, random_);
 		m_ghosts[Ghost.CLYDE] = new Ghost(this, Ghost.CLYDE, 15, 14, false,
-				6000);
+				6000, random_);
 		// Fruit
-		m_fruit = new Fruit(this, Thing.FRUIT, 13, 17, true);
+		m_fruit = new Fruit(this, Thing.FRUIT, 13, 17, true, random_);
 
 		fillThingArray();
 		createScatterChaseTable();
+	}
+
+	public void setRandom(Random random) {
+		random_ = random;
+		m_ghosts[Ghost.BLINKY].random_ = random_;
+		m_ghosts[Ghost.PINKY].random_ = random_;
+		m_ghosts[Ghost.INKY].random_ = random_;
+		m_ghosts[Ghost.CLYDE].random_ = random_;
+		// Fruit
+		m_fruit.random_ = random_;
 	}
 
 	/**

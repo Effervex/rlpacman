@@ -314,8 +314,6 @@ public class Policy {
 			GuidedRule gr = iter.next();
 
 			// Find the result set
-			// TODO Evaluate rules in a step-wise fashion, to infer how much of
-			// a rule fires
 			try {
 				// Forming the query
 				String query = StateSpec.getInstance().getRuleQuery(gr);
@@ -366,7 +364,7 @@ public class Policy {
 					// actions
 					if (actionsFound < actionsReturnedModified) {
 						if ((actionsFound + actionsList.size()) > actionsReturnedModified) {
-							Collections.shuffle(actionsList);
+							Collections.shuffle(actionsList, PolicyGenerator.random_);
 							actionsList = actionsList.subList(0,
 									actionsReturnedModified - actionsFound);
 						}

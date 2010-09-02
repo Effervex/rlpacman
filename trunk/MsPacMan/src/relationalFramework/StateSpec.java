@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -52,13 +53,19 @@ public abstract class StateSpec {
 	private String environment_;
 
 	/** The prerequisites of the rules and their structure. */
+	@SuppressWarnings("unchecked")
 	private MultiMap<String, Class> predicates_;
 
 	/** The type predicates, only used implicitly. */
+	@SuppressWarnings("unchecked")
 	private Map<Class, String> typePredicates_;
 
 	/** The actions of the rules and their structure. */
+	@SuppressWarnings("unchecked")
 	private MultiMap<String, Class> actions_;
+
+	/** The background rules and illegalities of the state. */
+	private Map<String, BackgroundKnowledge> backgroundRules_;
 
 	/** The number of simultaneous actions per step to take. */
 	private int actionNum_;
@@ -126,10 +133,11 @@ public abstract class StateSpec {
 			actionNum_ = initialiseActionsPerStep();
 
 			// Initialise the background knowledge rules
-			Map<String, String> backgroundRules = initialiseBackgroundKnowledge();
-			for (String ruleNames : backgroundRules.keySet()) {
-				rete_.eval("(defrule " + ruleNames + " "
-						+ backgroundRules.get(ruleNames) + ")");
+			backgroundRules_ = initialiseBackgroundKnowledge();
+			for (String ruleNames : backgroundRules_.keySet()) {
+				if (backgroundRules_.get(ruleNames).assertInJess())
+					rete_.eval("(defrule " + ruleNames + " "
+							+ backgroundRules_.get(ruleNames) + ")");
 			}
 
 			// Initialise the betweenRange function
@@ -211,6 +219,7 @@ public abstract class StateSpec {
 	 *            The rete object.
 	 * @return A mapping of classes to guided predicate names.
 	 */
+	@SuppressWarnings("unchecked")
 	protected abstract Map<Class, String> initialiseTypePredicateTemplates();
 
 	/**
@@ -218,6 +227,7 @@ public abstract class StateSpec {
 	 * 
 	 * @return The list of guided predicate names.
 	 */
+	@SuppressWarnings("unchecked")
 	protected abstract MultiMap<String, Class> initialisePredicateTemplates();
 
 	/**
@@ -225,6 +235,7 @@ public abstract class StateSpec {
 	 * 
 	 * @return The list of guided actions.
 	 */
+	@SuppressWarnings("unchecked")
 	protected abstract MultiMap<String, Class> initialiseActionTemplates();
 
 	/**
@@ -266,81 +277,7 @@ public abstract class StateSpec {
 	 * @return A mapping of rule names to the pure rules themselves (just pre =>
 	 *         post).
 	 */
-	protected abstract Map<String, String> initialiseBackgroundKnowledge();
-
-	/**
-	 * Parses a rule from a human readable string. the string is in the format
-	 * '[(predicate [ arg]) ]+ => (predicate [ arg])'.
-	 * 
-	 * Generally, lowercase variables are constants, while ?uppercase variables
-	 * are variables. Also, anonymous variables are allowed in the body. These
-	 * are like fully generalised variables in that anonymous variables may or
-	 * may not equal each other.
-	 * 
-	 * @param rule
-	 *            The string representation of the rule.
-	 * @return An instantiated rule.
-	 */
-	public final String parseRule(String rule) {
-		StringRule stringRule = extractInfo(rule);
-
-		// Organise the rule back into a string
-		StringBuffer buffer = new StringBuffer();
-		// Main preds first
-		for (String[] fact : stringRule.getMainConditions()) {
-			buffer.append(reformFact(fact) + " ");
-		}
-
-		// Inequals tests
-		buffer.append(createInequalsTests(stringRule.terms_));
-
-		// Type preds
-		for (String[] typeFact : stringRule.getTypeConditions()) {
-			buffer.append(reformFact(typeFact) + " ");
-		}
-
-		// Action
-		String[] action = stringRule.getAction();
-		buffer.append(INFERS_ACTION + " " + reformFact(action));
-
-		return buffer.toString();
-	}
-
-	/**
-	 * Extracts the predicates and predicate arguments from a string rule.
-	 * 
-	 * @param rule
-	 *            The rule being extracted
-	 * @return A 2D array of predicates, with an array per predicate, and each
-	 *         array containing the pred name and the arguments. The last
-	 *         predicate is the action.
-	 */
-	private final StringRule extractInfo(String rule) {
-		// Split the rule into conditions and actions
-		String[] split = rule.split(INFERS_ACTION);
-		if (split.length < 2)
-			return null;
-
-		StringRule info = new StringRule();
-		for (int i = 0; i < split.length; i++) {
-			String predicate = split[i];
-
-			// A Regexp looking for a predicate with args '(clear a)'
-			// '(move b ?X)' '(cool beans)' '(on ?X _)'
-			Pattern p = Pattern.compile("\\((\\w+)( .+?)+\\)(?= |$)");
-			Matcher m = p.matcher(predicate);
-			while (m.find()) {
-				String[] fact = splitFact(m.group());
-
-				if (i == 0)
-					info.addCondition(fact);
-				else
-					info.setAction(fact);
-			}
-		}
-
-		return info;
-	}
+	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
 
 	/**
 	 * Creates a string representation of a rule, in a light, easy-to-read, and
@@ -397,7 +334,8 @@ public abstract class StateSpec {
 	 * Generates the valid actions for the state into the state for the agent to
 	 * use. Actions are given in string format of just the arguments.
 	 * 
-	 * @param state The state from which the actions are generated.
+	 * @param state
+	 *            The state from which the actions are generated.
 	 * @return A multimap with each valid action predicate as the key and the
 	 *         values as the arguments.
 	 */
@@ -409,7 +347,7 @@ public abstract class StateSpec {
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
-					StringBuffer factBuffer = new StringBuffer(); 
+					StringBuffer factBuffer = new StringBuffer();
 					boolean first = true;
 					for (String term : actionPreconditions_.get(action)) {
 						if (!first)
@@ -423,7 +361,7 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		
+
 		return validActions;
 	}
 
@@ -436,8 +374,9 @@ public abstract class StateSpec {
 	 * @return A string array of the facts.
 	 */
 	public static String[] splitFact(String fact) {
-		Pattern p = Pattern.compile("((?:\\?[-\\w$*=+/<>_#.\\p{InGreek}]+&:\\(.+?\\))"
-				+ "|(?:[-?\\w$*=+/<>_#.\\p{InGreek}]+))(?= |\\)|$)");
+		Pattern p = Pattern
+				.compile("((?:\\?[-\\w$*=+/<>_#.\\p{InGreek}]+&:\\(.+?\\))"
+						+ "|(?:[-?\\w$*=+/<>_#.\\p{InGreek}]+))(?= |\\)|$)");
 		Matcher m = p.matcher(fact);
 		ArrayList<String> matches = new ArrayList<String>();
 		while (m.find())
@@ -455,6 +394,13 @@ public abstract class StateSpec {
 	 */
 	public static String reformFact(String[] factSplit) {
 		StringBuffer buffer = new StringBuffer("(" + factSplit[0]);
+		// Reforming negation
+		if (factSplit[0].equals("not"))
+			return buffer.toString()
+					+ " "
+					+ reformFact(Arrays.copyOfRange(factSplit, 1,
+							factSplit.length)) + ")";
+
 		for (int i = 1; i < factSplit.length; i++) {
 			buffer.append(" " + factSplit[i]);
 		}
@@ -480,46 +426,75 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates the inequals tests from the terms stored. Note anonymous terms
-	 * are special in that they aren't inequal to one-another.
+	 * Creates the inequals tests from the terms given. Note anonymous terms are
+	 * special in that they aren't inequal to one-another.
 	 * 
 	 * @return The string for detailing inequality '(test (<> ?X a b ?Y ?_0))
 	 *         (test (<> ?Y a ...))'
 	 */
-	public static String createInequalsTests(List<String> terms) {
-		StringBuffer buffer = new StringBuffer();
-		// Run through each term
-		List<String> constants = new ArrayList<String>();
-		for (int i = 0; i < terms.size(); i++) {
-			// If the term is a variable, assert an inequals
-			if (terms.get(i).charAt(0) == '?') {
-				boolean isValid = false;
-				StringBuffer subBuffer = new StringBuffer();
-				// The base term
-				subBuffer.append("(test (<> " + terms.get(i));
-				// The constants already seen
-				for (String constant : constants) {
-					subBuffer.append(" " + constant);
+	public static Collection<String> createInequalityTests(
+			Collection<String> variableTerms, Collection<String> constantTerms) {
+		Collection<String> tests = new ArrayList<String>();
+
+		// Run through each variable term
+		for (Iterator<String> termIter = variableTerms.iterator(); termIter
+				.hasNext();) {
+			String varTermA = termIter.next();
+			StringBuffer buffer = new StringBuffer("(test (<> " + varTermA);
+			boolean isValid = false;
+			// Adding other variable terms
+			for (Iterator<String> subIter = variableTerms.iterator(); subIter
+					.hasNext();) {
+				String varTermB = subIter.next();
+				if (varTermB != varTermA) {
 					isValid = true;
-				}
+					buffer.append(" " + varTermB);
+				} else
+					break;
+			}
 
-				// Later terms seen
-				for (int j = i + 1; j < terms.size(); j++) {
-					subBuffer.append(" " + terms.get(j));
-					isValid = true;
-				}
+			// Adding constant terms
+			for (String constant : constantTerms) {
+				isValid = true;
+				buffer.append(" " + constant);
+			}
 
-				subBuffer.append(")) ");
-
-				// If the expression is valid, add it
-				if (isValid)
-					buffer.append(subBuffer);
-			} else {
-				// Add the constant to the list of constants
-				constants.add(terms.get(i));
+			if (isValid) {
+				buffer.append("))");
+				tests.add(buffer.toString());
 			}
 		}
-		return buffer.toString();
+		return tests;
+	}
+
+	/**
+	 * Adds type predicates to the rule from a fact if they are not already
+	 * there.
+	 * 
+	 * @param fact
+	 *            The fact.
+	 * @param termIndex
+	 *            The index where the first term is found.
+	 */
+	public Collection<String> createTypeConds(String[] fact, int termIndex) {
+		Collection<String> typeConds = new HashSet<String>();
+		// If the term itself is a type pred, return.
+		if (isTypePredicate(fact[termIndex - 1])) {
+			return typeConds;
+		}
+
+		List<Class> classes = predicates_.get(fact[termIndex - 1]);
+		for (int i = termIndex; i < fact.length; i++) {
+			if (!fact[i].equals("?")) {
+				String[] typePred = new String[2];
+				typePred[0] = typePredicates_.get(classes.get(i - termIndex));
+				if (typePred[0] != null) {
+					typePred[1] = fact[i];
+					typeConds.add(reformFact(typePred));
+				}
+			}
+		}
+		return typeConds;
 	}
 
 	/**
@@ -556,6 +531,10 @@ public abstract class StateSpec {
 
 	public String getGoalState() {
 		return goalState_;
+	}
+
+	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
+		return backgroundRules_.values();
 	}
 
 	/**
@@ -786,109 +765,6 @@ public abstract class StateSpec {
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * A class for storing string rule information and organising it properly.
-	 * 
-	 * @author Samuel J. Sarjant
-	 */
-	private class StringRule {
-		private List<String[]> mainConditions_;
-		private List<String[]> typeConditions_;
-		private String[] action_;
-		private List<String> terms_;
-
-		public StringRule() {
-			mainConditions_ = new ArrayList<String[]>();
-			typeConditions_ = new ArrayList<String[]>();
-			terms_ = new ArrayList<String>();
-		}
-
-		/**
-		 * Adds a conditions to the string rule. If the rule is not a type
-		 * predicate, types are added automatically. Terms are also added
-		 * automatically.
-		 * 
-		 * @param fact
-		 *            The condition being added with the pred at the head, and
-		 *            the args as later elements.
-		 */
-		public void addCondition(String[] fact) {
-			// If the condition is a main predicate
-			if (predicates_.keySet().contains(fact[0])) {
-				mainConditions_.add(fact);
-				addTerms(fact);
-				addTypeConds(fact);
-			} else if (isTypePredicate(fact[0])) {
-				// Type predicate
-				addTerms(fact);
-				addTypeConds(fact);
-			}
-		}
-
-		/**
-		 * Adds terms to the rule from a fact.
-		 * 
-		 * @param fact
-		 *            The fact.
-		 */
-		private void addTerms(String[] fact) {
-			// Ignore the first argument
-			for (int i = 1; i < fact.length; i++) {
-				String term = fact[i];
-				// If the term isn't anonymous and isn't already in, add it.
-				if (!term.equals("?") && !terms_.contains(term)) {
-					// Don't include any numerical terms (variable or otherwise)
-					if ((predicates_.get(fact[0]) == null)
-							|| (!Number.class.isAssignableFrom(predicates_.get(
-									fact[0]).get(i - 1)))) {
-						terms_.add(term);
-					}
-				}
-			}
-		}
-
-		/**
-		 * Adds type predicates to the rule from a fact if they are not already
-		 * there.
-		 * 
-		 * @param fact
-		 *            The fact.
-		 */
-		private void addTypeConds(String[] fact) {
-			if (isTypePredicate(fact[0])) {
-				addContainsArray(typeConditions_, fact);
-				return;
-			}
-			List<Class> classes = predicates_.get(fact[0]);
-			for (int i = 1; i < fact.length; i++) {
-				if (!fact[i].equals("?")) {
-					String[] typePred = new String[2];
-					typePred[0] = typePredicates_.get(classes.get(i - 1));
-					if (typePred[0] != null) {
-						typePred[1] = fact[i];
-						addContainsArray(typeConditions_, typePred);
-					}
-				}
-			}
-		}
-
-		public String[] getAction() {
-			return action_;
-		}
-
-		public void setAction(String[] action) {
-			action_ = action;
-		}
-
-		public List<String[]> getMainConditions() {
-			return mainConditions_;
-		}
-
-		public List<String[]> getTypeConditions() {
-			return typeConditions_;
 		}
 	}
 }

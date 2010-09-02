@@ -7,6 +7,7 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
+import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 
 public class PacManStateSpecTest {
@@ -21,45 +22,42 @@ public class PacManStateSpecTest {
 	}
 
 	@Test
-	public void testApplyAction() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testParseRule() {
+	public void testRuleCreation() {
 		// All the main tests are covered in the BlocksWorld StateSpec test
 
 		// Testing numbers
-		String rule = spec_
-				.parseRule("(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
-		String body = rule.split("=>")[0];
-		int condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		String head = rule.split("=>")[1];
+		GuidedRule rule = new GuidedRule(
+				"(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
 		// 2 assertions in the body: clear, and block
-		assertEquals(condCount, 4);
-		assertTrue(body.contains("(distanceGhost ?Player ?Ghost 4)"));
-		assertTrue(body.contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(body.contains("(pacman ?Player)"));
-		assertTrue(body.contains("(ghost ?Ghost)"));
-		assertTrue(body.indexOf("distanceGhost") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("pacman"));
-		assertTrue(head.contains("(fromGhost ?Ghost)"));
+		assertEquals(rule.getConditions().size(), 4);
+		assertTrue(rule.getConditions().contains(
+				"(distanceGhost ?Player ?Ghost 4)"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Player ?Ghost))"));
+		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
+		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
+		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("pacman"));
+		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
 
 		// Testing conditional &:elements
-		rule = spec_
-				.parseRule("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
+		rule = new GuidedRule(
+				"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
 						+ " => (fromGhost ?Ghost)");
-		body = rule.split("=>")[0];
-		condCount = body.replaceAll("\\(.+?\\)( |$)", ".").length();
-		head = rule.split("=>")[1];
 		// 2 assertions in the body: clear, and block
-		assertEquals(condCount, 4);
-		assertTrue(body.contains("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"));
-		assertTrue(body.contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(body.contains("(pacman ?Player)"));
-		assertTrue(body.contains("(ghost ?Ghost)"));
-		assertTrue(body.indexOf("distanceGhost") < body.indexOf("test"));
-		assertTrue(body.indexOf("test") < body.indexOf("pacman"));
-		assertTrue(head.contains("(fromGhost ?Ghost)"));
+		assertEquals(rule.getConditions().size(), 4);
+		assertTrue(rule
+				.getConditions()
+				.contains(
+						"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"));
+		assertTrue(rule.getConditions().contains("(test (<> ?Player ?Ghost))"));
+		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
+		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
+		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
+				.getStringConditions().indexOf("test"));
+		assertTrue(rule.getStringConditions().indexOf("test") < rule
+				.getStringConditions().indexOf("pacman"));
+		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
 	}
 }

@@ -205,6 +205,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_ = environment_.getGameModel();
 		model_.noDots_ = noDots;
 		model_.noPowerDots_ = noPowerDots;
+		model_.setRandom(PolicyGenerator.random_);
 		rete_ = StateSpec.getInstance().getRete();
 
 		prevScore_ = 0;
@@ -445,14 +446,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 					// If edible, add assertion
 					if (ghost.isEdible()) {
 						rete_.eval("(assert (edible " + ghost + "))");
-					} else {
-						rete_.eval("(assert (aggressive " + ghost + "))");
 					}
 					// If flashing, add assertion
 					if (ghost.isBlinking()) {
 						rete_.eval("(assert (blinking " + ghost + "))");
-					} else {
-						rete_.eval("(assert (nonblinking " + ghost + "))");
 					}
 
 					// Distances from pacman to ghost

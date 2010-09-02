@@ -8,6 +8,8 @@
 (assert (tile b))
 (assert (tile c))
 (assert (tile d))
+(assert (towerBase TAU2))
+(assert (tile TAU2))
 (assert (clear a t2))
 (assert (on a b t2))
 (assert (on b c t2))
@@ -28,13 +30,18 @@
     =>
     (assert (move ?X ?Tb)))
 
-(defrule smaller
-    (tile ?X) (tile ?Y&:(< ?X ?Y))
+(defrule smaller1
+    (tile ?X) (not (towerBase ?X)) (tile ?Y&:(< ?X ?Y))
+    =>
+    (assert (smaller ?X ?Y)))
+
+(defrule smaller2
+    (tile ?X) (not (towerBase ?X)) (towerBase ?Y)
     =>
     (assert (smaller ?X ?Y)))
 
 (defrule goalRule
-    (tower t2) (forall (tile ?X) (or (on ?X ? t2) (onFloor ?X t2)))
+    (tower t2) (forall (tile ?X) (or (towerBase ?X) (on ?X ? t2)))
     =>
     (assert (goalMet true)))
 

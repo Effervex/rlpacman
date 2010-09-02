@@ -120,6 +120,19 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	}
 
 	/**
+	 * Gets the probability for an element if it is present.
+	 * 
+	 * @param element The element with a probability.
+	 * @return The probability of the rule, or -1 if it isn't present.
+	 */
+	public double getProb(T element) {
+		int index = indexOf(element);
+		if (index == -1)
+			return -1;
+		return getProb(index);
+	}
+
+	/**
 	 * Gets the element at an index.
 	 * 
 	 * @param index

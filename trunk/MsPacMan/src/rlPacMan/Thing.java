@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.awt.*;
+import java.util.Random;
 
 // Pacman and Ghosts
 public abstract class Thing extends PacPoint {
@@ -40,6 +41,8 @@ public abstract class Thing extends PacPoint {
 	int pixelY_;
 	int pixelSize_;
 	int pixelShrink_;
+	
+	Random random_ = new Random(0);
 
 	public Thing(GameModel gameModel, int startX, int startY, boolean bMiddleX) {
 		m_startX = startX;

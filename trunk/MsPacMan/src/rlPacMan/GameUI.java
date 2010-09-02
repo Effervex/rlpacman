@@ -563,7 +563,7 @@ public class GameUI extends Canvas {
 				&& x <= m_gameModel.m_doorLocX + 2)
 			return;
 
-		// TODO Debug drawing
+		// Debug drawing
 		// if (gameCell >= GameModel.PAL_BEND_TOPLEFT) {
 		// g.fillRect(x1, y1, CELL_LENGTH, CELL_LENGTH);
 		// return;

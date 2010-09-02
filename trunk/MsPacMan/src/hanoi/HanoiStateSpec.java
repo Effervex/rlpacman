@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import relationalFramework.BackgroundKnowledge;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
@@ -45,29 +46,39 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Map<String, String> initialiseBackgroundKnowledge() {
-		Map<String, String> bkMap = new HashMap<String, String>();
+	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
+		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
 
 		// TowerBase -> Tile
-		bkMap.put("towerBaseImplication",
-				"(towerBase ?X) => (assert (tile ?X))");
+		bkMap.put("towerBaseImplication", new BackgroundKnowledge(
+				"(towerBase ?X) => (assert (tile ?X))", true));
 
 		// Block(Y) & !On(X,Y) -> Clear(Y)
-		bkMap.put("clearTileRule",
+		bkMap.put("clearTileRule", new BackgroundKnowledge(
 				"(tile ?Y) (tower ?T) (on ?Y ? ?T) (not (on ? ?Y ?T)) "
-						+ "=> (assert (clear ?Y ?T))");
+						+ "=> (assert (clear ?Y ?T))", true));
 
 		// On(X,Y) -> Above(X,Y)
-		bkMap.put("aboveRule1", "(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))");
+		bkMap.put("aboveRule1", new BackgroundKnowledge(
+				"(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))", true));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
-		bkMap.put("aboveRule2",
-				"(on ?X ?Y ?T) (above ?Y ?Z ?T) => (assert (above ?X ?Z ?T))");
+		bkMap.put("aboveRule2", new BackgroundKnowledge(
+				"(on ?X ?Y ?T) (above ?Y ?Z ?T) => (assert (above ?X ?Z ?T))",
+				true));
 
-		// Smaller(X,Y) rule
-		bkMap.put("smallerRule", "(tile ?X) (not (towerBase ?X)) "
-				+ "(or (tile ?Y&:(< ?X ?Y)) (towerBase ?Y))"
-				+ "=> (assert (smaller ?X ?Y))");
+		// Smaller(X,Y) rule A
+		bkMap.put("smallerRule1", new BackgroundKnowledge(
+				"(tile ?X) (not (towerBase ?X)) (tile ?Y&:(< ?X ?Y)) "
+						+ "=> (assert (smaller ?X ?Y))", true));
+		// Smaller(X,Y) rule B
+		bkMap.put("smallerRule2", new BackgroundKnowledge(
+				"(tile ?X) (not (towerBase ?X)) (towerBase ?Y)) "
+						+ "=> (assert (smaller ?X ?Y))", true));
+		
+		// Tile(Z) & On(X,Y) -> !On(X,Z)
+		bkMap.put("onRule", new BackgroundKnowledge(
+				"(tile ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
 
 		return bkMap;
 	}
@@ -95,7 +106,7 @@ public class HanoiStateSpec extends StateSpec {
 
 		optimal = new Policy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new GuidedRule(parseRule(rules[i])), false, false);
+			optimal.addRule(new GuidedRule(rules[i]), false, false);
 
 		return optimal;
 	}
