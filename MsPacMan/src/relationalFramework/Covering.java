@@ -49,8 +49,10 @@ public class Covering {
 	/** The hash codes for each pre-goal. */
 	private Map<String, Integer> mutationHashs;
 
+	// TODO Refactor all observations into single object which covers
+	// specialised parts until all is converged.
 	/**
-	 * The conditions that have been observed to be true at least for each
+	 * The conditions that have been observed to be true at least once for each
 	 * action.
 	 */
 	private MultiMap<String, String> actionConditions_;
@@ -105,9 +107,7 @@ public class Covering {
 				previousRules = new ArrayList<GuidedRule>();
 
 			// Cover the state, using the previous rules and/or newly created
-			// rules while noting valid conditions for later rule mutation
-			// TODO Simplify the rules to remove unnecessary background
-			// conditions.
+			// rules while noting valid conditions for later rule mutation\
 			List<GuidedRule> actionRules = unifyActionRules(validActions
 					.get(action), relevantConditions, action, previousRules,
 					constants);
@@ -340,7 +340,7 @@ public class Covering {
 	 *         input fact) or null if no unification.
 	 */
 	@SuppressWarnings("unchecked")
-	private Collection<String> unifyFact(String fact,
+	public Collection<String> unifyFact(String fact,
 			Collection<String> unityFacts, BidiMap factReplacementMap,
 			BidiMap unityReplacementMap, List<String> factTerms,
 			boolean flexibleReplacement) {
@@ -385,7 +385,8 @@ public class Covering {
 
 					// If either are anonymous, the unification must be
 					// anonymous
-					if (factTerm.equals(StateSpec.ANONYMOUS)) {
+					if (factTerm.equals(StateSpec.ANONYMOUS)
+							|| ((unityTerm != null) && (unityTerm.equals(StateSpec.ANONYMOUS)))) {
 						unification[i] = StateSpec.ANONYMOUS;
 					} else if (factTerm.equals(unityTerm)) {
 						// If the two are the same term (not anonymous) and
@@ -468,9 +469,11 @@ public class Covering {
 			// If the fact term hasn't already been mapped to another unity term
 			if (!unityReplacementMap.containsValue(factTerm)
 					&& !tempUnityReplacementMap.containsValue(factTerm)) {
-				tempUnityReplacementMap.put(unityTerm, factTerm);
+				if (!factTerm.equals(StateSpec.ANONYMOUS))
+					tempUnityReplacementMap.put(unityTerm, factTerm);
 				return factTerm;
 			}
+			return null;
 		}
 
 		// Otherwise return the term.
@@ -646,7 +649,10 @@ public class Covering {
 
 		// Return the old, possibly modified rules and any new ones.
 		for (GuidedRule prev : previousRules) {
-			simplifyRule(prev);
+			SortedSet<String> ruleConds = simplifyRule(prev.getConditions(),
+					null, null, false);
+			if (ruleConds != null)
+				prev.setConditions(ruleConds, false);
 			prev.expandConditions();
 			prev.incrementStatesCovered();
 		}
@@ -654,30 +660,58 @@ public class Covering {
 	}
 
 	/**
-	 * Simplifies a rule by running through background conditions and removing
-	 * any unnecessary conditions.
+	 * Simplifies a rule with an optional added condition by removing any
+	 * non-necessary conditions and returning either a different set of
+	 * conditions, or null.
 	 * 
-	 * @param rule
-	 *            The rule to simplify.
+	 * @param ruleConds
+	 *            The rule conditions to simplify.
+	 * @param condition
+	 *            The optional condition to be added to the rule conditions.
+	 *            Useful for quickly checking duplicates/negations.
+	 * @param negCondition
+	 *            The optional negated condition for checking negation.
+	 * @param testForIllegalRule
+	 *            If the conditions need to be tested for illegal combinations
+	 *            as well (use background knowledge in conjugated form)
+	 * @return A modified version of the input rule conditions, or null if no
+	 *         change made.
 	 */
-	private void simplifyRule(GuidedRule rule) {
-		SortedSet<String> ruleConds = rule.getConditions();
-		boolean changed = false;
-		for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
-				.getBackgroundKnowledgeConditions()) {
-			BidiMap replacementTerms = new DualHashBidiMap();
-			int result = unifyStates(bckKnow.getAllConditions(), ruleConds,
-					replacementTerms);
-			// If all conditions are present, remove the action
-			if (result == 0) {
-				String cond = bckKnow.getPostCond(replacementTerms);
-				ruleConds.remove(cond);
-				changed = true;
+	public SortedSet<String> simplifyRule(SortedSet<String> ruleConds,
+			String condition, String negCondition, boolean testForIllegalRule) {
+		SortedSet<String> simplified = new TreeSet<String>(ruleConds);
+
+		// If we have an optional added condition, check for duplicates/negation
+		if (condition != null) {
+			Collection<String> unification = unifyFact(condition, ruleConds,
+					new DualHashBidiMap(), new DualHashBidiMap(),
+					new ArrayList<String>(), false);
+			if (!unification.isEmpty())
+				return null;
+
+			if (negCondition == null) {
+				String not = "(not ";
+				negCondition = (condition.substring(0, not.length())
+						.equals(not)) ? condition.substring(not.length(),
+						condition.length() - 1) : not + condition + ")";
 			}
+			Collection<String> negUnification = unifyFact(negCondition,
+					ruleConds, new DualHashBidiMap(), new DualHashBidiMap(),
+					new ArrayList<String>(), false);
+			if (!negUnification.isEmpty())
+				return null;
+
+			simplified.add(condition);
 		}
 
-		if (changed)
-			rule.setConditions(ruleConds, false);
+		for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
+				.getBackgroundKnowledgeConditions()) {
+			bckKnow.simplify(simplified, this, testForIllegalRule);
+		}
+
+		if (simplified.equals(ruleConds))
+			return null;
+		return simplified;
 	}
 
 	/**
@@ -807,9 +841,9 @@ public class Covering {
 			fact = StateSpec.reformFact(factSplit);
 
 			// Note down the conditions that can exist for the action
-			// TODO This needs to be move alongside the invariants
 			actionConditions_.putContains(actionTerms[0], fact);
 		}
+
 		return strings;
 	}
 
@@ -955,9 +989,9 @@ public class Covering {
 
 					// If the fact isn't in the rule, we have a mutation
 					if (!ruleConditions.contains(preGoalFact)) {
-						SortedSet<String> mutatedConditions = new TreeSet<String>(
-								ruleConditions);
-						if (isLegalRule(mutatedConditions, preGoalFact, null)) {
+						SortedSet<String> mutatedConditions = simplifyRule(
+								ruleConditions, preGoalFact, null, false);
+						if (mutatedConditions != null) {
 							mutatedConditions.add(preGoalFact);
 							GuidedRule mutant = new GuidedRule(
 									mutatedConditions, rule.getAction(), true);
@@ -1008,90 +1042,28 @@ public class Covering {
 			condition = StateSpec.reformFact(condSplit);
 			String negCondition = "(not " + condition + ")";
 
-			// If the rule doesn't contain either the condition of the negated
-			// condition, add both.
-			if (isLegalRule(conditions, condition, negCondition)) {
-				SortedSet<String> speConditions = new TreeSet<String>(
-						conditions);
-
-				// Add the condition and check if it exists
-				speConditions.add(condition);
-				GuidedRule specialisation = new GuidedRule(speConditions,
+			// Check for the regular condition
+			SortedSet<String> specConditions = simplifyRule(conditions,
+					condition, negCondition, true);
+			if (specConditions != null) {
+				GuidedRule specialisation = new GuidedRule(specConditions,
 						action, true);
 				if (!specialisations.contains(specialisation))
 					specialisations.add(specialisation);
+			}
 
-				speConditions = new TreeSet<String>(conditions);
-
-				// Add the condition and check if it exists
-				speConditions.add(negCondition);
-				specialisation = new GuidedRule(speConditions, action, true);
+			// Check for the negated condition
+			specConditions = simplifyRule(conditions, negCondition, condition,
+					true);
+			if (specConditions != null) {
+				GuidedRule specialisation = new GuidedRule(specConditions,
+						action, true);
 				if (!specialisations.contains(specialisation))
 					specialisations.add(specialisation);
 			}
 		}
 
 		return specialisations;
-	}
-
-	/**
-	 * Checks if a rule is legal/useful based on logical negation and inference.
-	 * 
-	 * @param conditions
-	 *            The existing conditions of a rule.
-	 * @param condition
-	 *            The condition that is to be added.
-	 * @param negCondition
-	 *            The negation of the condition to be added.
-	 * @return True if the added condition is legal/not useless.
-	 */
-	private boolean isLegalRule(SortedSet<String> conditions, String condition,
-			String negCondition) {
-		Collection<String> unification = unifyFact(condition, conditions,
-				new DualHashBidiMap(), new DualHashBidiMap(),
-				new ArrayList<String>(), true);
-		if (!unification.isEmpty())
-			return false;
-		if (negCondition != null) {
-			Collection<String> negUnification = unifyFact(negCondition,
-					conditions, new DualHashBidiMap(), new DualHashBidiMap(),
-					new ArrayList<String>(), true);
-			if (!negUnification.isEmpty())
-				return false;
-		}
-
-		// Checking background knowledge preventable rules
-		Collection<String> checkedConds = new ArrayList<String>();
-		checkedConds.add(condition);
-		if (negCondition != null)
-			checkedConds.add(negCondition);
-		for (String condAdded : checkedConds) {
-			Collection<String> addedConditionCol = new TreeSet<String>(
-					conditions);
-			addedConditionCol.add(condAdded);
-			for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
-					.getBackgroundKnowledgeConditions()) {
-				// Pointless specialisations
-				Collection<String> knowledgeConditions = bckKnow
-						.getAllConditions();
-				int result = unifyStates(knowledgeConditions,
-						addedConditionCol, new DualHashBidiMap());
-				// If the state remained the same, then the rule has pointless
-				// assertions in it.
-				if (result == 0)
-					return false;
-
-				// Illegal specialisations
-				knowledgeConditions = bckKnow.getConjugatedConditions();
-				result = unifyStates(knowledgeConditions, addedConditionCol,
-						new DualHashBidiMap());
-				// If the state remained the same, then the rule is illegal
-				if (result == 0)
-					return false;
-			}
-		}
-
-		return true;
 	}
 
 	/**
@@ -1403,7 +1375,7 @@ public class Covering {
 	 */
 	private boolean factMutation(String ruleAction, Set<GuidedRule> mutants,
 			String actionPred, List<String> preGoalState,
-			Collection<String> ruleConditions,
+			SortedSet<String> ruleConditions,
 			Map<String, String> replacementTerms,
 			Map<String, String> reverseReplacementTerms,
 			List<String> ruleTerms, List<String> preGoalTerms,
@@ -1460,17 +1432,22 @@ public class Covering {
 								String newCond = StateSpec
 										.reformFact(condSplit);
 								if (!ruleConditions.contains(newCond)) {
-									List<String> mutatedConditions = new ArrayList<String>(
+									SortedSet<String> mutatedConditions = new TreeSet<String>(
 											ruleConditions);
-									mutatedConditions.set(mutatedConditions
-											.indexOf(cond), newCond);
-									GuidedRule mutant = new GuidedRule(
-											mutatedConditions, ruleAction, true);
-									mutant.setQueryParams(queryParameters);
-									// Here, needs to add inequals and types
-									// that may not be present.
-									mutant.expandConditions();
-									mutants.add(mutant);
+									mutatedConditions.remove(cond);
+									mutatedConditions = simplifyRule(
+											mutatedConditions, newCond, null,
+											false);
+									if (mutatedConditions != null) {
+										GuidedRule mutant = new GuidedRule(
+												mutatedConditions, ruleAction,
+												true);
+										mutant.setQueryParams(queryParameters);
+										// Here, needs to add inequals and types
+										// that may not be present.
+										mutant.expandConditions();
+										mutants.add(mutant);
+									}
 								}
 
 								// Revert the cond split back
@@ -1721,7 +1698,7 @@ public class Covering {
 
 	/**
 	 * Sets the individual conditions that have been observed to be true for
-	 * executing an action. Should just be used for testing.
+	 * executing an action.
 	 * 
 	 * @param action
 	 *            The action to set the conditions for.
@@ -1732,6 +1709,18 @@ public class Covering {
 	public void setAllowedActionConditions(String action,
 			Collection<String> conditions) {
 		actionConditions_.putContains(action, conditions);
+	}
+
+	/**
+	 * Sets the individual conditions that have been observed to be true for
+	 * executing an action.
+	 * 
+	 * @param actionConditions
+	 *            The set of existing action conditions.
+	 */
+	public void setAllowedActionConditions(
+			MultiMap<String, String> actionConditions) {
+		actionConditions_ = actionConditions;
 	}
 
 	/**
@@ -1801,6 +1790,10 @@ public class Covering {
 		if (hash == null)
 			return 0;
 		return hash;
+	}
+
+	public MultiMap<String, String> getActionConditions() {
+		return actionConditions_;
 	}
 
 	/**

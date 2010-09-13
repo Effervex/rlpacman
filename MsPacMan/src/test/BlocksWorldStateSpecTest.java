@@ -206,7 +206,7 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(rule.getConditions().contains("(not (highest ?X))"));
 		assertEquals(rule.getAction(), "(moveFloor ?X)");
 		assertEquals(rule.getConditions().size(), 3);
-		
+
 		// Testing negation (with extra terms)
 		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(rule.getConditions().contains("(block ?X)"));
@@ -325,5 +325,13 @@ public class BlocksWorldStateSpecTest {
 		// Inner condition
 		result = StateSpec.splitFact("(clear ?X&:(<> ?X hat))");
 		assertArrayEquals(new String[] { "clear", "?X&:(<> ?X hat)" }, result);
+
+		// Test condition
+		result = StateSpec.splitFact("(test (<> ?X hat))");
+		assertArrayEquals(new String[] { "test", "<>", "?X", "hat" }, result);
+
+		// Not condition
+		result = StateSpec.splitFact("(not (clear ?X))");
+		assertArrayEquals(new String[] { "not", "clear", "?X" }, result);
 	}
 }

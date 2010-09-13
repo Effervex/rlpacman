@@ -131,12 +131,6 @@ public class PolicyGenerator {
 	private static final int NUM_COVERGED_UPDATES = 10;
 
 	/**
-	 * The constant used to determine when a rule is pruned from the
-	 * distribution.
-	 */
-	private static final double PRUNING_CONST = 0.05;
-
-	/**
 	 * The constructor for creating a new Policy Generator.
 	 */
 	public PolicyGenerator() {
@@ -406,13 +400,10 @@ public class PolicyGenerator {
 			for (GuidedRule gr : mutants) {
 				if (!removedRules_.contains(gr)) {
 					// Only add if not already in there
-					if (!ruleSlot.contains(gr)) {
-						ruleSlot.addNewRule(gr, false);
-					}
+					ruleSlot.addNewRule(gr, false);
 
 					if (debugMode_) {
 						System.out.println("\tADDED/EXISTING MUTANT: " + gr);
-
 					}
 
 					mutatedRules_.putContains(ruleSlot.getAction(), gr);
@@ -727,7 +718,7 @@ public class PolicyGenerator {
 	 *            The number of times a rule can be used before it can create
 	 *            mutations.
 	 */
-	public void postUpdateOperations(int mutationUses) {
+	public void postUpdateOperations(int mutationUses, double pruneConst) {
 		if (slotOptimisation_)
 			return;
 
@@ -748,7 +739,7 @@ public class PolicyGenerator {
 			// Pruning unused rules from the slots
 			ProbabilityDistribution<GuidedRule> distribution = slot
 					.getGenerator();
-			double pruneProb = (1.0 / distribution.size()) * PRUNING_CONST;
+			double pruneProb = (1.0 / distribution.size()) * pruneConst;
 			boolean removed = false;
 			for (Iterator<GuidedRule> iter = distribution.iterator(); iter
 					.hasNext();) {
@@ -756,6 +747,7 @@ public class PolicyGenerator {
 
 				if (distribution.getProb(rule) <= pruneProb) {
 					iter.remove();
+					distribution.remove(rule);
 					removed = true;
 					// Note the rule in the no-create list
 					removedRules_.add(rule);
@@ -848,6 +840,8 @@ public class PolicyGenerator {
 			ArrayList<String> internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addCoveredRules(policyGenerator.coveredRules_);
+		instance_.addActionConditions(policyGenerator.covering_
+				.getActionConditions());
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
 		return instance_;
@@ -925,6 +919,10 @@ public class PolicyGenerator {
 
 	public OrderedDistribution<Slot> getGenerator() {
 		return slotGenerator_;
+	}
+
+	private void addActionConditions(MultiMap<String, String> actionConditions) {
+		covering_.setAllowedActionConditions(actionConditions);
 	}
 
 	/**

@@ -85,6 +85,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;
+		} if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
+			StateSpec.reinitInstance(arg0.substring(5));
+			if (arg0.substring(4).contains("levelMax"))
+				model_.oneLife_ = true;
 		} else {
 			try {
 				int delay = Integer.parseInt(arg0);
@@ -123,8 +127,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Letting the thread 'sleep', so that the game still runs.
 		try {
-			if (!experimentMode_)
+			if (!experimentMode_) {
 				Thread.sleep(playerDelay_);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -199,12 +204,14 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public void resetEnvironment() {
 		boolean noDots = model_.noDots_;
 		boolean noPowerDots = model_.noPowerDots_;
+		boolean oneLife = model_.oneLife_;
 
 		environment_.reinit();
 
 		model_ = environment_.getGameModel();
 		model_.noDots_ = noDots;
 		model_.noPowerDots_ = noPowerDots;
+		model_.oneLife_ = oneLife;
 		model_.setRandom(PolicyGenerator.random_);
 		rete_ = StateSpec.getInstance().getRete();
 

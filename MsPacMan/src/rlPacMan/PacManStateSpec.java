@@ -108,12 +108,21 @@ public class PacManStateSpec extends StateSpec {
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
-		// constants.add("player");
-		// Actual goal condition
-		// return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
+		if (envParameter_ == null)
+			envParameter_ = "10000";
 
-		// Score maximisation
-		return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
+		if (envParameter_.equals("lvl10")) {
+			// Actual goal condition
+			return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
+		} else if (envParameter_.equals("10000")) {
+			// Score maximisation
+			return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
+		} else if (envParameter_.equals("levelMax")) {
+			// Score maximisation over a single level
+			return "(level 2)";
+		}
+		
+		return null;
 	}
 
 	@Override
@@ -191,6 +200,10 @@ public class PacManStateSpec extends StateSpec {
 							+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
 			rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
 					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
+			rules
+			.add("(distanceGhost ?Player ?Ghost ?Dist0) "
+					+ "(pacman ?Player) (not (edible ?Ghost)) (ghost ?Ghost) "
+					+ "=> (fromGhost ?Ghost ?Dist0)");
 		}
 
 		for (String rule : rules)

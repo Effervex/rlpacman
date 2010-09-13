@@ -25,6 +25,9 @@ public abstract class StateSpec {
 	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
 
+	/** The equivalent symbol. */
+	public static final String EQUIVALENT_RULE = "<=>";
+
 	/** The anonymous variable symbol. */
 	public static final String ANONYMOUS = "?";
 
@@ -375,8 +378,7 @@ public abstract class StateSpec {
 	 */
 	public static String[] splitFact(String fact) {
 		Pattern p = Pattern
-				.compile("((?:\\?[-\\w$*=+/<>_#.\\p{InGreek}]+&:\\(.+?\\))"
-						+ "|(?:[-?\\w$*=+/<>_#.\\p{InGreek}]+))(?= |\\)|$)");
+				.compile("(?:[^()\\s:]|(?:\\?.+&:\\(.+?\\)))+(?= |\\)|$)");
 		Matcher m = p.matcher(fact);
 		ArrayList<String> matches = new ArrayList<String>();
 		while (m.find())

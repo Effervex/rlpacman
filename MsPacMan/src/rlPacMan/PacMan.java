@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.net.URL;
-import java.util.Random;
 
 import javax.swing.JFrame;
 
@@ -26,8 +25,6 @@ public class PacMan {
 	/** The agent interfacing with this program. */
 	protected AgentInterface agent_;
 	protected PacManKeyAdapter keyAdapter_;
-	
-	private Random random_;
 
 	public void init(boolean experimentMode) {
 		setTicksPerSec(35);
@@ -359,7 +356,7 @@ public class PacMan {
 			m_gameModel.m_nTicks2LevelComp = 0;
 		}
 
-		m_gameModel.swapModes();
+		//m_gameModel.swapModes();
 	}
 
 	// Ticked when the game is running the intro
