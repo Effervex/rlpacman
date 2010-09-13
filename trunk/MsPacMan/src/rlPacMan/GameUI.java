@@ -550,8 +550,8 @@ public class GameUI extends Canvas {
 		if (!bClearExtra)
 			g.fillRect(x1, y1, CELL_LENGTH, CELL_LENGTH);
 		else
-			g.fillRect(x1 - WALL1, y1 - WALL1, CELL_LENGTH + WALL1 * 2,
-					CELL_LENGTH + WALL1 * 2);
+			g.fillRect(x1 - WALL1 * 2, y1 - WALL1 * 2, CELL_LENGTH + WALL1 * 4,
+					CELL_LENGTH + WALL1 * 4);
 
 		g.setColor(wallColor);
 

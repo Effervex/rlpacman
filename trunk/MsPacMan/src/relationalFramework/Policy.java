@@ -1,7 +1,6 @@
 package relationalFramework;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -90,16 +89,17 @@ public class Policy {
 			// Put the parameters into an arraylist
 			ArrayList<String> parameters = new ArrayList<String>();
 			for (String cond : constantConditions) {
-				String[] condSplit = StateSpec.splitFact(cond);
-				// Extract the parameters used in the constant conditions
-				for (int i = 1; i < condSplit.length; i++) {
-					// May need to replace parameters if modular is
-					// recursive
-					if (rule.getParameters() != null) {
-						parameters.add(rule
-								.getReplacementParameter(condSplit[i]));
-					} else {
-						parameters.add(condSplit[i]);
+				for (String[] condSplit : rule.getConstantCondSplits(cond)) {
+					// Extract the parameters used in the constant conditions
+					for (int i = 1; i < condSplit.length; i++) {
+						// May need to replace parameters if modular is
+						// recursive
+						if (rule.getParameters() != null) {
+							parameters.add(rule
+									.getReplacementParameter(condSplit[i]));
+						} else {
+							parameters.add(condSplit[i]);
+						}
 					}
 				}
 			}
@@ -251,11 +251,12 @@ public class Policy {
 	public String toString() {
 		return toString(true);
 	}
-	
+
 	/**
 	 * A method for displaying the policy with optional modular rules.
 	 * 
-	 * @param withModules If displaying modules.
+	 * @param withModules
+	 *            If displaying modules.
 	 * @return The policy in string format.
 	 */
 	public String toString(boolean withModules) {
@@ -266,7 +267,8 @@ public class Policy {
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
 				if (!isCoveredRule(rule))
-					buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
+					buffer.append(StateSpec.getInstance().encodeRule(rule)
+							+ "\n");
 			} else if (withModules) {
 				buffer.append("MODULAR: "
 						+ StateSpec.getInstance().encodeRule(rule) + "\n");
@@ -364,7 +366,8 @@ public class Policy {
 					// actions
 					if (actionsFound < actionsReturnedModified) {
 						if ((actionsFound + actionsList.size()) > actionsReturnedModified) {
-							Collections.shuffle(actionsList, PolicyGenerator.random_);
+							Collections.shuffle(actionsList,
+									PolicyGenerator.random_);
 							actionsList = actionsList.subList(0,
 									actionsReturnedModified - actionsFound);
 						}

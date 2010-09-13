@@ -406,7 +406,7 @@ public class LearningController {
 				}
 
 				// Run the post update operations
-				localPolicy.postUpdateOperations(population);
+				localPolicy.postUpdateOperations(population, (1 - STEP_SIZE));
 
 				t++;
 				sinceLastTest++;
@@ -473,6 +473,7 @@ public class LearningController {
 			saveElitePolicies(pvs);
 			// Output the episode averages
 			savePerformance(episodePerformances, run, false);
+			// TODO Save the pregoals
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

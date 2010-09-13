@@ -107,7 +107,8 @@ public class GameModel {
 	private int scatterChaseIndex_ = 0;
 	public boolean noDots_ = false;
 	public boolean noPowerDots_ = false;
-	
+	public boolean oneLife_ = false;
+
 	private Random random_ = new Random();
 
 	GameModel(PacMan pacMan) {
@@ -124,10 +125,12 @@ public class GameModel {
 		// Ghosts and Pacman
 		m_player = new Player(this, Thing.PACMAN, 13, 23, false);
 		m_ghosts = new Ghost[4];
-		m_ghosts[Ghost.BLINKY] = new Ghost(this, Ghost.BLINKY, 13, 11, true, 0, random_);
+		m_ghosts[Ghost.BLINKY] = new Ghost(this, Ghost.BLINKY, 13, 11, true, 0,
+				random_);
 		m_ghosts[Ghost.PINKY] = new Ghost(this, Ghost.PINKY, 12, 14, false,
 				2000, random_);
-		m_ghosts[Ghost.INKY] = new Ghost(this, Ghost.INKY, 13, 14, true, 4000, random_);
+		m_ghosts[Ghost.INKY] = new Ghost(this, Ghost.INKY, 13, 14, true, 4000,
+				random_);
 		m_ghosts[Ghost.CLYDE] = new Ghost(this, Ghost.CLYDE, 15, 14, false,
 				6000, random_);
 		// Fruit
@@ -388,7 +391,7 @@ public class GameModel {
 
 		// Reset the ghost's scatter behaviour
 		for (Ghost g : m_ghosts) {
-			g.m_bChaseMode = false;
+			g.m_bChaseMode = true;
 		}
 	}
 
@@ -407,7 +410,10 @@ public class GameModel {
 	// Called to reinitialize the game state and start a new game
 	public void newGame() {
 		m_stage = 0;
-		m_nLives = 2;
+		if (oneLife_)
+			m_nLives = 0;
+		else
+			m_nLives = 2;
 		m_bPlayStartClip = true;
 		m_bStartClipPlayed = false;
 		loadNextLevel();

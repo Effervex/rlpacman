@@ -31,6 +31,9 @@ public class GuidedRule {
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
 	private List<String> constantConditions_;
+	
+	/** The condsplits for each constant. */
+	private MultiMap<String, String[]> constantCondSplits_;
 
 	/** The guided predicate that defined the action. */
 	private String ruleAction_;
@@ -283,13 +286,15 @@ public class GuidedRule {
 	 * Finds the constants in the rule conditions.
 	 */
 	private void findConstants() {
-		// TODO Speed up this method
+		constantCondSplits_ = new MultiMap<String, String[]>();
+		
 		List<String> constants = new ArrayList<String>();
 		for (String cond : ruleConditions_) {
 			String[] condSplit = StateSpec.splitFact(cond);
 			// If the condition isn't a type predicate or test
 			if (!StateSpec.getInstance().isTypePredicate(condSplit[0])
-					&& StateSpec.getInstance().isUsefulPredicate(condSplit[0])) {
+					&& StateSpec.getInstance().isUsefulPredicate(condSplit[0])
+					&& !condSplit[0].equals("not")) {
 				// If the condition doesn't contain variables - except modular
 				// variables
 				boolean isConstant = true;
@@ -305,8 +310,10 @@ public class GuidedRule {
 					}
 				}
 
-				if (isConstant)
-					constants.add(cond);
+				if (isConstant) {
+					constants.add(condSplit[0]);
+					constantCondSplits_.put(condSplit[0], condSplit);
+				}
 			}
 		}
 
@@ -510,6 +517,10 @@ public class GuidedRule {
 		return constantConditions_;
 	}
 
+	public Collection<String[]> getConstantCondSplits(String cond) {
+		return constantCondSplits_.get(cond);
+	}
+
 	public String getAction() {
 		return ruleAction_;
 	}
@@ -654,6 +665,7 @@ public class GuidedRule {
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
 		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
+		clone.constantCondSplits_ = new MultiMap<String, String[]>(constantCondSplits_);
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)
@@ -700,9 +712,7 @@ public class GuidedRule {
 				return false;
 		} else if (other.ruleConditions_ == null)
 			return false;
-		else if (!ruleConditions_.containsAll(other.ruleConditions_))
-			return false;
-		else if (!other.ruleConditions_.containsAll(ruleConditions_))
+		else if (!ruleConditions_.equals(other.ruleConditions_))
 			return false;
 		if (queryParams_ == null) {
 			if (other.queryParams_ != null)

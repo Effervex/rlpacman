@@ -17,6 +17,11 @@ public class MultiMap<K, V> {
 	public MultiMap() {
 		innerMap_ = new HashMap<K, List<V>>();
 	}
+	
+	public MultiMap(MultiMap<K, V> mm) {
+		this();
+		putAll(mm);
+	}
 
 	/**
 	 * Initialises/gets the list under a key.

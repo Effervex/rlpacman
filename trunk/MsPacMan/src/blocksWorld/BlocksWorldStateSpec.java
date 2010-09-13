@@ -56,13 +56,13 @@ public class BlocksWorldStateSpec extends StateSpec {
 		bkMap.put("clearRule", new BackgroundKnowledge(
 				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
 
-		// Block(X) & !On(X,?) -> OnFloor(X)
+		// OnFloor(X) <-> !On(X,?)
 		bkMap.put("onFloorRule1", new BackgroundKnowledge(
-				"(block ?X) (not (on ?X ?)) => (onFloor ?X)", false));
+				"(onFloor ?X) <=> (not (on ?X ?))", false));
 
-		// Block(X) & On(X,?) -> !OnFloor(X)
+		// On(X,?) <-> !OnFloor(X)
 		bkMap.put("onFloorRule2", new BackgroundKnowledge(
-				"(block ?X) (on ?X ?) => (not (onFloor ?X))", false));
+				"(on ?X ?) <=> (not (onFloor ?X))", false));
 
 		// Block(Z) & On(X,Y) -> !On(X,Z)
 		bkMap.put("onRule", new BackgroundKnowledge(
@@ -75,6 +75,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
+		
+		bkMap.put("aboveRule1.5", new BackgroundKnowledge(
+				"(on ?X ?) => (above ?X ?)", false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
@@ -110,6 +113,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 			constants.add("a");
 			return "(clear a)";
 		}
+		
+		if (envParameter_.equals("highestA")) {
+			constants.add("a");
+			return "(highest a)";
+		}
 
 		return null;
 	}
@@ -134,6 +142,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
+		} else if (envParameter_.equals("highestA")) {
+			rules = new String[2];
+			rules[0] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
+			rules[1] = "(clear a) (highest ?Y) => (move a ?Y)";
 		}
 
 		optimal = new Policy();

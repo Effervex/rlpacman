@@ -73,7 +73,7 @@ public class HanoiStateSpec extends StateSpec {
 						+ "=> (assert (smaller ?X ?Y))", true));
 		// Smaller(X,Y) rule B
 		bkMap.put("smallerRule2", new BackgroundKnowledge(
-				"(tile ?X) (not (towerBase ?X)) (towerBase ?Y)) "
+				"(tile ?X) (not (towerBase ?X)) (towerBase ?Y) "
 						+ "=> (assert (smaller ?X ?Y))", true));
 		
 		// Tile(Z) & On(X,Y) -> !On(X,Z)

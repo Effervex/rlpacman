@@ -18,13 +18,13 @@ public class ConstantPred implements Comparable<ConstantPred> {
 
 	public ConstantPred(String fact) {
 		facts_ = new ArrayList<String>();
-		facts_.add(StateSpec.splitFact(fact)[0]);
+		facts_.add(fact);
 	}
 
 	public ConstantPred(Collection<String> facts) {
 		facts_ = new ArrayList<String>();
 		for (String fact : facts)
-			facts_.add(StateSpec.splitFact(fact)[0]);
+			facts_.add(fact);
 		Collections.sort(facts_);
 	}
 
