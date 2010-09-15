@@ -1,4 +1,4 @@
-package relationalFramework;
+package relationalFramework.agentObservations;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -7,6 +7,10 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
+
+import relationalFramework.Covering;
+import relationalFramework.GuidedRule;
+import relationalFramework.StateSpec;
 
 /**
  * A class representing background knowledge assertions

@@ -36,9 +36,9 @@ public class PacManStateSpecTest {
 		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
 		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
-				.getStringConditions().indexOf("test"));
-		assertTrue(rule.getStringConditions().indexOf("test") < rule
 				.getStringConditions().indexOf("pacman"));
+		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
+				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
 
 		// Testing conditional &:elements
@@ -55,9 +55,9 @@ public class PacManStateSpecTest {
 		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
 		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
-				.getStringConditions().indexOf("test"));
-		assertTrue(rule.getStringConditions().indexOf("test") < rule
 				.getStringConditions().indexOf("pacman"));
+		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
+				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
 	}
 }

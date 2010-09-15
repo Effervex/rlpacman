@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import relationalFramework.agentObservations.BackgroundKnowledge;
+
 import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;

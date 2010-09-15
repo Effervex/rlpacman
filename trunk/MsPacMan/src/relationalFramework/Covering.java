@@ -18,6 +18,11 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
+import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.BackgroundKnowledge;
+import relationalFramework.agentObservations.PreGoalInformation;
+import relationalFramework.agentObservations.RangedCondition;
+
 import jess.Fact;
 import jess.Rete;
 
@@ -33,8 +38,6 @@ public class Covering {
 	private static final char MODULO_LETTERS = 26;
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
-	/** The amount of state inactivity until it is considered settled. */
-	private static final int MAX_STATE_UNIFICATION_INACTIVITY = 50;
 	/** The prefix for range variables. */
 	public static final String RANGE_VARIABLE_PREFIX = "__Num";
 	/** The number of discretised ranges the rules are split into. */
@@ -68,6 +71,9 @@ public class Covering {
 
 	/** A recorded map of maximum ranges for each action and condition. */
 	private MultiMap<String, RangedCondition> actionRanges_;
+
+	/** The observations the agent has made about the environment. */
+	private AgentObservations ao_;
 
 	public Covering(int numActions) {
 		clearPreGoalState(numActions);
@@ -386,7 +392,8 @@ public class Covering {
 					// If either are anonymous, the unification must be
 					// anonymous
 					if (factTerm.equals(StateSpec.ANONYMOUS)
-							|| ((unityTerm != null) && (unityTerm.equals(StateSpec.ANONYMOUS)))) {
+							|| ((unityTerm != null) && (unityTerm
+									.equals(StateSpec.ANONYMOUS)))) {
 						unification[i] = StateSpec.ANONYMOUS;
 					} else if (factTerm.equals(unityTerm)) {
 						// If the two are the same term (not anonymous) and
@@ -810,14 +817,24 @@ public class Covering {
 	 *            The action split into terms.
 	 * @return A collection of strings of the same facts.
 	 */
-	private Collection<String> convertAndNoteFacts(List<String> facts,
-			String[] actionTerms) {
+	private Collection<String> convertAndNoteFacts(
+			Collection<? extends Object> facts, String[] actionTerms) {
 		Collection<String> strings = new ArrayList<String>();
-		for (String fact : facts) {
-			strings.add(fact);
+		for (Object fact : facts) {
+			String factStr = null;
+			if (fact instanceof String)
+				factStr = (String) fact;
+			else if (fact instanceof Fact) {
+				factStr = ((Fact) fact).toStringWithParens();
+				int colonIndex = factStr.lastIndexOf(':');
+				factStr = '(' + factStr.substring(colonIndex + 1);
+			}
 
 			// Replace variables
-			String[] factSplit = StateSpec.splitFact(fact);
+			String[] factSplit = StateSpec.splitFact(factStr);
+			if (factSplit.length > 1)
+				strings.add(factStr);
+
 			for (int i = 1; i < factSplit.length; i++) {
 				if (StateSpec.isNumber(factSplit[i]))
 					factSplit[i] = "?";
@@ -838,10 +855,10 @@ public class Covering {
 						factSplit[i] = "?";
 				}
 			}
-			fact = StateSpec.reformFact(factSplit);
+			factStr = StateSpec.reformFact(factSplit);
 
 			// Note down the conditions that can exist for the action
-			actionConditions_.putContains(actionTerms[0], fact);
+			actionConditions_.putContains(actionTerms[0], factStr);
 		}
 
 		return strings;
@@ -1600,7 +1617,7 @@ public class Covering {
 								newConstants.add(actionTerm);
 						}
 						Collection<String> preGoalStringState = inverselySubstitute(
-								preGoalState, actionTerms, newConstants);
+								preGoalState, actionSplit, newConstants);
 						removeUselessFacts(preGoalStringState);
 
 						// Unify with the old state
@@ -1837,192 +1854,5 @@ public class Covering {
 		if (preGoals_.isEmpty())
 			return false;
 		return true;
-	}
-
-	/**
-	 * A basic object for holding pre-goal state information for an action.
-	 * 
-	 * @author Samuel J. Sarjant
-	 */
-	private class PreGoalInformation {
-		private List<String> state_;
-		private List<String> actionTerms_;
-		private int inactivity_ = 0;
-
-		public PreGoalInformation(List<String> state, List<String> actionTerms) {
-			state_ = state;
-			actionTerms_ = actionTerms;
-		}
-
-		public int incrementInactivity() {
-			inactivity_++;
-			return inactivity_;
-		}
-
-		public void resetInactivity() {
-			inactivity_ = 0;
-		}
-
-		public boolean isSettled() {
-			if (inactivity_ < MAX_STATE_UNIFICATION_INACTIVITY)
-				return false;
-			return true;
-		}
-
-		public boolean isRecentlyChanged() {
-			if (inactivity_ == 0)
-				return true;
-			return false;
-		}
-
-		public List<String> getState() {
-			return state_;
-		}
-
-		public List<String> getActionTerms() {
-			return actionTerms_;
-		}
-
-		@Override
-		public String toString() {
-			return state_.toString() + " : " + actionTerms_.toString();
-		}
-
-		private Covering getOuterType() {
-			return Covering.this;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + getOuterType().hashCode();
-			int actionResult = 0;
-			for (String condition : actionTerms_)
-				actionResult += condition.hashCode();
-			result = prime * result + actionResult;
-			int stateResult = 0;
-			for (String condition : state_)
-				stateResult += condition.hashCode();
-			result = prime * result + stateResult;
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			PreGoalInformation other = (PreGoalInformation) obj;
-			if (!getOuterType().equals(other.getOuterType()))
-				return false;
-			if (actionTerms_ == null) {
-				if (other.actionTerms_ != null)
-					return false;
-			} else if (!actionTerms_.containsAll(other.actionTerms_))
-				return false;
-			else if (!other.actionTerms_.containsAll(actionTerms_))
-				return false;
-			if (state_ == null) {
-				if (other.state_ != null)
-					return false;
-			} else if (!state_.containsAll(other.state_))
-				return false;
-			else if (!other.state_.containsAll(state_))
-				return false;
-			return true;
-		}
-	}
-
-	/**
-	 * A class to represent a range of values for a condition. Used for
-	 * recording the maximum values recorded by the covered rules.
-	 * 
-	 * @author Sam Sarjant
-	 */
-	private class RangedCondition {
-		/** The condition (distanceDot, etc) */
-		private String condition_;
-		/** The minimum value. */
-		private double minimum_;
-
-		/** The maximum value */
-		private double maximum_;
-
-		/**
-		 * The ranged condition constructor.
-		 * 
-		 * @param condition
-		 *            The condition.
-		 * @param minimum
-		 *            The minimum value.
-		 * @param maximum
-		 *            The maximum value.
-		 */
-		public RangedCondition(String condition, double minimum, double maximum) {
-			condition_ = condition;
-			minimum_ = minimum;
-			maximum_ = maximum;
-		}
-
-		public String getCondition() {
-			return condition_;
-		}
-
-		public double getMinimum() {
-			return minimum_;
-		}
-
-		public double getMaximum() {
-			return maximum_;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result
-					+ ((condition_ == null) ? 0 : condition_.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			RangedCondition other = (RangedCondition) obj;
-			if (condition_ == null) {
-				if (other.condition_ != null)
-					return false;
-			} else if (!condition_.equals(other.condition_))
-				return false;
-			return true;
-		}
-
-		/**
-		 * Checks if the ranges of two RangedConditions are equal.
-		 * 
-		 * @param coveredRange
-		 *            The other ranged condition.
-		 * @return True if the ranges are equal, false otherwise.
-		 */
-		public boolean equalRange(RangedCondition coveredRange) {
-			if ((coveredRange.minimum_ == minimum_)
-					&& (coveredRange.maximum_ == maximum_))
-				return true;
-			return false;
-		}
-
-		@Override
-		public String toString() {
-			return condition_ + " {" + minimum_ + "-" + maximum_ + "}";
-		}
 	}
 }

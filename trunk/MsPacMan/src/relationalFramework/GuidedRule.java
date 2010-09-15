@@ -11,8 +11,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.sun.org.apache.bcel.internal.generic.ISUB;
-
 /**
  * A class that keeps track of the guided predicates that make up the rule
  * contained within.
@@ -31,7 +29,7 @@ public class GuidedRule {
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
 	private List<String> constantConditions_;
-	
+
 	/** The condsplits for each constant. */
 	private MultiMap<String, String[]> constantCondSplits_;
 
@@ -287,7 +285,7 @@ public class GuidedRule {
 	 */
 	private void findConstants() {
 		constantCondSplits_ = new MultiMap<String, String[]>();
-		
+
 		List<String> constants = new ArrayList<String>();
 		for (String cond : ruleConditions_) {
 			String[] condSplit = StateSpec.splitFact(cond);
@@ -299,8 +297,12 @@ public class GuidedRule {
 				// variables
 				boolean isConstant = true;
 				for (int i = 1; i < condSplit.length; i++) {
-					// If we're looking at a variable
-					if (condSplit[i].contains("?")) {
+					// If we're looking at a variable, but not a module variable
+					if (condSplit[i].contains("?")
+							&& (condSplit[i].length() <= Module.MOD_VARIABLE_PREFIX
+									.length() || !condSplit[i].substring(0,
+									Module.MOD_VARIABLE_PREFIX.length())
+									.equals(Module.MOD_VARIABLE_PREFIX))) {
 						// It may be a parameter, else return false.
 						if ((queryParams_ == null)
 								|| (!queryParams_.contains(condSplit[i]))) {
@@ -665,7 +667,8 @@ public class GuidedRule {
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
 		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
-		clone.constantCondSplits_ = new MultiMap<String, String[]>(constantCondSplits_);
+		clone.constantCondSplits_ = new MultiMap<String, String[]>(
+				constantCondSplits_);
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)

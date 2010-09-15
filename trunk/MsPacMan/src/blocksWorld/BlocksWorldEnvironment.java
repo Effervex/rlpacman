@@ -3,7 +3,6 @@ package blocksWorld;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +16,6 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -61,6 +59,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	/** If we're running an optimal agent. */
 	private boolean optimal_ = false;
 
+	/** Similar to debug mode, but only shows ASCII representation of blocks. */
+	private boolean viewingMode_ = false;
+
 	// @Override
 	public void env_cleanup() {
 		rete_ = null;
@@ -90,6 +91,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
 			StateSpec.reinitInstance(arg0.substring(5));
 		}
+		if (arg0.equals("-e"))
+			viewingMode_ = true;
 		try {
 			numBlocks_ = Integer.parseInt(arg0);
 			// Assign the blocks
@@ -109,7 +112,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
 		optimalSteps_ = optimalSteps();
-		if (PolicyGenerator.debugMode_) {
+		if (PolicyGenerator.debugMode_ || viewingMode_) {
 			System.out.println("\tAgent:\n" + state_);
 		}
 		steps_ = 0;
@@ -132,14 +135,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		RuleAction ruleAction = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
-				.getFirstActionList();
+		RuleAction ruleAction = ((ActionChoice) ObjectObservations
+				.getInstance().objectArray[0]).getFirstActionList();
 		List<String> actions = ruleAction.getTriggerActions();
 		String action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 
 		BlocksState newState = actOnAction(action, state_);
-		if (PolicyGenerator.debugMode_ && !optimal_) {
+		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
 			if (action != null)
 				System.out.println("\t" + action + " ->\n" + newState);
 			else
