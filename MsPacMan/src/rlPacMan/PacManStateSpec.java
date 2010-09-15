@@ -5,11 +5,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import relationalFramework.BackgroundKnowledge;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.BackgroundKnowledge;
 
 /**
  * The state specifications for the PacMan domain.

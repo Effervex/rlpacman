@@ -22,6 +22,8 @@ import java.util.regex.Pattern;
  * @author Samuel J. Sarjant
  */
 public class Module {
+	public static final String MOD_VARIABLE_PREFIX = "?_MOD_";
+
 	/** The relative directory in which modules are stored. */
 	public static final String MODULE_DIR = "modules";
 
@@ -299,7 +301,7 @@ public class Module {
 	 * @return The name of the parameter.
 	 */
 	public static String createModuleParameter(int paramIndex) {
-		return "?_MOD_" + (char) ('a' + paramIndex);
+		return MOD_VARIABLE_PREFIX + (char) ('a' + paramIndex);
 	}
 
 	/**

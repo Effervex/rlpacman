@@ -20,7 +20,6 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.math.stat.descriptive.SummaryStatistics;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
@@ -758,9 +757,9 @@ public class PolicyGenerator {
 
 			// Sample a rule from the slot and mutate it if it has seen
 			// sufficient states.
-			GuidedRule rule = slot.getGenerator().sample(false);
-			if (rule == null)
-				System.out.println("Problem...");
+			GuidedRule rule = distribution.sample(false);
+			if (distribution.isEmpty() || rule == null)
+				System.out.println("Problem... " + distribution);
 			if (rule.getUses() >= mutationUses)
 				mutateRule(rule, slot, false, true);
 		}

@@ -567,7 +567,7 @@ class Ghost extends Thing {
 				m_destinationY = -1;
 				prevDirection = m_direction;
 			} else {
-				// Otherwise, we haven't reached the destionation so
+				// Otherwise, we haven't reached the destination so
 				// continue in same direction.
 				return;
 			}

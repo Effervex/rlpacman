@@ -43,13 +43,10 @@ public class LearningController {
 
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
-	/** The number of times to repeat the experiment. */
-	private int repetitions_ = 1;
-	/**
-	 * The specific run number this experiment is saving to, or -1 if ignoring
-	 * this.
-	 */
-	private int runNumber_ = -1;
+	/** The first run number. */
+	private int repetitionsStart_ = 0;
+	/** The last run number. */
+	private int repetitionsEnd_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double POPULATION_CONSTANT = 10;
 	/** The ratio of samples to use as 'elite' samples. */
@@ -93,10 +90,14 @@ public class LearningController {
 			BufferedReader bf = new BufferedReader(reader);
 
 			String environmentClass = bf.readLine();
-			String[] repetitionsStr = bf.readLine().split(",");
-			Integer repetitions = Integer.parseInt(repetitionsStr[0]);
-			Integer runNumber = (repetitionsStr.length == 2) ? Integer
-					.parseInt(repetitionsStr[1]) : -1;
+			String[] repetitionsStr = bf.readLine().split("-");
+			// Num repetitions specified by a range for seeding random number.
+			Integer repetitionsStart = 0;
+			Integer repetitionsEnd = Integer.parseInt(repetitionsStr[0]);
+			if (repetitionsStr.length == 2) {
+				repetitionsStart = repetitionsEnd;
+				repetitionsEnd = Integer.parseInt(repetitionsStr[1]);
+			}
 			Integer episodes = Integer.parseInt(bf.readLine());
 			String policyFile = bf.readLine();
 			String generatorFile = bf.readLine();
@@ -114,9 +115,9 @@ public class LearningController {
 			bf.close();
 			reader.close();
 
-			initialise(environmentClass, repetitions, runNumber, episodes,
-					policyFile, generatorFile, performanceFile, extraArgsList
-							.toArray(new String[extraArgsList.size()]));
+			initialise(environmentClass, repetitionsStart, repetitionsEnd,
+					episodes, policyFile, generatorFile, performanceFile,
+					extraArgsList.toArray(new String[extraArgsList.size()]));
 
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
@@ -143,11 +144,10 @@ public class LearningController {
 	 * 
 	 * @param environmentClass
 	 *            The name of the environment class files.
-	 * @param repetitions
-	 *            The number of times to repeat the experiment.
-	 * @param runNumber
-	 *            The run number for this experiment to save to, or -1 if doing
-	 *            all.
+	 * @param repetitionsStart
+	 *            The first run number seed.
+	 * @param repetitionsEnd
+	 *            The last run number seed.
 	 * @param episodeCount
 	 *            The number of episodes to perform.
 	 * @param policyFile
@@ -159,11 +159,11 @@ public class LearningController {
 	 * @param extraArgs
 	 *            The extra arguments for the environment to take.
 	 */
-	private void initialise(String environmentClass, int repetitions,
-			int runNumber, int episodeCount, String policyFile,
+	private void initialise(String environmentClass, int repetitionsStart,
+			int repetitionsEnd, int episodeCount, String policyFile,
 			String generatorFile, String performanceFile, String[] extraArgs) {
-		repetitions_ = repetitions;
-		runNumber_ = runNumber;
+		repetitionsStart_ = repetitionsStart;
+		repetitionsEnd_ = repetitionsEnd;
 		maxEpisodes_ = episodeCount;
 
 		// Create the output files if necessary
@@ -210,16 +210,14 @@ public class LearningController {
 
 		// Determine the initial run (as previous runs may have already been
 		// done in a previous experiment)
-		int[] startPoint = checkFiles();
+		int[] startPoint = checkFiles(repetitionsStart_);
 		int run = startPoint[0];
-		if (runNumber_ != -1)
-			run = runNumber_;
 		// TODO Load the temp generators with all the necessary info
 		// (pre-goal too)
 		int iteration = -1;// startPoint[1];
 
 		// The ultra-outer loop, for averaging experiment results
-		for (; run < repetitions_; run++) {
+		for (; run < repetitionsEnd_; run++) {
 			runStart_ = System.currentTimeMillis();
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = PolicyGenerator.newInstance(run);
@@ -235,17 +233,14 @@ public class LearningController {
 
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();
-
-			if (runNumber_ != -1)
-				break;
 		}
 
 		RLGlue.RL_cleanup();
 
-		if (runNumber_ == -1) {
+		if (repetitionsStart_ == 0) {
 			try {
-				combineGenerators(repetitions_);
-				compilePerformanceAverage(repetitions_);
+				combineGenerators(repetitionsStart_, repetitionsEnd_);
+				compilePerformanceAverage(repetitionsStart_, repetitionsEnd_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -374,8 +369,9 @@ public class LearningController {
 					samples = pvs.size() - pvsSizeInitial;
 					maxSamples = population - pvsSizeInitial;
 				}
-				estimateETA(samples, maxSamples, t, finiteNum, run,
-						repetitions_, experimentStart_, true);
+				estimateETA(samples, maxSamples, t, finiteNum, run
+						- repetitionsStart_, repetitionsEnd_
+						- repetitionsStart_, experimentStart_, true);
 
 				// Debug - Looking at rule values
 				// printRuleWorths(localPolicy);
@@ -406,7 +402,8 @@ public class LearningController {
 				}
 
 				// Run the post update operations
-				localPolicy.postUpdateOperations(population, (1 - STEP_SIZE));
+				localPolicy.postUpdateOperations(population, Math.pow(
+						(1 - STEP_SIZE), 2));
 
 				t++;
 				sinceLastTest++;
@@ -453,10 +450,10 @@ public class LearningController {
 			ArrayList<Float> episodePerformances, List<PolicyValue> pvs,
 			int finiteNum, int t) {
 		// Test the agent and record the performances
-		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * run))
-				/ repetitions_;
-		episodePerformances.add(testAgent(t, maxSteps_, run, repetitions_,
-				expProg));
+		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
+				/ (repetitionsEnd_ - repetitionsStart_);
+		episodePerformances.add(testAgent(t, maxSteps_, run,
+				(repetitionsEnd_ - repetitionsStart_), expProg));
 
 		// Save the results at each episode
 		try {
@@ -711,12 +708,16 @@ public class LearningController {
 			return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
 					.size());
 		}
-		// Currently just using 50 * the largest slot
-		int sumSlot = 0;
+
+		double sumSlot = 0;
 		for (Slot slot : policyGenerator.getGenerator()) {
-			sumSlot += slot.getGenerator().size();
+			double weight = slot.getSelectionProbability()
+					+ slot.getSelectionSD();
+			if (weight > 1)
+				weight = 1;
+			sumSlot += (slot.getGenerator().size() * weight);
 		}
-		return (int) (POPULATION_CONSTANT * (1.0 * sumSlot / policyGenerator
+		return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
 				.getGenerator().size()));
 	}
 
@@ -971,11 +972,12 @@ public class LearningController {
 	 * @return The run number that the files stopped at and the point at which
 	 *         the experiment stopped.
 	 */
-	private int[] checkFiles() {
+	private int[] checkFiles(int startPoint) {
 		// Check the performance files
 		int[] result = new int[2];
 		// Find the last file created
-		int run = 0;
+		int run = startPoint;
+		result[0] = run;
 		File lastPerf = null;
 		File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
 				+ run);
@@ -1018,17 +1020,20 @@ public class LearningController {
 	 * Compiles the performance files togetrher into a single file, detailing
 	 * the average, min and max performances.
 	 * 
-	 * @param runs
-	 *            The number of runs involved in the experiment.
+	 * @param runStart
+	 *            The first run.
+	 * @param runEnd
+	 *            The last run.
 	 */
-	private void compilePerformanceAverage(int runs) throws Exception {
-		double[][] performances = new double[maxEpisodes_][runs];
+	private void compilePerformanceAverage(int runStart, int runEnd)
+			throws Exception {
+		double[][] performances = new double[maxEpisodes_][runEnd - runStart];
 		float min = Float.MAX_VALUE;
 		int minIndex = -1;
 		float max = -Float.MAX_VALUE;
 		int maxIndex = -1;
 		// For every performance file
-		for (int i = 0; i < runs; i++) {
+		for (int i = runStart; i < runEnd; i++) {
 			File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_ + i);
 			FileReader reader = new FileReader(tempPerf);
 			BufferedReader buf = new BufferedReader(reader);
@@ -1046,18 +1051,18 @@ public class LearningController {
 				if (!noNote) {
 					val = Float.parseFloat(input);
 				}
-				performances[e][i] = val;
+				performances[e][i - runStart] = val;
 				sum += val;
 			}
 
 			// Find min or max runs
 			if (sum < min) {
 				min = sum;
-				minIndex = i;
+				minIndex = i - runStart;
 			}
 			if (sum > max) {
 				max = sum;
-				maxIndex = i;
+				maxIndex = i - runStart;
 			}
 
 			buf.close();
@@ -1091,12 +1096,14 @@ public class LearningController {
 	 * Combines the generators into a single file, averaging the generator
 	 * values.
 	 * 
-	 * @param runs
-	 *            The number of runs involved in the experiment.
+	 * @param runStart
+	 *            The first run.
+	 * @param runEnd
+	 *            The last run.
 	 * @throws Exception
 	 *             Should something go awry...
 	 */
-	private void combineGenerators(int runs) throws Exception {
+	private void combineGenerators(int runStart, int runEnd) throws Exception {
 		// TODO Combine generators in a modular fashion
 	}
 

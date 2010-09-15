@@ -9,12 +9,11 @@ import java.util.Comparator;
  * 
  * @author Sam Sarjant
  */
-@SuppressWarnings("hiding")
 public class ConditionComparator<T> implements Comparator<T> {
 	private static Comparator<String> instance_;
 	private final int BASE = 0;
-	private final int INEQ = 1;
-	private final int TYPE = 2;
+	private final int INEQ = 2;
+	private final int TYPE = 1;
 	
 	private ConditionComparator() {
 		
