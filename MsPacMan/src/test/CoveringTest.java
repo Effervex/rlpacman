@@ -27,6 +27,7 @@ import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 public class CoveringTest {
 	private Covering sut_;
@@ -691,19 +692,19 @@ public class CoveringTest {
 	@Test
 	public void testUnifyStates() {
 		// No change unification
-		List<String> oldState = new ArrayList<String>();
-		oldState.add("(clear ?X)");
-		List<String> newState = new ArrayList<String>();
-		newState.add("(clear x)");
-		List<String> oldTerms = new ArrayList<String>();
-		oldTerms.add("?X");
-		List<String> newTerms = new ArrayList<String>();
-		newTerms.add("x");
+		List<StringFact> oldState = new ArrayList<StringFact>();
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		List<StringFact> newState = new ArrayList<StringFact>();
+		newState.add(StateSpec.toStringFact("(clear x)"));
+		String[] oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		String[] newTerms = new String[1];
+		newTerms[0] = "x";
 		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertEquals(oldTerms[0], "?X");
 
 		// No change with constants
 		oldState.clear();
@@ -1821,10 +1822,9 @@ public class CoveringTest {
 				"(clear ?X) (above ?X ?) (block ?X) (block a) => (moveFloor ?X)");
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(2, results.size());
-		assertTrue(results
-				.contains(new GuidedRule(
-						"(on ?X a) (clear ?X) (block ?X) (block a) => (moveFloor ?X)",
-						false, true, null)));
+		assertTrue(results.contains(new GuidedRule(
+				"(on ?X a) (clear ?X) (block ?X) (block a) => (moveFloor ?X)",
+				false, true, null)));
 		assertTrue(results
 				.contains(new GuidedRule(
 						"(clear ?X) (above ?X a) (block ?X) (block a) => (moveFloor ?X)",
@@ -1898,7 +1898,8 @@ public class CoveringTest {
 
 		mutant = new GuidedRule("(highest a) (on a ?) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (not (highest a)) (on a ?) => (moveFloor a)");
+		mutant = new GuidedRule(
+				"(clear a) (not (highest a)) (on a ?) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 2);
 
@@ -2103,7 +2104,7 @@ public class CoveringTest {
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
 		assertEquals(results.size(), 1);
-		
+
 		// Testing swapped for left equivalent conditions
 		ruleConds.clear();
 		ruleConds.add("(not (on ?X ?))");
@@ -2111,7 +2112,7 @@ public class CoveringTest {
 		assertNotNull(results);
 		assertTrue(results.contains("(onFloor ?X)"));
 		assertEquals(results.size(), 1);
-		
+
 		ruleConds.clear();
 		ruleConds.add("(not (onFloor ?X))");
 		results = sut_.simplifyRule(ruleConds, null, null, false);

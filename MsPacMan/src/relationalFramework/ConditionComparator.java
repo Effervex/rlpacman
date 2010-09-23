@@ -10,7 +10,7 @@ import java.util.Comparator;
  * @author Sam Sarjant
  */
 public class ConditionComparator<T> implements Comparator<T> {
-	private static Comparator<String> instance_;
+	private static Comparator<StringFact> instance_;
 	private final int BASE = 0;
 	private final int INEQ = 2;
 	private final int TYPE = 1;
@@ -55,9 +55,9 @@ public class ConditionComparator<T> implements Comparator<T> {
 		return str0.compareTo(str1);
 	}
 
-	public static Comparator<String> getInstance() {
+	public static Comparator<StringFact> getInstance() {
 		if (instance_ == null)
-			instance_ = new ConditionComparator<String>();
+			instance_ = new ConditionComparator<StringFact>();
 		return instance_;
 	}
 }

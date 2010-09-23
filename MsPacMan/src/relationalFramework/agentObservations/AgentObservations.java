@@ -3,10 +3,17 @@ package relationalFramework.agentObservations;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
+import relationalFramework.MultiMap;
+import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
+
+import jess.Fact;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -19,21 +26,24 @@ public class AgentObservations {
 	public static final int INACTIVITY_THRESHOLD = 50;
 
 	/** A hash code to track when an observation changes. */
-	private int observationHash_;
+	private Integer observationHash_ = null;
 
 	/** The agent's beliefs about the condition inter-relations. */
 	private SortedSet<ConditionBeliefs> conditionBeliefs_;
 
 	/** The inactivity counter for the condition beliefs. */
 	private int conditionBeliefInactivity_ = 0;
-	
+
 	/** The observed invariants of the environment. */
 	private Collection<String> invariants_;
 
 	/** The rules about the environment learned by the agent. */
 	private Collection<BackgroundKnowledge> learnedEnvironmentRules_;
 
-	/** The action based observations. */
+	/** A group of facts indexed by terms used within. */
+	private MultiMap<String, StringFact> termMappedFacts_;
+
+	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
 
 	/**
@@ -47,10 +57,73 @@ public class AgentObservations {
 	}
 
 	/**
+	 * A method for scanning the state and assigning facts to term based maps.
+	 * During the scan, condition inter-relations are noted (is not yet
+	 * settled).
+	 * 
+	 * @param state
+	 *            The state in raw fact form.
+	 * @return The mapping of terms to facts.
+	 */
+	public void scanState(Collection<Fact> state) {
+		// TODO Make condition notes.
+		// If condition beliefs changed, signal for a hash update
+		observationHash_ = null;
+		updateHash();
+
+		termMappedFacts_ = new MultiMap<String, StringFact>();
+		for (Fact stateFact : state) {
+			// Ignore the type, inequal and actions pred
+			String[] split = StateSpec.splitFact(stateFact.toString());
+			if (StateSpec.getInstance().isUsefulPredicate(split[0])) {
+				String[] arguments = new String[split.length - 1];
+				System.arraycopy(split, 1, arguments, 0, arguments.length);
+				StringFact strFact = new StringFact(StateSpec.getInstance()
+						.getPredicates().get(split[0]), arguments);
+
+				// Run through the arguments and index the fact by term
+				for (int i = 0; i < arguments.length; i++) {
+					// Ignore numerical terms
+					if (!StateSpec.isNumber(arguments[i]))
+						termMappedFacts_.putContains(arguments[i], strFact);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Gathers all relevant facts for a particular action and returns them.
+	 * 
+	 * @param action
+	 *            The action (wit arguments).
+	 * @return The relevant facts pertaining to the action.
+	 */
+	public Collection<StringFact> gatherActionFacts(StringFact action) {
+		// Note down action conditions if still unsettled.
+		observationHash_ = null;
+		updateHash();
+		
+		Collection<StringFact> actionFacts = new HashSet<StringFact>();
+		for (String argument : action.getArguments()) {
+			List<StringFact> termFacts = termMappedFacts_.get(argument);
+			if (termFacts != null) {
+				for (StringFact termFact : termFacts) {
+					if (!actionFacts.contains(termFact))
+						actionFacts.add(termFact);
+				}
+			}
+		}
+		
+		return actionFacts;
+	}
+
+	/**
 	 * Updates the observation hash code.
 	 */
 	private void updateHash() {
-		observationHash_ = 0;
+		if (observationHash_ == null) {
+			// Update the hash
+		}
 	}
 
 	public int getObservationHash() {
