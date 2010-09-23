@@ -13,21 +13,24 @@ import java.util.Collections;
  */
 public class ConstantPred implements Comparable<ConstantPred> {
 	/** A sorted list of facts using only constant terms */
-	private ArrayList<String> facts_;
+	private ArrayList<StringFact> facts_;
 
-	public ConstantPred(String fact) {
-		facts_ = new ArrayList<String>();
+	// TODO Sort out the guided rule constant pred stuff. Have this object store
+	// the facts and be able to convert them into comparable strings.
+
+	public ConstantPred(StringFact fact) {
+		facts_ = new ArrayList<StringFact>();
 		facts_.add(fact);
 	}
 
-	public ConstantPred(Collection<String> facts) {
-		facts_ = new ArrayList<String>();
-		for (String fact : facts)
+	public ConstantPred(Collection<StringFact> facts) {
+		facts_ = new ArrayList<StringFact>();
+		for (StringFact fact : facts)
 			facts_.add(fact);
 		Collections.sort(facts_);
 	}
 
-	public ArrayList<String> getFacts() {
+	public ArrayList<StringFact> getFacts() {
 		return facts_;
 	}
 
@@ -49,9 +52,7 @@ public class ConstantPred implements Comparable<ConstantPred> {
 
 	@Override
 	public String toString() {
-		if (facts_.size() == 1)
-			return facts_.get(0);
-		return facts_.toString();
+		return Module.formName(facts_);
 	}
 
 	@Override

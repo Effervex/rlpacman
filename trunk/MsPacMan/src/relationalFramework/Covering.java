@@ -60,12 +60,6 @@ public class Covering {
 	 */
 	private MultiMap<String, String> actionConditions_;
 
-	/** The set of conditions that are always true. */
-	private Collection<String> environmentInvariants;
-	// TODO Set up environment invariants
-	/** The number of states the invariants have remained the same. */
-	private int stableInvariants_ = 0;
-
 	/** A suffix numbered variable to use when defining new ranged variables. */
 	private int rangeIndex_ = 0;
 
@@ -99,7 +93,7 @@ public class Covering {
 		List<String> constants = StateSpec.getInstance().getConstants();
 
 		// The relevant facts which contain the key term
-		MultiMap<String, String> relevantConditions = compileRelevantConditionMap(state);
+		ao_.scanState(StateSpec.extractFacts(state));
 
 		// Maintain a mapping for each action, to be used in unification between
 		// actions
@@ -115,8 +109,7 @@ public class Covering {
 			// Cover the state, using the previous rules and/or newly created
 			// rules while noting valid conditions for later rule mutation\
 			List<GuidedRule> actionRules = unifyActionRules(validActions
-					.get(action), relevantConditions, action, previousRules,
-					constants);
+					.get(action), action, previousRules, constants);
 			generalActions.addAll(actionRules);
 		}
 
@@ -180,9 +173,9 @@ public class Covering {
 	 *         remained the same, -1 if the states did not unify and returned
 	 *         the empty set.
 	 */
-	public int unifyStates(Collection<String> oldState,
-			Collection<String> newState, List<String> oldTerms,
-			List<String> newTerms) {
+	public int unifyStates(Collection<StringFact> oldState,
+			Collection<StringFact> newState, String[] oldTerms,
+			String[] newTerms) {
 		// If the terms don't match up, create a replacement map
 		BidiMap oldReplacementMap = new DualHashBidiMap();
 		BidiMap newReplacementMap = new DualHashBidiMap();
@@ -212,9 +205,9 @@ public class Covering {
 	 *         they unified but the old state was changed. In the two latter
 	 *         cases, the replacement map will contain replacement terms.
 	 */
-	public int unifyStates(Collection<String> oldState,
-			Collection<String> newState, BidiMap replacementMap) {
-		return unifyStates(oldState, newState, new ArrayList<String>(), true,
+	public int unifyStates(Collection<StringFact> oldState,
+			Collection<StringFact> newState, BidiMap replacementMap) {
+		return unifyStates(oldState, newState, new String[0], true,
 				new DualHashBidiMap(), replacementMap);
 	}
 
@@ -237,22 +230,22 @@ public class Covering {
 	 * @return -1 if no unification possible, 0 if perfect unification, 1 if
 	 *         unification with old state changed.
 	 */
-	private int unifyStates(Collection<String> oldState,
-			Collection<String> newState, List<String> oldTerms,
+	private int unifyStates(Collection<StringFact> oldState,
+			Collection<StringFact> newState, String[] oldTerms,
 			boolean flexibleReplacement, BidiMap oldReplacementMap,
 			BidiMap newReplacementMap) {
 		// For each item in the old state, see if it is present in the new state
 		boolean hasChanged = false;
-		List<String> oldStateRepl = new ArrayList<String>();
-		for (String oldStateFact : oldState) {
-			Collection<String> modFacts = unifyFact(oldStateFact, newState,
+		List<StringFact> oldStateRepl = new ArrayList<StringFact>();
+		for (StringFact oldStateFact : oldState) {
+			Collection<StringFact> modFacts = unifyFact(oldStateFact, newState,
 					oldReplacementMap, newReplacementMap, oldTerms,
 					flexibleReplacement);
 
 			if (modFacts.isEmpty())
 				hasChanged = true;
 
-			for (String modFact : modFacts) {
+			for (StringFact modFact : modFacts) {
 				// Check for a change
 				if (!oldStateFact.equals(modFact))
 					hasChanged = true;
@@ -291,13 +284,12 @@ public class Covering {
 	 *            The replacement map for the new terms.
 	 * @return False if replacement is impossible, true otherwise.
 	 */
-	private boolean createReplacementMaps(List<String> oldTerms,
-			List<String> newTerms, BidiMap oldReplacementMap,
-			BidiMap newReplacementMap) {
-		for (int i = 0; i < oldTerms.size(); i++) {
+	private boolean createReplacementMaps(String[] oldTerms, String[] newTerms,
+			BidiMap oldReplacementMap, BidiMap newReplacementMap) {
+		for (int i = 0; i < oldTerms.length; i++) {
 			// If this index of terms don't match up
-			String oldTerm = oldTerms.get(i);
-			String newTerm = newTerms.get(i);
+			String oldTerm = oldTerms[i];
+			String newTerm = newTerms[i];
 			// If the terms don't match and aren't numbers, create a replacement
 			if (!oldTerm.equals(newTerm) && !StateSpec.isNumber(oldTerm)
 					&& !StateSpec.isNumber(newTerm)) {
@@ -346,14 +338,11 @@ public class Covering {
 	 *         input fact) or null if no unification.
 	 */
 	@SuppressWarnings("unchecked")
-	public Collection<String> unifyFact(String fact,
-			Collection<String> unityFacts, BidiMap factReplacementMap,
-			BidiMap unityReplacementMap, List<String> factTerms,
+	public Collection<StringFact> unifyFact(StringFact fact,
+			Collection<StringFact> unityFacts, BidiMap factReplacementMap,
+			BidiMap unityReplacementMap, String[] factTerms,
 			boolean flexibleReplacement) {
-		Collection<String> result = new ArrayList<String>();
-
-		// Split the fact up and apply the replacements
-		String[] factSplit = StateSpec.splitFact(fact);
+		Collection<StringFact> result = new ArrayList<StringFact>();
 
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
@@ -361,31 +350,30 @@ public class Covering {
 		// Check against each item in the unity state.
 		// TODO Speed this up by assigning the facts to a map so they are
 		// quickly accessible.
-		for (Iterator<String> iter = unityFacts.iterator(); iter.hasNext();) {
-			String[] unitySplit = StateSpec.splitFact(iter.next());
-
+		for (StringFact unityFact : unityFacts) {
 			// Check it if the same fact
-			boolean sameFact = factSplit[0].equals(unitySplit[0]);
-			int compareIndex = 1;
-			if (sameFact && factSplit[0].equals("not")) {
-				sameFact = factSplit[1].equals(unitySplit[1]);
-				compareIndex++;
-			}
+			boolean sameFact = fact.getFactName().equals(
+					unityFact.getFactName())
+					&& (fact.isNegated() == unityFact.isNegated());
 
+			// If dealing with the same fact
 			if (sameFact) {
-				String[] unification = new String[factSplit.length];
+				String[] factArguments = fact.getArguments();
+				String[] unityArguments = unityFact.getArguments();
+				String[] unification = new String[factArguments.length];
 				int thisGeneralness = 0;
 				boolean notAnonymous = false;
 				BidiMap tempUnityReplacementMap = new DualHashBidiMap();
 
 				// Unify each term
-				for (int i = compareIndex; i < factSplit.length; i++) {
+				for (int i = 0; i < factArguments.length; i++) {
 					// Apply the replacements
 					String factTerm = (String) ((factReplacementMap
-							.containsKey(factSplit[i])) ? factReplacementMap
-							.get(factSplit[i]) : factSplit[i]);
+							.containsKey(factArguments[i])) ? factReplacementMap
+							.get(factArguments[i])
+							: factArguments[i]);
 					String unityTerm = findUnityReplacement(
-							unityReplacementMap, unitySplit[i],
+							unityReplacementMap, unityArguments[i],
 							flexibleReplacement, tempUnityReplacementMap,
 							factTerm);
 
@@ -400,8 +388,8 @@ public class Covering {
 						// their replacements match up, use that
 						unification[i] = factTerm;
 						notAnonymous = true;
-					} else if (!numericalValueCheck(factSplit[i],
-							unitySplit[i], unification, i, factTerms)) {
+					} else if (!numericalValueCheck(factArguments[i],
+							unityArguments[i], unification, i, factTerms)) {
 						// Failing that simply use an anonymous variable
 						unification[i] = StateSpec.ANONYMOUS;
 						thisGeneralness++;
@@ -417,10 +405,9 @@ public class Covering {
 						generalisation = thisGeneralness;
 					}
 					if (thisGeneralness == generalisation) {
-						unification[0] = factSplit[0];
-						if (factSplit[0].equals("not"))
-							unification[1] = factSplit[1];
-						result.add(StateSpec.reformFact(unification));
+						StringFact unifact = new StringFact(fact, unification,
+								fact.isNegated());
+						result.add(unifact);
 
 						// If we're using flexible replacements, store any
 						// temporary replacements created
@@ -434,9 +421,11 @@ public class Covering {
 
 		if (!result.isEmpty()) {
 			// Setting the fact terms
-			for (Object factKey : factReplacementMap.keySet())
-				Collections.replaceAll(factTerms, (String) factKey,
-						(String) factReplacementMap.get(factKey));
+			for (int i = 0; i < factTerms.length; i++) {
+				for (Object factKey : factReplacementMap.keySet())
+					if (factTerms[i].equals(factKey))
+						factTerms[i] = (String) factReplacementMap.get(factKey);
+			}
 		}
 
 		return result;
@@ -504,7 +493,7 @@ public class Covering {
 	 *         variable.
 	 */
 	private boolean numericalValueCheck(String factValue, String unityValue,
-			String[] unification, int index, List<String> factTerms) {
+			String[] unification, int index, String[] factTerms) {
 		// Check the unity is a number
 		double unityDouble = 0;
 		if (StateSpec.isNumber(unityValue))
@@ -561,8 +550,9 @@ public class Covering {
 					+ " " + max + ")";
 
 			// Change the action terms as well.
-			if (factTerms.contains(factValue)) {
-				factTerms.set(factTerms.indexOf(factValue), rangeVariable);
+			for (int i = 0; i < factTerms.length; i++) {
+				if (factTerms[i].equals(factValue))
+					factTerms[i] = rangeVariable;
 			}
 			return true;
 		}
@@ -575,8 +565,6 @@ public class Covering {
 	 * 
 	 * @param argsList
 	 *            A heuristically sorted list of actions for a single predicate.
-	 * @param relevantConditions
-	 *            The relevant conditions for each term in the state.
 	 * @param actionPred
 	 *            The action predicate spawning this rule.
 	 * @param previousRules
@@ -587,12 +575,11 @@ public class Covering {
 	 * @return All rules representing a general action.
 	 */
 	private List<GuidedRule> unifyActionRules(List<String> argsList,
-			MultiMap<String, String> relevantConditions, String actionPred,
-			List<GuidedRule> previousRules, List<String> constants) {
+			String actionPred, List<GuidedRule> previousRules,
+			List<String> constants) {
 		// The terms in the action
-		String[] action = new String[1 + StateSpec.getInstance().getActions()
-				.get(actionPred).size()];
-		action[0] = actionPred;
+		StringFact baseAction = StateSpec.getInstance().getActions().get(
+				actionPred);
 
 		Iterator<String> argIter = argsList.iterator();
 		// Do until:
@@ -600,25 +587,15 @@ public class Covering {
 		// 2) Every rule is not yet minimal
 		while (argIter.hasNext()) {
 			String arg = argIter.next();
-			List<String> actionFacts = new ArrayList<String>();
 
-			String[] terms = arg.split(" ");
-			// Find the facts containing the same (useful) terms in the action
-			for (int i = 0; i < terms.length; i++) {
-				List<String> termFacts = relevantConditions.get(terms[i]);
-				if (termFacts != null) {
-					for (String termFact : termFacts) {
-						if (!actionFacts.contains(termFact))
-							actionFacts.add(termFact);
-					}
-				}
+			String[] args = arg.split(" ");
+			StringFact action = new StringFact(baseAction, args);
 
-				action[i + 1] = terms[i];
-			}
+			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action);
 
 			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = new GuidedRule(convertAndNoteFacts(
-					actionFacts, action), StateSpec.reformFact(action), false);
+			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action,
+					false);
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -631,8 +608,8 @@ public class Covering {
 					GuidedRule prev = previousRules.get(i);
 
 					// Unify the prev rule and the inverse subbed rule
-					SortedSet<String> ruleConditions = prev.getConditions();
-					List<String> ruleTerms = prev.getActionTerms();
+					SortedSet<StringFact> ruleConditions = prev.getConditions();
+					String[] ruleTerms = prev.getActionTerms();
 					int changed = unifyStates(ruleConditions, inverseSubbed
 							.getConditions(), ruleTerms, inverseSubbed
 							.getActionTerms());
@@ -656,8 +633,8 @@ public class Covering {
 
 		// Return the old, possibly modified rules and any new ones.
 		for (GuidedRule prev : previousRules) {
-			SortedSet<String> ruleConds = simplifyRule(prev.getConditions(),
-					null, null, false);
+			SortedSet<StringFact> ruleConds = simplifyRule(
+					prev.getConditions(), null, null, false);
 			if (ruleConds != null)
 				prev.setConditions(ruleConds, false);
 			prev.expandConditions();
@@ -684,27 +661,25 @@ public class Covering {
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
-	public SortedSet<String> simplifyRule(SortedSet<String> ruleConds,
-			String condition, String negCondition, boolean testForIllegalRule) {
-		SortedSet<String> simplified = new TreeSet<String>(ruleConds);
+	public SortedSet<StringFact> simplifyRule(SortedSet<StringFact> ruleConds,
+			StringFact condition, StringFact negCondition, boolean testForIllegalRule) {
+		SortedSet<StringFact> simplified = new TreeSet<StringFact>(ruleConds);
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
-			Collection<String> unification = unifyFact(condition, ruleConds,
+			Collection<StringFact> unification = unifyFact(condition, ruleConds,
 					new DualHashBidiMap(), new DualHashBidiMap(),
-					new ArrayList<String>(), false);
+					new String[0], false);
 			if (!unification.isEmpty())
 				return null;
 
 			if (negCondition == null) {
-				String not = "(not ";
-				negCondition = (condition.substring(0, not.length())
-						.equals(not)) ? condition.substring(not.length(),
-						condition.length() - 1) : not + condition + ")";
+				negCondition = new StringFact(condition);
+				negCondition.swapNegated();
 			}
-			Collection<String> negUnification = unifyFact(negCondition,
+			Collection<StringFact> negUnification = unifyFact(negCondition,
 					ruleConds, new DualHashBidiMap(), new DualHashBidiMap(),
-					new ArrayList<String>(), false);
+					new String[0], false);
 			if (!negUnification.isEmpty())
 				return null;
 
@@ -808,63 +783,6 @@ public class Covering {
 	}
 
 	/**
-	 * A method which simply converts a List of Facts into a Collection of
-	 * Strings of the same facts.
-	 * 
-	 * @param facts
-	 *            The list of facts to be converted into strings.
-	 * @param actionTerms
-	 *            The action split into terms.
-	 * @return A collection of strings of the same facts.
-	 */
-	private Collection<String> convertAndNoteFacts(
-			Collection<? extends Object> facts, String[] actionTerms) {
-		Collection<String> strings = new ArrayList<String>();
-		for (Object fact : facts) {
-			String factStr = null;
-			if (fact instanceof String)
-				factStr = (String) fact;
-			else if (fact instanceof Fact) {
-				factStr = ((Fact) fact).toStringWithParens();
-				int colonIndex = factStr.lastIndexOf(':');
-				factStr = '(' + factStr.substring(colonIndex + 1);
-			}
-
-			// Replace variables
-			String[] factSplit = StateSpec.splitFact(factStr);
-			if (factSplit.length > 1)
-				strings.add(factStr);
-
-			for (int i = 1; i < factSplit.length; i++) {
-				if (StateSpec.isNumber(factSplit[i]))
-					factSplit[i] = "?";
-				else {
-					boolean replaced = false;
-					// Replace each action term present in the fact with a
-					// variable
-					for (int j = 1; j < actionTerms.length; j++) {
-						if (factSplit[i].equals(actionTerms[j])) {
-							factSplit[i] = Covering
-									.getVariableTermString(j - 1);
-							replaced = true;
-							break;
-						}
-					}
-					// Replace all else with anonymous
-					if (!replaced)
-						factSplit[i] = "?";
-				}
-			}
-			factStr = StateSpec.reformFact(factSplit);
-
-			// Note down the conditions that can exist for the action
-			actionConditions_.putContains(actionTerms[0], factStr);
-		}
-
-		return strings;
-	}
-
-	/**
 	 * Adds a type predicate to a collection for the jth term in the fact split.
 	 * 
 	 * @param collection
@@ -919,12 +837,6 @@ public class Covering {
 			}
 		}
 
-		// Noting the always true conditions
-		if (environmentInvariants == null)
-			environmentInvariants = stateConds;
-		else if (!environmentInvariants.isEmpty())
-			environmentInvariants.retainAll(stateConds);
-
 		return relevantConditions;
 	}
 
@@ -945,15 +857,15 @@ public class Covering {
 		PreGoalInformation preGoal = preGoals_.get(actionPred);
 
 		// If we have a pre goal state
-		SortedSet<String> ruleConditions = rule.getConditions();
+		SortedSet<StringFact> ruleConditions = rule.getConditions();
 		if (preGoal != null) {
 			List<String> preGoalState = preGoal.getState();
 
 			// Form a replacement terms map.
 			Map<String, String> replacementTerms = new HashMap<String, String>();
 			Map<String, String> reverseReplacementTerms = new HashMap<String, String>();
-			List<String> ruleTerms = rule.getActionTerms();
-			List<String> preGoalTerms = preGoal.getActionTerms();
+			String[] ruleTerms = rule.getAction().getArguments();
+			String[] preGoalTerms = preGoal.getActionTerms();
 			for (int i = 0; i < preGoalTerms.size(); i++) {
 				if (!preGoalTerms.get(i).equals(ruleTerms.get(i))) {
 					replacementTerms.put(preGoalTerms.get(i), ruleTerms.get(i));
@@ -1603,8 +1515,9 @@ public class Covering {
 					for (String action : actions) {
 						// Inversely substitute the old pregoal state
 						String[] actionSplit = StateSpec.splitFact(action);
-						String[] actionTerms = Arrays.copyOfRange(actionSplit,
-								1, actionSplit.length);
+						String[] actionTerms = new String[actionSplit.length - 1];
+						System.arraycopy(actionSplit, 1, actionTerms, 0,
+								actionTerms.length);
 
 						// The actions become constants if possible
 						List<String> newConstants = new ArrayList<String>(

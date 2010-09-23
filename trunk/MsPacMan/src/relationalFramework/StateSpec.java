@@ -51,6 +51,10 @@ public abstract class StateSpec {
 	/** The replacement value for unnecessary facts. */
 	private static final String ACTION_TERM_REPL = "__TYPE__";
 
+	/** The StringFact definition for the test predicate. */
+	private static final StringFact TEST_DEFINITION = new StringFact("test",
+			new Class[] { String.class });
+
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -58,16 +62,20 @@ public abstract class StateSpec {
 	private String environment_;
 
 	/** The prerequisites of the rules and their structure. */
-	@SuppressWarnings("unchecked")
-	private MultiMap<String, Class> predicates_;
+	private Map<String, StringFact> predicates_;
+
+	/** The set of all possible variable predicates. */
+	private MultiMap<String, StringFact> possibleVariablePredicates_;
 
 	/** The type predicates, only used implicitly. */
 	@SuppressWarnings("unchecked")
-	private Map<Class, String> typePredicates_;
+	private Map<Class, StringFact> typePredicates_;
+
+	/** The type predicates ordered by name. */
+	private Map<String, StringFact> typeNames_;
 
 	/** The actions of the rules and their structure. */
-	@SuppressWarnings("unchecked")
-	private MultiMap<String, Class> actions_;
+	private Map<String, StringFact> actions_;
 
 	/** The background rules and illegalities of the state. */
 	private Map<String, BackgroundKnowledge> backgroundRules_;
@@ -105,6 +113,7 @@ public abstract class StateSpec {
 	/**
 	 * The constructor for a state specification.
 	 */
+	@SuppressWarnings("unchecked")
 	private final void initialise() {
 		try {
 			rete_ = new Rete();
@@ -112,26 +121,34 @@ public abstract class StateSpec {
 			environment_ = this.getClass().getPackage().getName();
 
 			// Type predicates
-			typePredicates_ = initialiseTypePredicateTemplates();
-			for (String typeName : typePredicates_.values()) {
-				defineTemplate(typeName, rete_);
+			typePredicates_ = new HashMap<Class, StringFact>();
+			typeNames_ = new HashMap<String, StringFact>();
+			for (StringFact type : initialiseTypePredicateTemplates()) {
+				typePredicates_.put(type.getArgTypes()[0], type);
+				typeNames_.put(type.getFactName(), type);
+				defineTemplate(type.getFactName(), rete_);
 			}
 			unnecessaries_ = formUnnecessaryString(typePredicates_.values());
 
 			// Main predicates
-			predicates_ = initialisePredicateTemplates();
-			for (String predName : predicates_.keySet()) {
-				defineTemplate(predName, rete_);
+			predicates_ = new HashMap<String, StringFact>();
+			for (StringFact pred : initialisePredicateTemplates()) {
+				predicates_.put(pred.getFactName(), pred);
+				defineTemplate(pred.getFactName(), rete_);
 			}
+
+			// Create the list of possible predicates.
+			possibleVariablePredicates_ = createPossibleConditions();
 
 			// Set up the valid actions template
 			StringBuffer actBuf = new StringBuffer("(deftemplate "
 					+ VALID_ACTIONS);
 			// Actions
-			actions_ = initialiseActionTemplates();
-			for (String actName : actions_.keySet()) {
-				defineTemplate(actName, rete_);
-				actBuf.append(" (multislot " + actName + ")");
+			actions_ = new HashMap<String, StringFact>();
+			for (StringFact action : initialiseActionTemplates()) {
+				actions_.put(action.getFactName(), action);
+				defineTemplate(action.getFactName(), rete_);
+				actBuf.append(" (multislot " + action.getFactName() + ")");
 			}
 			actBuf.append(")");
 			rete_.eval(actBuf.toString());
@@ -209,12 +226,126 @@ public abstract class StateSpec {
 	 *            The types that need not be in rules.
 	 * @return The regexp string.
 	 */
-	private String formUnnecessaryString(Collection<String> types) {
+	private String formUnnecessaryString(Collection<StringFact> types) {
 		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
-		for (String type : types)
-			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
+		for (StringFact type : types)
+			buffer.append("|(\\(" + type.getFactName() + " " + ACTION_TERM_REPL
+					+ "\\))");
 		buffer.append(")( |$)");
 		return buffer.toString();
+	}
+
+	/**
+	 * Creates all possible variations of the predicates in variable form.
+	 * 
+	 * @return A MultiMap indexed by predicate containing at least one element,
+	 *         which has variable arguments.
+	 */
+	@SuppressWarnings("unchecked")
+	private MultiMap<String, StringFact> createPossibleConditions() {
+		MultiMap<String, StringFact> possibleConditions = new MultiMap<String, StringFact>();
+
+		// For each predicate in the state spec
+		for (StringFact predicate : predicates_.values()) {
+			// Create the mapping of terms to classes.
+			MultiMap<Class, String> possibleTerms = createActionTerms(predicate);
+
+			// Form the possible actions recursively
+			List<StringFact> possibleFacts = new ArrayList<StringFact>();
+			String[] arguments = new String[predicate.getArguments().length];
+			formPossibleFact(arguments, 0, possibleTerms, predicate,
+					possibleFacts);
+
+			// Add to the multimap
+			possibleConditions.putCollection(predicate.getFactName(),
+					possibleFacts);
+		}
+
+		return possibleConditions;
+	}
+
+	/**
+	 * Creates the mapping of variable action terms to argument types, based on
+	 * the location of the argument within the predicate.
+	 * 
+	 * @param predicate
+	 *            The predicate to form action term map from.
+	 * @return The mapping of argument type classes to argument variables.
+	 */
+	@SuppressWarnings("unchecked")
+	private MultiMap<Class, String> createActionTerms(StringFact predicate) {
+		MultiMap<Class, String> actionTerms = new MultiMap<Class, String>();
+
+		Class[] argTypes = predicate.getArgTypes();
+		for (int i = 0; i < argTypes.length; i++) {
+			if (!isNumberClass(argTypes[i]))
+				actionTerms.put(argTypes[i], Covering.getVariableTermString(i));
+		}
+
+		return actionTerms;
+	}
+
+	/**
+	 * Recursively forms a possible variable fact that may exist in the
+	 * environment.
+	 * 
+	 * @param arguments
+	 *            The developing array of arguments to form into a fact.
+	 * @param index
+	 *            The current index being filled by the method.
+	 * @param possibleTerms
+	 *            The possible terms map.
+	 * @param baseFact
+	 *            The base fact to build facts from.
+	 * @param actionFacts
+	 *            The list of facts to fill.
+	 */
+	@SuppressWarnings("unchecked")
+	private void formPossibleFact(String[] arguments, int index,
+			MultiMap<Class, String> possibleTerms, StringFact baseFact,
+			List<StringFact> actionFacts) {
+		// Base case, if index is outside arguments, build the fact
+		Class[] argTypes = baseFact.getArgTypes();
+		if (index >= argTypes.length) {
+			// Check the arguments aren't fully anonymous
+			boolean anonymous = true;
+			for (String arg : arguments) {
+				if (!arg.equals("?")) {
+					anonymous = false;
+					break;
+				}
+			}
+
+			// If not anonymous, form the fact
+			if (!anonymous) {
+				actionFacts.add(new StringFact(baseFact, Arrays.copyOf(
+						arguments, arguments.length)));
+			}
+			return;
+		}
+
+		// Use all terms for the slot and '?'
+		List<String> terms = new ArrayList<String>();
+		terms.add("?");
+		if (possibleTerms.containsKey(argTypes[index])) {
+			terms.addAll(possibleTerms.get(argTypes[index]));
+		}
+
+		// For each term
+		MultiMap<Class, String> termsClone = new MultiMap<Class, String>(
+				possibleTerms);
+		for (String term : terms) {
+			arguments[index] = term;
+			// If the term isn't anonymous, remove it from the possible terms
+			// (clone).
+			if (!term.equals("?")) {
+				termsClone.get(argTypes[index]).remove(term);
+			}
+
+			// Recurse further
+			formPossibleFact(arguments, index + 1, termsClone, baseFact,
+					actionFacts);
+		}
 	}
 
 	/**
@@ -224,24 +355,21 @@ public abstract class StateSpec {
 	 *            The rete object.
 	 * @return A mapping of classes to guided predicate names.
 	 */
-	@SuppressWarnings("unchecked")
-	protected abstract Map<Class, String> initialiseTypePredicateTemplates();
+	protected abstract Collection<StringFact> initialiseTypePredicateTemplates();
 
 	/**
 	 * Initialises the state predicates.
 	 * 
 	 * @return The list of guided predicate names.
 	 */
-	@SuppressWarnings("unchecked")
-	protected abstract MultiMap<String, Class> initialisePredicateTemplates();
+	protected abstract Collection<StringFact> initialisePredicateTemplates();
 
 	/**
 	 * Initialises the state actions.
 	 * 
 	 * @return The list of guided actions.
 	 */
-	@SuppressWarnings("unchecked")
-	protected abstract MultiMap<String, Class> initialiseActionTemplates();
+	protected abstract Collection<StringFact> initialiseActionTemplates();
 
 	/**
 	 * Initialises the number of actions to take per time step.
@@ -322,7 +450,7 @@ public abstract class StateSpec {
 	 *            The action terms of the rule.
 	 * @return A regexp modified to match the rule.
 	 */
-	private String formRuleSpecificRegexp(List<String> terms) {
+	private String formRuleSpecificRegexp(String[] terms) {
 		StringBuffer actionRepl = new StringBuffer("(");
 		boolean first = true;
 		for (String term : terms) {
@@ -390,6 +518,27 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Transforms a String fact into a StringFact.
+	 * 
+	 * @param fact
+	 *            The String fact.
+	 * @return A StringFact version of the fact.
+	 */
+	public static StringFact toStringFact(String fact) {
+		String[] condSplit = StateSpec.splitFact(fact);
+		int offset = 1;
+		boolean negated = false;
+		if (condSplit[0].equals("not")) {
+			offset = 2;
+			negated = true;
+		}
+		String[] arguments = new String[condSplit.length - offset];
+		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
+		return new StringFact(StateSpec.getInstance().getStringFact(
+				condSplit[offset - 1]), arguments, negated);
+	}
+
+	/**
 	 * Reforms a fact back together again from a split array.
 	 * 
 	 * @param factSplit
@@ -436,15 +585,15 @@ public abstract class StateSpec {
 	 * @return The string for detailing inequality '(test (<> ?X a b ?Y ?_0))
 	 *         (test (<> ?Y a ...))'
 	 */
-	public static Collection<String> createInequalityTests(
+	public static Collection<StringFact> createInequalityTests(
 			Collection<String> variableTerms, Collection<String> constantTerms) {
-		Collection<String> tests = new ArrayList<String>();
+		Collection<StringFact> tests = new ArrayList<StringFact>();
 
 		// Run through each variable term
 		for (Iterator<String> termIter = variableTerms.iterator(); termIter
 				.hasNext();) {
 			String varTermA = termIter.next();
-			StringBuffer buffer = new StringBuffer("(test (<> " + varTermA);
+			StringBuffer buffer = new StringBuffer("(<> " + varTermA);
 			boolean isValid = false;
 			// Adding other variable terms
 			for (Iterator<String> subIter = variableTerms.iterator(); subIter
@@ -464,8 +613,9 @@ public abstract class StateSpec {
 			}
 
 			if (isValid) {
-				buffer.append("))");
-				tests.add(buffer.toString());
+				buffer.append(")");
+				tests.add(new StringFact(TEST_DEFINITION, new String[] { buffer
+						.toString() }));
 			}
 		}
 		return tests;
@@ -480,21 +630,21 @@ public abstract class StateSpec {
 	 * @param termIndex
 	 *            The index where the first term is found.
 	 */
-	public Collection<String> createTypeConds(String[] fact, int termIndex) {
-		Collection<String> typeConds = new HashSet<String>();
+	@SuppressWarnings("unchecked")
+	public Collection<StringFact> createTypeConds(StringFact fact) {
+		Collection<StringFact> typeConds = new HashSet<StringFact>();
 		// If the term itself is a type pred, return.
-		if (isTypePredicate(fact[termIndex - 1])) {
+		if (isTypePredicate(fact.getFactName())) {
 			return typeConds;
 		}
 
-		List<Class> classes = predicates_.get(fact[termIndex - 1]);
-		for (int i = termIndex; i < fact.length; i++) {
-			if (!fact[i].equals("?")) {
-				String[] typePred = new String[2];
-				typePred[0] = typePredicates_.get(classes.get(i - termIndex));
-				if (typePred[0] != null) {
-					typePred[1] = fact[i];
-					typeConds.add(reformFact(typePred));
+		Class[] classes = fact.getArgTypes();
+		for (int i = 0; i < classes.length; i++) {
+			if (!fact.getArguments()[i].equals("?")) {
+				StringFact typeFact = typePredicates_.get(classes[i]);
+				if (typeFact != null) {
+					typeConds.add(new StringFact(typeFact, new String[] { fact
+							.getArguments()[i] }));
 				}
 			}
 		}
@@ -517,15 +667,20 @@ public abstract class StateSpec {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
+	public static boolean isNumberClass(Class clazz) {
+		return Number.class.isAssignableFrom(clazz);
+	}
+
 	public String getEnvironmentName() {
 		return environment_;
 	}
 
-	public MultiMap<String, Class> getPredicates() {
+	public Map<String, StringFact> getPredicates() {
 		return predicates_;
 	}
 
-	public MultiMap<String, Class> getActions() {
+	public Map<String, StringFact> getActions() {
 		return actions_;
 	}
 
@@ -539,6 +694,30 @@ public abstract class StateSpec {
 
 	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
 		return backgroundRules_.values();
+	}
+
+	public MultiMap<String, StringFact> getPossibleConditions() {
+		return possibleVariablePredicates_;
+	}
+
+	/**
+	 * Gets a string fact by the fact name.
+	 * 
+	 * @param factName
+	 *            The fact name.
+	 * @return The StringFact corresponding to the fact name, or null if
+	 *         non-existant.
+	 */
+	public StringFact getStringFact(String factName) {
+		if (predicates_.containsKey(factName))
+			return predicates_.get(factName);
+		if (actions_.containsKey(factName))
+			return actions_.get(factName);
+		if (typeNames_.containsKey(factName))
+			return typeNames_.get(factName);
+		if (factName.equals("test"))
+			return TEST_DEFINITION;
+		return null;
 	}
 
 	/**
@@ -574,7 +753,7 @@ public abstract class StateSpec {
 	 * @return The predicate associated with the class, or null if no such class
 	 *         key.
 	 */
-	public String getTypePredicate(Class key) {
+	public StringFact getTypePredicate(Class key) {
 		return typePredicates_.get(key);
 	}
 
@@ -587,18 +766,18 @@ public abstract class StateSpec {
 	 *            The index of the argument for the term.
 	 * @return The appropriate type predicate for the term.
 	 */
-	public String getTypePredicate(String predicate, int argIndex) {
+	public StringFact getTypePredicate(String predicate, int argIndex) {
 		if (isTypePredicate(predicate))
-			return predicate;
+			return typeNames_.get(predicate);
 
-		List<Class> classes = getPredicates().get(predicate);
+		Class[] classes = predicates_.get(predicate).getArgTypes();
 		if (classes != null)
-			return getTypePredicate(classes.get(argIndex));
+			return getTypePredicate(classes[argIndex]);
 		return null;
 	}
 
 	public boolean isTypePredicate(String predicate) {
-		if (typePredicates_.values().contains(predicate))
+		if (typeNames_.keySet().contains(predicate))
 			return true;
 		return false;
 	}

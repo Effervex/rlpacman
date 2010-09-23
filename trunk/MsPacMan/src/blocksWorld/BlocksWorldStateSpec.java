@@ -1,6 +1,7 @@
 package blocksWorld;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class BlocksWorldStateSpec extends StateSpec {
@@ -31,19 +33,19 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialiseActionTemplates() {
-		MultiMap<String, Class> actions = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialiseActionTemplates() {
+		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Move action
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		structure.add(Block.class);
-		actions.putCollection("move", structure);
+		Class[] structure = new Class[2];
+		structure[0] = Block.class;
+		structure[1] = Block.class;
+		actions.add(new StringFact("move", structure));
 
 		// MoveFloor action
-		structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		actions.putCollection("moveFloor", structure);
+		structure = new Class[1];
+		structure[0] = Block.class;
+		actions.add(new StringFact("moveFloor", structure));
 
 		return actions;
 	}
@@ -75,7 +77,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
-		
+
 		bkMap.put("aboveRule1.5", new BackgroundKnowledge(
 				"(on ?X ?) => (above ?X ?)", false));
 
@@ -113,7 +115,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			constants.add("a");
 			return "(clear a)";
 		}
-		
+
 		if (envParameter_.equals("highestA")) {
 			constants.add("a");
 			return "(highest a)";
@@ -156,44 +158,44 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialisePredicateTemplates() {
-		MultiMap<String, Class> predicates = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialisePredicateTemplates() {
+		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// On predicate
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		structure.add(Block.class);
-		predicates.putCollection("on", structure);
+		Class[] structure = new Class[2];
+		structure[0] = Block.class;
+		structure[1] = Block.class;
+		predicates.add(new StringFact("on", structure));
 
 		// OnFloor predicate
-		structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		predicates.putCollection("onFloor", structure);
+		structure = new Class[1];
+		structure[0] = Block.class;
+		predicates.add(new StringFact("onFloor", structure));
 
 		// Clear predicate
-		structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		predicates.putCollection("clear", structure);
+		structure = new Class[1];
+		structure[0] = Block.class;
+		predicates.add(new StringFact("clear", structure));
 
 		// Above predicate
-		structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		structure.add(Block.class);
-		predicates.putCollection("above", structure);
+		structure = new Class[2];
+		structure[0] = Block.class;
+		structure[1] = Block.class;
+		predicates.add(new StringFact("above", structure));
 
 		// Highest predicate
-		structure = new ArrayList<Class>();
-		structure.add(Block.class);
-		predicates.putCollection("highest", structure);
+		structure = new Class[1];
+		structure[0] = Block.class;
+		predicates.add(new StringFact("highest", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Map<Class, String> initialiseTypePredicateTemplates() {
-		Map<Class, String> typePreds = new HashMap<Class, String>();
+	protected Collection<StringFact> initialiseTypePredicateTemplates() {
+		Collection<StringFact> typePreds = new ArrayList<StringFact>();
 
-		typePreds.put(Block.class, "block");
+		typePreds.add(new StringFact("block", new Class[]{Block.class}));
 
 		return typePreds;
 	}

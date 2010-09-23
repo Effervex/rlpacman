@@ -75,12 +75,10 @@ public class Policy {
 	 *            The rule being checked.
 	 */
 	private void checkModular(GuidedRule rule) {
-		List<String> constantConditions = rule.getConstantConditions();
-		if (constantConditions.isEmpty())
+		ConstantPred constantConditions = rule.getConstantConditions();
+		if (constantConditions == null)
 			return;
-		Collections.sort(constantConditions);
-		String modName = Module.formName(new ConstantPred(constantConditions)
-				.getFacts());
+		String modName = constantConditions.toString();
 
 		Module module = Module.loadModule(StateSpec.getInstance()
 				.getEnvironmentName(), modName);
@@ -88,20 +86,25 @@ public class Policy {
 		if (module != null) {
 			// Put the parameters into an arraylist
 			ArrayList<String> parameters = new ArrayList<String>();
-			for (String cond : constantConditions) {
-				for (String[] condSplit : rule.getConstantCondSplits(cond)) {
-					// Extract the parameters used in the constant conditions
-					for (int i = 1; i < condSplit.length; i++) {
-						// May need to replace parameters if modular is
-						// recursive
-						if (rule.getParameters() != null) {
-							parameters.add(rule
-									.getReplacementParameter(condSplit[i]));
-						} else {
-							parameters.add(condSplit[i]);
+			Set<String> usedConds = new HashSet<String>();
+			for (String[] cond : constantConditions) {
+				if (!usedConds.contains(cond)) {
+					for (String[] condSplit : rule.getConstantCondSplits(cond)) {
+						// Extract the parameters used in the constant
+						// conditions
+						for (int i = 1; i < condSplit.length; i++) {
+							// May need to replace parameters if modular is
+							// recursive
+							if (rule.getParameters() != null) {
+								parameters.add(rule
+										.getReplacementParameter(condSplit[i]));
+							} else {
+								parameters.add(condSplit[i]);
+							}
 						}
 					}
 				}
+				usedConds.add(cond);
 			}
 
 			// Add the module rules.

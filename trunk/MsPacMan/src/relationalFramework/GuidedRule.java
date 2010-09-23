@@ -1,10 +1,14 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -25,19 +29,13 @@ public class GuidedRule {
 	private static final int SETTLED_RULE_STATES = 50;
 
 	/** The conditions of the rule. */
-	private SortedSet<String> ruleConditions_;
+	private SortedSet<StringFact> ruleConditions_;
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
-	private List<String> constantConditions_;
-
-	/** The condsplits for each constant. */
-	private MultiMap<String, String[]> constantCondSplits_;
+	private ConstantPred constantConditions_;
 
 	/** The guided predicate that defined the action. */
-	private String ruleAction_;
-
-	/** The terms present in the action. */
-	private List<String> actionTerms_;
+	private StringFact ruleAction_;
 
 	/** The slot this rule was generated from. */
 	private Slot slot_;
@@ -81,8 +79,7 @@ public class GuidedRule {
 	public GuidedRule(String ruleString) {
 		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
 		ruleConditions_ = splitConditions(split[0]);
-		ruleAction_ = split[1].trim();
-		actionTerms_ = findTerms(ruleAction_);
+		ruleAction_ = StateSpec.toStringFact(split[1].trim());
 		slot_ = null;
 		expandConditions();
 		findConstants();
@@ -99,16 +96,15 @@ public class GuidedRule {
 	 *            If this rule is a mutant rule.
 	 */
 	@SuppressWarnings("unchecked")
-	public GuidedRule(Collection<String> conditions, String action,
+	public GuidedRule(Collection<StringFact> conditions, StringFact action,
 			boolean mutant) {
 		if (!(conditions instanceof SortedSet)) {
-			ruleConditions_ = new TreeSet<String>(ConditionComparator
+			ruleConditions_ = new TreeSet<StringFact>(ConditionComparator
 					.getInstance());
 			ruleConditions_.addAll(conditions);
 		} else
-			ruleConditions_ = (SortedSet<String>) conditions;
+			ruleConditions_ = (SortedSet<StringFact>) conditions;
 		ruleAction_ = action;
-		actionTerms_ = findTerms(ruleAction_);
 		mutant_ = mutant;
 		slot_ = null;
 		findConstants();
@@ -196,34 +192,20 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Finds the terms in the action.
-	 * 
-	 * @param ruleAction
-	 *            The action.
-	 * @return The terms in the action.
-	 */
-	private List<String> findTerms(String ruleAction) {
-		List<String> terms = new ArrayList<String>();
-		String[] split = StateSpec.splitFact(ruleAction);
-		for (int i = 1; i < split.length; i++)
-			terms.add(split[i]);
-		return terms;
-	}
-
-	/**
 	 * Splits a conditions string into individual facts.
 	 * 
 	 * @param conditionString
 	 *            The condition string to be split.
 	 * @return The facts of the string in segments.
 	 */
-	public static SortedSet<String> splitConditions(String conditionString) {
-		SortedSet<String> conds = new TreeSet<String>(ConditionComparator
-				.getInstance());
+	public static SortedSet<StringFact> splitConditions(String conditionString) {
+		SortedSet<StringFact> conds = new TreeSet<StringFact>(
+				ConditionComparator.getInstance());
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(conditionString);
-		while (m.find())
-			conds.add(m.group().trim());
+		while (m.find()) {
+			conds.add(StateSpec.toStringFact(m.group()));
+		}
 		return conds;
 	}
 
@@ -231,42 +213,39 @@ public class GuidedRule {
 	 * Expands the conditions by parsing the base definitions of the condition
 	 * into a fully type and inequal'ed condition.
 	 */
-	@SuppressWarnings("unchecked")
 	public void expandConditions() {
-		Set<String> addedConditions = new TreeSet<String>();
-		Set<String> removedConditions = new TreeSet<String>();
+		Set<StringFact> addedConditions = new TreeSet<StringFact>();
+		Set<StringFact> removedConditions = new TreeSet<StringFact>();
 
 		Set<String> variableTerms = new TreeSet<String>();
 		Set<String> constantTerms = new TreeSet<String>();
-		for (String condition : ruleConditions_) {
-			String[] condSplit = StateSpec.splitFact(condition);
-
-			if (StateSpec.getInstance().isUsefulPredicate(condSplit[0])) {
-				MultiMap<String, Class> predicates = StateSpec.getInstance()
+		for (StringFact condition : ruleConditions_) {
+			if (StateSpec.getInstance().isUsefulPredicate(
+					condition.getFactName())) {
+				Map<String, StringFact> predicates = StateSpec.getInstance()
 						.getPredicates();
-				int termIndex = (condSplit[0].equals("not")) ? 2 : 1;
-				String predName = condSplit[termIndex - 1];
 
 				// Adding the terms
-				for (int i = termIndex; i < condSplit.length; i++) {
+				String[] arguments = condition.getArguments();
+				for (int i = 0; i < arguments.length; i++) {
 					// Ignore numerical terms
-					if ((predicates.get(predName) == null)
-							|| (!Number.class.isAssignableFrom(predicates.get(
-									predName).get(i - termIndex)))) {
+					if ((predicates.get(condition.getFactName()) == null)
+							|| (!StateSpec.isNumberClass(condition
+									.getArgTypes()[i]))) {
 						// Adding variable terms
-						if (condSplit[i].charAt(0) == '?') {
-							if (condSplit[i].length() > 1)
-								variableTerms.add(condSplit[i]);
+						if (arguments[i].charAt(0) == '?') {
+							if (arguments[i].length() > 1)
+								variableTerms.add(arguments[i]);
 						} else {
 							// Adding constant terms
-							constantTerms.add(condSplit[i]);
+							constantTerms.add(arguments[i]);
 						}
 					}
 				}
 
 				// Adding the type arguments
 				addedConditions.addAll(StateSpec.getInstance().createTypeConds(
-						condSplit, termIndex));
+						condition));
 			} else {
 				removedConditions.add(condition);
 			}
@@ -284,28 +263,25 @@ public class GuidedRule {
 	 * Finds the constants in the rule conditions.
 	 */
 	private void findConstants() {
-		constantCondSplits_ = new MultiMap<String, String[]>();
-
-		List<String> constants = new ArrayList<String>();
-		for (String cond : ruleConditions_) {
-			String[] condSplit = StateSpec.splitFact(cond);
+		List<StringFact> constants = new ArrayList<StringFact>();
+		for (StringFact cond : ruleConditions_) {
 			// If the condition isn't a type predicate or test
-			if (!StateSpec.getInstance().isTypePredicate(condSplit[0])
-					&& StateSpec.getInstance().isUsefulPredicate(condSplit[0])
-					&& !condSplit[0].equals("not")) {
+			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
+					&& StateSpec.getInstance().isUsefulPredicate(
+							cond.getFactName()) && !cond.isNegated()) {
 				// If the condition doesn't contain variables - except modular
 				// variables
 				boolean isConstant = true;
-				for (int i = 1; i < condSplit.length; i++) {
+				for (String argument : cond.getArguments()) {
 					// If we're looking at a variable, but not a module variable
-					if (condSplit[i].contains("?")
-							&& (condSplit[i].length() <= Module.MOD_VARIABLE_PREFIX
-									.length() || !condSplit[i].substring(0,
+					if (argument.contains("?")
+							&& (argument.length() <= Module.MOD_VARIABLE_PREFIX
+									.length() || !argument.substring(0,
 									Module.MOD_VARIABLE_PREFIX.length())
 									.equals(Module.MOD_VARIABLE_PREFIX))) {
 						// It may be a parameter, else return false.
 						if ((queryParams_ == null)
-								|| (!queryParams_.contains(condSplit[i]))) {
+								|| (!queryParams_.contains(argument))) {
 							isConstant = false;
 							break;
 						}
@@ -313,13 +289,13 @@ public class GuidedRule {
 				}
 
 				if (isConstant) {
-					constants.add(condSplit[0]);
-					constantCondSplits_.put(condSplit[0], condSplit);
+					constants.add(cond);
 				}
 			}
 		}
 
-		constantConditions_ = constants;
+		if (!constants.isEmpty())
+			constantConditions_ = new ConstantPred(constants);
 	}
 
 	/**
@@ -332,7 +308,7 @@ public class GuidedRule {
 	 * @return 1 if the rule is minimal, 0 if not minimal, and -1 if invalid
 	 *         (too few conditions).
 	 */
-	private int determineLGGStatus(SortedSet<String> conditions,
+	private int determineLGGStatus(SortedSet<StringFact> conditions,
 			boolean removeUnnecessaryFacts) {
 		if (conditions.isEmpty()) {
 			System.err.println("Conditions have been over-shrunk: "
@@ -345,14 +321,14 @@ public class GuidedRule {
 		// Run through the conditions, ensuring each one has at least one unique
 		// term seen in the action.
 		boolean notLGG = false;
-		for (Iterator<String> iter = conditions.iterator(); iter.hasNext();) {
-			String condition = iter.next();
+		for (Iterator<StringFact> iter = conditions.iterator(); iter.hasNext();) {
+			String condition = iter.next().toString();
 
 			boolean contains = false;
 
 			// Check if any of the terms are in the condition
 			boolean containsAny = false;
-			for (String term : actionTerms_) {
+			for (String term : ruleAction_.getArguments()) {
 				// If the condition contains a term
 				if (condition.contains(term)) {
 					// If the term hasn't already been used, keep it
@@ -380,7 +356,7 @@ public class GuidedRule {
 			return 0;
 
 		// If there are terms remaining, the condition is invalid
-		if (usedTerms.size() < actionTerms_.size())
+		if (usedTerms.size() < ruleAction_.getArguments().length)
 			return -1;
 
 		return 1;
@@ -442,8 +418,8 @@ public class GuidedRule {
 	 * 
 	 * @return The conditions of the rule.
 	 */
-	public SortedSet<String> getConditions() {
-		return new TreeSet<String>(ruleConditions_);
+	public SortedSet<StringFact> getConditions() {
+		return new TreeSet<StringFact>(ruleConditions_);
 	}
 
 	/**
@@ -456,13 +432,14 @@ public class GuidedRule {
 	 *            the action terms should be removed.
 	 * @return True if the newly set conditions are valid.
 	 */
-	public boolean setConditions(SortedSet<String> conditions,
+	public boolean setConditions(SortedSet<StringFact> conditions,
 			boolean removeUnnecessaryFacts) {
 		// If the conditions are the same, return true.
 		if (conditions.equals(ruleConditions_)) {
 			return true;
 		}
 
+		// TODO This may not really be needed.
 		int result = determineLGGStatus(conditions, removeUnnecessaryFacts);
 		// If the rule is invalid, return false.
 		if (result == -1) {
@@ -479,8 +456,8 @@ public class GuidedRule {
 	}
 
 	/**
-	 * Shifts any modular rule variable names by an amount. e.g. a -> c when i =
-	 * 2.
+	 * Shifts any modular rule variable names by an amount. e.g. ?_MOD_a ->
+	 * ?_MOD_c when i = 2.
 	 * 
 	 * @param i
 	 *            The amount to shift the variable name.
@@ -489,46 +466,58 @@ public class GuidedRule {
 		if (i == 0)
 			return;
 
-		SortedSet<String> modConditions = new TreeSet<String>(
-				ConditionComparator.getInstance());
-		for (String cond : ruleConditions_) {
-			for (int j = 0; j < queryParams_.size(); j++) {
-				cond = cond.replaceAll(Pattern.quote(Module
-						.createModuleParameter(j)), Module
-						.createModuleParameter(j + i));
-				modConditions.add(cond);
-			}
+		// Run through each condition, removing it, then readding it back with
+		// possibly changed arguments.
+		replaceArguments(i, ruleConditions_);
+		// Do the same for the constants
+		replaceArguments(i, constantConditions_.getFacts());
+	}
+
+	/**
+	 * Replaces modular arguments with shifted arguments.
+	 * 
+	 * @param i
+	 *            The amount to shift by.
+	 * @param strFacts
+	 *            The collection to replace the arguments within.
+	 */
+	private void replaceArguments(int i, Collection<StringFact> strFacts) {
+		Map<String, String> replacementMap = new HashMap<String, String>();
+		// Create the replacement map.
+		for (int j = 0; j < queryParams_.size(); j++) {
+			replacementMap.put(Module.createModuleParameter(j), Module
+					.createModuleParameter(j + i));
 		}
 
-		ruleConditions_ = modConditions;
-
-		findConstants();
+		// Replace for each condition.
+		for (Iterator<StringFact> condIter = strFacts.iterator(); condIter
+				.hasNext();) {
+			StringFact cond = condIter.next();
+			condIter.remove();
+			cond.replaceArguments(replacementMap);
+			strFacts.add(cond);
+		}
 	}
 
 	public String getStringConditions() {
 		StringBuffer buffer = new StringBuffer();
-		for (String cond : ruleConditions_) {
+		for (StringFact cond : ruleConditions_) {
 			buffer.append(cond + " ");
 		}
 
-		String result = buffer.toString();
-		return result;
+		return buffer.toString();
 	}
 
-	public List<String> getConstantConditions() {
+	public ConstantPred getConstantConditions() {
 		return constantConditions_;
 	}
 
-	public Collection<String[]> getConstantCondSplits(String cond) {
-		return constantCondSplits_.get(cond);
-	}
-
-	public String getAction() {
+	public StringFact getAction() {
 		return ruleAction_;
 	}
 
-	public List<String> getActionTerms() {
-		return new ArrayList<String>(actionTerms_);
+	public String[] getActionTerms() {
+		return ruleAction_.getArguments();
 	}
 
 	public List<String> getQueryParameters() {
@@ -577,7 +566,7 @@ public class GuidedRule {
 	 * @return The action predicate for the action.
 	 */
 	public String getActionPredicate() {
-		return StateSpec.splitFact(ruleAction_)[0];
+		return ruleAction_.getFactName();
 	}
 
 	/**
@@ -586,15 +575,8 @@ public class GuidedRule {
 	 * @param terms
 	 *            The new action terms.
 	 */
-	public void setActionTerms(List<String> terms) {
-		if (!terms.equals(actionTerms_)) {
-			actionTerms_ = terms;
-			String[] modified = StateSpec.splitFact(ruleAction_);
-			for (int i = 1; i < modified.length; i++) {
-				modified[i] = actionTerms_.get(i - 1);
-			}
-			ruleAction_ = StateSpec.reformFact(modified);
-		}
+	public void setActionTerms(String[] terms) {
+		ruleAction_ = new StringFact(ruleAction_, terms);
 	}
 
 	public void setSlot(Slot slot) {
@@ -666,9 +648,7 @@ public class GuidedRule {
 		clone.hasSpawned_ = hasSpawned_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
-		clone.constantConditions_ = new ArrayList<String>(constantConditions_);
-		clone.constantCondSplits_ = new MultiMap<String, String[]>(
-				constantCondSplits_);
+		clone.constantConditions_ = constantConditions_;
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)
@@ -688,7 +668,7 @@ public class GuidedRule {
 		result = prime * result
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		int conditionResult = 0;
-		for (String condition : ruleConditions_)
+		for (StringFact condition : ruleConditions_)
 			conditionResult += condition.hashCode();
 		result = prime * result + conditionResult;
 		result = prime * result

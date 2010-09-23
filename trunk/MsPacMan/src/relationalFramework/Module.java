@@ -283,11 +283,12 @@ public class Module {
 	 *            The constant pred(s).
 	 * @return A String representing the filename of the module.
 	 */
-	public static String formName(List<String> constantPred) {
+	public static String formName(List<StringFact> constantPred) {
 		Collections.sort(constantPred);
-		StringBuffer buffer = new StringBuffer(constantPred.get(0));
+		StringBuffer buffer = new StringBuffer(constantPred.get(0)
+				.getFactName());
 		for (int i = 1; i < constantPred.size(); i++) {
-			buffer.append(MODULE_JOIN + constantPred.get(i));
+			buffer.append(MODULE_JOIN + constantPred.get(i).getFactName());
 		}
 
 		return buffer.toString();

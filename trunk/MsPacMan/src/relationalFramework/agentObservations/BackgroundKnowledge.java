@@ -11,6 +11,7 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import relationalFramework.Covering;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 /**
  * A class representing background knowledge assertions
@@ -24,10 +25,10 @@ public class BackgroundKnowledge {
 	private boolean jessAssert_;
 
 	/** The preconditions for the background knowledge. */
-	private Collection<String> preConds_;
+	private Collection<StringFact> preConds_;
 
 	/** The postcondition (asserted value) for the background knowledge. */
-	private String postCondition_;
+	private StringFact postCondition_;
 
 	/** If this background knowledge is equivalent or just inferred. */
 	private boolean equivalentRule_;
@@ -55,10 +56,10 @@ public class BackgroundKnowledge {
 		split[1] = split[1].trim();
 		String assertStr = "(assert ";
 		if (split[1].contains(assertStr))
-			postCondition_ = split[1].substring(assertStr.length(), split[1]
-					.length() - 1);
+			postCondition_ = StateSpec.toStringFact(split[1].substring(
+					assertStr.length(), split[1].length() - 1));
 		else
-			postCondition_ = split[1].trim();
+			postCondition_ = StateSpec.toStringFact(split[1].trim());
 	}
 
 	/**
@@ -67,8 +68,8 @@ public class BackgroundKnowledge {
 	 * 
 	 * @return A collection of all conditions shown in the background rule.
 	 */
-	private Collection<String> getAllConditions() {
-		Collection<String> backgroundConditions = new ArrayList<String>(
+	private Collection<StringFact> getAllConditions() {
+		Collection<StringFact> backgroundConditions = new ArrayList<StringFact>(
 				preConds_);
 		backgroundConditions.add(postCondition_);
 		return backgroundConditions;
@@ -79,11 +80,12 @@ public class BackgroundKnowledge {
 	 * 
 	 * @return A collection of all conditions with the postcondition negated.
 	 */
-	private Collection<String> getConjugatedConditions() {
-		Collection<String> backgroundConditions = new ArrayList<String>(
+	private Collection<StringFact> getConjugatedConditions() {
+		Collection<StringFact> backgroundConditions = new ArrayList<StringFact>(
 				preConds_);
-
-		backgroundConditions.add(getNegatedPostCond(null));
+		StringFact negated = new StringFact(postCondition_);
+		negated.swapNegated();
+		backgroundConditions.add(negated);
 
 		return backgroundConditions;
 	}
@@ -96,10 +98,13 @@ public class BackgroundKnowledge {
 	 *            The replacement map, or null.
 	 * @return The preconditions of the background knowledge.
 	 */
-	private Collection<String> getPreConds(BidiMap replacementTerms) {
-		Collection<String> preConds = new ArrayList<String>(preConds_.size());
-		for (String preCond : preConds_) {
-			preConds.add(replaceTerms(preCond, replacementTerms));
+	private Collection<StringFact> getPreConds(BidiMap replacementTerms) {
+		Collection<StringFact> preConds = new ArrayList<StringFact>(preConds_
+				.size());
+		for (StringFact preCond : preConds_) {
+			StringFact replacedFact = new StringFact(preCond);
+			replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
+			preConds.add(replacedFact);
 		}
 
 		return preConds;
@@ -112,48 +117,10 @@ public class BackgroundKnowledge {
 	 * @param replacementTerms
 	 *            The replacement terms to swap the terms with.
 	 */
-	private String getPostCond(BidiMap replacementTerms) {
-		return replaceTerms(postCondition_, replacementTerms);
-	}
-
-	/**
-	 * Replaces the terms of a condition with those specified in the replacement
-	 * map.
-	 * 
-	 * @param condition
-	 *            The condition with terms to be replaced.
-	 * @param replacementMap
-	 *            The replacement map.
-	 * @return The condition with terms replaced.
-	 */
-	private String replaceTerms(String condition, BidiMap replacementMap) {
-		if (replacementMap == null)
-			return condition;
-
-		for (Object key : replacementMap.values())
-			if (!key.equals(StateSpec.ANONYMOUS))
-				condition = condition.replaceAll(" "
-						+ Pattern.quote((String) key) + "(?=( |\\)))", " "
-						+ replacementMap.getKey(key));
-		return condition;
-	}
-
-	/**
-	 * Gets the post condition of the background knowledge with the terms of the
-	 * condition swapped for the replacement terms.
-	 * 
-	 * @param replacementTerms
-	 *            The replacement terms to swap the terms with.
-	 */
-	private String getNegatedPostCond(BidiMap replacementTerms) {
-		String cond = getPostCond(replacementTerms);
-
-		// Dealing with double negation
-		String not = "(not ";
-		if (cond.substring(0, not.length()).equals(not))
-			return cond.substring(not.length(), postCondition_.length() - 1);
-		else
-			return not + cond + ")";
+	private StringFact getPostCond(BidiMap replacementTerms) {
+		StringFact replacedFact = new StringFact(postCondition_);
+		replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
+		return replacedFact;
 	}
 
 	/**
@@ -167,7 +134,7 @@ public class BackgroundKnowledge {
 	 *            If the conditions are being tested for illegal conditions too.
 	 * @return True if the conditions were simplified, false otherwise.
 	 */
-	public boolean simplify(SortedSet<String> ruleConds, Covering coveringObj,
+	public boolean simplify(SortedSet<StringFact> ruleConds, Covering coveringObj,
 			boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
@@ -176,7 +143,7 @@ public class BackgroundKnowledge {
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
 		if (result == 0) {
-			String cond = getPostCond(replacementTerms);
+			StringFact cond = getPostCond(replacementTerms);
 			if (ruleConds.remove(cond))
 				changed = true;
 		}
@@ -184,13 +151,15 @@ public class BackgroundKnowledge {
 		// Simplify to the left for equivalent background knowledge
 		if (equivalentRule_) {
 			replacementTerms.clear();
-			Collection<String> unifiedEquiv = coveringObj.unifyFact(
+			Collection<StringFact> unifiedEquiv = coveringObj.unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
-					replacementTerms, new ArrayList<String>(), true);
-			for (String unifiedFact : unifiedEquiv) {
-				ruleConds.remove(replaceTerms(unifiedFact, replacementTerms));
-				Collection<String> equivFacts = getPreConds(replacementTerms);
-				for (String equivFact : equivFacts) {
+					replacementTerms, new String[0], true);
+			for (StringFact unifiedFact : unifiedEquiv) {
+				StringFact removed = new StringFact(unifiedFact);
+				removed.replaceArguments(replacementTerms.inverseBidiMap());
+				ruleConds.remove(removed);
+				Collection<StringFact> equivFacts = getPreConds(replacementTerms);
+				for (StringFact equivFact : equivFacts) {
 					if (!ruleConds.contains(equivFact)) {
 						ruleConds.add(equivFact);
 						changed = true;
@@ -206,7 +175,8 @@ public class BackgroundKnowledge {
 			// If the rule is found to be illegal using the conjugated
 			// conditions, remove the illegal condition
 			if (result == 0) {
-				String cond = getNegatedPostCond(replacementTerms);
+				StringFact cond = getPostCond(replacementTerms);
+				cond.swapNegated();
 				if (ruleConds.remove(cond))
 					changed = true;
 			}
