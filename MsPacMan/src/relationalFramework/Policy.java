@@ -86,25 +86,18 @@ public class Policy {
 		if (module != null) {
 			// Put the parameters into an arraylist
 			ArrayList<String> parameters = new ArrayList<String>();
-			Set<String> usedConds = new HashSet<String>();
-			for (String[] cond : constantConditions) {
-				if (!usedConds.contains(cond)) {
-					for (String[] condSplit : rule.getConstantCondSplits(cond)) {
-						// Extract the parameters used in the constant
-						// conditions
-						for (int i = 1; i < condSplit.length; i++) {
-							// May need to replace parameters if modular is
-							// recursive
-							if (rule.getParameters() != null) {
-								parameters.add(rule
-										.getReplacementParameter(condSplit[i]));
-							} else {
-								parameters.add(condSplit[i]);
-							}
-						}
+			for (StringFact cond : constantConditions.getFacts()) {
+				// Extract the parameters used in the constant
+				// conditions
+				for (String arg : cond.getArguments()) {
+					// May need to replace parameters if modular is
+					// recursive
+					if (rule.getParameters() != null) {
+						parameters.add(rule.getReplacementParameter(arg));
+					} else {
+						parameters.add(arg);
 					}
 				}
-				usedConds.add(cond);
 			}
 
 			// Add the module rules.
@@ -337,32 +330,29 @@ public class Policy {
 					// For each possible replacement
 					do {
 						// Get the rule action, without brackets
-						String[] split = StateSpec.splitFact(gr.getAction());
-						StringBuffer actBuffer = new StringBuffer("("
-								+ split[0]);
+						StringFact action = new StringFact(gr.getAction());
 
 						// Find the arguments.
 						StringBuffer args = new StringBuffer();
 						boolean first = true;
-						for (int i = 1; i < split.length; i++) {
-							String value = split[i];
-							if (value.charAt(0) == '?')
-								value = results
-										.getSymbol(split[i].substring(1));
-							actBuffer.append(" " + value);
+						String[] arguments = action.getArguments();
+						for (int i = 0; i < arguments.length; i++) {
+							if (arguments[i].charAt(0) == '?')
+								arguments[i] = results.getSymbol(arguments[i]
+										.substring(1));
 
 							if (!first)
 								args.append(" ");
-							args.append(value);
+							args.append(arguments[i]);
 							first = false;
 						}
-						actBuffer.append(")");
 
-						activatedActions.putContains(split[0], args.toString());
+						activatedActions.putContains(action.getFactName(), args
+								.toString());
 
 						// Use the found action set as a result.
 						if (canAddRule(gr, actionsFound, actionsReturned))
-							actionsList.add(actBuffer.toString());
+							actionsList.add(action.toString());
 					} while (results.next());
 
 					// Trim down the action list as it may contain too many
