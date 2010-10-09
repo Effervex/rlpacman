@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -9,7 +10,9 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import relationalFramework.ActionChoice;
 import relationalFramework.MultiMap;
+import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 
@@ -138,6 +141,83 @@ public class AgentObservations {
 		return learnedEnvironmentRules_;
 	}
 
+	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
+			ActionChoice actionChoice, List<String> constants) {
+		for (RuleAction ruleAction : actionChoice.getActions()) {
+			String actionPred = ruleAction.getRule().getActionPredicate();
+			// If the state isn't yet settled, try unification
+			if (!actionBasedObservations_.get(actionPred).getPGI().isSettled()) {
+				List<String> actions = ruleAction.getUtilisedActions();
+
+				// Create a pre-goal from every action in the actions list.
+				if (actions != null) {
+					for (String action : actions) {
+						// Inversely substitute the old pregoal state
+						String[] actionSplit = StateSpec.splitFact(action);
+						String[] actionTerms = new String[actionSplit.length - 1];
+						System.arraycopy(actionSplit, 1, actionTerms, 0,
+								actionTerms.length);
+
+						// The actions become constants if possible
+						List<String> newConstants = new ArrayList<String>(
+								constants);
+						List<String> newStateTerms = new ArrayList<String>();
+						for (String actionTerm : actionTerms) {
+							newStateTerms.add(actionTerm);
+							// Ignore numerical terms and terms already added
+							if (!newConstants.contains(actionTerm))
+								newConstants.add(actionTerm);
+						}
+						Collection<String> preGoalStringState = inverselySubstitute(
+								preGoalState, actionSplit, newConstants);
+						removeUselessFacts(preGoalStringState);
+
+						// Unify with the old state
+						PreGoalInformation preGoal = preGoals_
+								.get(actionSplit[0]);
+						if (preGoal == null) {
+							preGoals_.put(actionSplit[0],
+									new PreGoalInformation(
+											(List<String>) preGoalStringState,
+											newStateTerms));
+							calculateMutationHash(actionSplit[0]);
+						} else {
+							// Unify the two states and check if it has changed
+							// at all.
+							int result = unifyStates(preGoal.getState(),
+									preGoalStringState, preGoal
+											.getActionTerms(), newStateTerms);
+
+							// If the states unified, reset the counter,
+							// otherwise increment.
+							if (result == 1) {
+								preGoal.resetInactivity();
+								calculateMutationHash(actionSplit[0]);
+							} else if (result == 0) {
+								if (!formedActions.contains(actionPred))
+									preGoal.incrementInactivity();
+							} else if (result == -1) {
+								throw new RuntimeException(
+										"Pre-goal states did not unify: "
+												+ preGoal + ", "
+												+ preGoalStringState);
+							}
+
+							formedActions.add(actionPred);
+						}
+					}
+				}
+			}
+		}
+		
+		Collection<String> settled = new ArrayList<String>();
+		for (String preGoalAction : preGoals_.keySet()) {
+			if (isPreGoalSettled(preGoalAction))
+				settled.add(preGoalAction);
+		}
+		return settled;
+	}
+
 	/**
 	 * An internal class to note the action-based observations.
 	 * 
@@ -158,5 +238,9 @@ public class AgentObservations {
 
 		/** The inactivity of the ranged conditions. */
 		private int rangedConditionInactivity_ = 0;
+
+		public PreGoalInformation getPGI() {
+			return pgi_;
+		}
 	}
 }
