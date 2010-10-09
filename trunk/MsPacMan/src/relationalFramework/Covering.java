@@ -662,13 +662,14 @@ public class Covering {
 	 *         change made.
 	 */
 	public SortedSet<StringFact> simplifyRule(SortedSet<StringFact> ruleConds,
-			StringFact condition, StringFact negCondition, boolean testForIllegalRule) {
+			StringFact condition, StringFact negCondition,
+			boolean testForIllegalRule) {
 		SortedSet<StringFact> simplified = new TreeSet<StringFact>(ruleConds);
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
-			Collection<StringFact> unification = unifyFact(condition, ruleConds,
-					new DualHashBidiMap(), new DualHashBidiMap(),
+			Collection<StringFact> unification = unifyFact(condition,
+					ruleConds, new DualHashBidiMap(), new DualHashBidiMap(),
 					new String[0], false);
 			if (!unification.isEmpty())
 				return null;
@@ -792,52 +793,18 @@ public class Covering {
 	 * @param j
 	 *            The jth index.
 	 */
-	private void addTypePred(Collection<String> collection, String[] factSplit,
+	private void addTypePred(Collection<StringFact> collection, String[] factSplit,
 			int j) {
-		String[] typePred = new String[2];
-		typePred[0] = StateSpec.getInstance().getTypePredicate(factSplit[0],
-				j - 1);
-		// Check it is a valid type pred.
-		if (typePred[0] == null)
+		StringFact typeFact = StateSpec.getInstance().getTypePredicate(
+				factSplit[0], j - 1);
+		
+		if (typeFact == null)
 			return;
 
-		typePred[1] = factSplit[j];
+		typeFact = new StringFact(typeFact, new String[] {factSplit[j - 1]});
 
-		String formedType = StateSpec.reformFact(typePred);
-		if (!collection.contains(formedType))
-			collection.add(formedType);
-	}
-
-	/**
-	 * Compiles the relevant term conditions from the state into map format,
-	 * with the term as the key and the fact as the value. This makes finding
-	 * relevant conditions a quick matter.
-	 * 
-	 * @param state
-	 *            The state containing the conditions.
-	 * @return The relevant conditions multimap.
-	 */
-	@SuppressWarnings("unchecked")
-	private MultiMap<String, String> compileRelevantConditionMap(Rete state) {
-		MultiMap<String, String> relevantConditions = new MultiMap<String, String>();
-		Collection<String> stateConds = new HashSet<String>();
-
-		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
-			Fact stateFact = factIter.next();
-			// Ignore the type, inequal and actions pred
-			String[] split = StateSpec.splitFact(stateFact.toString());
-			if (StateSpec.getInstance().isUsefulPredicate(split[0])) {
-				String fact = StateSpec.reformFact(split);
-				stateConds.add(fact);
-				for (int i = 1; i < split.length; i++) {
-					// Ignore numerical terms
-					if (!StateSpec.isNumber(split[i]))
-						relevantConditions.putContains(split[i], fact);
-				}
-			}
-		}
-
-		return relevantConditions;
+		if (!collection.contains(typeFact))
+			collection.add(typeFact);
 	}
 
 	/**
@@ -1499,6 +1466,8 @@ public class Covering {
 	 */
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
 			ActionChoice actionChoice, List<String> constants) {
+		return ao_.formPreGoalState(preGoalState, actionChoice, constants);
+		
 		// A set to note which actions have been covered this state to avoid
 		// premature settling.
 		Set<String> formedActions = new HashSet<String>();

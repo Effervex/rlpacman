@@ -38,7 +38,7 @@ public class PolicyGenerator {
 
 	/** The actions set the generator was initialised with. */
 	@SuppressWarnings("unchecked")
-	private MultiMap<String, Class> actionSet_;
+	private Map<String, StringFact> actionSet_;
 
 	/** If the generator is currently frozen. */
 	private boolean frozen_ = false;
@@ -253,20 +253,19 @@ public class PolicyGenerator {
 					else
 						System.out.println("\tREFINED RULE: " + coveredRule);
 
-					String actionPred = StateSpec.splitFact(coveredRule
-							.getAction())[0];
+					StringFact action = coveredRule.getAction();
 					if (coveredRule.getSlot() == null) {
-						Slot slot = findSlot(actionPred);
+						Slot slot = findSlot(action.getFactName());
 
 						// Adding the rule to the slot
 						slot.addNewRule(coveredRule, false);
 					}
 
 					// If the rule is maximally general, mutate and store it
-					coveredRules_.putContains(actionPred, coveredRule);
+					coveredRules_.putContains(action.getFactName(), coveredRule);
 
 					// Mutate unless already mutated
-					if (!covering_.isPreGoalSettled(actionPred)) {
+					if (!covering_.isPreGoalSettled(action.getFactName())) {
 						mutateRule(coveredRule, coveredRule.getSlot(), true,
 								false);
 					}
@@ -793,11 +792,9 @@ public class PolicyGenerator {
 			for (GuidedRule gr : slot.getGenerator()) {
 				// Check the rule's pre-goal is settled
 				if (covering_.isPreGoalSettled(gr.getActionPredicate())) {
-					List<String> constants = gr.getConstantConditions();
-					for (String fact : constants)
-						constantFacts.add(new ConstantPred(fact));
-					if (constants.size() > 1)
-						constantFacts.add(new ConstantPred(constants));
+					ConstantPred constants = gr.getConstantConditions();
+					if (constants != null)
+						constantFacts.add(constants);
 				}
 			}
 		}
