@@ -69,7 +69,7 @@ public class CoveringTest {
 		assertEquals(rules.size(), 2);
 		for (GuidedRule gr : rules) {
 			System.out.println(gr);
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
@@ -138,7 +138,7 @@ public class CoveringTest {
 		assertEquals(existingRules.sizeTotal(), 2);
 		for (GuidedRule gr : existingRules.values()) {
 			System.out.println(gr);
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
@@ -189,7 +189,7 @@ public class CoveringTest {
 		existingRules.clear();
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				assertTrue(gr.getConditions().contains("(highest d)"));
 				assertFalse(gr.getConditions().contains("(clear d)"));
 				assertTrue(gr.getConditions().contains("(on d b)"));
@@ -246,7 +246,7 @@ public class CoveringTest {
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
 			System.out.println(gr.toString());
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				assertTrue(gr.getConditions().contains("(highest ?X)"));
 				assertFalse(gr.getConditions().contains("(clear ?X)"));
 				assertTrue(gr.getConditions().contains("(on ?X ?)"));
@@ -302,7 +302,7 @@ public class CoveringTest {
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : existingRules.values()) {
 			System.out.println(gr.toString());
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				assertTrue(gr.getConditions().contains("(highest ?X)"));
 				assertFalse(gr.getConditions().contains("(clear ?X)"));
 				assertTrue(gr.getConditions().contains("(on ?X ?)"));
@@ -358,7 +358,7 @@ public class CoveringTest {
 		assertEquals(2, rules.size());
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				assertTrue(gr.getConditions().contains("(highest b)"));
 				assertFalse(gr.getConditions().contains("(clear b)"));
 				assertTrue(gr.getConditions().contains("(on b d)"));
@@ -411,7 +411,7 @@ public class CoveringTest {
 		assertEquals(2, existingRules.sizeTotal());
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
-			if (gr.getAction().contains("moveFloor")) {
+			if (gr.getAction().getFactName().equals("moveFloor")) {
 				assertTrue(gr.getConditions().contains("(highest b)"));
 				assertFalse(gr.getConditions().contains("(clear b)"));
 				assertTrue(gr.getConditions().contains("(on b ?)"));
@@ -552,8 +552,8 @@ public class CoveringTest {
 		state.eval("(assert (clear a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 		ActionChoice ac = new ActionChoice();
-		List<String> actions = new ArrayList<String>();
-		actions.add("(moveFloor a)");
+		List<StringFact> actions = new ArrayList<StringFact>();
+		actions.add(StateSpec.toStringFact("(moveFloor a)"));
 		Policy policy = new Policy();
 		RuleAction ra = new RuleAction(new GuidedRule(
 				"(clear a) => (moveFloor a)"), actions, policy);
@@ -573,7 +573,7 @@ public class CoveringTest {
 		facts = StateSpec.extractFacts(state);
 		ac = new ActionChoice();
 		actions.clear();
-		actions.add("(moveFloor b)");
+		actions.add(StateSpec.toStringFact("(moveFloor b)"));
 		ra = new RuleAction(new GuidedRule("(clear b) => (moveFloor b)"),
 				actions, policy);
 		ra.getTriggerActions();
@@ -605,7 +605,7 @@ public class CoveringTest {
 		facts = StateSpec.extractFacts(state);
 		ac = new ActionChoice();
 		actions.clear();
-		actions.add("(move a b)");
+		actions.add(StateSpec.toStringFact("(move a b)"));
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
 				policy);
@@ -668,7 +668,7 @@ public class CoveringTest {
 		// Generalising the action
 		ac = new ActionChoice();
 		actions.clear();
-		actions.add("(move b a)");
+		actions.add(StateSpec.toStringFact("(move b a)"));
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move b a)"), actions,
 				policy);
@@ -703,596 +703,597 @@ public class CoveringTest {
 		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// No change with constants
 		oldState.clear();
-		oldState.add("(clear a)");
+		oldState.add(StateSpec.toStringFact("(clear a)"));
 		newState.clear();
-		newState.add("(clear a)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		newTerms.clear();
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(clear a)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "a";
+		newTerms = new String[1];
+		newTerms[0] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear a)"));
-		assertTrue(oldTerms.contains("a"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear a)")));
+		assertEquals(oldTerms[0], "a");
 
 		// Basic removal of preds unification
 		oldState.clear();
-		oldState.add("(clear ?X)");
-		oldState.add("(on ?X ?)");
-		oldState.add("(clear ?)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(on ?X ?)"));
+		oldState.add(StateSpec.toStringFact("(clear ?)"));
 		newState.clear();
-		newState.add("(on z x)");
-		newState.add("(highest a)");
-		newState.add("(clear x)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		newTerms.clear();
-		newTerms.add("x");
+		newState.add(StateSpec.toStringFact("(on z x)"));
+		newState.add(StateSpec.toStringFact("(highest a)"));
+		newState.add(StateSpec.toStringFact("(clear x)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		newTerms = new String[1];
+		newTerms[0] = "x";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Simple unification
 		oldState.clear();
-		oldState.add("(clear ?X)");
-		oldState.add("(clear ?Y)");
-		oldState.add("(on ?X ?)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+		oldState.add(StateSpec.toStringFact("(on ?X ?)"));
 		newState.clear();
-		newState.add("(clear y)");
-		newState.add("(clear x)");
-		oldState.add("(on y z)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("x");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(clear y)"));
+		newState.add(StateSpec.toStringFact("(clear x)"));
+		oldState.add(StateSpec.toStringFact("(on y z)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "x";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Absorption
 		oldState.clear();
-		oldState.add("(clear ?X)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
 		newState.clear();
-		newState.add("(clear a)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		newTerms.clear();
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(clear a)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		newTerms = new String[1];
+		newTerms[0] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Generalisation
 		oldState.clear();
-		oldState.add("(clear a)");
+		oldState.add(StateSpec.toStringFact("(clear a)"));
 		newState.clear();
-		newState.add("(clear x)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		newTerms.clear();
-		newTerms.add("x");
+		newState.add(StateSpec.toStringFact("(clear x)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "a";
+		newTerms = new String[1];
+		newTerms[0] = "x";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Mutual generalisation
 		oldState.clear();
-		oldState.add("(clear a)");
+		oldState.add(StateSpec.toStringFact("(clear a)"));
 		newState.clear();
-		newState.add("(clear b)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		newTerms.clear();
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(clear b)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "a";
+		newTerms = new String[1];
+		newTerms[0] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Two terms
 		oldState.clear();
-		oldState.add("(on a b)");
+		oldState.add(StateSpec.toStringFact("(on a b)"));
 		newState.clear();
-		newState.add("(on b a)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("b");
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(on b a)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "b";
+		newTerms[1] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ?X ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Two terms in differing order
 		oldState.clear();
-		oldState.add("(on a b)");
+		oldState.add(StateSpec.toStringFact("(on a b)"));
 		newState.clear();
-		newState.add("(on a b)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("b");
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(on a b)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "b";
+		newTerms[1] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on a b)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on a b)")));
 
 		// Two terms with two aligned preds
 		oldState.clear();
-		oldState.add("(on a b)");
-		oldState.add("(clear a)");
+		oldState.add(StateSpec.toStringFact("(on a b)"));
+		oldState.add(StateSpec.toStringFact("(clear a)"));
 		newState.clear();
-		newState.add("(on b a)");
-		newState.add("(clear b)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("b");
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(on b a)"));
+		newState.add(StateSpec.toStringFact("(clear b)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "b";
+		newTerms[1] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(on ?X ?Y)"));
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Two terms with two misaligned preds
 		oldState.clear();
-		oldState.add("(on a b)");
-		oldState.add("(clear a)");
+		oldState.add(StateSpec.toStringFact("(on a b)"));
+		oldState.add(StateSpec.toStringFact("(clear a)"));
 		newState.clear();
-		newState.add("(on b a)");
-		newState.add("(clear a)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("b");
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(on b a)"));
+		newState.add(StateSpec.toStringFact("(clear a)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "b";
+		newTerms[1] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ?X ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Generalisation to anonymous
 		oldState.clear();
-		oldState.add("(clear ?X)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
 		newState.clear();
-		newState.add("(clear z)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		newTerms.clear();
-		newTerms.add("x");
+		newState.add(StateSpec.toStringFact("(clear z)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		newTerms = new String[1];
+		newTerms[0] = "x";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 
 		// Constant and variable case
 		oldState.clear();
-		oldState.add("(on a ?X)");
+		oldState.add(StateSpec.toStringFact("(on a ?X)"));
 		newState.clear();
-		newState.add("(on b x)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		newTerms.clear();
-		newTerms.add("x");
+		newState.add(StateSpec.toStringFact("(on b x)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		newTerms = new String[1];
+		newTerms[0] = "x";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ? ?X)"));
-		assertTrue(oldTerms.contains("?X"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? ?X)")));
+		assertEquals(oldTerms[0], "?X");
 
 		// Tough case
 		oldState.clear();
-		oldState.add("(on a ?Y)");
+		oldState.add(StateSpec.toStringFact("(on a ?Y)"));
 		newState.clear();
-		newState.add("(on z y)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on z y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ? ?Y)"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? ?Y)")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Tough case 2
 		oldState.clear();
-		oldState.add("(on ?X a)");
+		oldState.add(StateSpec.toStringFact("(on ?X a)"));
 		newState.clear();
-		newState.add("(on z y)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("a");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on z y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "a";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ? ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Tough case 3
 		oldState.clear();
-		oldState.add("(on a ?Y)");
+		oldState.add(StateSpec.toStringFact("(on a ?Y)"));
 		newState.clear();
-		newState.add("(on a z)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on a z)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on a ?)"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on a ?)")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Early generalisation test
 		oldState.clear();
-		oldState.add("(on a ?Y)");
+		oldState.add(StateSpec.toStringFact("(on a ?Y)"));
 		newState.clear();
-		newState.add("(on a z)");
-		newState.add("(on a y)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on a z)"));
+		newState.add(StateSpec.toStringFact("(on a y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on a ?Y)"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on a ?Y)")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?Y");
 
 		oldState.clear();
-		oldState.add("(on a ?Y)");
+		oldState.add(StateSpec.toStringFact("(on a ?Y)"));
 		newState.clear();
-		newState.add("(on x y)");
-		newState.add("(on a y)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("x");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on x y)"));
+		newState.add(StateSpec.toStringFact("(on a y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "x";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(on ?X ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Using the same fact for unification
 		oldState.clear();
-		oldState.add("(on a ?Y)");
-		oldState.add("(on ?X ?Y)");
+		oldState.add(StateSpec.toStringFact("(on a ?Y)"));
+		oldState.add(StateSpec.toStringFact("(on ?X ?Y)"));
 		newState.clear();
-		newState.add("(on x y)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("x");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on x y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "x";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(on ? ?Y)"));
-		assertTrue(oldState.contains("(on ?X ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? ?Y)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Left with constant predicate
 		oldState.clear();
-		oldState.add("(on ?X b)");
-		oldState.add("(clear ?X)");
-		oldState.add("(clear ?Y)");
+		oldState.add(StateSpec.toStringFact("(on ?X b)"));
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
 		newState.clear();
-		newState.add("(on y b)");
-		newState.add("(clear x)");
-		newState.add("(clear y)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("x");
-		newTerms.add("y");
+		newState.add(StateSpec.toStringFact("(on y b)"));
+		newState.add(StateSpec.toStringFact("(clear x)"));
+		newState.add(StateSpec.toStringFact("(clear y)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "x";
+		newTerms[1] = "y";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(3, oldState.size());
-		assertTrue(oldState.contains("(on ? b)"));
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?Y"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? b)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?Y");
 
 		// Un-unifiable
 		oldState.clear();
-		oldState.add("(clear ?X)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
 		newState.clear();
-		newState.add("(on a b)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		newTerms.clear();
-		newTerms.add("a");
+		newState.add(StateSpec.toStringFact("(on a b)"));
+		oldTerms = new String[1];
+		oldTerms[0] = "?X";
+		newTerms = new String[1];
+		newTerms[0] = "a";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 
 		// Interesting case
 		oldState.clear();
-		oldState.add("(on a c)");
-		oldState.add("(on c ?)");
-		oldState.add("(on ?X d)");
-		oldState.add("(onFloor e)");
-		oldState.add("(onFloor d)");
-		oldState.add("(clear a)");
-		oldState.add("(clear ?X)");
-		oldState.add("(highest a)");
+		oldState.add(StateSpec.toStringFact("(on a c)"));
+		oldState.add(StateSpec.toStringFact("(on c ?)"));
+		oldState.add(StateSpec.toStringFact("(on ?X d)"));
+		oldState.add(StateSpec.toStringFact("(onFloor e)"));
+		oldState.add(StateSpec.toStringFact("(onFloor d)"));
+		oldState.add(StateSpec.toStringFact("(clear a)"));
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(highest a)"));
 		newState.clear();
-		newState.add("(on b c)");
-		newState.add("(on c f)");
-		newState.add("(on a e)");
-		newState.add("(onFloor d)");
-		newState.add("(onFloor f)");
-		newState.add("(onFloor e)");
-		newState.add("(clear d)");
-		newState.add("(clear b)");
-		newState.add("(clear a)");
-		newState.add("(highest b)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("a");
-		newTerms.clear();
-		newTerms.add("d");
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(on b c)"));
+		newState.add(StateSpec.toStringFact("(on c f)"));
+		newState.add(StateSpec.toStringFact("(on a e)"));
+		newState.add(StateSpec.toStringFact("(onFloor d)"));
+		newState.add(StateSpec.toStringFact("(onFloor f)"));
+		newState.add(StateSpec.toStringFact("(onFloor e)"));
+		newState.add(StateSpec.toStringFact("(clear d)"));
+		newState.add(StateSpec.toStringFact("(clear b)"));
+		newState.add(StateSpec.toStringFact("(clear a)"));
+		newState.add(StateSpec.toStringFact("(highest b)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "a";
+		newTerms = new String[2];
+		newTerms[0] = "d";
+		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(6, oldState.size());
-		assertTrue(oldState.contains("(on ?Y c)"));
-		assertTrue(oldState.contains("(on c ?)"));
-		assertTrue(oldState.contains("(onFloor e)"));
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
-		assertTrue(oldState.contains("(highest ?Y)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?Y c)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(onFloor e)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(highest ?Y)")));
 
 		// Action precedence
 		oldState.clear();
-		oldState.add("(on a c)");
-		oldState.add("(on c ?)");
-		oldState.add("(on b ?)");
+		oldState.add(StateSpec.toStringFact("(on a c)"));
+		oldState.add(StateSpec.toStringFact("(on c ?)"));
+		oldState.add(StateSpec.toStringFact("(on b ?)"));
 		newState.clear();
-		newState.add("(on b c)");
-		newState.add("(on c f)");
-		newState.add("(on a e)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(on b c)"));
+		newState.add(StateSpec.toStringFact("(on c f)"));
+		newState.add(StateSpec.toStringFact("(on a e)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(4, oldState.size());
-		assertTrue(oldState.contains("(on a ?)"));
-		assertTrue(oldState.contains("(on ? c)"));
-		assertTrue(oldState.contains("(on c ?)"));
-		assertTrue(oldState.contains("(on b ?)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on a ?)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? c)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on b ?)")));
 
 		// Double unification
 		oldState.clear();
-		oldState.add("(on c e)");
-		oldState.add("(on f g)");
+		oldState.add(StateSpec.toStringFact("(on c e)"));
+		oldState.add(StateSpec.toStringFact("(on f g)"));
 		newState.clear();
-		newState.add("(on c g)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(on c g)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(on c ?)"));
-		assertTrue(oldState.contains("(on ? g)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? g)")));
 
 		// Double unification
 		oldState.clear();
-		oldState.add("(on c g)");
+		oldState.add(StateSpec.toStringFact("(on c g)"));
 		newState.clear();
-		newState.add("(on c e)");
-		newState.add("(on f g)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("b");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(on c e)"));
+		newState.add(StateSpec.toStringFact("(on f g)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "b";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(on c ?)"));
-		assertTrue(oldState.contains("(on ? g)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? g)")));
 
 		// Unifying with an inequality test present
 		oldState.clear();
-		oldState.add("(clear ?X)");
-		oldState.add("(clear ?Y)");
-		oldState.add("(test (<> ?X ?Y))");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+		oldState.add(StateSpec.toStringFact("(test (<> ?X ?Y))"));
 		newState.clear();
-		newState.add("(clear a)");
-		newState.add("(clear b)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("?Y");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("b");
+		newState.add(StateSpec.toStringFact("(clear a)"));
+		newState.add(StateSpec.toStringFact("(clear b)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 	}
 
 	@Test
 	public void testTermlessUnifyStates() {
 		// Basic unification
-		List<String> oldState = new ArrayList<String>();
-		oldState.add("(clear ?X)");
-		List<String> newState = new ArrayList<String>();
-		newState.add("(clear ?X)");
+		List<StringFact> oldState = new ArrayList<StringFact>();
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		List<StringFact> newState = new ArrayList<StringFact>();
+		newState.add(StateSpec.toStringFact("(clear ?X)"));
 		BidiMap replacementMap = new DualHashBidiMap();
 		int result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?X"));
 		assertEquals(replacementMap.get("?X"), "?X");
 
 		// Negation unification
 		oldState.clear();
-		oldState.add("(not (clear ?X))");
+		oldState.add(StateSpec.toStringFact("(not (clear ?X))"));
 		newState.clear();
-		newState.add("(not (clear ?X))");
+		newState.add(StateSpec.toStringFact("(not (clear ?X))"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(not (clear ?X))"));
+		assertTrue(oldState
+				.contains(StateSpec.toStringFact("(not (clear ?X))")));
 		assertTrue(replacementMap.containsKey("?X"));
 		assertEquals(replacementMap.get("?X"), "?X");
 
 		// Substitution unification
 		oldState.clear();
-		oldState.add("(clear ?X)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
 		newState.clear();
-		newState.add("(clear ?Y)");
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
 		// More complex substitution unification
 		oldState.clear();
-		oldState.add("(clear ?X)");
-		oldState.add("(highest ?X)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(highest ?X)"));
 		newState.clear();
-		newState.add("(clear ?Y)");
-		newState.add("(highest ?Y)");
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
+		newState.add(StateSpec.toStringFact("(highest ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
-		assertTrue(oldState.contains("(highest ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
 		// Tricky complex substitution unification (could be either case)
 		oldState.clear();
-		oldState.add("(clear ?X)");
-		oldState.add("(highest ?Y)");
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(highest ?Y)"));
 		newState.clear();
-		newState.add("(clear ?Y)");
-		newState.add("(highest ?Y)");
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
+		newState.add(StateSpec.toStringFact("(highest ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(clear ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
 		// Unifying with a negated condition
 		oldState.clear();
-		oldState.add("(block ?X)");
-		oldState.add("(clear ?X)");
-		oldState.add("(not (clear ?Y))");
+		oldState.add(StateSpec.toStringFact("(block ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(not (clear ?Y))"));
 		newState.clear();
-		newState.add("(block ?X)");
-		newState.add("(not (clear ?X))");
-		newState.add("(clear ?Y)");
+		newState.add(StateSpec.toStringFact("(block ?X)"));
+		newState.add(StateSpec.toStringFact("(not (clear ?X))"));
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(block ?X)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(block ?X)")));
 
 		oldState.clear();
-		oldState.add("(block ?X)");
-		oldState.add("(clear ?Y)");
-		oldState.add("(not (highest ?X))");
+		oldState.add(StateSpec.toStringFact("(block ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+		oldState.add(StateSpec.toStringFact("(not (highest ?X))"));
 		newState.clear();
-		newState.add("(block ?X)");
-		newState.add("(not (clear ?X))");
-		newState.add("(clear ?Y)");
+		newState.add(StateSpec.toStringFact("(block ?X)"));
+		newState.add(StateSpec.toStringFact("(not (clear ?X))"));
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(block ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(block ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 
 		oldState.clear();
-		oldState.add("(block ?X)");
-		oldState.add("(clear ?Y)");
-		oldState.add("(not (on ?X ?Y))");
+		oldState.add(StateSpec.toStringFact("(block ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+		oldState.add(StateSpec.toStringFact("(not (on ?X ?Y))"));
 		newState.clear();
-		newState.add("(block ?X)");
-		newState.add("(not (clear ?X))");
-		newState.add("(clear ?Y)");
+		newState.add(StateSpec.toStringFact("(block ?X)"));
+		newState.add(StateSpec.toStringFact("(not (clear ?X))"));
+		newState.add(StateSpec.toStringFact("(clear ?Y)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains("(block ?X)"));
-		assertTrue(oldState.contains("(clear ?Y)"));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(block ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 	}
 
 	/**
@@ -1301,35 +1302,35 @@ public class CoveringTest {
 	@Test
 	public void testNumericalUnifyStates() {
 		// No change unification
-		List<String> oldState = new ArrayList<String>();
-		oldState.add("(distance a b 1)");
-		List<String> newState = new ArrayList<String>();
-		newState.add("(distance a b 1)");
-		List<String> oldTerms = new ArrayList<String>();
-		oldTerms.add("a");
-		oldTerms.add("1");
-		List<String> newTerms = new ArrayList<String>();
-		newTerms.add("a");
-		newTerms.add("1");
+		List<StringFact> oldState = new ArrayList<StringFact>();
+		oldState.add(StateSpec.toStringFact("(distance a b 1)"));
+		List<StringFact> newState = new ArrayList<StringFact>();
+		newState.add(StateSpec.toStringFact("(distance a b 1)"));
+		String[] oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		String[] newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "1";
 		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains("(distance a b 1)"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("1"));
-		assertEquals(2, oldTerms.size());
+		assertTrue(oldState
+				.contains(StateSpec.toStringFact("(distance a b 1)")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "1");
 
 		// Range addition
 		oldState.clear();
-		oldState.add("(distance a b 1)");
+		oldState.add(StateSpec.toStringFact("(distance a b 1)"));
 		newState.clear();
-		newState.add("(distance a b 2)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("1");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("2");
+		newState.add(StateSpec.toStringFact("(distance a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1338,22 +1339,20 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Range addition (reversed)
 		oldState.clear();
-		oldState.add("(distance a b 2)");
+		oldState.add(StateSpec.toStringFact("(distance a b 2)"));
 		newState.clear();
-		newState.add("(distance a b 1)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("2");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("1");
+		newState.add(StateSpec.toStringFact("(distance a b 1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "2";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "1";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1362,22 +1361,20 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Negative range addition
 		oldState.clear();
-		oldState.add("(distance a b -1)");
+		oldState.add(StateSpec.toStringFact("(distance a b -1)"));
 		newState.clear();
-		newState.add("(distance a b 2)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("-1");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("2");
+		newState.add(StateSpec.toStringFact("(distance a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1386,22 +1383,20 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Tiny value range addition
 		oldState.clear();
-		oldState.add("(distance a b -1)");
+		oldState.add(StateSpec.toStringFact("(distance a b -1)"));
 		newState.clear();
-		newState.add("(distance a b 2.567483E-64)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("-1");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("2.567483E-64");
+		newState.add(StateSpec.toStringFact("(distance a b 2.567483E-64)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2.567483E-64";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1411,22 +1406,20 @@ public class CoveringTest {
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index
 				+ " -1.0 2.567483E-64))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Regular variable unification with numerical values too
 		oldState.clear();
-		oldState.add("(distance x y -1)");
+		oldState.add(StateSpec.toStringFact("(distance x y -1)"));
 		newState.clear();
-		newState.add("(distance a b 2)");
-		oldTerms.clear();
-		oldTerms.add("x");
-		oldTerms.add("-1");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("2");
+		newState.add(StateSpec.toStringFact("(distance a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "x";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1435,24 +1428,23 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Unification under an existing range term
 		oldState.clear();
-		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
-				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
+		oldState.add(StateSpec.toStringFact("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
-		newState.add("(distance a b 2)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?" + Covering.RANGE_VARIABLE_PREFIX + "0");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("2");
+		newState.add(StateSpec.toStringFact("(distance a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
@@ -1460,24 +1452,23 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms
-				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 
 		// Unification under an existing range term (extension)
 		oldState.clear();
-		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
-				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
+		oldState.add(StateSpec.toStringFact("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
-		newState.add("(distance a b -2)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?" + Covering.RANGE_VARIABLE_PREFIX + "0");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("-2");
+		newState.add(StateSpec.toStringFact("(distance a b -2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
@@ -1485,24 +1476,22 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms
-				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 
 		// Multiple numerical terms
 		oldState.clear();
-		oldState.add("(distance a b 1)");
-		oldState.add("(level a 1)");
+		oldState.add(StateSpec.toStringFact("(distance a b 1)"));
+		oldState.add(StateSpec.toStringFact("(level a 1)"));
 		newState.clear();
-		newState.add("(distance a b -2)");
-		newState.add("(level a 3)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("1");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("-2");
+		newState.add(StateSpec.toStringFact("(distance a b -2)"));
+		newState.add(StateSpec.toStringFact("(level a 3)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
@@ -1511,10 +1500,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " -2.0 1.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 		index++;
 		assertTrue(oldState.contains("(level a ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
@@ -1523,19 +1510,20 @@ public class CoveringTest {
 
 		// Multiple numerical terms with existing range term
 		oldState.clear();
-		oldState.add("(distance a b ?" + Covering.RANGE_VARIABLE_PREFIX
-				+ "0&:(" + StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))");
-		oldState.add("(level a 1)");
+		oldState.add(StateSpec.toStringFact("(distance a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+		oldState.add(StateSpec.toStringFact("(level a 1)"));
 		newState.clear();
-		newState.add("(distance a b -2)");
-		newState.add("(level a 3)");
-		oldTerms.clear();
-		oldTerms.add("a");
-		oldTerms.add("?" + Covering.RANGE_VARIABLE_PREFIX + "0");
-		newTerms.clear();
-		newTerms.add("a");
-		newTerms.add("-2");
+		newState.add(StateSpec.toStringFact("(distance a b -2)"));
+		newState.add(StateSpec.toStringFact("(level a 3)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
@@ -1543,10 +1531,8 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))"));
-		assertTrue(oldTerms.contains("a"));
-		assertTrue(oldTerms
-				.contains("?" + Covering.RANGE_VARIABLE_PREFIX + "0"));
-		assertEquals(2, oldTerms.size());
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 		index++;
 		assertTrue(oldState.contains("(level a ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
@@ -1555,19 +1541,19 @@ public class CoveringTest {
 
 		// Variables and numerical unification (differing distance)
 		oldState.clear();
-		oldState.add("(distanceDot ? ?X 1)");
-		oldState.add("(dot ?X)");
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
 		newState.clear();
-		newState.add("(distanceGhost player blinky 2)");
-		newState.add("(ghost blinky)");
-		newState.add("(distanceDot player dot_1 5)");
-		newState.add("(dot dot_1)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("1");
-		newTerms.clear();
-		newTerms.add("dot_1");
-		newTerms.add("5");
+		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 2)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
@@ -1576,27 +1562,26 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
-		assertTrue(oldState.contains("(dot ?X)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (out-of-range distance)
 		oldState.clear();
-		oldState.add("(distanceDot ? ?X 1)");
-		oldState.add("(dot ?X)");
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
 		newState.clear();
-		newState.add("(distanceGhost player blinky 10)");
-		newState.add("(ghost blinky)");
-		newState.add("(distanceDot player dot_1 5)");
-		newState.add("(dot dot_1)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("1");
-		newTerms.clear();
-		newTerms.add("dot_1");
-		newTerms.add("5");
+		newState
+				.add(StateSpec.toStringFact("(distanceGhost player blinky 10)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
@@ -1605,27 +1590,25 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
-		assertTrue(oldState.contains("(dot ?X)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (same distance)
 		oldState.clear();
-		oldState.add("(distanceDot ? ?X 1)");
-		oldState.add("(dot ?X)");
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
 		newState.clear();
-		newState.add("(distanceGhost player blinky 1)");
-		newState.add("(ghost blinky)");
-		newState.add("(distanceDot player dot_1 5)");
-		newState.add("(dot dot_1)");
-		oldTerms.clear();
-		oldTerms.add("?X");
-		oldTerms.add("1");
-		newTerms.clear();
-		newTerms.add("dot_1");
-		newTerms.add("5");
+		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 1)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
@@ -1634,11 +1617,9 @@ public class CoveringTest {
 				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))"));
-		assertTrue(oldState.contains("(dot ?X)"));
-		assertTrue(oldTerms.contains("?X"));
-		assertTrue(oldTerms.contains("?" + Covering.RANGE_VARIABLE_PREFIX
-				+ index));
-		assertEquals(2, oldTerms.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 	}
 
 	/**
@@ -2006,17 +1987,17 @@ public class CoveringTest {
 	@Test
 	public void testSimplifyRule() {
 		// Simple no-effect test
-		SortedSet<String> ruleConds = new TreeSet<String>(ConditionComparator
-				.getInstance());
-		ruleConds.add("(clear a)");
-		SortedSet<String> results = sut_.simplifyRule(ruleConds, null, null,
-				false);
+		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+				ConditionComparator.getInstance());
+		ruleConds.add(StateSpec.toStringFact("(clear a)"));
+		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+				null, false);
 		assertNull(results);
 
 		// Condition removal
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		ruleConds.add("(above ?X ?)");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
@@ -2024,14 +2005,16 @@ public class CoveringTest {
 
 		// Using an added condition (null result)
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(above ?X ?)", null, false);
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(above ?X ?)"), null, false);
 		assertNull(results);
 
 		// Using an added condition (no simplification)
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(clear ?X)", null, false);
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(clear ?X)"), null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
 		assertTrue(results.contains("(clear ?X)"));
@@ -2039,23 +2022,24 @@ public class CoveringTest {
 
 		// Using an added condition (swapped result)
 		ruleConds.clear();
-		ruleConds.add("(above ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(on ?X ?)", null, false);
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(on ?X ?)"), null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
 		assertEquals(results.size(), 1);
 
 		// Testing double-negated condition
 		ruleConds.clear();
-		ruleConds.add("(above ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(not (above ?X ?))", null,
-				false);
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(not (above ?X ?))"), null, false);
 		assertNull(results);
 
 		// Testing illegal condition
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		ruleConds.add("(not (above ?X ?))");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		ruleConds.add(StateSpec.toStringFact("(not (above ?X ?))"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNull(results);
 		results = sut_.simplifyRule(ruleConds, null, null, true);
@@ -2065,41 +2049,44 @@ public class CoveringTest {
 
 		// Testing same condition
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(on ?X ?)", null, false);
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(on ?X ?)"), null, false);
 		assertNull(results);
 
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(not (on ?X ?))", "(on ?X ?)",
-				false);
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(not (on ?X ?))"), StateSpec
+				.toStringFact("(on ?X ?)"), false);
 		assertNull(results);
 
 		// Testing unification
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		results = sut_.simplifyRule(ruleConds, "(on ?X ?Y)", null, false);
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toStringFact("(on ?X ?Y)"), null, false);
 		assertNull(results);
 
 		// Testing non-unification
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		ruleConds.add("(above ?X a)");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?X a)"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNull(results);
 
 		// Testing equivalent conditions (prefer left side of equation to right)
 		ruleConds.clear();
-		ruleConds.add("(not (on ?X ?))");
-		ruleConds.add("(onFloor ?X)");
+		ruleConds.add(StateSpec.toStringFact("(not (on ?X ?))"));
+		ruleConds.add(StateSpec.toStringFact("(onFloor ?X)"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(onFloor ?X)"));
 		assertEquals(results.size(), 1);
 
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		ruleConds.add("(not (onFloor ?X))");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		ruleConds.add(StateSpec.toStringFact("(not (onFloor ?X))"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
@@ -2107,14 +2094,14 @@ public class CoveringTest {
 
 		// Testing swapped for left equivalent conditions
 		ruleConds.clear();
-		ruleConds.add("(not (on ?X ?))");
+		ruleConds.add(StateSpec.toStringFact("(not (on ?X ?))"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(onFloor ?X)"));
 		assertEquals(results.size(), 1);
 
 		ruleConds.clear();
-		ruleConds.add("(not (onFloor ?X))");
+		ruleConds.add(StateSpec.toStringFact("(not (onFloor ?X))"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?)"));
@@ -2122,16 +2109,16 @@ public class CoveringTest {
 
 		// Testing unification of background knowledge
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?Y)");
-		ruleConds.add("(above ?X ?)");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?Y)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains("(on ?X ?Y)"));
 		assertEquals(results.size(), 1);
 
 		ruleConds.clear();
-		ruleConds.add("(on ?X ?)");
-		ruleConds.add("(above ?X ?Y)");
+		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?Y)"));
 		results = sut_.simplifyRule(ruleConds, null, null, false);
 		assertNull(results);
 	}
