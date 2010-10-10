@@ -1,6 +1,7 @@
 package relationalFramework.agentObservations;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -105,7 +106,7 @@ public class AgentObservations {
 		// Note down action conditions if still unsettled.
 		observationHash_ = null;
 		updateHash();
-		
+
 		Collection<StringFact> actionFacts = new HashSet<StringFact>();
 		for (String argument : action.getArguments()) {
 			List<StringFact> termFacts = termMappedFacts_.get(argument);
@@ -116,12 +117,13 @@ public class AgentObservations {
 				}
 			}
 		}
-		
+
 		return actionFacts;
 	}
 
 	/**
 	 * Updates the observation hash code.
+	 * // TODO Make this only called from the mutation stage, so it is only updated once per iteration. 
 	 */
 	private void updateHash() {
 		if (observationHash_ == null) {
@@ -141,81 +143,41 @@ public class AgentObservations {
 		return learnedEnvironmentRules_;
 	}
 
-	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actionChoice, List<String> constants) {
-		for (RuleAction ruleAction : actionChoice.getActions()) {
-			String actionPred = ruleAction.getRule().getActionPredicate();
-			// If the state isn't yet settled, try unification
-			if (!actionBasedObservations_.get(actionPred).getPGI().isSettled()) {
-				List<String> actions = ruleAction.getUtilisedActions();
+	public PreGoalInformation getPreGoal(String actionPred) {
+		if (!actionBasedObservations_.containsKey(actionPred))
+			return null;
+		return actionBasedObservations_.get(actionPred).getPGI();
+	}
 
-				// Create a pre-goal from every action in the actions list.
-				if (actions != null) {
-					for (String action : actions) {
-						// Inversely substitute the old pregoal state
-						String[] actionSplit = StateSpec.splitFact(action);
-						String[] actionTerms = new String[actionSplit.length - 1];
-						System.arraycopy(actionSplit, 1, actionTerms, 0,
-								actionTerms.length);
+	public void setPreGoal(String actionPred, PreGoalInformation preGoal) {
+		getActionBasedObservation(actionPred).setPGI(preGoal);
+		observationHash_ = null;
+		updateHash();
+	}
 
-						// The actions become constants if possible
-						List<String> newConstants = new ArrayList<String>(
-								constants);
-						List<String> newStateTerms = new ArrayList<String>();
-						for (String actionTerm : actionTerms) {
-							newStateTerms.add(actionTerm);
-							// Ignore numerical terms and terms already added
-							if (!newConstants.contains(actionTerm))
-								newConstants.add(actionTerm);
-						}
-						Collection<String> preGoalStringState = inverselySubstitute(
-								preGoalState, actionSplit, newConstants);
-						removeUselessFacts(preGoalStringState);
+	/**
+	 * Clears the observation hash for the agent observations so the hash code must be updated again.
+	 */
+	public void clearHash() {
+		observationHash_ = null;
+		updateHash();
+	}
 
-						// Unify with the old state
-						PreGoalInformation preGoal = preGoals_
-								.get(actionSplit[0]);
-						if (preGoal == null) {
-							preGoals_.put(actionSplit[0],
-									new PreGoalInformation(
-											(List<String>) preGoalStringState,
-											newStateTerms));
-							calculateMutationHash(actionSplit[0]);
-						} else {
-							// Unify the two states and check if it has changed
-							// at all.
-							int result = unifyStates(preGoal.getState(),
-									preGoalStringState, preGoal
-											.getActionTerms(), newStateTerms);
-
-							// If the states unified, reset the counter,
-							// otherwise increment.
-							if (result == 1) {
-								preGoal.resetInactivity();
-								calculateMutationHash(actionSplit[0]);
-							} else if (result == 0) {
-								if (!formedActions.contains(actionPred))
-									preGoal.incrementInactivity();
-							} else if (result == -1) {
-								throw new RuntimeException(
-										"Pre-goal states did not unify: "
-												+ preGoal + ", "
-												+ preGoalStringState);
-							}
-
-							formedActions.add(actionPred);
-						}
-					}
-				}
-			}
+	/**
+	 * Gets/Initialises the action based observation for the action given.
+	 * 
+	 * @param actionPred
+	 *            The action predicate.
+	 * @return The ActionBasedObservation object assigned to the action or a new
+	 *         one.
+	 */
+	private ActionBasedObservations getActionBasedObservation(String actionPred) {
+		ActionBasedObservations abo = actionBasedObservations_.get(actionPred);
+		if (abo == null) {
+			abo = new ActionBasedObservations();
+			actionBasedObservations_.put(actionPred, abo);
 		}
-		
-		Collection<String> settled = new ArrayList<String>();
-		for (String preGoalAction : preGoals_.keySet()) {
-			if (isPreGoalSettled(preGoalAction))
-				settled.add(preGoalAction);
-		}
-		return settled;
+		return abo;
 	}
 
 	/**
@@ -241,6 +203,10 @@ public class AgentObservations {
 
 		public PreGoalInformation getPGI() {
 			return pgi_;
+		}
+
+		public void setPGI(PreGoalInformation preGoal) {
+			pgi_ = preGoal;
 		}
 	}
 }

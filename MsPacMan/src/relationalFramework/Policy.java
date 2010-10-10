@@ -325,7 +325,7 @@ public class Policy {
 
 				// If there is at least one result
 				if (results.next()) {
-					List<String> actionsList = new ArrayList<String>();
+					List<StringFact> actionsList = new ArrayList<StringFact>();
 
 					// For each possible replacement
 					do {

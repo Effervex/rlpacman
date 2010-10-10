@@ -14,7 +14,7 @@ public class RuleAction {
 	private GuidedRule rule_;
 
 	/** The actions spawned by the rule. */
-	private List<String> actions_;
+	private List<StringFact> actions_;
 
 	/** The policy that created this rule action. */
 	private Policy policy_;
@@ -25,9 +25,9 @@ public class RuleAction {
 	 */
 	private boolean utilised_;
 
-	public RuleAction(GuidedRule rule, List<String> actions, Policy policy) {
+	public RuleAction(GuidedRule rule, List<StringFact> actionsList, Policy policy) {
 		rule_ = rule;
-		actions_ = actions;
+		actions_ = actionsList;
 		policy_ = policy;
 	}
 
@@ -39,13 +39,8 @@ public class RuleAction {
 	 */
 	public void replaceTerms(Map<String, String> replacements) {
 		// For each action
-		for (int i = 0; i < actions_.size(); i++) {
-			String action = actions_.get(i);
-			for (String constant : replacements.keySet()) {
-				action = action.replaceAll(" " + Pattern.quote(constant)
-						+ "(?=( |\\)))", " " + replacements.get(constant));
-			}
-			actions_.set(i, action);
+		for (StringFact action : actions_) {
+			action.replaceArguments(replacements);
 		}
 	}
 
@@ -69,7 +64,7 @@ public class RuleAction {
 	 * @return The actions for this rule action and also triggers the action in
 	 *         the policy.
 	 */
-	public List<String> getTriggerActions() {
+	public List<StringFact> getTriggerActions() {
 		// Trigger the action rule and return actions
 		if (!isEmpty()) {
 			policy_.addTriggeredRule(rule_);
@@ -83,7 +78,7 @@ public class RuleAction {
 	 * 
 	 * @return The rule's actions if this was utilised otherwise null.
 	 */
-	public List<String> getUtilisedActions() {
+	public List<StringFact> getUtilisedActions() {
 		if (utilised_)
 			return actions_;
 		return null;

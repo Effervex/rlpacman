@@ -1,6 +1,9 @@
 package relationalFramework.agentObservations;
 
-import java.util.List;
+import java.util.Arrays;
+import java.util.Collection;
+
+import relationalFramework.StringFact;
 
 /**
  * A basic object for holding pre-goal state information for an action.
@@ -8,12 +11,13 @@ import java.util.List;
  * @author Samuel J. Sarjant
  */
 public class PreGoalInformation {
-	private List<String> state_;
-	private List<String> actionTerms_;
+	private Collection<StringFact> state_;
+	private String[] actionTerms_;
 	private int inactivity_ = 0;
 
-	public PreGoalInformation(List<String> state, List<String> actionTerms) {
+	public PreGoalInformation(Collection<StringFact> state, String[] actionTerms) {
 		state_ = state;
+		// TODO May need to remove numerical arguments
 		actionTerms_ = actionTerms;
 	}
 
@@ -38,11 +42,11 @@ public class PreGoalInformation {
 		return false;
 	}
 
-	public List<String> getState() {
+	public Collection<StringFact> getState() {
 		return state_;
 	}
 
-	public List<String> getActionTerms() {
+	public String[] getActionTerms() {
 		return actionTerms_;
 	}
 
@@ -51,21 +55,24 @@ public class PreGoalInformation {
 		return state_.toString() + " : " + actionTerms_.toString();
 	}
 
+	/* (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		int actionResult = 0;
-		for (String condition : actionTerms_)
-			actionResult += condition.hashCode();
-		result = prime * result + actionResult;
-		int stateResult = 0;
-		for (String condition : state_)
-			stateResult += condition.hashCode();
-		result = prime * result + stateResult;
+		result = prime * result + Arrays.hashCode(actionTerms_);
+		int subresult = 1;
+		for (StringFact fact : state_)
+			subresult = prime * subresult + fact.hashCode();
+		result = prime * subresult;
 		return result;
 	}
 
+	/* (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -75,12 +82,7 @@ public class PreGoalInformation {
 		if (getClass() != obj.getClass())
 			return false;
 		PreGoalInformation other = (PreGoalInformation) obj;
-		if (actionTerms_ == null) {
-			if (other.actionTerms_ != null)
-				return false;
-		} else if (!actionTerms_.containsAll(other.actionTerms_))
-			return false;
-		else if (!other.actionTerms_.containsAll(actionTerms_))
+		if (!Arrays.equals(actionTerms_, other.actionTerms_))
 			return false;
 		if (state_ == null) {
 			if (other.state_ != null)
