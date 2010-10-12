@@ -33,6 +33,7 @@ public class Dot extends Thing {
 		return value_;
 	}
 	
+	@Override
 	public String getObjectName() {
 		return "dot";
 	}

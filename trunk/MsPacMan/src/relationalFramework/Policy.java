@@ -352,7 +352,7 @@ public class Policy {
 
 						// Use the found action set as a result.
 						if (canAddRule(gr, actionsFound, actionsReturned))
-							actionsList.add(action.toString());
+							actionsList.add(action);
 					} while (results.next());
 
 					// Trim down the action list as it may contain too many

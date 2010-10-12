@@ -528,9 +528,25 @@ public abstract class StateSpec {
 		String[] condSplit = StateSpec.splitFact(fact);
 		int offset = 1;
 		boolean negated = false;
+		// Negated case
 		if (condSplit[0].equals("not")) {
 			offset = 2;
 			negated = true;
+		}
+		// Test case
+		if (condSplit[0].equals("test")) {
+			StringBuffer testedGroup = new StringBuffer("(");
+			boolean first = true;
+			for (int i = 1; i < condSplit.length; i++) {
+				if (!first)
+					testedGroup.append(" ");
+				testedGroup.append(condSplit[i]);
+				first = false;
+			}
+			testedGroup.append(")");
+			condSplit = new String[2];
+			condSplit[0] = "test";
+			condSplit[1] = testedGroup.toString();
 		}
 		String[] arguments = new String[condSplit.length - offset];
 		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
@@ -576,6 +592,20 @@ public abstract class StateSpec {
 		}
 
 		return facts;
+	}
+
+	/**
+	 * Basic method which checks if an array contains a string.
+	 * 
+	 * @param array The array to search.
+	 * @param str The string to search for.
+	 * @return True if the string is in the array, false otherwise.
+	 */
+	public static boolean arrayContains(String[] array, String str) {
+		for (String arg : array)
+			if (arg.equals(str))
+				return true;
+		return false;
 	}
 
 	/**

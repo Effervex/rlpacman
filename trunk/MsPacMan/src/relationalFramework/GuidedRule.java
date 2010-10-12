@@ -1,9 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -104,7 +102,7 @@ public class GuidedRule {
 			ruleConditions_.addAll(conditions);
 		} else
 			ruleConditions_ = (SortedSet<StringFact>) conditions;
-		ruleAction_ = action;
+		ruleAction_ = new StringFact(action);
 		mutant_ = mutant;
 		slot_ = null;
 		findConstants();
@@ -204,7 +202,8 @@ public class GuidedRule {
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(conditionString);
 		while (m.find()) {
-			conds.add(StateSpec.toStringFact(m.group()));
+			StringFact cond = StateSpec.toStringFact(m.group());
+			conds.add(cond);
 		}
 		return conds;
 	}

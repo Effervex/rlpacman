@@ -1,12 +1,6 @@
 package hanoi;
 
-import java.awt.Point;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Random;
 import java.util.Stack;
 
 import jess.Rete;
@@ -17,13 +11,13 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 /**
  * The environment for the blocks world interface.
@@ -131,8 +125,8 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		List<String> actions = ruleAction.getTriggerActions();
-		String action = actions.get(PolicyGenerator.random_.nextInt(actions
+		List<StringFact> actions = ruleAction.getTriggerActions();
+		StringFact action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 
 		HanoiState newState = actOnAction(action, state_);
@@ -244,18 +238,18 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private HanoiState actOnAction(String action, HanoiState worldState) {
+	private HanoiState actOnAction(StringFact action, HanoiState worldState) {
 		if (action == null)
 			return worldState;
 
-		String[] split = StateSpec.splitFact(action);
+		String[] arguments = action.getArguments();
 
 		HanoiState newState = worldState.clone();
 
 		// Convert the blocks to indices
 		Stack<Character>[] stateStacks = newState.getState();
-		int fromIndex = Integer.parseInt(split[2].charAt(1) + "");
-		int toIndex = Integer.parseInt(split[4].charAt(1) + "");
+		int fromIndex = Integer.parseInt(arguments[1].charAt(1) + "");
+		int toIndex = Integer.parseInt(arguments[3].charAt(1) + "");
 		Character from = stateStacks[fromIndex].pop();
 		String to = null;
 		if (!stateStacks[toIndex].isEmpty())
@@ -264,8 +258,8 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			to = TOWER_BASE_PREFIX;
 
 		// Check the elements add up
-		if ((split[1].charAt(0) == from.charValue())
-				&& (split[3].substring(0, to.length()).equals(to)))
+		if ((arguments[0].charAt(0) == from.charValue())
+				&& (arguments[2].substring(0, to.length()).equals(to)))
 			stateStacks[toIndex].push(from);
 		else
 			System.err
@@ -346,6 +340,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			return tileState_;
 		}
 
+		@Override
 		public HanoiState clone() {
 			HanoiState clone = new HanoiState();
 			for (int i = 0; i < tileState_.length; i++) {

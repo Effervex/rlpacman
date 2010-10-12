@@ -13,8 +13,6 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
-import quicktime.std.clocks.ExtremesCallBack;
-import relationalFramework.Covering;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.ConditionBeliefs;

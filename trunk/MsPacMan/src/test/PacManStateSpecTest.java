@@ -31,15 +31,18 @@ public class PacManStateSpecTest {
 		// 2 assertions in the body: clear, and block
 		assertEquals(rule.getConditions().size(), 4);
 		assertTrue(rule.getConditions().contains(
-				"(distanceGhost ?Player ?Ghost 4)"));
-		assertTrue(rule.getConditions().contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
-		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
+				StateSpec.toStringFact("(distanceGhost ?Player ?Ghost 4)")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(pacman ?Player)")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(ghost ?Ghost)")));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
-		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
+		assertEquals(rule.getAction(), StateSpec.toStringFact("(fromGhost ?Ghost)"));
 
 		// Testing conditional &:elements
 		rule = new GuidedRule(
@@ -50,14 +53,18 @@ public class PacManStateSpecTest {
 		assertTrue(rule
 				.getConditions()
 				.contains(
-						"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"));
-		assertTrue(rule.getConditions().contains("(test (<> ?Player ?Ghost))"));
-		assertTrue(rule.getConditions().contains("(pacman ?Player)"));
-		assertTrue(rule.getConditions().contains("(ghost ?Ghost)"));
+						StateSpec
+								.toStringFact("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(pacman ?Player)")));
+		assertTrue(rule.getConditions().contains(
+				StateSpec.toStringFact("(ghost ?Ghost)")));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
-		assertEquals(rule.getAction(), "(fromGhost ?Ghost)");
+		assertEquals(rule.getAction(), StateSpec.toStringFact("(fromGhost ?Ghost)"));
 	}
 }

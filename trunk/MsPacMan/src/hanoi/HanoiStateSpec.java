@@ -1,6 +1,7 @@
 package hanoi;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class HanoiStateSpec extends StateSpec {
@@ -31,16 +33,12 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialiseActionTemplates() {
-		MultiMap<String, Class> actions = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialiseActionTemplates() {
+		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Move action
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		structure.add(Tower.class);
-		structure.add(Tile.class);
-		structure.add(Tower.class);
-		actions.putCollection("move", structure);
+		Class[] structure = { Tile.class, Tower.class, Tile.class, Tower.class };
+		actions.add(new StringFact("move", structure));
 
 		return actions;
 	}
@@ -75,7 +73,7 @@ public class HanoiStateSpec extends StateSpec {
 		bkMap.put("smallerRule2", new BackgroundKnowledge(
 				"(tile ?X) (not (towerBase ?X)) (towerBase ?Y) "
 						+ "=> (assert (smaller ?X ?Y))", true));
-		
+
 		// Tile(Z) & On(X,Y) -> !On(X,Z)
 		bkMap.put("onRule", new BackgroundKnowledge(
 				"(tile ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
@@ -112,72 +110,73 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialisePredicateTemplates() {
-		MultiMap<String, Class> predicates = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialisePredicateTemplates() {
+		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// On predicate
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		structure.add(Tile.class);
-		structure.add(Tower.class);
-		predicates.putCollection("on", structure);
+		Class[] structure = new Class[3];
+		structure[0] = Tile.class;
+		structure[1] = Tile.class;
+		structure[2] = Tower.class;
+		predicates.add(new StringFact("on", structure));
 
 		// Clear predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		structure.add(Tower.class);
-		predicates.putCollection("clear", structure);
+		structure = new Class[2];
+		structure[0] = Tile.class;
+		structure[1] = Tower.class;
+		predicates.add(new StringFact("clear", structure));
 
 		// Above predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		structure.add(Tile.class);
-		structure.add(Tower.class);
-		predicates.putCollection("above", structure);
+		structure = new Class[2];
+		structure[0] = Tile.class;
+		structure[1] = Tile.class;
+		structure[2] = Tower.class;
+		predicates.add(new StringFact("above", structure));
 
 		// Smaller predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		structure.add(Tile.class);
-		predicates.putCollection("smaller", structure);
+		structure = new Class[2];
+		structure[0] = Tile.class;
+		structure[1] = Tile.class;
+		predicates.add(new StringFact("smaller", structure));
 
 		// NumTiles predicate
-		structure = new ArrayList<Class>();
-		structure.add(EvenOdd.class);
-		predicates.putCollection("numTiles", structure);
+		structure = new Class[2];
+		structure[0] = EvenOdd.class;
+		predicates.add(new StringFact("numTiles", structure));
 
 		// LastMoved predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		predicates.putCollection("lastMoved", structure);
+		structure = new Class[2];
+		structure[0] = Tile.class;
+		predicates.add(new StringFact("lastMoved", structure));
 
 		// LastMoved predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tile.class);
-		predicates.putCollection("notLastMoved", structure);
+		structure = new Class[2];
+		structure[0] = Tile.class;
+		predicates.add(new StringFact("notLastMoved", structure));
 
 		// NextTower predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tower.class);
-		structure.add(Tower.class);
-		predicates.putCollection("nextTower", structure);
+		structure = new Class[2];
+		structure[0] = Tower.class;
+		structure[1] = Tower.class;
+		predicates.add(new StringFact("nextTower", structure));
 
 		// PrevTower predicate
-		structure = new ArrayList<Class>();
-		structure.add(Tower.class);
-		structure.add(Tower.class);
-		predicates.putCollection("prevTower", structure);
+		structure = new Class[2];
+		structure[0] = Tower.class;
+		structure[1] = Tower.class;
+		predicates.add(new StringFact("prevTower", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Map<Class, String> initialiseTypePredicateTemplates() {
-		Map<Class, String> typePreds = new HashMap<Class, String>();
+	protected Collection<StringFact> initialiseTypePredicateTemplates() {
+		Collection<StringFact> typePreds = new ArrayList<StringFact>();
 
-		typePreds.put(Tile.class, "tile");
-		typePreds.put(Tower.class, "tower");
-		typePreds.put(TowerBase.class, "towerBase");
+		typePreds.add(new StringFact("tile", new Class[] { Tile.class }));
+		typePreds.add(new StringFact("tower", new Class[] { Tower.class }));
+		typePreds.add(new StringFact("towerBase",
+				new Class[] { TowerBase.class }));
 
 		return typePreds;
 	}

@@ -639,9 +639,9 @@ public class LearningController {
 					// rules together.
 					List<String> newQueryParams = new ArrayList<String>();
 					int i = 0;
-					for (String fact : internalGoal.getFacts()) {
+					for (StringFact fact : internalGoal.getFacts()) {
 						Module partialMod = Module.loadModule(StateSpec
-								.getInstance().getEnvironmentName(), fact);
+								.getInstance().getEnvironmentName(), fact.getFactName());
 
 						// Reform the rule parameters
 						int j = 0;

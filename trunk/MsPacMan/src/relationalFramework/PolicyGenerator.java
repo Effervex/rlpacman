@@ -37,7 +37,6 @@ public class PolicyGenerator {
 	private OrderedDistribution<Slot> slotGenerator_;
 
 	/** The actions set the generator was initialised with. */
-	@SuppressWarnings("unchecked")
 	private Map<String, StringFact> actionSet_;
 
 	/** If the generator is currently frozen. */
@@ -68,7 +67,7 @@ public class PolicyGenerator {
 	private boolean moduleGenerator_;
 
 	/** The goal this generator is working towards if modular. */
-	private ArrayList<String> moduleGoal_;
+	private ArrayList<StringFact> moduleGoal_;
 
 	/**
 	 * If this policy generator only updates the ordering of slots - no rule
@@ -833,11 +832,10 @@ public class PolicyGenerator {
 	 * @return The new PolicyGenerator.
 	 */
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			ArrayList<String> internalGoal) {
+			ArrayList<StringFact> internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addCoveredRules(policyGenerator.coveredRules_);
-		instance_.addActionConditions(policyGenerator.covering_
-				.getActionConditions());
+		instance_.covering_.migrateAgentObservations(policyGenerator.covering_);
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
 		return instance_;
@@ -855,7 +853,7 @@ public class PolicyGenerator {
 	 */
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
 			Collection<GuidedRule> rules, List<String> newQueryParams,
-			ArrayList<String> internalGoal) {
+			ArrayList<StringFact> internalGoal) {
 		instance_ = newInstance(policyGenerator, internalGoal);
 		instance_.slotOptimisation_ = true;
 
@@ -880,6 +878,7 @@ public class PolicyGenerator {
 		instance_ = generator;
 		instance_.moduleGenerator_ = false;
 		instance_.moduleGoal_ = null;
+		instance_.covering_.loadBackupPreGoal();
 	}
 
 	public boolean isFrozen() {
@@ -915,10 +914,6 @@ public class PolicyGenerator {
 
 	public OrderedDistribution<Slot> getGenerator() {
 		return slotGenerator_;
-	}
-
-	private void addActionConditions(MultiMap<String, String> actionConditions) {
-		covering_.setAllowedActionConditions(actionConditions);
 	}
 
 	/**

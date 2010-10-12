@@ -3,8 +3,6 @@ package relationalFramework.agentObservations;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.SortedSet;
-import java.util.regex.Pattern;
-
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
@@ -119,7 +117,8 @@ public class BackgroundKnowledge {
 	 */
 	private StringFact getPostCond(BidiMap replacementTerms) {
 		StringFact replacedFact = new StringFact(postCondition_);
-		replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
+		if (replacementTerms != null)
+			replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
 		return replacedFact;
 	}
 
@@ -134,8 +133,8 @@ public class BackgroundKnowledge {
 	 *            If the conditions are being tested for illegal conditions too.
 	 * @return True if the conditions were simplified, false otherwise.
 	 */
-	public boolean simplify(SortedSet<StringFact> ruleConds, Covering coveringObj,
-			boolean testForIllegalRule) {
+	public boolean simplify(SortedSet<StringFact> ruleConds,
+			Covering coveringObj, boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
 		int result = coveringObj.unifyStates(getAllConditions(), ruleConds,

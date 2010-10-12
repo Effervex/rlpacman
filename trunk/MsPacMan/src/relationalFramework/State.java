@@ -26,6 +26,7 @@ public abstract class State {
 	/**
 	 * Simple toString method.
 	 */
+	@Override
 	public String toString() {
 		return "State";
 	}

@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.awt.Point;
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -25,6 +26,7 @@ import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;
@@ -290,11 +292,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 			double[] directionVote = new double[PacManLowAction.values().length];
 			double worst = 0;
 			double bestWeight = 0;
-			List<String> actionStrings = ruleAction.getTriggerActions();
+			List<StringFact> actionStrings = ruleAction.getTriggerActions();
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
-			for (String action : actionStrings) {
+			for (StringFact action : actionStrings) {
 				// For each rule, a list of actions are returned
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 						.getInstance()).applyAction(action, state);
@@ -617,7 +619,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 					+ "))");
 		} else {
 			// Use Euclidean distance, rounding
-			int distance = (int) Math.round(Point.distance(thing.m_locX,
+			int distance = (int) Math.round(Point2D.distance(thing.m_locX,
 					thing.m_locY, pacMan.m_locX, pacMan.m_locY));
 			rete_.eval("(assert (distance" + thing.getClass().getSimpleName()
 					+ " player " + thingName + " " + distance + "))");
