@@ -30,6 +30,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 	 * 
 	 * @return A clone of this distribution.
 	 */
+	@Override
 	public OrderedDistribution<T> clone() {
 		OrderedDistribution<T> clone = new OrderedDistribution<T>(random_);
 

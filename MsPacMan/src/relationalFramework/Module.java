@@ -60,16 +60,14 @@ public class Module {
 	 * @param orderedDistribution
 	 *            The state of the distribution for the agent.
 	 */
-	private Module(ArrayList<String> facts,
+	private Module(ArrayList<StringFact> facts,
 			OrderedDistribution<Slot> orderedDistribution) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = formName(facts);
-		for (String fact : facts) {
-			String[] splitGoal = StateSpec.splitFact(fact);
-
-			for (int i = 1; i < splitGoal.length; i++) {
-				parameterTerms_.add(createModuleParameter(i - 1));
+		for (StringFact fact : facts) {
+			for (int i = 0; i < fact.getArguments().length; i++) {
+				parameterTerms_.add(createModuleParameter(i));
 			}
 		}
 
@@ -192,7 +190,7 @@ public class Module {
 	 * @param orderedDistribution
 	 *            The policy generator which solves the goal.
 	 */
-	public static void saveModule(ArrayList<String> facts, String environment,
+	public static void saveModule(ArrayList<StringFact> facts, String environment,
 			OrderedDistribution<Slot> orderedDistribution) {
 		Module newModule = new Module(facts, orderedDistribution);
 		String modName = formName(facts);
@@ -213,10 +211,10 @@ public class Module {
 				bf.write("(declare (variables");
 				// Write the parameters out for each fact in the module.
 				int j = 0;
-				for (String fact : facts) {
+				for (StringFact fact : facts) {
 					int i = 0;
 					for (; i < StateSpec.getInstance().getPredicates()
-							.get(fact).size(); i++) {
+							.get(fact).getArguments().length; i++) {
 						bf.write(" " + createModuleParameter(i + j));
 					}
 					j += i;
@@ -252,7 +250,7 @@ public class Module {
 	 * @return True, if it module exists, else false.
 	 */
 	public static boolean moduleExists(String environmentName,
-			ArrayList<String> constantPred) {
+			ArrayList<StringFact> constantPred) {
 		String modName = formName(constantPred);
 
 		// Checks to skip loading.

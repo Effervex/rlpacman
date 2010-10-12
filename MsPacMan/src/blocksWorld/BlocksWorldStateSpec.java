@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
-import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;

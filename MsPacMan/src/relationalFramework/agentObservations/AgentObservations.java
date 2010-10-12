@@ -1,23 +1,18 @@
 package relationalFramework.agentObservations;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import relationalFramework.ActionChoice;
+import jess.Fact;
 import relationalFramework.MultiMap;
-import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-
-import jess.Fact;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -44,7 +39,7 @@ public class AgentObservations {
 	/** The rules about the environment learned by the agent. */
 	private Collection<BackgroundKnowledge> learnedEnvironmentRules_;
 
-	/** A group of facts indexed by terms used within. */
+	/** A transient group of facts indexed by terms used within. */
 	private MultiMap<String, StringFact> termMappedFacts_;
 
 	/** The action based observations, keyed by action predicate. */
@@ -57,6 +52,7 @@ public class AgentObservations {
 		conditionBeliefs_ = new TreeSet<ConditionBeliefs>();
 		learnedEnvironmentRules_ = new HashSet<BackgroundKnowledge>();
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
+		observationHash_ = null;
 		updateHash();
 	}
 
@@ -83,7 +79,7 @@ public class AgentObservations {
 				String[] arguments = new String[split.length - 1];
 				System.arraycopy(split, 1, arguments, 0, arguments.length);
 				StringFact strFact = new StringFact(StateSpec.getInstance()
-						.getPredicates().get(split[0]), arguments);
+						.getStringFact(split[0]), arguments);
 
 				// Run through the arguments and index the fact by term
 				for (int i = 0; i < arguments.length; i++) {
@@ -122,16 +118,17 @@ public class AgentObservations {
 	}
 
 	/**
-	 * Updates the observation hash code.
-	 * // TODO Make this only called from the mutation stage, so it is only updated once per iteration. 
+	 * Updates the observation hash code. // TODO Make this only called from the
+	 * mutation stage, so it is only updated once per iteration.
 	 */
 	private void updateHash() {
 		if (observationHash_ == null) {
-			// Update the hash
+			// TODO Update the hash
 		}
 	}
 
 	public int getObservationHash() {
+		updateHash();
 		return observationHash_;
 	}
 
@@ -155,12 +152,83 @@ public class AgentObservations {
 		updateHash();
 	}
 
+	public boolean hasPreGoal() {
+		for (String action : actionBasedObservations_.keySet()) {
+			if (actionBasedObservations_.get(action).getPGI() != null)
+				return true;
+		}
+		return false;
+	}
+
+	public Collection<StringFact> getActionConditions(String actionPred) {
+		if (!actionBasedObservations_.containsKey(actionPred))
+			return null;
+		return actionBasedObservations_.get(actionPred).getActionConditions();
+	}
+
+	public void setActionConditions(String action,
+			Collection<StringFact> conditions) {
+		getActionBasedObservation(action).setActionConditions(conditions);
+		observationHash_ = null;
+		updateHash();
+	}
+
+	public List<RangedCondition> getActionRange(String actionPred) {
+		if (!actionBasedObservations_.containsKey(actionPred))
+			return null;
+		return actionBasedObservations_.get(actionPred).getActionRange();
+	}
+
+	public void setActionRange(String actionPred, RangedCondition rc) {
+		getActionBasedObservation(actionPred).setActionRange(rc);
+		observationHash_ = null;
+		updateHash();
+	}
+
 	/**
-	 * Clears the observation hash for the agent observations so the hash code must be updated again.
+	 * Backs up the pre-goals into a single mapping and removes them from the
+	 * observations so a different learning algorithm can use the agent
+	 * observations.
+	 * 
+	 * @return The backed up pre-goals.
+	 */
+	public Map<String, PreGoalInformation> backupAndClearPreGoals() {
+		Map<String, PreGoalInformation> backups = new HashMap<String, PreGoalInformation>();
+		for (String action : actionBasedObservations_.keySet()) {
+			backups.put(action, actionBasedObservations_.get(action).getPGI());
+			actionBasedObservations_.get(action).setPGI(null);
+		}
+
+		return backups;
+	}
+
+	/**
+	 * Loads a backed up mapping of pregoals into the agent observations.
+	 * 
+	 * @param backupPreGoals
+	 *            The backup pre-goals being loaded.
+	 */
+	public void loadPreGoals(Map<String, PreGoalInformation> backupPreGoals) {
+		for (String key : backupPreGoals.keySet()) {
+			getActionBasedObservation(key).setPGI(backupPreGoals.get(key));
+		}
+		observationHash_ = null;
+		updateHash();
+	}
+
+	/**
+	 * Clears the observation hash for the agent observations so the hash code
+	 * must be updated again.
 	 */
 	public void clearHash() {
 		observationHash_ = null;
 		updateHash();
+	}
+
+	public void clearPreGoal() {
+		for (String action : actionBasedObservations_.keySet()) {
+			actionBasedObservations_.get(action).setPGI(null);
+		}
 	}
 
 	/**
@@ -190,7 +258,7 @@ public class AgentObservations {
 		private PreGoalInformation pgi_;
 
 		/** The conditions observed to have been true for the action. */
-		private List<String> actionConditions_;
+		private Collection<StringFact> actionConditions_;
 
 		/** The inactivity of the action conditions. */
 		private int actionConditionInactivity_ = 0;
@@ -207,6 +275,25 @@ public class AgentObservations {
 
 		public void setPGI(PreGoalInformation preGoal) {
 			pgi_ = preGoal;
+		}
+
+		public Collection<StringFact> getActionConditions() {
+			return actionConditions_;
+		}
+
+		public void setActionConditions(Collection<StringFact> conditions) {
+			actionConditions_ = conditions;
+		}
+
+		public List<RangedCondition> getActionRange() {
+			return conditionRanges_;
+		}
+
+		public void setActionRange(RangedCondition rc) {
+			if (conditionRanges_ == null)
+				conditionRanges_ = new ArrayList<RangedCondition>();
+			conditionRanges_.remove(rc);
+			conditionRanges_.add(rc);
 		}
 	}
 }

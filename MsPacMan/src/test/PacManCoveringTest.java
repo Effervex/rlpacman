@@ -14,6 +14,7 @@ import org.junit.Test;
 import relationalFramework.Covering;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 public class PacManCoveringTest {
 	private Covering sut_;
@@ -27,7 +28,7 @@ public class PacManCoveringTest {
 	@Test
 	public void testSpecialiseToPreGoal() {
 		// Specialising a range without a pregoal (splitting an LGG rule)
-		sut_.clearPreGoalState(StateSpec.getInstance().getActions().size());
+		sut_.clearPreGoalState();
 
 		GuidedRule rule = new GuidedRule(
 				"(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
@@ -39,7 +40,7 @@ public class PacManCoveringTest {
 			hs.add(ruley);
 		}
 		assertEquals(results, hs);
-		
+
 		assertEquals(Covering.NUM_DISCRETE_RANGES, results.size());
 		double interval = 36 / Covering.NUM_DISCRETE_RANGES;
 		for (int i = 0; i < Covering.NUM_DISCRETE_RANGES; i++) {
@@ -86,13 +87,15 @@ public class PacManCoveringTest {
 		// Specialising a range with a single numerical pregoal
 		double[] points = { 0, 4, 9, 10, 30, 36 };
 
-		List<String> pregoal = new ArrayList<String>();
+		List<StringFact> pregoal = new ArrayList<StringFact>();
 		for (double point : points) {
 			pregoal.clear();
-			pregoal.add("(dot ?X)");
-			pregoal.add("(pacman player)");
-			pregoal.add("(distanceDot player ?X " + point + ")");
-			sut_.setPreGoal("(toDot ?X " + point + ")", pregoal);
+			pregoal.add(StateSpec.toStringFact("(dot ?X)"));
+			pregoal.add(StateSpec.toStringFact("(pacman player)"));
+			pregoal.add(StateSpec.toStringFact("(distanceDot player ?X "
+					+ point + ")"));
+			sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X " + point + ")"),
+					pregoal);
 
 			rule = new GuidedRule(
 					"(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
@@ -125,12 +128,14 @@ public class PacManCoveringTest {
 			double endPoint = points[p];
 
 			pregoal.clear();
-			pregoal.add("(dot ?X)");
-			pregoal.add("(pacman player)");
+			pregoal.add(StateSpec.toStringFact("(dot ?X)"));
+			pregoal.add(StateSpec.toStringFact("(pacman player)"));
 			pregoal
-					.add("(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 "
-							+ startPoint + " " + endPoint + "))");
-			sut_.setPreGoal("(toDot ?X ?__Num3)", pregoal);
+					.add(StateSpec
+							.toStringFact("(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 "
+									+ startPoint + " " + endPoint + "))"));
+			sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X ?__Num3)"),
+					pregoal);
 
 			rule = new GuidedRule(
 					"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
@@ -176,7 +181,7 @@ public class PacManCoveringTest {
 		}
 
 		// Special case: Range goes through 0 (no pregoal)
-		sut_.clearPreGoalState(StateSpec.getInstance().getActions().size());
+		sut_.clearPreGoalState();
 
 		rule = new GuidedRule(
 				"(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 -16.0 26.0)) "
@@ -205,5 +210,331 @@ public class PacManCoveringTest {
 							+ (afterInterval * (i + 1))
 							+ ")) (junction ?X) => (toJunction ?X ?__Num0)",
 					false, true, null)));
+	}
+
+	@Test
+	public void testNumericalUnifyStates() {
+		// No change unification
+		List<StringFact> oldState = new ArrayList<StringFact>();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		List<StringFact> newState = new ArrayList<StringFact>();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		String[] oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		String[] newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "1";
+		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b 1)")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "1");
+
+		// Range addition
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		int index = 0;
+		assertTrue(oldState
+				.contains(StateSpec
+						.toStringFact("(distanceDot a b ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ " 1.0 2.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Range addition (reversed)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "2";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "1";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Negative range addition
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b -1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Tiny value range addition
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b -1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 2.567483E-64)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2.567483E-64";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index
+				+ " -1.0 2.567483E-64))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Regular variable unification with numerical values too
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot x y -1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "x";
+		oldTerms[1] = "-1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ?X ? ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Unification under an existing range term
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
+
+		// Unification under an existing range term (extension)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
+
+		// Multiple numerical terms
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toStringFact("(level a 1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
+		newState.add(StateSpec.toStringFact("(level a 3)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " -2.0 1.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(level a ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
+
+		// Multiple numerical terms with existing range term
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+		oldState.add(StateSpec.toStringFact("(level a 1)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
+		newState.add(StateSpec.toStringFact("(level a 3)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "a";
+		oldTerms[1] = "?" + Covering.RANGE_VARIABLE_PREFIX + "0";
+		newTerms = new String[2];
+		newTerms[0] = "a";
+		newTerms[1] = "-2";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+		assertEquals(oldTerms[0], "a");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(level a ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
+
+		// Variables and numerical unification (differing distance)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 2)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Variables and numerical unification (out-of-range distance)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		newState.clear();
+		newState
+				.add(StateSpec.toStringFact("(distanceGhost player blinky 10)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+
+		// Variables and numerical unification (same distance)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 1)"));
+		newState.add(StateSpec.toStringFact("(ghost blinky)"));
+		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "1";
+		newTerms = new String[2];
+		newTerms[0] = "dot_1";
+		newTerms[1] = "5";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertEquals(2, oldState.size());
+		index++;
+		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ StateSpec.BETWEEN_RANGE + " ?"
+				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 	}
 }

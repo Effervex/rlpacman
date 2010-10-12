@@ -2,7 +2,6 @@ package relationalFramework;
 
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * A class which describes he actions returned by a specific GuidedRule.

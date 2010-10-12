@@ -287,6 +287,7 @@ public class Slot {
 	 * @return A cloned version of this slot. This clone clones the
 	 *         distributions within, but no deeper.
 	 */
+	@Override
 	public Slot clone() {
 		Slot clone = new Slot(action_);
 		clone.selectionProb_ = selectionProb_;

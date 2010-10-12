@@ -100,6 +100,36 @@ public class StringFact implements Comparable<StringFact> {
 	}
 
 	/**
+	 * Replaces all variable indexed terms (?X,?Y,?Z...) with the given indexed
+	 * terms, be they variable or otherwise.
+	 * 
+	 * @param replacements
+	 *            The terms to replace any variable terms with.
+	 */
+	public void replaceArguments(String[] replacements) {
+		// Run through the arguments, replacing variable args with the
+		// replacements.
+		for (int i = 0; i < arguments_.length; i++) {
+			int termIndex = Covering.getVariableTermIndex(arguments_[i]);
+			if (termIndex != -1)
+				arguments_[i] = replacements[termIndex];
+		}
+	}
+
+	/**
+	 * Replaces a single argument by another.
+	 * 
+	 * @param replacedTerm The term to be replaced.
+	 * @param replacementTerm the term to replace the old term.
+	 */
+	public void replaceArguments(String replacedTerm, String replacementTerm) {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].equals(replacedTerm))
+				arguments_[i] = replacementTerm;
+		}
+	}
+
+	/**
 	 * Gets the name of the fact.
 	 * 
 	 * @return The name of the fact.

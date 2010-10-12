@@ -22,6 +22,7 @@ import relationalFramework.PolicyActor;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
 /**
  * The environment for the blocks world interface.
@@ -137,8 +138,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		List<String> actions = ruleAction.getTriggerActions();
-		String action = actions.get(PolicyGenerator.random_.nextInt(actions
+		List<StringFact> actions = ruleAction.getTriggerActions();
+		StringFact action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 
 		BlocksState newState = actOnAction(action, state_);
@@ -185,17 +186,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private BlocksState actOnAction(String action, BlocksState worldState) {
+	private BlocksState actOnAction(StringFact action, BlocksState worldState) {
 		if (action == null)
 			return worldState;
 
 		Integer[] newState = new Integer[worldState.length];
 
-		String[] split = StateSpec.splitFact(action);
-
 		// Finding the block objects
 		int[] indices = null;
-		if (split[0].equals("move")) {
+		if (action.getFactName().equals("move")) {
 			indices = new int[2];
 		} else {
 			indices = new int[1];
@@ -204,7 +203,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Convert the blocks to indices
 		Integer[] stateArray = worldState.getState();
 		for (int i = 0; i < indices.length; i++) {
-			indices[i] = (split[i + 1].charAt(0)) - ('a');
+			indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
 			// In order to do either action, both blocks must be free
 			for (int j = 0; j < worldState.length; j++) {
 				newState[j] = stateArray[j];

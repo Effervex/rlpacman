@@ -202,6 +202,7 @@ public class Player extends Thing {
 		pixelShrink_ = -pixelSize_ / 5;
 	}
 	
+	@Override
 	public String getObjectName() {
 		return "player";
 	}

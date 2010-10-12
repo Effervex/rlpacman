@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 /**
@@ -44,54 +46,54 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialiseActionTemplates() {
-		MultiMap<String, Class> actions = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialiseActionTemplates() {
+		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Actions have a type and a distance
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Dot.class);
-		structure.add(Integer.class);
-		actions.putCollection("toDot", structure);
+		Class[] structure = new Class[2];
+		structure[0] = Dot.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("toDot", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(PowerDot.class);
-		structure.add(Integer.class);
-		actions.putCollection("toPowerDot", structure);
+		structure = new Class[2];
+		structure[0] = PowerDot.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("toPowerDot", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(PowerDot.class);
-		structure.add(Integer.class);
-		actions.putCollection("fromPowerDot", structure);
+		structure = new Class[2];
+		structure[0] = PowerDot.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("fromPowerDot", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Fruit.class);
-		structure.add(Integer.class);
-		actions.putCollection("toFruit", structure);
+		structure = new Class[2];
+		structure[0] = Fruit.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("toFruit", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		structure.add(Integer.class);
-		actions.putCollection("toGhost", structure);
+		structure = new Class[2];
+		structure[0] = Ghost.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("toGhost", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		structure.add(Integer.class);
-		actions.putCollection("fromGhost", structure);
+		structure = new Class[2];
+		structure[0] = Ghost.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("fromGhost", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(GhostCentre.class);
-		structure.add(Double.class);
-		actions.putCollection("toGhostCentre", structure);
+		structure = new Class[2];
+		structure[0] = GhostCentre.class;
+		structure[1] = Double.class;
+		actions.add(new StringFact("toGhostCentre", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(GhostCentre.class);
-		structure.add(Double.class);
-		actions.putCollection("fromGhostCentre", structure);
+		structure = new Class[2];
+		structure[0] = GhostCentre.class;
+		structure[1] = Double.class;
+		actions.add(new StringFact("fromGhostCentre", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Junction.class);
-		structure.add(Integer.class);
-		actions.putCollection("toJunction", structure);
+		structure = new Class[2];
+		structure[0] = Junction.class;
+		structure[1] = Integer.class;
+		actions.add(new StringFact("toJunction", structure));
 
 		return actions;
 	}
@@ -121,7 +123,7 @@ public class PacManStateSpec extends StateSpec {
 			// Score maximisation over a single level
 			return "(level 2)";
 		}
-		
+
 		return null;
 	}
 
@@ -200,8 +202,7 @@ public class PacManStateSpec extends StateSpec {
 							+ "(pacman ?Player) (fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
 			rules.add("(distanceDot ?Player ?Dot ?Dist0) (pacman ?Player) "
 					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
-			rules
-			.add("(distanceGhost ?Player ?Ghost ?Dist0) "
+			rules.add("(distanceGhost ?Player ?Ghost ?Dist0) "
 					+ "(pacman ?Player) (not (edible ?Ghost)) (ghost ?Ghost) "
 					+ "=> (fromGhost ?Ghost ?Dist0)");
 		}
@@ -213,89 +214,90 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected MultiMap<String, Class> initialisePredicateTemplates() {
-		MultiMap<String, Class> predicates = new MultiMap<String, Class>();
+	protected Collection<StringFact> initialisePredicateTemplates() {
+		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// Score
-		List<Class> structure = new ArrayList<Class>();
-		structure.add(Integer.class);
-		predicates.putCollection("score", structure);
+		Class[] structure = new Class[1];
+		structure[0] = Integer.class;
+		predicates.add(new StringFact("score", structure));
 
 		// High Score
-		structure = new ArrayList<Class>();
-		structure.add(Integer.class);
-		predicates.putCollection("highScore", structure);
+		structure = new Class[1];
+		structure[0] = Integer.class;
+		predicates.add(new StringFact("highScore", structure));
 
 		// Lives
-		structure = new ArrayList<Class>();
-		structure.add(Integer.class);
-		predicates.putCollection("lives", structure);
+		structure = new Class[1];
+		structure[0] = Integer.class;
+		predicates.add(new StringFact("lives", structure));
 
 		// Level
-		structure = new ArrayList<Class>();
-		structure.add(Integer.class);
-		predicates.putCollection("level", structure);
+		structure = new Class[1];
+		structure[0] = Integer.class;
+		predicates.add(new StringFact("level", structure));
 
 		// Edible
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		predicates.putCollection("edible", structure);
+		structure = new Class[1];
+		structure[0] = Ghost.class;
+		predicates.add(new StringFact("edible", structure));
 
 		// Blinking
-		structure = new ArrayList<Class>();
-		structure.add(Ghost.class);
-		predicates.putCollection("blinking", structure);
+		structure = new Class[1];
+		structure[0] = Ghost.class;
+		predicates.add(new StringFact("blinking", structure));
 
 		// Distance Metrics
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(Dot.class);
-		structure.add(Integer.class);
-		predicates.putCollection("distanceDot", structure);
+		structure = new Class[3];
+		structure[0] = Player.class;
+		structure[1] = Dot.class;
+		structure[2] = Integer.class;
+		predicates.add(new StringFact("distanceDot", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(PowerDot.class);
-		structure.add(Integer.class);
-		predicates.putCollection("distancePowerDot", structure);
+		structure = new Class[3];
+		structure[0] = Player.class;
+		structure[1] = PowerDot.class;
+		structure[2] = Integer.class;
+		predicates.add(new StringFact("distancePowerDot", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(Ghost.class);
-		structure.add(Integer.class);
-		predicates.putCollection("distanceGhost", structure);
+		structure = new Class[3];
+		structure[0] = Player.class;
+		structure[1] = Ghost.class;
+		structure[2] = Integer.class;
+		predicates.add(new StringFact("distanceGhost", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(GhostCentre.class);
-		structure.add(Double.class);
-		predicates.putCollection("distanceGhostCentre", structure);
+		structure = new Class[3];
+		structure[0] = Player.class;
+		structure[1] = GhostCentre.class;
+		structure[2] = Double.class;
+		predicates.add(new StringFact("distanceGhostCentre", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Player.class);
-		structure.add(Fruit.class);
-		structure.add(Integer.class);
-		predicates.putCollection("distanceFruit", structure);
+		structure = new Class[3];
+		structure[0] = Player.class;
+		structure[1] = Fruit.class;
+		structure[2] = Integer.class;
+		predicates.add(new StringFact("distanceFruit", structure));
 
-		structure = new ArrayList<Class>();
-		structure.add(Junction.class);
-		structure.add(Integer.class);
-		predicates.putCollection("junctionSafety", structure);
+		structure = new Class[2];
+		structure[0] = Junction.class;
+		structure[1] = Integer.class;
+		predicates.add(new StringFact("junctionSafety", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Map<Class, String> initialiseTypePredicateTemplates() {
-		Map<Class, String> typeMap = new HashMap<Class, String>();
+	protected Collection<StringFact> initialiseTypePredicateTemplates() {
+		Collection<StringFact> typeMap = new ArrayList<StringFact>();
 
-		typeMap.put(Player.class, "pacman");
-		typeMap.put(Dot.class, "dot");
-		typeMap.put(PowerDot.class, "powerDot");
-		typeMap.put(Ghost.class, "ghost");
-		typeMap.put(Fruit.class, "fruit");
-		typeMap.put(GhostCentre.class, "ghostCentre");
-		typeMap.put(Junction.class, "junction");
+		typeMap.add(new StringFact("pacman", new Class[] { Player.class }));
+		typeMap.add(new StringFact("dot", new Class[] { Dot.class }));
+		typeMap.add(new StringFact("powerDot", new Class[] { PowerDot.class }));
+		typeMap.add(new StringFact("ghost", new Class[] { Ghost.class }));
+		typeMap.add(new StringFact("fruit", new Class[] { Fruit.class }));
+		typeMap.add(new StringFact("ghostCentre",
+				new Class[] { GhostCentre.class }));
+		typeMap.add(new StringFact("junction", new Class[] { Junction.class }));
 
 		return typeMap;
 	}
@@ -307,29 +309,30 @@ public class PacManStateSpec extends StateSpec {
 	 *            The action to apply.
 	 * @return A Byte direction to move towards/from.
 	 */
-	public WeightedDirection applyAction(String action, PacManState state) {
-		String[] actionSplit = StateSpec.splitFact(action);
-		double weight = determineWeight(Integer.parseInt(actionSplit[2]));
+	public WeightedDirection applyAction(StringFact action, PacManState state) {
+		String[] arguments = action.getArguments();
+		double weight = determineWeight(Integer
+				.parseInt(arguments[1]));
 
 		// Move towards static points (dots, powerdots, junctions)
-		if ((actionSplit[0].equals("toDot"))
-				|| (actionSplit[0].equals("toPowerDot"))
-				|| (actionSplit[0].equals("fromPowerDot"))
-				|| (actionSplit[0].equals("toGhostCentre"))
-				|| (actionSplit[0].equals("fromGhostCentre"))) {
+		if ((action.getFactName().equals("toDot"))
+				|| (action.getFactName().equals("toPowerDot"))
+				|| (action.getFactName().equals("fromPowerDot"))
+				|| (action.getFactName().equals("toGhostCentre"))
+				|| (action.getFactName().equals("fromGhostCentre"))) {
 			// To Dot, to/from powerdot
-			String[] coords = actionSplit[1].split("_");
+			String[] coords = arguments[0].split("_");
 			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
 					.parseInt(coords[1])][Integer.parseInt(coords[2])];
 			if (distanceGrid == null)
 				return null;
 			byte path = distanceGrid.getDirection();
-			if ((actionSplit[0].equals("fromPowerDot"))
-					|| (actionSplit[0].equals("fromGhostCentre")))
+			if ((action.getFactName().equals("fromPowerDot"))
+					|| (action.getFactName().equals("fromGhostCentre")))
 				path *= -1;
 			return new WeightedDirection(path, weight);
 
-		} else if (actionSplit[0].equals("toFruit")) {
+		} else if (action.getFactName().equals("toFruit")) {
 			// To fruit
 			DistanceDir distanceGrid = state.getDistanceGrid()[state.getFruit().m_locX][state
 					.getFruit().m_locY];
@@ -337,8 +340,8 @@ public class PacManStateSpec extends StateSpec {
 				return null;
 			return new WeightedDirection(distanceGrid.getDirection(), weight);
 
-		} else if (actionSplit[0].equals("toJunction")) {
-			String[] coords = actionSplit[1].split("_");
+		} else if (action.getFactName().equals("toJunction")) {
+			String[] coords = arguments[0].split("_");
 			// Modify the distances such that a higher safety has a lower
 			// positive value
 			double normalisedSafety = state.getSafestJunction();
@@ -350,7 +353,7 @@ public class PacManStateSpec extends StateSpec {
 				normalisedSafety *= -1;
 
 			// Junction value
-			int juncVal = Integer.parseInt(actionSplit[2]);
+			int juncVal = Integer.parseInt(arguments[1]);
 			// If the junction has safety 0, there is neither weight towards,
 			// nor from it.
 			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
@@ -365,16 +368,16 @@ public class PacManStateSpec extends StateSpec {
 			weight = determineWeight(normalisedSafety);
 			return new WeightedDirection(distanceGrid.getDirection(), weight);
 
-		} else if ((actionSplit[0].equals("toGhost"))
-				|| (actionSplit[0].equals("fromGhost"))) {
+		} else if ((action.getFactName().equals("toGhost"))
+				|| (action.getFactName().equals("fromGhost"))) {
 			int ghostIndex = 0;
-			if (actionSplit[1].equals("blinky"))
+			if (arguments[0].equals("blinky"))
 				ghostIndex = Ghost.BLINKY;
-			else if (actionSplit[1].equals("pinky"))
+			else if (arguments[0].equals("pinky"))
 				ghostIndex = Ghost.PINKY;
-			else if (actionSplit[1].equals("inky"))
+			else if (arguments[0].equals("inky"))
 				ghostIndex = Ghost.INKY;
-			else if (actionSplit[1].equals("clyde"))
+			else if (arguments[0].equals("clyde"))
 				ghostIndex = Ghost.CLYDE;
 
 			DistanceDir distanceGrid = state.getDistanceGrid()[state
@@ -382,7 +385,7 @@ public class PacManStateSpec extends StateSpec {
 			if (distanceGrid == null)
 				return null;
 			byte path = distanceGrid.getDirection();
-			if (actionSplit[0].equals("toGhost"))
+			if (action.getFactName().equals("toGhost"))
 				return new WeightedDirection(path, weight);
 			else
 				return new WeightedDirection((byte) -path, weight);

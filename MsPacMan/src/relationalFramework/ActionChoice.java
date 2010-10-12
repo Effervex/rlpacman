@@ -1,9 +1,7 @@
 package relationalFramework;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * This class represents the chosen actions the agent returns when making a
