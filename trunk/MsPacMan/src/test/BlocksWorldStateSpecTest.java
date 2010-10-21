@@ -29,65 +29,6 @@ public class BlocksWorldStateSpecTest {
 	}
 
 	@Test
-	public void testGetPossibleConditions() {
-		MultiMap<String, StringFact> possibleConditions = spec_
-				.getPossibleConditions();
-		assertEquals(possibleConditions.size(), 5);
-
-		// Above
-		StringFact basePred = StateSpec.getInstance().getPredicates().get(
-				"above");
-		List<StringFact> conditions = possibleConditions.get("above");
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?X", "?Y" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?X", "?" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?", "?Y" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?", "?X" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?Y", "?" })));
-		assertEquals(conditions.size(), 5);
-
-		// Clear
-		basePred = StateSpec.getInstance().getPredicates().get("clear");
-		conditions = possibleConditions.get("clear");
-		assertTrue(conditions.contains(new StringFact(basePred,
-				new String[] { "?X" })));
-		assertEquals(conditions.size(), 1);
-
-		// Highest
-		basePred = StateSpec.getInstance().getPredicates().get("highest");
-		conditions = possibleConditions.get("highest");
-		assertTrue(conditions.contains(new StringFact(basePred,
-				new String[] { "?X" })));
-		assertEquals(conditions.size(), 1);
-
-		// On
-		basePred = StateSpec.getInstance().getPredicates().get("on");
-		conditions = possibleConditions.get("on");
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?X", "?Y" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?X", "?" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?", "?Y" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?", "?X" })));
-		assertTrue(conditions.contains(new StringFact(basePred, new String[] {
-				"?Y", "?" })));
-		assertEquals(conditions.size(), 5);
-
-		// OnFloor
-		basePred = StateSpec.getInstance().getPredicates().get("onFloor");
-		conditions = possibleConditions.get("onFloor");
-		assertTrue(conditions.contains(new StringFact(basePred,
-				new String[] { "?X" })));
-		assertEquals(conditions.size(), 1);
-	}
-
-	@Test
 	public void testReinitInstance() {
 		try {
 			spec_.getRete().eval("(assert (on a b))");

@@ -71,6 +71,8 @@ public class LearningController {
 	private int maxSteps_;
 	/** The generator file to load. */
 	private File loadedGeneratorFile_;
+	/*** If the algorithm is running tests throughout the learning. */
+	private boolean runningTests_ = true;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -130,7 +132,8 @@ public class LearningController {
 					// Load a generator file
 					i++;
 					loadedGeneratorFile_ = new File(args[i]);
-				}
+				} else if (args[i].equals("-t"))
+					runningTests_ = false;
 			}
 
 		} catch (Exception e) {
@@ -325,6 +328,7 @@ public class LearningController {
 
 			boolean restart = false;
 			// Fill the Policy Values list.
+			int maxSize = (t == 0) ? population * 2 : population;
 			do {
 				Policy pol = localPolicy.generatePolicy(true);
 				System.out.println(pol);
@@ -375,7 +379,7 @@ public class LearningController {
 
 				// Debug - Looking at rule values
 				// printRuleWorths(localPolicy);
-			} while (pvs.size() < population);
+			} while (pvs.size() < maxSize);
 
 			if (!restart) {
 				Collections.sort(pvs);
@@ -386,15 +390,18 @@ public class LearningController {
 				if (ENTROBEAM) {
 					numElite = population;
 				}
-				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
 
 				// Clean up the policy values
-				pvs = cleanPolicyValues(pvs, numElite, t, testingStep);
+				pvs = preUpdateModification(pvs, numElite);
+
+				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
+
+				pvs = postUpdateModification(pvs, t, testingStep);
 
 				// Only test the agent every number of steps, otherwise more
 				// time is spent testing than evaluating. (And at the first and
 				// last steps).
-				if ((sinceLastTest >= testingStep) || (t == finiteNum - 1)
+				if ((t == finiteNum - 1) || (sinceLastTest >= testingStep)
 						|| (t == 0)) {
 					testRecordAgent(localPolicy, run, episodePerformances, pvs,
 							finiteNum, t);
@@ -469,21 +476,45 @@ public class LearningController {
 			localPolicy.saveGenerators(tempGen);
 			saveElitePolicies(pvs);
 			// Output the episode averages
-			savePerformance(episodePerformances, run, false);
-			// TODO Save the pregoals
+			if (runningTests_)
+				savePerformance(episodePerformances, run, false);
+			File preGoalFile = new File(TEMP_FOLDER + "/preGoals.txt" + run);
+			preGoalFile.createNewFile();
+			localPolicy.savePreGoals(preGoalFile);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
 	/**
-	 * Cleans the elite policy values up by removing stale policy values and
-	 * keeping the number of values low.
+	 * Modifies the policy values before updating (cutting the values down to
+	 * size).
+	 * 
+	 * @param pvs
+	 *            The policy values to modify.
+	 * @param numElite
+	 *            The number of elite samples to use when updating. The size
+	 *            policy values should be.
+	 * @return The modified policy values list.
+	 */
+	private List<PolicyValue> preUpdateModification(List<PolicyValue> pvs,
+			int numElite) {
+		if (ENTROBEAM) {
+			if (pvs.size() > numElite) {
+				for (int i = pvs.size() - 1; i >= numElite; i--)
+					pvs.remove(i);
+			}
+		} else if (SLIDING_WINDOW)
+			pvs = pvs.subList(0, pvs.size() - numElite);
+		return pvs;
+	}
+
+	/**
+	 * Cleans the elite policy values up by removing stale policy values.
 	 * 
 	 * @param pvs
 	 *            The policy values list.
-	 * @param numElite
-	 *            The number of values there should be maximum.
 	 * @param iteration
 	 *            The current iteration.
 	 * @param staleValue
@@ -491,26 +522,15 @@ public class LearningController {
 	 *            stale.
 	 * @return The cleaned list of policy values.
 	 */
-	private List<PolicyValue> cleanPolicyValues(List<PolicyValue> pvs,
-			int numElite, int iteration, double staleValue) {
+	private List<PolicyValue> postUpdateModification(List<PolicyValue> pvs,
+			int iteration, double staleValue) {
 		// Remove any stale policies
-		// for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
-		// PolicyValue pv = iter.next();
-		// if (iteration - pv.getIteration() >= staleValue) {
-		// iter.remove();
-		// }
-		// }
-
-		// If the collection is too big, remove the worst policy values
-		if (ENTROBEAM) {
-			if (pvs.size() > numElite) {
-				for (int i = numElite; i < pvs.size(); i++)
-					pvs.remove(i);
+		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
+			PolicyValue pv = iter.next();
+			if (iteration - pv.getIteration() >= staleValue) {
+				iter.remove();
 			}
-		} else if (SLIDING_WINDOW)
-			pvs = pvs.subList(0, pvs.size() - numElite);
-		else
-			pvs.clear();
+		}
 		return pvs;
 	}
 
@@ -585,112 +605,147 @@ public class LearningController {
 	 * internal goal.
 	 * 
 	 * @param policyGenerator
-	 *            The policy generator.
+	 *            The current policy generator.
 	 */
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
 		// Run through each rule in the policy generator, noting which ones
 		// require module learning.
-		SortedSet<ConstantPred> modularFacts = policyGenerator
+		// TODO Problem: Have duplicate facts here. Maybe just check the facts
+		// have not already been used.
+		SortedSet<ConstantPred> constantFacts = policyGenerator
 				.getConstantFacts();
 
 		// Check if we have a module file for each.
-		for (Iterator<ConstantPred> factIter = modularFacts.iterator(); factIter
+		Set<String> usedPreds = new HashSet<String>();
+		for (Iterator<ConstantPred> factIter = constantFacts.iterator(); factIter
 				.hasNext();) {
 			ConstantPred pred = factIter.next();
 			if (Module.moduleExists(StateSpec.getInstance()
-					.getEnvironmentName(), pred.getFacts())) {
+					.getEnvironmentName(), pred.getFacts())
+					|| usedPreds.contains(pred.toString())) {
 				factIter.remove();
 			}
+			usedPreds.add(pred.toString());
 		}
 
 		// We should be left with whatever modules do not yet exist
-		if (!modularFacts.isEmpty()) {
+		if (!constantFacts.isEmpty()) {
 			int modsComplete = 0;
 			// Commence learning of the module
-			for (ConstantPred internalGoal : modularFacts) {
-				if (PolicyGenerator.debugMode_) {
-					try {
-						System.out.println("\n\n\n------LEARNING MODULE: "
-								+ internalGoal + "------\n\n\n");
-						System.out.println("Press Enter to continue.");
-						System.in.read();
-						System.in.read();
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-				}
-
-				// Set the internal goal
-				ObjectObservations.getInstance().objectArray = internalGoal
-						.getFacts().toArray(
-								new String[internalGoal.getFacts().size()]);
-				RLGlue.RL_agent_message(INTERNAL_PREFIX);
-				String[] oldInternalGoal = (String[]) ObjectObservations
-						.getInstance().objectArray;
-
-				// Begin development
-				PolicyGenerator modularGenerator = null;
-				// If we have several constant facts in one rule, we need to
-				// find the distribution of rules in the module that fit it
-				// properly.
-				if (internalGoal.getFacts().size() > 1) {
-					Collection<GuidedRule> rules = new ArrayList<GuidedRule>();
-					// Run through each module (known to be created) and add the
-					// rules together.
-					List<String> newQueryParams = new ArrayList<String>();
-					int i = 0;
-					for (StringFact fact : internalGoal.getFacts()) {
-						Module partialMod = Module.loadModule(StateSpec
-								.getInstance().getEnvironmentName(), fact.getFactName());
-
-						// Reform the rule parameters
-						int j = 0;
-						for (GuidedRule gr : partialMod.getModuleRules()) {
-							if (j == 0) {
-								j = gr.getQueryParameters().size();
-							}
-							gr.shiftModularVariables(i);
-							gr.setAsLoadedModuleRule(false);
-							rules.add(gr);
-						}
-
-						// Forming the new query parameters
-						for (int k = i; k < (j + i); k++)
-							newQueryParams.add(Module.createModuleParameter(k));
-
-						i += j;
-					}
-
-					// Create a policy generator that only updates slot weights.
-					modularGenerator = PolicyGenerator.newInstance(
-							policyGenerator, rules, newQueryParams,
-							internalGoal.getFacts());
-				} else {
-					modularGenerator = PolicyGenerator.newInstance(
-							policyGenerator, internalGoal.getFacts());
-				}
-				developPolicy(modularGenerator, -modularFacts.size()
-						+ modsComplete, 0);
-
-				// Save the module
-				Module.saveModule(internalGoal.getFacts(), StateSpec
-						.getInstance().getEnvironmentName(), modularGenerator
-						.getGenerator());
-
-				modsComplete++;
-
-				// Unset the internal goal
-				if (oldInternalGoal == null) {
-					ObjectObservations.getInstance().objectArray = null;
-					RLGlue.RL_agent_message(INTERNAL_PREFIX);
-				} else {
-					ObjectObservations.getInstance().objectArray = oldInternalGoal;
-					RLGlue.RL_agent_message(INTERNAL_PREFIX);
-				}
+			for (ConstantPred internalGoal : constantFacts) {
+				createModule(policyGenerator, constantFacts, modsComplete,
+						internalGoal);
 			}
 
 			// Ensure to reset the policy generator
 			PolicyGenerator.setInstance(policyGenerator);
+		}
+	}
+
+	/**
+	 * Creates a module by initialising generators.
+	 * 
+	 * @param policyGenerator
+	 *            The current policy generator.
+	 * @param constantFacts
+	 *            All the constant facts in the policy.
+	 * @param modsComplete
+	 *            How many modules are complete.
+	 * @param internalGoal
+	 *            The current module being created.
+	 */
+	private void createModule(PolicyGenerator policyGenerator,
+			SortedSet<ConstantPred> constantFacts, int modsComplete,
+			ConstantPred internalGoal) {
+		if (PolicyGenerator.debugMode_) {
+			try {
+				System.out.println("\n\n\n------LEARNING MODULE: "
+						+ internalGoal + "------\n\n\n");
+				System.out.println("Press Enter to continue.");
+				System.in.read();
+				System.in.read();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		// Set the internal goal
+		String[] moduleGoal = new String[internalGoal.getFacts().size()];
+		for (int i = 0; i < internalGoal.getFacts().size(); i++)
+			moduleGoal[i] = internalGoal.getFacts().get(i).getFactName();
+		ObjectObservations.getInstance().objectArray = moduleGoal;
+		RLGlue.RL_agent_message(INTERNAL_PREFIX);
+		String[] oldInternalGoal = (String[]) ObjectObservations.getInstance().objectArray;
+
+		// Begin development
+		PolicyGenerator modularGenerator = null;
+		// If we have several constant facts in one rule, we need to
+		// find the distribution of rules in the module that fit it
+		// properly.
+		if (internalGoal.getFacts().size() > 1) {
+			Collection<GuidedRule> rules = new ArrayList<GuidedRule>();
+			// Run through each module (known to be created) and add the
+			// rules together.
+			List<String> newQueryParams = new ArrayList<String>();
+			int i = 0;
+			for (StringFact fact : internalGoal.getFacts()) {
+				Module partialMod = Module.loadModule(StateSpec.getInstance()
+						.getEnvironmentName(), fact.getFactName());
+				if (partialMod == null) {
+					unsetInternalGoal(oldInternalGoal);
+					return;
+				}
+
+				// Reform the rule parameters
+				int j = 0;
+				for (GuidedRule gr : partialMod.getModuleRules()) {
+					if (j == 0) {
+						j = gr.getQueryParameters().size();
+					}
+					gr.shiftModularVariables(i);
+					gr.setAsLoadedModuleRule(false);
+					rules.add(gr);
+				}
+
+				// Forming the new query parameters
+				for (int k = i; k < (j + i); k++)
+					newQueryParams.add(Module.createModuleParameter(k));
+
+				i += j;
+			}
+
+			// Create a policy generator that only updates slot weights.
+			modularGenerator = PolicyGenerator.newInstance(policyGenerator,
+					rules, newQueryParams, internalGoal.getFacts());
+		} else {
+			modularGenerator = PolicyGenerator.newInstance(policyGenerator,
+					internalGoal.getFacts());
+		}
+		developPolicy(modularGenerator, -constantFacts.size() + modsComplete, 0);
+
+		// Save the module
+		Module.saveModule(internalGoal.getFacts(), StateSpec.getInstance()
+				.getEnvironmentName(), modularGenerator.getGenerator());
+
+		modsComplete++;
+
+		// Unset the internal goal
+		unsetInternalGoal(oldInternalGoal);
+	}
+
+	/**
+	 * Unsets the internal goal of the policy.
+	 * 
+	 * @param oldInternalGoal
+	 *            The old internal goal to set.
+	 */
+	private void unsetInternalGoal(String[] oldInternalGoal) {
+		if (oldInternalGoal == null) {
+			ObjectObservations.getInstance().objectArray = null;
+			RLGlue.RL_agent_message(INTERNAL_PREFIX);
+		} else {
+			ObjectObservations.getInstance().objectArray = oldInternalGoal;
+			RLGlue.RL_agent_message(INTERNAL_PREFIX);
 		}
 	}
 
@@ -754,39 +809,44 @@ public class LearningController {
 	 */
 	public float testAgent(int episode, int maxSteps, int run, int runs,
 			double expProg) {
-		System.out.println();
-		System.out.println("Beginning testing for episode " + episode + ".");
-		System.out.println();
 		float averageScore = 0;
 		RLGlue.RL_env_message("freeze");
+		if (runningTests_) {
+			System.out.println();
+			System.out
+					.println("Beginning testing for episode " + episode + ".");
+			System.out.println();
 
-		long startTime = System.currentTimeMillis();
+			long startTime = System.currentTimeMillis();
 
-		// Run the agent through several test iterations, resampling the agent
-		// at each step
-		for (int i = 0; i < TEST_ITERATIONS; i++) {
-			estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
+			// Run the agent through several test iterations, resampling the
+			// agent
+			// at each step
+			for (int i = 0; i < TEST_ITERATIONS; i++) {
+				estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
 
-			Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
-			System.out.println(pol);
-			// Send the agent a generated policy
-			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-			RLGlue.RL_agent_message("Policy");
+				Policy pol = PolicyGenerator.getInstance()
+						.generatePolicy(false);
+				System.out.println(pol);
+				// Send the agent a generated policy
+				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
+				RLGlue.RL_agent_message("Policy");
 
-			double score = 0;
-			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-				RLGlue.RL_episode(maxSteps);
-				if (PolicyGenerator.getInstance().isModuleGenerator())
-					score += Double.parseDouble(RLGlue
-							.RL_agent_message("internalReward"));
-				else
-					score += RLGlue.RL_return();
+				double score = 0;
+				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+					RLGlue.RL_episode(maxSteps);
+					if (PolicyGenerator.getInstance().isModuleGenerator())
+						score += Double.parseDouble(RLGlue
+								.RL_agent_message("internalReward"));
+					else
+						score += RLGlue.RL_return();
+				}
+				averageScore += score;
+				pol.parameterArgs(null);
+				System.out.println(score / AVERAGE_ITERATIONS + "\n");
 			}
-			averageScore += score;
-			pol.parameterArgs(null);
-			System.out.println(score / AVERAGE_ITERATIONS + "\n");
+			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 		}
-		averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 
 		// Write the state of the generators out in human readable form
 		try {
@@ -938,19 +998,35 @@ public class LearningController {
 	private void savePerformance(ArrayList<Float> episodeAverage, int run,
 			boolean finalWrite) throws Exception {
 		File tempPerf = null;
-		if (PolicyGenerator.getInstance().isModuleGenerator())
+		File detailedPerf = null;
+		if (PolicyGenerator.getInstance().isModuleGenerator()) {
 			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
 					+ PolicyGenerator.getInstance().getModuleName()
 					+ performanceFile_.getName());
-		else
+			detailedPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
+					+ PolicyGenerator.getInstance().getModuleName()
+					+ "detailed" + performanceFile_.getName());
+		} else {
 			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
 					+ run);
+			detailedPerf = new File(TEMP_FOLDER + "/" + "detailed"
+					+ performanceFile_.getName() + run);
+		}
 		tempPerf.createNewFile();
+		detailedPerf.createNewFile();
 		FileWriter wr = new FileWriter(tempPerf);
 		BufferedWriter buf = new BufferedWriter(wr);
+		FileWriter detWR = new FileWriter(detailedPerf);
+		BufferedWriter detBuf = new BufferedWriter(detWR);
 
 		System.out.println("Average episode elite scores:");
 		for (float perf : episodeAverage) {
+			PolicyGenerator.getInstance().saveHumanGenerators(detBuf);
+			detBuf.write("\n");
+			PolicyGenerator.getInstance().saveGenerators(detBuf);
+			detBuf.write("\n\n" + perf + "\n");
+			detBuf.write("\n\n\n");
+			
 			buf.write(perf + "\n");
 			System.out.println(perf);
 		}
@@ -961,6 +1037,8 @@ public class LearningController {
 					+ toTimeFormat(System.currentTimeMillis() - runStart_));
 		}
 
+		detBuf.close();
+		detWR.close();
 		buf.close();
 		wr.close();
 	}

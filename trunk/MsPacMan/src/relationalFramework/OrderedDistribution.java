@@ -136,7 +136,8 @@ public class OrderedDistribution<T> implements Collection<T> {
 	 *            The relative positions of the elements.
 	 * @param stepSize
 	 *            The step size update parameter.
-	 * @return The difference between the old and the new value.
+	 * @return The KL divergence between the old probabilities and the new
+	 *         probabilities.
 	 */
 	public double updateDistribution(Map<T, Double> elementPositions,
 			double stepSize) {
@@ -154,7 +155,7 @@ public class OrderedDistribution<T> implements Collection<T> {
 
 				element.setProbability(newValue);
 
-				diff += Math.abs(oldValue - newValue);
+				diff += Math.abs(newValue - oldValue);
 			}
 		}
 		return diff;

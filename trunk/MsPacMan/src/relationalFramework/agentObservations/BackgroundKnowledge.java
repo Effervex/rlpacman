@@ -100,8 +100,8 @@ public class BackgroundKnowledge {
 		Collection<StringFact> preConds = new ArrayList<StringFact>(preConds_
 				.size());
 		for (StringFact preCond : preConds_) {
-			StringFact replacedFact = new StringFact(preCond);
-			replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
+			StringFact replacedFact = new StringFact(preCond, replacementTerms.inverseBidiMap(),
+					true);
 			preConds.add(replacedFact);
 		}
 
@@ -118,7 +118,8 @@ public class BackgroundKnowledge {
 	private StringFact getPostCond(BidiMap replacementTerms) {
 		StringFact replacedFact = new StringFact(postCondition_);
 		if (replacementTerms != null)
-			replacedFact.replaceArguments(replacementTerms.inverseBidiMap());
+			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
+					true);
 		return replacedFact;
 	}
 
@@ -150,13 +151,13 @@ public class BackgroundKnowledge {
 		// Simplify to the left for equivalent background knowledge
 		if (equivalentRule_) {
 			replacementTerms.clear();
-			Collection<StringFact> unifiedEquiv = coveringObj.unifyFact(
-					getPostCond(null), ruleConds, new DualHashBidiMap(),
-					replacementTerms, new String[0], true);
-			for (StringFact unifiedFact : unifiedEquiv) {
-				StringFact removed = new StringFact(unifiedFact);
-				removed.replaceArguments(replacementTerms.inverseBidiMap());
-				ruleConds.remove(removed);
+			StringFact unifiedEquiv = coveringObj.unifyFact(getPostCond(null),
+					ruleConds, new DualHashBidiMap(), replacementTerms,
+					new String[0], true);
+			if (unifiedEquiv != null) {
+				unifiedEquiv.replaceArguments(
+						replacementTerms.inverseBidiMap(), true);
+				ruleConds.remove(unifiedEquiv);
 				Collection<StringFact> equivFacts = getPreConds(replacementTerms);
 				for (StringFact equivFact : equivFacts) {
 					if (!ruleConds.contains(equivFact)) {
@@ -196,8 +197,42 @@ public class BackgroundKnowledge {
 
 	@Override
 	public String toString() {
-		if (jessAssert_)
-			return assertionString_;
-		return "STATE RULE: " + assertionString_;
+		return assertionString_;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + (equivalentRule_ ? 1231 : 1237);
+		result = prime * result
+				+ ((postCondition_ == null) ? 0 : postCondition_.hashCode());
+		result = prime * result
+				+ ((preConds_ == null) ? 0 : preConds_.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		BackgroundKnowledge other = (BackgroundKnowledge) obj;
+		if (equivalentRule_ != other.equivalentRule_)
+			return false;
+		if (postCondition_ == null) {
+			if (other.postCondition_ != null)
+				return false;
+		} else if (!postCondition_.equals(other.postCondition_))
+			return false;
+		if (preConds_ == null) {
+			if (other.preConds_ != null)
+				return false;
+		} else if (!preConds_.equals(other.preConds_))
+			return false;
+		return true;
 	}
 }

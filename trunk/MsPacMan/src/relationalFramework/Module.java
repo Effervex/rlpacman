@@ -213,8 +213,7 @@ public class Module {
 				int j = 0;
 				for (StringFact fact : facts) {
 					int i = 0;
-					for (; i < StateSpec.getInstance().getPredicates()
-							.get(fact).getArguments().length; i++) {
+					for (; i < fact.getArguments().length; i++) {
 						bf.write(" " + createModuleParameter(i + j));
 					}
 					j += i;

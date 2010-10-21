@@ -52,7 +52,10 @@ public class Covering {
 	 */
 	private Map<String, PreGoalInformation> backupPreGoals_;
 
-	public Covering(int numActions) {
+	/**
+	 * Basic constructor.
+	 */
+	public Covering() {
 		ao_ = new AgentObservations();
 	}
 
@@ -162,7 +165,16 @@ public class Covering {
 	}
 
 	/**
-	 * The actual unify state method used by the two outer methods.
+	 * The actual unify state method used by the two outer methods. This method
+	 * has a some guarantees:
+	 * 
+	 * The unified old state can only ever get more general - either by losing
+	 * predicates or making terms more general. Which means that the number of
+	 * preds in the post-unified state will only be <= the old state.
+	 * 
+	 * The unification process may not be the most ideal one, it is a single
+	 * pass process, but it does try to unify with the most specific terms in
+	 * the new state. Each term in the new state can only be unified with once.
 	 * 
 	 * @param oldState
 	 *            The old state to be unified with.
@@ -184,24 +196,33 @@ public class Covering {
 			Collection<StringFact> newState, String[] oldTerms,
 			boolean flexibleReplacement, BidiMap oldReplacementMap,
 			BidiMap newReplacementMap) {
+		// Copy the new state as it is going to be modified.
+		newState = new ArrayList<StringFact>(newState);
+
 		// For each item in the old state, see if it is present in the new state
 		boolean hasChanged = false;
 		List<StringFact> oldStateRepl = new ArrayList<StringFact>();
 		for (StringFact oldStateFact : oldState) {
-			Collection<StringFact> modFacts = unifyFact(oldStateFact, newState,
+			StringFact modFact = unifyFact(oldStateFact, newState,
 					oldReplacementMap, newReplacementMap, oldTerms,
 					flexibleReplacement);
 
-			if (modFacts.isEmpty())
+			// If the fact is null, then there was no unification.
+			if (modFact == null)
 				hasChanged = true;
-
-			for (StringFact modFact : modFacts) {
+			else {
 				// Check for a change
 				if (!oldStateFact.equals(modFact))
 					hasChanged = true;
 
-				if ((modFact != null) && (!oldStateRepl.contains(modFact)))
+				if (!oldStateRepl.contains(modFact))
 					oldStateRepl.add(modFact);
+
+				// Remove the fact from the new state so it cannot be used for
+				// unifying again.
+				StringFact replFact = new StringFact(modFact, newReplacementMap
+						.inverseBidiMap(), true);
+				newState.remove(replFact);
 			}
 		}
 
@@ -288,11 +309,11 @@ public class Covering {
 	 *         input fact) or null if no unification.
 	 */
 	@SuppressWarnings("unchecked")
-	public Collection<StringFact> unifyFact(StringFact fact,
+	public StringFact unifyFact(StringFact fact,
 			Collection<StringFact> unityFacts, BidiMap factReplacementMap,
 			BidiMap unityReplacementMap, String[] factTerms,
 			boolean flexibleReplacement) {
-		Collection<StringFact> result = new ArrayList<StringFact>();
+		StringFact result = null;
 
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
@@ -351,13 +372,12 @@ public class Covering {
 				// 2. The fact is less general than the current best
 				if (notAnonymous) {
 					if (thisGeneralness < generalisation) {
-						result.clear();
 						generalisation = thisGeneralness;
 					}
 					if (thisGeneralness == generalisation) {
 						StringFact unifact = new StringFact(fact, unification,
 								fact.isNegated());
-						result.add(unifact);
+						result = unifact;
 
 						// If we're using flexible replacements, store any
 						// temporary replacements created
@@ -369,7 +389,7 @@ public class Covering {
 			}
 		}
 
-		if (!result.isEmpty()) {
+		if (result != null) {
 			// Setting the fact terms
 			for (int i = 0; i < factTerms.length; i++) {
 				for (Object factKey : factReplacementMap.keySet())
@@ -615,25 +635,24 @@ public class Covering {
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
-			Collection<StringFact> unification = unifyFact(condition,
-					ruleConds, new DualHashBidiMap(), new DualHashBidiMap(),
+			StringFact unification = unifyFact(condition, ruleConds,
+					new DualHashBidiMap(), new DualHashBidiMap(),
 					new String[0], false);
-			if (!unification.isEmpty())
+			if (unification != null)
 				return null;
 
 			condition.swapNegated();
-			Collection<StringFact> negUnification = unifyFact(condition,
-					ruleConds, new DualHashBidiMap(), new DualHashBidiMap(),
+			StringFact negUnification = unifyFact(condition, ruleConds,
+					new DualHashBidiMap(), new DualHashBidiMap(),
 					new String[0], false);
 			condition.swapNegated();
-			if (!negUnification.isEmpty())
+			if (negUnification != null)
 				return null;
 
 			simplified.add(condition);
 		}
 
-		for (BackgroundKnowledge bckKnow : StateSpec.getInstance()
-				.getBackgroundKnowledgeConditions()) {
+		for (BackgroundKnowledge bckKnow : ao_.getLearnedBackgroundKnowledge()) {
 			bckKnow.simplify(simplified, this, testForIllegalRule);
 		}
 
@@ -707,8 +726,8 @@ public class Covering {
 				// replacing pre-goal terms with rule terms
 				if (!hasPred) {
 					// Replace pre-goal action terms with local rule terms
-					preGoalFact = new StringFact(preGoalFact);
-					preGoalFact.replaceArguments(replacementTerms);
+					preGoalFact = new StringFact(preGoalFact, replacementTerms,
+							true);
 
 					// If the fact isn't in the rule, we have a mutation
 					if (!ruleConditions.contains(preGoalFact)) {
@@ -1317,11 +1336,14 @@ public class Covering {
 	 *            The other covering object.
 	 */
 	public void migrateAgentObservations(Covering otherCovering) {
-		backupPreGoals_ = otherCovering.ao_.backupAndClearPreGoals();
+		otherCovering.backupPreGoals_ = otherCovering.ao_
+				.backupAndClearPreGoals();
 		ao_ = otherCovering.ao_;
 	}
 
 	public void loadBackupPreGoal() {
+		if (backupPreGoals_ == null)
+			return;
 		ao_.loadPreGoals(backupPreGoals_);
 	}
 
@@ -1341,7 +1363,7 @@ public class Covering {
 
 	/**
 	 * Sets the individual conditions that have been observed to be true for
-	 * executing an action.
+	 * executing an action. Testing method.
 	 * 
 	 * @param action
 	 *            The action to set the conditions for.
@@ -1381,6 +1403,24 @@ public class Covering {
 		if (pgi == null)
 			return false;
 		return pgi.isRecentlyChanged();
+	}
+
+	/**
+	 * If the AgentObservations are settled.
+	 * 
+	 * @return True if the observations are settled.
+	 */
+	public boolean isSettled() {
+		return ao_.isConditionBeliefsSettled()
+				&& ao_.isActionConditionSettled()
+				&& ao_.isRangedConditionSettled();
+	}
+
+	/**
+	 * Resets the inactivity counters of the AgentObservations object.
+	 */
+	public void resetInactivity() {
+		ao_.resetInactivity();
 	}
 
 	/**

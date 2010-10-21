@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -10,6 +11,9 @@ import java.util.Map;
  * @author Sam Sarjant
  */
 public class StringFact implements Comparable<StringFact> {
+	private final int CONST = 0;
+	private final int VAR = 1;
+	private final int ANON = 2;
 	/** The fact name. */
 	private String factName_;
 	/** If this fact is negated (prefixed by not) */
@@ -83,18 +87,45 @@ public class StringFact implements Comparable<StringFact> {
 	}
 
 	/**
+	 * Constructor for a clone StringFact with the arguments replaced.
+	 * 
+	 * @param stringFact
+	 *            The StringFact to clone.
+	 * @param replacementMap
+	 *            The replacement map for the arguments.
+	 * @param retainOtherArgs
+	 *            If arguments that have no replacement should be retained (or
+	 *            turned anonymous).
+	 */
+	public StringFact(StringFact stringFact,
+			Map<String, String> replacementMap, boolean retainOtherArgs) {
+		this(stringFact);
+		replaceArguments(replacementMap, retainOtherArgs);
+	}
+
+	/**
 	 * Replaces all occurrences of an argument with another value.
 	 * 
 	 * @param replacementMap
 	 *            The replacement map for the arguments.
+	 * @param retainOtherArgs
+	 *            If arguments that have no replacement should be retained (or
+	 *            turned anonymous).
 	 */
-	public void replaceArguments(Map<String, String> replacementMap) {
+	public void replaceArguments(Map<String, String> replacementMap,
+			boolean retainOtherArgs) {
 		String[] newArguments = Arrays.copyOf(arguments_, arguments_.length);
 		for (int i = 0; i < arguments_.length; i++) {
+			boolean hasReplacement = false;
 			for (String key : replacementMap.keySet()) {
-				if (arguments_[i].equals(key))
+				if (arguments_[i].equals(key)) {
 					newArguments[i] = replacementMap.get(key);
+					hasReplacement = true;
+				}
 			}
+
+			if (!retainOtherArgs && !hasReplacement)
+				newArguments[i] = "?";
 		}
 		arguments_ = newArguments;
 	}
@@ -119,14 +150,33 @@ public class StringFact implements Comparable<StringFact> {
 	/**
 	 * Replaces a single argument by another.
 	 * 
-	 * @param replacedTerm The term to be replaced.
-	 * @param replacementTerm the term to replace the old term.
+	 * @param replacedTerm
+	 *            The term to be replaced.
+	 * @param replacementTerm
+	 *            the term to replace the old term.
 	 */
 	public void replaceArguments(String replacedTerm, String replacementTerm) {
 		for (int i = 0; i < arguments_.length; i++) {
 			if (arguments_[i].equals(replacedTerm))
 				arguments_[i] = replacementTerm;
 		}
+	}
+
+	/**
+	 * Creates a variable term replacement map using this StringFacts
+	 * non-numerical arguments as the terms being replaced.
+	 * 
+	 * @return A replacement map which converts this string fact's non-numerical
+	 *         terms into ordered variable terms.
+	 */
+	public Map<String, String> createVariableTermReplacementMap() {
+		Map<String, String> replacementMap = new HashMap<String, String>();
+		for (int i = 0; i < arguments_.length; i++) {
+			if (!Number.class.isAssignableFrom(factTypes_[i]))
+				replacementMap.put(arguments_[i], Covering
+						.getVariableTermString(i));
+		}
+		return replacementMap;
 	}
 
 	/**
@@ -195,6 +245,29 @@ public class StringFact implements Comparable<StringFact> {
 		// Fact Types should be the same if both names are the same
 		// Check arguments
 		for (int i = 0; i < arguments_.length; i++) {
+			// Special comparison here: constants outrank variables outrank
+			// anonymous
+			int argType0 = CONST;
+			int argType1 = CONST;
+
+			if (arguments_[i].charAt(0) == '?') {
+				if (arguments_[i].length() > 1)
+					argType0 = VAR;
+				else
+					argType0 = ANON;
+			}
+
+			if (sf.arguments_[i].charAt(0) == '?') {
+				if (sf.arguments_[i].length() > 1)
+					argType1 = VAR;
+				else
+					argType1 = ANON;
+			}
+
+			if (argType0 < argType1)
+				return -1;
+			if (argType0 > argType1)
+				return 1;
 			result = arguments_[i].compareTo(sf.arguments_[i]);
 			if (result != 0)
 				return result;

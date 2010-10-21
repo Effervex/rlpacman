@@ -404,7 +404,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 *            The count for this element.
 	 * @param stepSize
 	 *            The step size for the update.
-	 * @return The value of the change in the probability.
+	 * @return The KL divergence of the update.
 	 */
 	public double updateElement(ItemProb<T> element, double numSamples,
 			double count, double stepSize) {
@@ -416,7 +416,24 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		// Set the new value.
 		element.setProbability(newValue);
 
-		return newValue - oldValue;
+		return klDivergence(oldValue, newValue);
+	}
+
+	/**
+	 * Calculates the KL divergence between two probability values.
+	 * 
+	 * @param oldValue The old value.
+	 * @param newValue The new value.
+	 * @return The KL divergence between the values.
+	 */
+	private double klDivergence(double oldValue, double newValue) {
+		if (newValue == 0)
+			return 0;
+		if (oldValue == 0)
+			return Double.POSITIVE_INFINITY;
+		
+		double result = newValue * Math.log(newValue / oldValue);
+		return result;
 	}
 
 	/**
@@ -610,6 +627,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	@Override
 	public String toString() {
+		// TODO Output the string as a sorted list by probability
 		StringBuffer buffer = new StringBuffer("[");
 		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
 		if (iter.hasNext())

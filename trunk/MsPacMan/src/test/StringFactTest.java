@@ -29,7 +29,7 @@ public class StringFactTest {
 		assertArrayEquals(strFact.getArguments(), new String[] { "a" });
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		replacementMap.put("a", "b");
-		strFact.replaceArguments(replacementMap);
+		strFact.replaceArguments(replacementMap, true);
 		assertArrayEquals(strFact.getArguments(), new String[] { "b" });
 		
 		// Swapsies
@@ -39,7 +39,7 @@ public class StringFactTest {
 		replacementMap = new HashMap<String, String>();
 		replacementMap.put("a", "b");
 		replacementMap.put("b", "a");
-		strFact.replaceArguments(replacementMap);
+		strFact.replaceArguments(replacementMap, true);
 		assertArrayEquals(strFact.getArguments(), new String[] { "b", "a" });
 	}
 

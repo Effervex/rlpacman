@@ -6,10 +6,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.Set;
 
 import jess.Fact;
+import relationalFramework.Covering;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -28,7 +28,7 @@ public class AgentObservations {
 	private Integer observationHash_ = null;
 
 	/** The agent's beliefs about the condition inter-relations. */
-	private SortedSet<ConditionBeliefs> conditionBeliefs_;
+	private Map<String, ConditionBeliefs> conditionBeliefs_;
 
 	/** The inactivity counter for the condition beliefs. */
 	private int conditionBeliefInactivity_ = 0;
@@ -36,6 +36,7 @@ public class AgentObservations {
 	/** The observed invariants of the environment. */
 	private Collection<String> invariants_;
 
+	// TODO Save these for visual examination or agent reuse.
 	/** The rules about the environment learned by the agent. */
 	private Collection<BackgroundKnowledge> learnedEnvironmentRules_;
 
@@ -49,11 +50,11 @@ public class AgentObservations {
 	 * The constructor for the agent observations.
 	 */
 	public AgentObservations() {
-		conditionBeliefs_ = new TreeSet<ConditionBeliefs>();
+		conditionBeliefs_ = new HashMap<String, ConditionBeliefs>();
 		learnedEnvironmentRules_ = new HashSet<BackgroundKnowledge>();
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 		observationHash_ = null;
-		updateHash();
+		learnedEnvironmentRules_ = formBackgroundKnowledge();
 	}
 
 	/**
@@ -66,11 +67,9 @@ public class AgentObservations {
 	 * @return The mapping of terms to facts.
 	 */
 	public void scanState(Collection<Fact> state) {
-		// TODO Make condition notes.
-		// If condition beliefs changed, signal for a hash update
-		observationHash_ = null;
-		updateHash();
-
+		// Run through the facts, adding to term mapped facts and adding the raw
+		// facts for condition belief scanning.
+		Collection<StringFact> stateFacts = new ArrayList<StringFact>();
 		termMappedFacts_ = new MultiMap<String, StringFact>();
 		for (Fact stateFact : state) {
 			// Ignore the type, inequal and actions pred
@@ -80,6 +79,8 @@ public class AgentObservations {
 				System.arraycopy(split, 1, arguments, 0, arguments.length);
 				StringFact strFact = new StringFact(StateSpec.getInstance()
 						.getStringFact(split[0]), arguments);
+				if (!StateSpec.getInstance().isTypePredicate(split[0]))
+					stateFacts.add(strFact);
 
 				// Run through the arguments and index the fact by term
 				for (int i = 0; i < arguments.length; i++) {
@@ -89,6 +90,101 @@ public class AgentObservations {
 				}
 			}
 		}
+
+		// Use the term mapped facts to generate collections of true facts.
+		recordConditionAssociations(stateFacts);
+	}
+
+	/**
+	 * Records all conditions associations from the current state using the term
+	 * mapped facts to form the relations.
+	 * 
+	 * @param stateFacts
+	 *            The facts of the state in StringFact form.
+	 */
+	private void recordConditionAssociations(Collection<StringFact> stateFacts) {
+		if (conditionBeliefInactivity_ >= INACTIVITY_THRESHOLD)
+			return;
+
+		boolean changed = false;
+		for (StringFact baseFact : stateFacts) {
+			// Getting the ConditionBeliefs object
+			ConditionBeliefs cb = conditionBeliefs_.get(baseFact.getFactName());
+			if (cb == null) {
+				cb = new ConditionBeliefs(baseFact.getFactName());
+				conditionBeliefs_.put(baseFact.getFactName(), cb);
+				observationHash_ = null;
+			}
+
+			// Create a replacement map here (excluding numerical values)
+			Map<String, String> replacementMap = baseFact
+					.createVariableTermReplacementMap();
+
+			// Replace facts for all relevant facts and store as condition
+			// beliefs.
+			Collection<StringFact> relativeFacts = new HashSet<StringFact>();
+			for (String term : baseFact.getArguments()) {
+				Collection<StringFact> termFacts = termMappedFacts_.get(term);
+				if (termFacts != null) {
+					for (StringFact termFact : termFacts) {
+						// Don't include the fact itself or type facts in the
+						// condition beliefs.
+						if (!termFact.equals(baseFact)
+								&& !StateSpec.getInstance().isTypePredicate(
+										termFact.getFactName())) {
+							StringFact relativeFact = new StringFact(termFact,
+									replacementMap, false);
+							relativeFacts.add(relativeFact);
+						}
+					}
+				}
+			}
+
+			if (cb.noteTrueRelativeFacts(relativeFacts)) {
+				changed = true;
+				observationHash_ = null;
+			}
+		}
+
+		if (changed) {
+			learnedEnvironmentRules_ = formBackgroundKnowledge();
+			conditionBeliefInactivity_ = 0;
+		} else
+			conditionBeliefInactivity_++;
+	}
+
+	/**
+	 * Forms the background knowledge from the condition beliefs.
+	 */
+	private Collection<BackgroundKnowledge> formBackgroundKnowledge() {
+		Collection<BackgroundKnowledge> backgroundKnowledge = new HashSet<BackgroundKnowledge>();
+		// Add the knowledge provided by the state specification
+		backgroundKnowledge.addAll(StateSpec.getInstance()
+				.getBackgroundKnowledgeConditions());
+
+		// Run through every condition in the beliefs
+		for (String cond : conditionBeliefs_.keySet()) {
+			ConditionBeliefs cb = conditionBeliefs_.get(cond);
+			StringFact cbFact = StateSpec.getInstance().getStringFact(
+					cb.getCondition());
+			String[] arguments = new String[cbFact.getArguments().length];
+			for (int i = 0; i < arguments.length; i++)
+				arguments[i] = Covering.getVariableTermString(i);
+			cbFact = new StringFact(cbFact, arguments);
+
+			// Assert the true facts
+			for (StringFact alwaysTrue : cb.getAlwaysTrue()) {
+				backgroundKnowledge.add(new BackgroundKnowledge(cbFact + " => "
+						+ alwaysTrue, false));
+			}
+
+			// Assert the false facts
+			for (StringFact neverTrue : cb.getNeverTrue()) {
+				backgroundKnowledge.add(new BackgroundKnowledge(cbFact + " => "
+						+ "(not " + neverTrue + ")", false));
+			}
+		}
+		return backgroundKnowledge;
 	}
 
 	/**
@@ -100,17 +196,34 @@ public class AgentObservations {
 	 */
 	public Collection<StringFact> gatherActionFacts(StringFact action) {
 		// Note down action conditions if still unsettled.
-		observationHash_ = null;
-		updateHash();
-
+		Map<String, String> replacementMap = action
+				.createVariableTermReplacementMap();
 		Collection<StringFact> actionFacts = new HashSet<StringFact>();
 		for (String argument : action.getArguments()) {
 			List<StringFact> termFacts = termMappedFacts_.get(argument);
 			if (termFacts != null) {
+				Set<StringFact> actionConds = new HashSet<StringFact>();
 				for (StringFact termFact : termFacts) {
 					if (!actionFacts.contains(termFact))
 						actionFacts.add(termFact);
+
+					// If the action conditions have not settled, note the
+					// action conditions.
+					if (getActionBasedObservation(action.getFactName()).actionConditionInactivity_ < INACTIVITY_THRESHOLD) {
+						// Ignore type predicates.
+						if (!StateSpec.getInstance().isTypePredicate(
+								termFact.getFactName())) {
+							// Note the action condition
+							StringFact actionCond = new StringFact(termFact,
+									replacementMap, false);
+							actionConds.add(actionCond);
+						}
+					}
 				}
+				if (!actionConds.isEmpty()
+						&& getActionBasedObservation(action.getFactName())
+								.addActionConditions(actionConds))
+					observationHash_ = null;
 			}
 		}
 
@@ -118,12 +231,24 @@ public class AgentObservations {
 	}
 
 	/**
-	 * Updates the observation hash code. // TODO Make this only called from the
-	 * mutation stage, so it is only updated once per iteration.
+	 * Updates the observation hash code.
 	 */
 	private void updateHash() {
 		if (observationHash_ == null) {
-			// TODO Update the hash
+			// Update the hash
+			final int prime = 31;
+			observationHash_ = 1;
+
+			// Note the condition beliefs - the invariants and background
+			// knowledge depend on it anyway.
+			int subresult = 1;
+			for (ConditionBeliefs cb : conditionBeliefs_.values())
+				subresult = prime * subresult + cb.hashCode();
+			observationHash_ = prime * observationHash_ + subresult;
+
+			// Note the pre goal, action conditions and condition ranges
+			observationHash_ = prime * observationHash_
+					+ actionBasedObservations_.hashCode();
 		}
 	}
 
@@ -132,7 +257,7 @@ public class AgentObservations {
 		return observationHash_;
 	}
 
-	public SortedSet<ConditionBeliefs> getConditionBeliefs() {
+	public Map<String, ConditionBeliefs> getConditionBeliefs() {
 		return conditionBeliefs_;
 	}
 
@@ -149,7 +274,6 @@ public class AgentObservations {
 	public void setPreGoal(String actionPred, PreGoalInformation preGoal) {
 		getActionBasedObservation(actionPred).setPGI(preGoal);
 		observationHash_ = null;
-		updateHash();
 	}
 
 	public boolean hasPreGoal() {
@@ -168,9 +292,8 @@ public class AgentObservations {
 
 	public void setActionConditions(String action,
 			Collection<StringFact> conditions) {
-		getActionBasedObservation(action).setActionConditions(conditions);
+		getActionBasedObservation(action).addActionConditions(conditions);
 		observationHash_ = null;
-		updateHash();
 	}
 
 	public List<RangedCondition> getActionRange(String actionPred) {
@@ -180,9 +303,8 @@ public class AgentObservations {
 	}
 
 	public void setActionRange(String actionPred, RangedCondition rc) {
-		getActionBasedObservation(actionPred).setActionRange(rc);
-		observationHash_ = null;
-		updateHash();
+		if (getActionBasedObservation(actionPred).setActionRange(rc))
+			observationHash_ = null;
 	}
 
 	/**
@@ -213,7 +335,6 @@ public class AgentObservations {
 			getActionBasedObservation(key).setPGI(backupPreGoals.get(key));
 		}
 		observationHash_ = null;
-		updateHash();
 	}
 
 	/**
@@ -222,13 +343,41 @@ public class AgentObservations {
 	 */
 	public void clearHash() {
 		observationHash_ = null;
-		updateHash();
 	}
 
 	public void clearPreGoal() {
 		for (String action : actionBasedObservations_.keySet()) {
 			actionBasedObservations_.get(action).setPGI(null);
 		}
+	}
+
+	public void resetInactivity() {
+		conditionBeliefInactivity_ = 0;
+		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
+			abo.actionConditionInactivity_ = 0;
+			abo.rangedConditionInactivity_ = 0;
+		}
+	}
+
+	public boolean isConditionBeliefsSettled() {
+		return (conditionBeliefInactivity_ >= INACTIVITY_THRESHOLD);
+	}
+
+	public boolean isActionConditionSettled() {
+		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
+			if (abo.actionConditionInactivity_ < INACTIVITY_THRESHOLD)
+				return false;
+		}
+		return true;
+	}
+
+	public boolean isRangedConditionSettled() {
+		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
+			if ((abo.conditionRanges_ != null)
+					&& (abo.rangedConditionInactivity_ < INACTIVITY_THRESHOLD))
+				return false;
+		}
+		return true;
 	}
 
 	/**
@@ -281,19 +430,107 @@ public class AgentObservations {
 			return actionConditions_;
 		}
 
-		public void setActionConditions(Collection<StringFact> conditions) {
-			actionConditions_ = conditions;
+		/**
+		 * Adds action conditions to the action based observations.
+		 * 
+		 * @param actionConds
+		 *            the action conditions being added.
+		 * @return True if the set of action conditions changed because of the
+		 *         addition.
+		 */
+		public boolean addActionConditions(Collection<StringFact> actionConds) {
+			if (actionConditions_ == null) {
+				actionConditions_ = new HashSet<StringFact>();
+			}
+			int numConds = actionConditions_.size();
+			actionConditions_.addAll(actionConds);
+
+			if ((actionConditions_.size() - numConds) != 0) {
+				actionConditionInactivity_ = 0;
+				return true;
+			}
+
+			actionConditionInactivity_++;
+			return false;
 		}
 
 		public List<RangedCondition> getActionRange() {
 			return conditionRanges_;
 		}
 
-		public void setActionRange(RangedCondition rc) {
+		/**
+		 * Sets the action range to the specified value.
+		 * 
+		 * @param rc
+		 *            The ranged condition to set.
+		 * @return True if the condition range changed, false otherwise.
+		 */
+		public boolean setActionRange(RangedCondition rc) {
+			RangedCondition oldCond = null;
 			if (conditionRanges_ == null)
 				conditionRanges_ = new ArrayList<RangedCondition>();
-			conditionRanges_.remove(rc);
+			else {
+				int index = conditionRanges_.indexOf(rc);
+				oldCond = conditionRanges_.remove(index);
+			}
 			conditionRanges_.add(rc);
+
+			if (!rc.equalRange(oldCond)) {
+				rangedConditionInactivity_ = 0;
+				return true;
+			}
+			rangedConditionInactivity_++;
+			return false;
+		}
+
+		private AgentObservations getOuterType() {
+			return AgentObservations.this;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + getOuterType().hashCode();
+			result = prime
+					* result
+					+ ((actionConditions_ == null) ? 0 : actionConditions_
+							.hashCode());
+			result = prime
+					* result
+					+ ((conditionRanges_ == null) ? 0 : conditionRanges_
+							.hashCode());
+			result = prime * result + ((pgi_ == null) ? 0 : pgi_.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			ActionBasedObservations other = (ActionBasedObservations) obj;
+			if (!getOuterType().equals(other.getOuterType()))
+				return false;
+			if (actionConditions_ == null) {
+				if (other.actionConditions_ != null)
+					return false;
+			} else if (!actionConditions_.equals(other.actionConditions_))
+				return false;
+			if (conditionRanges_ == null) {
+				if (other.conditionRanges_ != null)
+					return false;
+			} else if (!conditionRanges_.equals(other.conditionRanges_))
+				return false;
+			if (pgi_ == null) {
+				if (other.pgi_ != null)
+					return false;
+			} else if (!pgi_.equals(other.pgi_))
+				return false;
+			return true;
 		}
 	}
 }

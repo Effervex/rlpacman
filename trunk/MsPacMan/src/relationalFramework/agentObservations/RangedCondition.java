@@ -73,6 +73,8 @@ public class RangedCondition {
 	 * @return True if the ranges are equal, false otherwise.
 	 */
 	public boolean equalRange(RangedCondition coveredRange) {
+		if (coveredRange == null)
+			return false;
 		if ((coveredRange.minimum_ == minimum_)
 				&& (coveredRange.maximum_ == maximum_))
 			return true;

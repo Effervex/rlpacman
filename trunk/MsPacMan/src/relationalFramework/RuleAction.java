@@ -39,7 +39,7 @@ public class RuleAction {
 	public void replaceTerms(Map<String, String> replacements) {
 		// For each action
 		for (StringFact action : actions_) {
-			action.replaceArguments(replacements);
+			action.replaceArguments(replacements, true);
 		}
 	}
 
