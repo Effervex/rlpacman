@@ -15,9 +15,6 @@ public class ConstantPred implements Comparable<ConstantPred> {
 	/** A sorted list of facts using only constant terms */
 	private ArrayList<StringFact> facts_;
 
-	// TODO Sort out the guided rule constant pred stuff. Have this object store
-	// the facts and be able to convert them into comparable strings.
-
 	public ConstantPred(StringFact fact) {
 		facts_ = new ArrayList<StringFact>();
 		facts_.add(fact);

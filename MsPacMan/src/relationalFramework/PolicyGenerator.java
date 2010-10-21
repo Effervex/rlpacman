@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -61,7 +62,7 @@ public class PolicyGenerator {
 	 * The last amount of difference in distribution probabilities from the
 	 * update.
 	 */
-	private double updateDifference_;
+	private double klDivergence_;
 
 	/** If this policy generator is being used for learning a module. */
 	private boolean moduleGenerator_;
@@ -112,6 +113,12 @@ public class PolicyGenerator {
 	private static final double MIN_UPDATE = 0.1;
 
 	/**
+	 * If the summed total update value is only at this percentage of the
+	 * update, the distribution is converged.
+	 */
+	private static final double CONVERGED_EPSILON = 0.01;
+
+	/**
 	 * The threshold coefficient relative to distribution size at which rules
 	 * have extra influence.
 	 */
@@ -134,10 +141,10 @@ public class PolicyGenerator {
 	public PolicyGenerator() {
 		actionSet_ = StateSpec.getInstance().getActions();
 		coveredRules_ = new MultiMap<String, GuidedRule>();
-		covering_ = new Covering(actionSet_.size());
+		covering_ = new Covering();
 		mutatedRules_ = new MultiMap<String, GuidedRule>();
 		removedRules_ = new HashSet<GuidedRule>();
-		updateDifference_ = Double.MAX_VALUE;
+		klDivergence_ = Double.MAX_VALUE;
 
 		resetGenerator();
 	}
@@ -232,10 +239,7 @@ public class PolicyGenerator {
 			MultiMap<String, String> activatedActions, boolean createNewRules) {
 		// If there are actions to cover, cover them.
 		if (!frozen_ && !slotOptimisation_
-				&& !coveredValidActions(validActions, activatedActions)) {
-			if (createNewRules)
-				System.out.println("\t<COVERING TRIGGERED:>");
-
+				&& isCoveringNeeded(validActions, activatedActions)) {
 			List<GuidedRule> covered = null;
 			try {
 				covered = covering_.coverState(state, validActions,
@@ -249,8 +253,6 @@ public class PolicyGenerator {
 				if (coveredRule.isRecentlyModified()) {
 					if (createNewRules)
 						System.out.println("\tCOVERED RULE: " + coveredRule);
-					else
-						System.out.println("\tREFINED RULE: " + coveredRule);
 
 					StringFact action = coveredRule.getAction();
 					if (coveredRule.getSlot() == null) {
@@ -261,12 +263,12 @@ public class PolicyGenerator {
 					}
 
 					// If the rule is maximally general, mutate and store it
-					coveredRules_.putContains(action.getFactName(), coveredRule);
+					coveredRules_
+							.putContains(action.getFactName(), coveredRule);
 
 					// Mutate unless already mutated
 					if (!covering_.isPreGoalSettled(action.getFactName())) {
-						mutateRule(coveredRule, coveredRule.getSlot(), true,
-								false);
+						mutateRule(coveredRule, coveredRule.getSlot());
 					}
 
 					// Rules were modified so learning needs to restart.
@@ -291,23 +293,29 @@ public class PolicyGenerator {
 	 * @param activatedActions
 	 *            The set of actions already activated by the policy. We only
 	 *            consider these when we're creating new rules.
-	 * @return True if the activated actions cover all valid actions, false
-	 *         otherwise.
+	 * @return True if covering is needed.
 	 */
-	private boolean coveredValidActions(MultiMap<String, String> validActions,
+	private boolean isCoveringNeeded(MultiMap<String, String> validActions,
 			MultiMap<String, String> activatedActions) {
 		for (String action : validActions.keySet()) {
 			// If the activated actions don't even contain the key, return
 			// false.
-			if (!activatedActions.containsKey(action))
-				return false;
+			if (!activatedActions.containsKey(action)) {
+				covering_.resetInactivity();
+				return true;
+			}
 
 			// Check each set of actions match up
 			if (!activatedActions.get(action).containsAll(
-					(validActions.get(action))))
-				return false;
+					(validActions.get(action)))) {
+				covering_.resetInactivity();
+				return true;
+			}
+
+			if (!covering_.isSettled())
+				return true;
 		}
-		return true;
+		return false;
 	}
 
 	/**
@@ -316,17 +324,17 @@ public class PolicyGenerator {
 	 * 
 	 * @param baseRule
 	 *            The rule to mutate.
-	 * @param removeOld
-	 *            If the pre-goal has settled.
+	 * @param ruleSlot
+	 *            The slot in which the base rule is from.
 	 */
-	private void mutateRule(GuidedRule baseRule, Slot ruleSlot,
-			boolean removeOld, boolean settled) {
+	private void mutateRule(GuidedRule baseRule, Slot ruleSlot) {
 		int preGoalHash = covering_.getMutationHash(baseRule
 				.getActionPredicate());
 
 		// If the base rule hasn't already spawned mutants for this pre-goal.
 		if (!baseRule.hasSpawned(preGoalHash)) {
-
+			// Remove old rules if this rule is an LGG rule.
+			boolean removeOld = (baseRule.isMutant()) ? false : true;
 			if (debugMode_) {
 				try {
 					System.out.println("\tMUTATING " + baseRule);
@@ -336,9 +344,6 @@ public class PolicyGenerator {
 						System.out.println(action + ": "
 								+ covering_.getPreGoalState(action));
 					}
-					System.out.println("Press Enter to continue.");
-					System.in.read();
-					System.in.read();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -374,15 +379,6 @@ public class PolicyGenerator {
 					// Setting the restart value.
 					if (!removables.isEmpty()) {
 						restart_ = true;
-						if (debugMode_) {
-							try {
-								System.out.println("Press Enter to continue.");
-								System.in.read();
-								System.in.read();
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-						}
 					}
 
 					if (ruleSlot.getGenerator().removeAll(removables))
@@ -400,7 +396,10 @@ public class PolicyGenerator {
 					ruleSlot.addNewRule(gr, false);
 
 					if (debugMode_) {
-						System.out.println("\tADDED/EXISTING MUTANT: " + gr);
+						if (mutatedRules_.containsValue(gr))
+							System.out.println("\tEXISTING MUTANT: " + gr);
+						else
+							System.out.println("\tADDED MUTANT: " + gr);
 					}
 
 					mutatedRules_.putContains(ruleSlot.getAction(), gr);
@@ -457,7 +456,7 @@ public class PolicyGenerator {
 						&& coveredRules_.containsKey(action)) {
 					boolean settled = covering_.isPreGoalSettled(action);
 					for (GuidedRule general : coveredRules_.get(action))
-						mutateRule(general, general.getSlot(), true, settled);
+						mutateRule(general, general.getSlot());
 				}
 			}
 
@@ -571,7 +570,7 @@ public class PolicyGenerator {
 	 * @return True if the generator is converged, false otherwise.
 	 */
 	public boolean isConverged() {
-		if (updateDifference_ < convergedValue_)
+		if (klDivergence_ < convergedValue_)
 			convergedStrike_++;
 		else
 			convergedStrike_ = 0;
@@ -597,8 +596,8 @@ public class PolicyGenerator {
 		ElitesData ed = countRules(sortedPolicies.subList(0, numElite));
 
 		// Update the slot distribution
-		updateDifference_ = slotGenerator_.updateDistribution(ed
-				.getSlotPositions(), stepSize);
+		klDivergence_ = slotGenerator_.updateDistribution(
+				ed.getSlotPositions(), stepSize);
 
 		// Update the rule distributions and slot activation probability
 		if (!slotOptimisation_) {
@@ -608,12 +607,12 @@ public class PolicyGenerator {
 				double sd = ed.getSlotNumeracySD(slot);
 				slot.updateSelectionValues(mean, sd, stepSize);
 
-				updateDifference_ += slot.getGenerator().updateDistribution(
+				klDivergence_ += slot.getGenerator().updateDistribution(
 						ed.getSlotCount(slot), ed.getRuleCounts(), stepSize);
 			}
 		}
 
-		convergedValue_ = stepSize / 10;
+		convergedValue_ = stepSize * CONVERGED_EPSILON;
 	}
 
 	/**
@@ -723,9 +722,6 @@ public class PolicyGenerator {
 		if (debugMode_) {
 			try {
 				System.out.println("\tPERFORMING POST-UPDATE OPERATIONS");
-				System.out.println("Press Enter to continue.");
-				System.in.read();
-				System.in.read();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -736,22 +732,27 @@ public class PolicyGenerator {
 			// Pruning unused rules from the slots
 			ProbabilityDistribution<GuidedRule> distribution = slot
 					.getGenerator();
-			double pruneProb = (1.0 / distribution.size()) * pruneConst;
-			boolean removed = false;
-			for (Iterator<GuidedRule> iter = distribution.iterator(); iter
-					.hasNext();) {
-				GuidedRule rule = iter.next();
+			// Only prune if the distribution is bigger than 1
+			if (distribution.size() > 1) {
+				double pruneProb = (1.0 / distribution.size()) * pruneConst;
+				boolean removed = false;
+				for (Iterator<GuidedRule> iter = distribution.iterator(); iter
+						.hasNext();) {
+					GuidedRule rule = iter.next();
 
-				if (distribution.getProb(rule) <= pruneProb) {
-					iter.remove();
-					distribution.remove(rule);
-					removed = true;
-					// Note the rule in the no-create list
-					removedRules_.add(rule);
+					if (distribution.getProb(rule) <= pruneProb) {
+						iter.remove();
+						distribution.remove(rule);
+						removed = true;
+						// Note the rule in the no-create list
+						removedRules_.add(rule);
+
+						System.out.println("\tREMOVED RULE: " + rule);
+					}
 				}
+				if (removed)
+					distribution.normaliseProbs();
 			}
-			if (removed)
-				distribution.normaliseProbs();
 
 			// Sample a rule from the slot and mutate it if it has seen
 			// sufficient states.
@@ -759,16 +760,13 @@ public class PolicyGenerator {
 			if (distribution.isEmpty() || rule == null)
 				System.out.println("Problem... " + distribution);
 			if (rule.getUses() >= mutationUses)
-				mutateRule(rule, slot, false, true);
+				mutateRule(rule, slot);
 		}
 
 		// Mutate the rules further
 		if (debugMode_) {
 			try {
 				System.out.println(slotGenerator_);
-				System.out.println("Press Enter to continue.");
-				System.in.read();
-				System.in.read();
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -856,6 +854,7 @@ public class PolicyGenerator {
 			ArrayList<StringFact> internalGoal) {
 		instance_ = newInstance(policyGenerator, internalGoal);
 		instance_.slotOptimisation_ = true;
+		instance_.covering_.migrateAgentObservations(policyGenerator.covering_);
 
 		// Set the slot rules
 		instance_.slotGenerator_.clear();
@@ -875,6 +874,8 @@ public class PolicyGenerator {
 	 *            The PolicyGenerator instance.
 	 */
 	public static void setInstance(PolicyGenerator generator) {
+		if (generator == instance_)
+			return;
 		instance_ = generator;
 		instance_.moduleGenerator_ = false;
 		instance_.moduleGoal_ = null;
@@ -965,24 +966,31 @@ public class PolicyGenerator {
 	 *             Should something go awry.
 	 */
 	public void saveGenerators(File output) throws Exception {
-		OrderedDistribution<Slot> policyGenerator = PolicyGenerator
-				.getInstance().getGenerator();
-
 		FileWriter wr = new FileWriter(output);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		// For each of the rule generators
-		for (Slot slot : policyGenerator) {
-			buf.write("(" + slot.toParsableString() + ")" + ELEMENT_DELIMITER
-					+ policyGenerator.getOrdering(slot) + ELEMENT_DELIMITER
-					+ slot.getSelectionProbability() + ELEMENT_DELIMITER
-					+ slot.getSelectionSD() + "\n");
-		}
-		buf.write("Total Update Size: " + updateDifference_ + "\n");
-		buf.write("Converged Value: " + convergedValue_);
+		saveGenerators(buf);
 
 		buf.close();
 		wr.close();
+	}
+
+	/**
+	 * Saves the generators into a predefined stream.
+	 * 
+	 * @param buf
+	 *            The predefined stream to write to.
+	 */
+	public void saveGenerators(BufferedWriter buf) throws IOException {
+		// For each of the rule generators
+		for (Slot slot : slotGenerator_) {
+			buf.write("(" + slot.toParsableString() + ")" + ELEMENT_DELIMITER
+					+ slotGenerator_.getOrdering(slot) + ELEMENT_DELIMITER
+					+ slot.getSelectionProbability() + ELEMENT_DELIMITER
+					+ slot.getSelectionSD() + "\n");
+		}
+		buf.write("Total Update Size: " + klDivergence_ + "\n");
+		buf.write("Converged Value: " + convergedValue_);
 	}
 
 	/**
@@ -993,16 +1001,31 @@ public class PolicyGenerator {
 	 *            The file to output the human readable generators to.
 	 */
 	public void saveHumanGenerators(File output) throws Exception {
-		OrderedDistribution<Slot> policyGenerator = PolicyGenerator
-				.getInstance().getGenerator();
-
 		FileWriter wr = new FileWriter(output);
 		BufferedWriter buf = new BufferedWriter(wr);
+
+		saveHumanGenerators(buf);
+
+		buf.close();
+		wr.close();
+	}
+
+	/**
+	 * Saves the geneartors to an existing stream.
+	 * 
+	 * @param buf
+	 *            The stream to save the generators to.
+	 */
+	public void saveHumanGenerators(BufferedWriter buf) throws IOException {
+		// First check if the slots are frozen
+		boolean unfreeze = !frozen_;
+		if (unfreeze)
+			freeze(true);
 
 		buf.write("A typical policy:\n");
 
 		// Go through each slot, writing out those that fire
-		List<Slot> orderedElements = policyGenerator.getOrderedElements();
+		List<Slot> orderedElements = slotGenerator_.getOrderedElements();
 		for (Slot slot : orderedElements) {
 			// Output each slot a number of times based on its selection
 			// probability.
@@ -1025,6 +1048,28 @@ public class PolicyGenerator {
 				}
 
 				buf.write(slotOutput.toString());
+			}
+		}
+
+		if (unfreeze)
+			freeze(false);
+	}
+
+	/**
+	 * Saves the pregoals to file.
+	 * 
+	 * @param preGoalFile
+	 *            The file to save to.
+	 */
+	public void savePreGoals(File preGoalFile) throws Exception {
+		FileWriter wr = new FileWriter(preGoalFile);
+		BufferedWriter buf = new BufferedWriter(wr);
+
+		for (String action : StateSpec.getInstance().getActions().keySet()) {
+			Collection<StringFact> preGoal = covering_.getPreGoalState(action);
+			if (preGoal != null) {
+				buf.write(action + "\n");
+				buf.write(preGoal.toString() + "\n");
 			}
 		}
 

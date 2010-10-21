@@ -36,8 +36,8 @@ public class CoveringTest {
 	public void setUp() throws Exception {
 		BasicConfigurator.configure();
 		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
-		sut_ = new Covering(2);
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		sut_ = new Covering();
 	}
 
 	@Test
@@ -1229,9 +1229,8 @@ public class CoveringTest {
 		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
-		assertEquals(4, oldState.size());
+		assertEquals(3, oldState.size());
 		assertTrue(oldState.contains(StateSpec.toStringFact("(on a ?)")));
-		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? c)")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(on b ?)")));
 
@@ -1267,8 +1266,7 @@ public class CoveringTest {
 		newTerms[1] = "b";
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
-		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(on c ?)")));
+		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec.toStringFact("(on ? g)")));
 
 		// Unifying with an inequality test present
@@ -1409,6 +1407,20 @@ public class CoveringTest {
 		assertEquals(2, oldState.size());
 		assertTrue(oldState.contains(StateSpec.toStringFact("(block ?X)")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		
+		// Problem with generalisation unification
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(on ?X ?Y)"));
+		oldState.add(StateSpec.toStringFact("(on ?X ?)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(clear ?X)"));
+		newState.add(StateSpec.toStringFact("(on ?X ?)"));
+		newState.add(StateSpec.toStringFact("(block ?X)"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(1, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
 	}
 
 	/**

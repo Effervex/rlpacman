@@ -94,25 +94,35 @@ public class PolicyValue implements Comparable<PolicyValue> {
 
 	}
 
-	// @Override
-	@Override
-	public boolean equals(Object obj) {
-		if ((obj == null) || (!(obj instanceof PolicyValue)))
-			return false;
-		PolicyValue pv = (PolicyValue) obj;
-		if (value_ == pv.value_) {
-			if (policy_.equals(pv.policy_)) {
-				if (iteration_ == pv.iteration_)
-					return true;
-			}
-		}
-		return false;
-	}
-
-	// @Override
 	@Override
 	public int hashCode() {
-		return (int) (value_ * policy_.hashCode() * (iteration_ + 165781));
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + iteration_;
+		result = prime * result + ((policy_ == null) ? 0 : policy_.hashCode());
+		result = prime * result + Float.floatToIntBits(value_);
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		PolicyValue other = (PolicyValue) obj;
+		if (iteration_ != other.iteration_)
+			return false;
+		if (policy_ == null) {
+			if (other.policy_ != null)
+				return false;
+		} else if (!policy_.equals(other.policy_))
+			return false;
+		if (Float.floatToIntBits(value_) != Float.floatToIntBits(other.value_))
+			return false;
+		return true;
 	}
 
 	@Override

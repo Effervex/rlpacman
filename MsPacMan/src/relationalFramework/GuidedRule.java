@@ -3,7 +3,6 @@ package relationalFramework;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,9 @@ public class GuidedRule {
 
 	/** The conditions of the rule. */
 	private SortedSet<StringFact> ruleConditions_;
+	
+	/** The hash value of the rule. */
+	private Integer ruleHash_ = null;
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
 	private ConstantPred constantConditions_;
@@ -106,6 +108,7 @@ public class GuidedRule {
 		mutant_ = mutant;
 		slot_ = null;
 		findConstants();
+		ruleHash_ = hashCode();
 	}
 
 	/**
@@ -256,6 +259,12 @@ public class GuidedRule {
 		// Adding the inequality predicates
 		ruleConditions_.addAll(StateSpec.createInequalityTests(variableTerms,
 				constantTerms));
+		
+		Integer oldHash = ruleHash_;
+		Integer newHash = hashCode();
+		if (!newHash.equals(oldHash))
+			statesSeen_ = 0;
+		ruleHash_ = newHash;
 	}
 
 	/**
@@ -295,70 +304,37 @@ public class GuidedRule {
 
 		if (!constants.isEmpty())
 			constantConditions_ = new ConstantPred(constants);
+		else
+			constantConditions_ = null;
 	}
 
 	/**
-	 * Determines the LGG status of this rule. Also has the option of removing
-	 * unnecessary rules as it runs through the rules.
+	 * Removes unnecessary conditions from the set of conditions by removing any
+	 * not containing action terms.
 	 * 
-	 * @param removeUnnecessaryFacts
-	 *            If, during the sweep through the rules, unnecessary rules
-	 *            should be removed.
-	 * @return 1 if the rule is minimal, 0 if not minimal, and -1 if invalid
-	 *         (too few conditions).
+	 * @param conditions
+	 *            The conditions to scan through and remove.
 	 */
-	private int determineLGGStatus(SortedSet<StringFact> conditions,
-			boolean removeUnnecessaryFacts) {
-		if (conditions.isEmpty()) {
-			System.err.println("Conditions have been over-shrunk: "
-					+ conditions + ", " + ruleAction_);
-			return -1;
-		}
-
-		Set<String> usedTerms = new HashSet<String>();
-
+	private void removeUnnecessaryFacts(SortedSet<StringFact> conditions) {
 		// Run through the conditions, ensuring each one has at least one unique
 		// term seen in the action.
-		boolean notLGG = false;
 		for (Iterator<StringFact> iter = conditions.iterator(); iter.hasNext();) {
-			String condition = iter.next().toString();
-
-			boolean contains = false;
+			StringFact condition = iter.next();
 
 			// Check if any of the terms are in the condition
 			boolean containsAny = false;
 			for (String term : ruleAction_.getArguments()) {
-				// If the condition contains a term
-				if (condition.contains(term)) {
-					// If the term hasn't already been used, keep it
-					if (!usedTerms.contains(term)) {
-						usedTerms.add(term);
-						contains = true;
-					}
+				if (StateSpec.arrayContains(condition.getArguments(), term)) {
 					containsAny = true;
+					break;
 				}
 			}
 
 			// Removing unnecessary terms
-			if (!containsAny && removeUnnecessaryFacts) {
+			if (!containsAny) {
 				iter.remove();
-			} else {
-				// If no term is in the condition, return false
-				if (!contains) {
-					notLGG = true;
-				}
 			}
 		}
-
-		// If terms occur multiple times, the rule isn't LGG
-		if (notLGG)
-			return 0;
-
-		// If there are terms remaining, the condition is invalid
-		if (usedTerms.size() < ruleAction_.getArguments().length)
-			return -1;
-
-		return 1;
 	}
 
 	/**
@@ -438,16 +414,12 @@ public class GuidedRule {
 			return true;
 		}
 
-		// TODO This may not really be needed.
-		int result = determineLGGStatus(conditions, removeUnnecessaryFacts);
-		// If the rule is invalid, return false.
-		if (result == -1) {
-			return false;
-		}
+		// Instead, introduce method (remove unnecessary conditions).
+		if (removeUnnecessaryFacts)
+			removeUnnecessaryFacts(conditions);
 
 		// Reset the states seen, as the rule has changed.
 		hasSpawned_ = null;
-		statesSeen_ = 0;
 		ruleConditions_ = conditions;
 		ruleUses_ = 0;
 		findConstants();
@@ -469,7 +441,8 @@ public class GuidedRule {
 		// possibly changed arguments.
 		replaceArguments(i, ruleConditions_);
 		// Do the same for the constants
-		replaceArguments(i, constantConditions_.getFacts());
+		if (constantConditions_ != null)
+			replaceArguments(i, constantConditions_.getFacts());
 	}
 
 	/**
@@ -492,9 +465,7 @@ public class GuidedRule {
 		for (Iterator<StringFact> condIter = strFacts.iterator(); condIter
 				.hasNext();) {
 			StringFact cond = condIter.next();
-			condIter.remove();
-			cond.replaceArguments(replacementMap);
-			strFacts.add(cond);
+			cond.replaceArguments(replacementMap, true);
 		}
 	}
 
@@ -643,11 +614,14 @@ public class GuidedRule {
 	 */
 	@Override
 	public Object clone() {
-		GuidedRule clone = new GuidedRule(ruleConditions_, ruleAction_, mutant_);
+		Collection<StringFact> cloneConds = new ArrayList<StringFact>();
+		for (StringFact cond : ruleConditions_)
+			cloneConds.add(new StringFact(cond));
+		GuidedRule clone = new GuidedRule(cloneConds, ruleAction_, mutant_);
 		clone.hasSpawned_ = hasSpawned_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
-		clone.constantConditions_ = constantConditions_;
+		
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)

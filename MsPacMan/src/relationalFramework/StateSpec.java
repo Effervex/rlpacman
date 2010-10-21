@@ -64,9 +64,6 @@ public abstract class StateSpec {
 	/** The prerequisites of the rules and their structure. */
 	private Map<String, StringFact> predicates_;
 
-	/** The set of all possible variable predicates. */
-	private MultiMap<String, StringFact> possibleVariablePredicates_;
-
 	/** The type predicates, only used implicitly. */
 	@SuppressWarnings("unchecked")
 	private Map<Class, StringFact> typePredicates_;
@@ -136,9 +133,6 @@ public abstract class StateSpec {
 				predicates_.put(pred.getFactName(), pred);
 				defineTemplate(pred.getFactName(), rete_);
 			}
-
-			// Create the list of possible predicates.
-			possibleVariablePredicates_ = createPossibleConditions();
 
 			// Set up the valid actions template
 			StringBuffer actBuf = new StringBuffer("(deftemplate "
@@ -233,119 +227,6 @@ public abstract class StateSpec {
 					+ "\\))");
 		buffer.append(")( |$)");
 		return buffer.toString();
-	}
-
-	/**
-	 * Creates all possible variations of the predicates in variable form.
-	 * 
-	 * @return A MultiMap indexed by predicate containing at least one element,
-	 *         which has variable arguments.
-	 */
-	@SuppressWarnings("unchecked")
-	private MultiMap<String, StringFact> createPossibleConditions() {
-		MultiMap<String, StringFact> possibleConditions = new MultiMap<String, StringFact>();
-
-		// For each predicate in the state spec
-		for (StringFact predicate : predicates_.values()) {
-			// Create the mapping of terms to classes.
-			MultiMap<Class, String> possibleTerms = createActionTerms(predicate);
-
-			// Form the possible actions recursively
-			List<StringFact> possibleFacts = new ArrayList<StringFact>();
-			String[] arguments = new String[predicate.getArguments().length];
-			formPossibleFact(arguments, 0, possibleTerms, predicate,
-					possibleFacts);
-
-			// Add to the multimap
-			possibleConditions.putCollection(predicate.getFactName(),
-					possibleFacts);
-		}
-
-		return possibleConditions;
-	}
-
-	/**
-	 * Creates the mapping of variable action terms to argument types, based on
-	 * the location of the argument within the predicate.
-	 * 
-	 * @param predicate
-	 *            The predicate to form action term map from.
-	 * @return The mapping of argument type classes to argument variables.
-	 */
-	@SuppressWarnings("unchecked")
-	private MultiMap<Class, String> createActionTerms(StringFact predicate) {
-		MultiMap<Class, String> actionTerms = new MultiMap<Class, String>();
-
-		Class[] argTypes = predicate.getArgTypes();
-		for (int i = 0; i < argTypes.length; i++) {
-			if (!isNumberClass(argTypes[i]))
-				actionTerms.put(argTypes[i], Covering.getVariableTermString(i));
-		}
-
-		return actionTerms;
-	}
-
-	/**
-	 * Recursively forms a possible variable fact that may exist in the
-	 * environment.
-	 * 
-	 * @param arguments
-	 *            The developing array of arguments to form into a fact.
-	 * @param index
-	 *            The current index being filled by the method.
-	 * @param possibleTerms
-	 *            The possible terms map.
-	 * @param baseFact
-	 *            The base fact to build facts from.
-	 * @param actionFacts
-	 *            The list of facts to fill.
-	 */
-	@SuppressWarnings("unchecked")
-	private void formPossibleFact(String[] arguments, int index,
-			MultiMap<Class, String> possibleTerms, StringFact baseFact,
-			List<StringFact> actionFacts) {
-		// Base case, if index is outside arguments, build the fact
-		Class[] argTypes = baseFact.getArgTypes();
-		if (index >= argTypes.length) {
-			// Check the arguments aren't fully anonymous
-			boolean anonymous = true;
-			for (String arg : arguments) {
-				if (!arg.equals("?")) {
-					anonymous = false;
-					break;
-				}
-			}
-
-			// If not anonymous, form the fact
-			if (!anonymous) {
-				actionFacts.add(new StringFact(baseFact, Arrays.copyOf(
-						arguments, arguments.length)));
-			}
-			return;
-		}
-
-		// Use all terms for the slot and '?'
-		List<String> terms = new ArrayList<String>();
-		terms.add("?");
-		if (possibleTerms.containsKey(argTypes[index])) {
-			terms.addAll(possibleTerms.get(argTypes[index]));
-		}
-
-		// For each term
-		MultiMap<Class, String> termsClone = new MultiMap<Class, String>(
-				possibleTerms);
-		for (String term : terms) {
-			arguments[index] = term;
-			// If the term isn't anonymous, remove it from the possible terms
-			// (clone).
-			if (!term.equals("?")) {
-				termsClone.get(argTypes[index]).remove(term);
-			}
-
-			// Recurse further
-			formPossibleFact(arguments, index + 1, termsClone, baseFact,
-					actionFacts);
-		}
 	}
 
 	/**
@@ -724,10 +605,6 @@ public abstract class StateSpec {
 
 	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
 		return backgroundRules_.values();
-	}
-
-	public MultiMap<String, StringFact> getPossibleConditions() {
-		return possibleVariablePredicates_;
 	}
 
 	/**
