@@ -122,7 +122,8 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	/**
 	 * Gets the probability for an element if it is present.
 	 * 
-	 * @param element The element with a probability.
+	 * @param element
+	 *            The element with a probability.
 	 * @return The probability of the rule, or -1 if it isn't present.
 	 */
 	public double getProb(T element) {
@@ -277,7 +278,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 */
 	public ArrayList<T> getOrderedElements() {
 		ArrayList<ItemProb<T>> ips = new ArrayList<ItemProb<T>>(itemProbs_);
-		Collections.sort(ips, Collections.reverseOrder());
+		Collections.sort(ips);
 
 		ArrayList<T> ordered = new ArrayList<T>();
 		for (ItemProb<T> ip : ips) {
@@ -294,7 +295,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	 */
 	public ArrayList<T> getNonZeroOrderedElements() {
 		ArrayList<ItemProb<T>> ips = new ArrayList<ItemProb<T>>(itemProbs_);
-		Collections.sort(ips, Collections.reverseOrder());
+		Collections.sort(ips);
 
 		ArrayList<T> ordered = new ArrayList<T>();
 		for (ItemProb<T> ip : ips) {
@@ -422,8 +423,10 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 	/**
 	 * Calculates the KL divergence between two probability values.
 	 * 
-	 * @param oldValue The old value.
-	 * @param newValue The new value.
+	 * @param oldValue
+	 *            The old value.
+	 * @param newValue
+	 *            The new value.
 	 * @return The KL divergence between the values.
 	 */
 	private double klDivergence(double oldValue, double newValue) {
@@ -431,7 +434,7 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 			return 0;
 		if (oldValue == 0)
 			return Double.POSITIVE_INFINITY;
-		
+
 		double result = newValue * Math.log(newValue / oldValue);
 		return result;
 	}
@@ -627,24 +630,25 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 
 	@Override
 	public String toString() {
-		// TODO Output the string as a sorted list by probability
-		StringBuffer buffer = new StringBuffer("[");
+		Collections.sort(itemProbs_);
+		StringBuffer buffer = new StringBuffer("{");
 		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
 		if (iter.hasNext())
 			buffer.append(iter.next());
 		while (iter.hasNext()) {
 			buffer.append(", " + iter.next());
 		}
-		buffer.append("]");
+		buffer.append("}");
 		return buffer.toString();
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
-		int result = 1;
-		result = prime * result
-				+ ((itemProbs_ == null) ? 0 : itemProbs_.hashCode());
+		int result = 0;
+		for (ItemProb<T> ip : itemProbs_)
+			result += ip.hashCode();
+		result = prime * result + 1;
 		return result;
 	}
 
@@ -660,7 +664,9 @@ public class ProbabilityDistribution<T> implements Collection<T> {
 		if (itemProbs_ == null) {
 			if (other.itemProbs_ != null)
 				return false;
-		} else if (!itemProbs_.equals(other.itemProbs_))
+		} else if (!itemProbs_.containsAll(other.itemProbs_))
+			return false;
+		else if (!other.itemProbs_.containsAll(itemProbs_))
 			return false;
 		return true;
 	}

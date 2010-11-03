@@ -1,5 +1,8 @@
 package relationalFramework.agentObservations;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -7,6 +10,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 import jess.Fact;
 import relationalFramework.Covering;
@@ -22,7 +28,12 @@ import relationalFramework.StringFact;
  */
 public class AgentObservations {
 	/** The amount of inactivity before an observation is considered converged. */
-	public static final int INACTIVITY_THRESHOLD = 50;
+	// TODO Set this as a better measure
+	public static final int INACTIVITY_THRESHOLD = 500;
+
+	/** The agent observations directory. */
+	public static final File AGENT_OBSERVATIONS_DIR = new File(
+			"agentObservations/");
 
 	/** A hash code to track when an observation changes. */
 	private Integer observationHash_ = null;
@@ -36,9 +47,8 @@ public class AgentObservations {
 	/** The observed invariants of the environment. */
 	private Collection<String> invariants_;
 
-	// TODO Save these for visual examination or agent reuse.
 	/** The rules about the environment learned by the agent. */
-	private Collection<BackgroundKnowledge> learnedEnvironmentRules_;
+	private SortedSet<BackgroundKnowledge> learnedEnvironmentRules_;
 
 	/** A transient group of facts indexed by terms used within. */
 	private MultiMap<String, StringFact> termMappedFacts_;
@@ -50,11 +60,12 @@ public class AgentObservations {
 	 * The constructor for the agent observations.
 	 */
 	public AgentObservations() {
-		conditionBeliefs_ = new HashMap<String, ConditionBeliefs>();
-		learnedEnvironmentRules_ = new HashSet<BackgroundKnowledge>();
+		conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 		observationHash_ = null;
 		learnedEnvironmentRules_ = formBackgroundKnowledge();
+
+		AGENT_OBSERVATIONS_DIR.mkdir();
 	}
 
 	/**
@@ -156,8 +167,8 @@ public class AgentObservations {
 	/**
 	 * Forms the background knowledge from the condition beliefs.
 	 */
-	private Collection<BackgroundKnowledge> formBackgroundKnowledge() {
-		Collection<BackgroundKnowledge> backgroundKnowledge = new HashSet<BackgroundKnowledge>();
+	private SortedSet<BackgroundKnowledge> formBackgroundKnowledge() {
+		SortedSet<BackgroundKnowledge> backgroundKnowledge = new TreeSet<BackgroundKnowledge>();
 		// Add the knowledge provided by the state specification
 		backgroundKnowledge.addAll(StateSpec.getInstance()
 				.getBackgroundKnowledgeConditions());
@@ -395,6 +406,85 @@ public class AgentObservations {
 			actionBasedObservations_.put(actionPred, abo);
 		}
 		return abo;
+	}
+
+	/**
+	 * Saves agent observations to file in the agent observations directory.
+	 */
+	public void saveAgentObservations(int run) {
+		try {
+			// Make the environment directory if necessary
+			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
+					.getInstance().getEnvironmentName()
+					+ File.separatorChar);
+			environmentDir.mkdir();
+
+			// Condition beliefs
+			File condBeliefFile = new File(environmentDir,
+					"conditionBeliefs.txt" + run);
+			condBeliefFile.createNewFile();
+			FileWriter wr = new FileWriter(condBeliefFile);
+			BufferedWriter buf = new BufferedWriter(wr);
+
+			// Write condition beliefs
+			for (String condition : conditionBeliefs_.keySet()) {
+				buf.write(conditionBeliefs_.get(condition) + "\n");
+			}
+			buf.write("\n");
+			// TODO Write invariants
+			buf.write("Background Knowledge\n");
+			for (BackgroundKnowledge bk : learnedEnvironmentRules_) {
+				buf.write(bk.toString() + "\n");
+			}
+
+			buf.close();
+			wr.close();
+
+			// Action Conditions and ranges
+			File actionCondsFile = new File(environmentDir,
+					"actionConditions&Ranges.txt" + run);
+			actionCondsFile.createNewFile();
+			wr = new FileWriter(actionCondsFile);
+			buf = new BufferedWriter(wr);
+
+			// Write action conditions and ranges
+			for (String action : actionBasedObservations_.keySet()) {
+				buf.write(action + "\n");
+				buf
+						.write("True conditions: "
+								+ actionBasedObservations_.get(action).actionConditions_
+								+ "\n");
+				if (actionBasedObservations_.get(action).conditionRanges_ != null)
+					buf
+							.write("Ranged values: "
+									+ actionBasedObservations_.get(action).conditionRanges_
+									+ "\n");
+				buf.write("\n");
+			}
+
+			buf.close();
+			wr.close();
+
+			// Pre goal saving
+			File preGoalFile = new File(environmentDir, "preGoal.txt" + run);
+			preGoalFile.createNewFile();
+			wr = new FileWriter(preGoalFile);
+			buf = new BufferedWriter(wr);
+
+			for (String action : actionBasedObservations_.keySet()) {
+				PreGoalInformation pgi = actionBasedObservations_.get(action)
+						.getPGI();
+				if (pgi != null) {
+					buf.write(action + "\n");
+					buf.write(pgi.toString() + "\n");
+				}
+			}
+
+			buf.close();
+			wr.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**

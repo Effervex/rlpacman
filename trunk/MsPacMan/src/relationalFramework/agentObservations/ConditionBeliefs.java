@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.TreeSet;
 
+import org.apache.commons.collections.CollectionUtils;
+
 import relationalFramework.Covering;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
@@ -38,6 +40,12 @@ public class ConditionBeliefs {
 	private Collection<StringFact> occasionallyTrue_;
 
 	/**
+	 * The set of conditions with predicate condition_ that are more general
+	 * version of this condition.
+	 */
+	private Collection<StringFact> disallowed_;
+
+	/**
 	 * The initialisation for condition beliefs, taking the condition, and the
 	 * initial relative state it was created in.
 	 * 
@@ -49,6 +57,7 @@ public class ConditionBeliefs {
 		alwaysTrue_ = new TreeSet<StringFact>();
 		neverTrue_ = new TreeSet<StringFact>();
 		occasionallyTrue_ = new TreeSet<StringFact>();
+		disallowed_ = new TreeSet<StringFact>();
 	}
 
 	/**
@@ -65,11 +74,18 @@ public class ConditionBeliefs {
 		if (firstState) {
 			alwaysTrue_.addAll(trueFacts);
 			addNeverSeenPreds();
+			rearrangeGeneralRules();
 			return true;
 		}
 		// If the condition has no relations don't bother updating.
 		else if (alwaysTrue_.isEmpty() && neverTrue_.isEmpty())
 			return false;
+
+		// Expand the true facts first
+		trueFacts.addAll(generateGenerals(trueFacts));
+		
+		// Filter the disallowed facts
+		trueFacts.removeAll(disallowed_);
 
 		// Otherwise, perform a number of intersections to determine the sets.
 		// Find any predicates present in this trueFacts not in alwaysTrue
@@ -81,12 +97,93 @@ public class ConditionBeliefs {
 			neverTrue_.removeAll(union);
 			int occSize = occasionallyTrue_.size();
 			occasionallyTrue_.addAll(union);
+			rearrangeGeneralRules();
 			if (occasionallyTrue_.size() != occSize)
 				return true;
 			else
 				return false;
 		}
 		return false;
+	}
+
+	/**
+	 * Rearranges the rules about if there are specific rules in always or never
+	 * such that more general version of those rules are also in always or
+	 * never.
+	 * 
+	 * Also ensures that there are self rules that add more general versions of
+	 * this condition to the always true set of rules.
+	 */
+	private void rearrangeGeneralRules() {
+		Collection<StringFact> generals = generateGenerals(alwaysTrue_);
+		occasionallyTrue_.removeAll(generals);
+		neverTrue_.removeAll(generals);
+		alwaysTrue_.addAll(generals);
+
+		generals = generateGenerals(neverTrue_);
+		occasionallyTrue_.removeAll(generals);
+		alwaysTrue_.removeAll(generals);
+		neverTrue_.addAll(generals);
+
+		// Add general rules to always true
+		for (StringFact general : disallowed_) {
+			// Do not add fully anonymous/not anonymous at all rules.
+			boolean fullyAnon = true;
+			boolean fullyVar = true;
+			for (String arg : general.getArguments()) {
+				if (arg.equals("?"))
+					fullyVar = false;
+				else
+					fullyAnon = false;
+			}
+
+			if (!fullyAnon && !fullyVar) {
+				occasionallyTrue_.remove(general);
+				neverTrue_.remove(general);
+				alwaysTrue_.add(general);
+			}
+		}
+	}
+
+	/**
+	 * Generates more general versions of each base fact in the base set. Each
+	 * fact must be non-anonymous and not the same as the base fact.
+	 * 
+	 * @param baseSet
+	 *            The set of base facts to generalise.
+	 * @return The collection of more general facts for the facts from base set.
+	 */
+	private Collection<StringFact> generateGenerals(
+			Collection<StringFact> baseSet) {
+		Collection<StringFact> addedGeneralisations = new HashSet<StringFact>();
+		// Run through each fact in the base set.
+		for (StringFact baseFact : baseSet) {
+			// Run through each possible binary implementation of the arguments,
+			// adding to the added args. (ignoring first and last case)
+			for (int b = 1; b < Math.pow(2, baseFact.getArguments().length) - 1; b++) {
+				StringFact general = new StringFact(baseFact);
+				String[] factArgs = general.getArguments();
+				// Change each argument based on the binary representation.
+				boolean changed = false;
+				boolean anonymous = true;
+				for (int i = 0; i < factArgs.length; i++) {
+					// If the argument originally isn't anonymous
+					if (!factArgs[i].equals("?")) {
+						// Make it anonymous
+						if ((b & (int) Math.pow(2, i)) == 0) {
+							factArgs[i] = "?";
+							changed = true;
+						} else
+							anonymous = false;
+					}
+				}
+
+				if (changed && !anonymous)
+					addedGeneralisations.add(general);
+			}
+		}
+
+		return addedGeneralisations;
 	}
 
 	/**
@@ -114,6 +211,11 @@ public class ConditionBeliefs {
 						&& !occasionallyTrue_.contains(fact))
 					neverTrue_.add(fact);
 			}
+
+			// If the same pred, remove the disallowed values from always true
+			// as well.
+			if (pred.equals(condition_))
+				alwaysTrue_.removeAll(disallowed_);
 		}
 		firstState = false;
 		return true;
@@ -149,7 +251,6 @@ public class ConditionBeliefs {
 				baseArgs[i] = Covering.getVariableTermString(i);
 			shapedFacts.remove(new StringFact(predFact, baseArgs));
 		}
-		// TODO Expand this to remove preds more general than the pred.
 
 		return shapedFacts;
 	}
@@ -197,19 +298,25 @@ public class ConditionBeliefs {
 		// Base case, if index is outside arguments, build the fact
 		Class[] argTypes = baseFact.getArgTypes();
 		if (index >= argTypes.length) {
-			// Check the arguments aren't fully anonymous
-			boolean anonymous = true;
-			for (String arg : arguments) {
-				if (!arg.equals("?")) {
-					anonymous = false;
+			// Check the arguments aren't anonymous and/or a generalisation of
+			// the condition itself.
+			boolean keepRule = false;
+			for (int i = 0; i < arguments.length; i++) {
+				if (!arguments[i].equals("?")
+						&& !(baseFact.getFactName().equals(condition_) && arguments[i]
+								.equals(Covering.getVariableTermString(i)))) {
+					keepRule = true;
 					break;
 				}
 			}
 
 			// If not anonymous, form the fact
-			if (!anonymous) {
-				possibleFacts.add(new StringFact(baseFact, Arrays.copyOf(
-						arguments, arguments.length)));
+			StringFact possible = new StringFact(baseFact, Arrays.copyOf(
+					arguments, arguments.length));
+			if (keepRule) {
+				possibleFacts.add(possible);
+			} else {
+				disallowed_.add(possible);
 			}
 			return;
 		}
@@ -310,9 +417,8 @@ public class ConditionBeliefs {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer(condition_ + ":\n");
 		buffer.append("\tAlways True: " + alwaysTrue_.toString() + "\n");
-		buffer.append("\tSometimes True: " + occasionallyTrue_.toString()
-				+ "\n");
-		buffer.append("\tNever True: " + neverTrue_.toString());
+		buffer.append("\tNever True: " + neverTrue_.toString() + "\n");
+		buffer.append("\tSometimes True: " + occasionallyTrue_.toString());
 		return buffer.toString();
 	}
 }

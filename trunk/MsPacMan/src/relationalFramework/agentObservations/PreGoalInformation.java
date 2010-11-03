@@ -17,7 +17,6 @@ public class PreGoalInformation {
 
 	public PreGoalInformation(Collection<StringFact> state, String[] actionTerms) {
 		state_ = state;
-		// TODO May need to remove numerical arguments
 		actionTerms_ = actionTerms;
 	}
 
@@ -52,7 +51,7 @@ public class PreGoalInformation {
 
 	@Override
 	public String toString() {
-		return state_.toString() + " : " + actionTerms_.toString();
+		return state_.toString() + " : " + Arrays.toString(actionTerms_);
 	}
 
 	/* (non-Javadoc)

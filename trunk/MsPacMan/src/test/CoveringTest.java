@@ -48,9 +48,9 @@ public class CoveringTest {
 		assertFalse(strFactA.hashCode() == strFactB.hashCode());
 
 		GuidedRule gr = new GuidedRule("(clear a) (block a) => (moveFloor a)");
-		assertTrue(gr.getConditions().contains(
+		assertTrue(gr.getConditions(false).contains(
 				StateSpec.toStringFact("(clear a)")));
-		assertTrue(gr.getConditions().contains(
+		assertTrue(gr.getConditions(false).contains(
 				StateSpec.toStringFact("(block a)")));
 	}
 
@@ -88,16 +88,15 @@ public class CoveringTest {
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				// on implies above
-				assertFalse(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(onFloor ?X)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor ?X)"), gr
 						.getAction());
@@ -106,21 +105,21 @@ public class CoveringTest {
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -172,15 +171,15 @@ public class CoveringTest {
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(onFloor ?X)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor ?X)"), gr
 						.getAction());
@@ -189,21 +188,21 @@ public class CoveringTest {
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -234,23 +233,23 @@ public class CoveringTest {
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest d)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear d)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on d b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above d b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above d a)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above d c)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block a)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block c)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor d)"), gr
 						.getAction());
@@ -260,27 +259,27 @@ public class CoveringTest {
 				assertEquals(7, condCount);
 				existingRules.put("moveFloor", gr);
 			} else {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? a)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -313,54 +312,54 @@ public class CoveringTest {
 		for (GuidedRule gr : existingRules.values()) {
 			System.out.println(gr.toString());
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X a)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X c)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block a)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block c)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor ?X)"), gr
 						.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
-				assertEquals(6, condCount);
+				assertEquals(5, condCount);
 			} else {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? a)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -392,50 +391,50 @@ public class CoveringTest {
 		for (GuidedRule gr : existingRules.values()) {
 			System.out.println(gr.toString());
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X a)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block a)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor ?X)"), gr
 						.getAction());
 				int condCount = StateSpec.getInstance().encodeRule(gr).split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
-				assertEquals(4, condCount);
+				assertEquals(3, condCount);
 			} else {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ? a)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -469,25 +468,25 @@ public class CoveringTest {
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on b d)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above b a)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above b d)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above b c)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block a)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block b)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block c)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block d)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor b)"), gr
 						.getAction());
@@ -497,21 +496,21 @@ public class CoveringTest {
 				assertEquals(7, condCount);
 				existingRules.put("moveFloor", gr);
 			} else {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?X)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear ?Y)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?X ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?X)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above ?Y ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest ?Y)")));
 				assertEquals(StateSpec.toStringFact("(move ?X ?Y)"), gr
 						.getAction());
@@ -542,15 +541,15 @@ public class CoveringTest {
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(highest b)")));
-				assertFalse(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(clear b)")));
-				assertTrue(gr.getConditions().contains(
+				assertFalse(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(on b ?)")));
-				assertFalse(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(above b ?)")));
-				assertTrue(gr.getConditions().contains(
+				assertTrue(gr.getConditions(false).contains(
 						StateSpec.toStringFact("(block b)")));
 				assertEquals(StateSpec.toStringFact("(moveFloor b)"), gr
 						.getAction());
@@ -1288,6 +1287,24 @@ public class CoveringTest {
 		assertEquals(2, oldState.size());
 		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(clear ?_MOD_a)"));
+		newState.add(StateSpec.toStringFact("(clear b)"));
+		oldTerms = new String[2];
+		oldTerms[0] = "?X";
+		oldTerms[1] = "?Y";
+		newTerms = new String[2];
+		newTerms[0] = "?_MOD_a";
+		newTerms[1] = "b";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(2, oldState.size());
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 	}
 
 	@Test
@@ -1440,7 +1457,7 @@ public class CoveringTest {
 
 		GuidedRule rule = new GuidedRule(
 				"(clear ?X) (clear ?Y) => (move ?X ?Y)");
-		assertEquals(5, rule.getConditions().size());
+		assertEquals(5, rule.getConditions(false).size());
 		Collection<GuidedRule> results = sut_.specialiseToPreGoal(rule);
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(

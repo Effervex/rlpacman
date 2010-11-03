@@ -27,7 +27,7 @@ public class GuidedRule {
 
 	/** The conditions of the rule. */
 	private SortedSet<StringFact> ruleConditions_;
-	
+
 	/** The hash value of the rule. */
 	private Integer ruleHash_ = null;
 
@@ -259,7 +259,7 @@ public class GuidedRule {
 		// Adding the inequality predicates
 		ruleConditions_.addAll(StateSpec.createInequalityTests(variableTerms,
 				constantTerms));
-		
+
 		Integer oldHash = ruleHash_;
 		Integer newHash = hashCode();
 		if (!newHash.equals(oldHash))
@@ -391,9 +391,19 @@ public class GuidedRule {
 	/**
 	 * Gets the conditions in a sorted order, including the inequals predicate.
 	 * 
+	 * @param withoutInequals
+	 *            If inequals predicates should be removed.
 	 * @return The conditions of the rule.
 	 */
-	public SortedSet<StringFact> getConditions() {
+	public SortedSet<StringFact> getConditions(boolean withoutInequals) {
+		if (withoutInequals) {
+			SortedSet<StringFact> conds = new TreeSet<StringFact>(ruleConditions_.comparator());
+			for (StringFact cond : ruleConditions_) {
+				if (!cond.getFactName().equals("test"))
+					conds.add(cond);
+			}
+			return conds;
+		}
 		return new TreeSet<StringFact>(ruleConditions_);
 	}
 
@@ -621,7 +631,7 @@ public class GuidedRule {
 		clone.hasSpawned_ = hasSpawned_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
-		
+
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);
 		if (parameters_ != null)

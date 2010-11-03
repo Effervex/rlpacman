@@ -61,11 +61,9 @@ public class Slot {
 	 * 
 	 * @param guidedRule
 	 *            The rule being added.
-	 * @param duplicates
-	 *            If addition allows duplicates
 	 */
-	public void addNewRule(GuidedRule guidedRule, boolean duplicates) {
-		if (duplicates || !ruleGenerator_.contains(guidedRule)) {
+	public void addNewRule(GuidedRule guidedRule) {
+		if (!ruleGenerator_.contains(guidedRule)) {
 			if (ruleGenerator_.isEmpty())
 				ruleGenerator_.add(guidedRule, 1);
 			else {
@@ -338,8 +336,9 @@ public class Slot {
 	@Override
 	public String toString() {
 		String result = (fixed_) ? "FIXED " : "";
-		return result + "Slot (" + action_.toString() + "): "
-				+ ruleGenerator_.toString();
+		return result + "Slot (" + action_.toString() + ") "
+				+ ruleGenerator_.toString() + "," + selectionProb_ + ","
+				+ selectionVariance_;
 	}
 
 	public boolean isEmpty() {
@@ -358,8 +357,7 @@ public class Slot {
 		buffer.append(action_ + "{");
 		for (int i = 0; i < ruleGenerator_.size(); i++) {
 			if (ruleGenerator_.getProb(i) > 0)
-				buffer.append("(" + ruleGenerator_.getElement(i)
-						+ ELEMENT_DELIMITER + ruleGenerator_.getProb(i) + ")");
+				buffer.append(ruleGenerator_.toString());
 		}
 		buffer.append("}");
 		return buffer.toString();

@@ -61,17 +61,17 @@ public class ConditionBeliefsTest {
 
 		cb = new ConditionBeliefs("on");
 		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>()));
-		assertTrue(cb.getAlwaysTrue().isEmpty());
+		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(on ?X ?)")));
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(on ? ?Y)")));
 		assertTrue(cb.getOccasionallyTrue().isEmpty());
 		assertFalse(cb.getNeverTrue().isEmpty());
-		assertTrue(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(on ?Y ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(on ? ?X)")));
-		assertTrue(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(on ? ?Y)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
@@ -94,7 +94,7 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(clear ?Y)")));
-		assertEquals(cb.getNeverTrue().size(), 15);
+		assertEquals(cb.getNeverTrue().size(), 13);
 	}
 
 	@Test
@@ -116,19 +116,19 @@ public class ConditionBeliefsTest {
 
 		cb = new ConditionBeliefs("distanceGhost");
 		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>()));
-		assertTrue(cb.getAlwaysTrue().isEmpty());
+		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(distanceGhost ?X ? ?)")));
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(distanceGhost ? ?Y ?)")));
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(distanceGhost ?X ?Y ?)")));
 		assertTrue(cb.getOccasionallyTrue().isEmpty());
 		assertFalse(cb.getNeverTrue().isEmpty());
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(distancePowerDot ?X ? ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(distanceDot ?X ? ?)")));
-		assertTrue(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(distanceGhost ?X ? ?)")));
-		assertTrue(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(distanceGhost ? ?Y ?)")));
-		assertTrue(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(distanceGhost ?X ?Y ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(distanceFruit ?X ? ?)")));
 		assertTrue(cb.getNeverTrue().contains(
@@ -137,7 +137,7 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(edible ?Y)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(blinking ?Y)")));
-		assertEquals(cb.getNeverTrue().size(), 9);
+		assertEquals(cb.getNeverTrue().size(), 6);
 	}
 
 	@Test

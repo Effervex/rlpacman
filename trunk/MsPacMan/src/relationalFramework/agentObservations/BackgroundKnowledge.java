@@ -2,6 +2,7 @@ package relationalFramework.agentObservations;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.SortedSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
@@ -16,7 +17,7 @@ import relationalFramework.StringFact;
  * 
  * @author Sam Sarjant
  */
-public class BackgroundKnowledge {
+public class BackgroundKnowledge implements Comparable {
 	/** The JESS compatible assertion string. */
 	private String assertionString_;
 
@@ -100,8 +101,8 @@ public class BackgroundKnowledge {
 		Collection<StringFact> preConds = new ArrayList<StringFact>(preConds_
 				.size());
 		for (StringFact preCond : preConds_) {
-			StringFact replacedFact = new StringFact(preCond, replacementTerms.inverseBidiMap(),
-					true);
+			StringFact replacedFact = new StringFact(preCond, replacementTerms
+					.inverseBidiMap(), true);
 			preConds.add(replacedFact);
 		}
 
@@ -234,5 +235,45 @@ public class BackgroundKnowledge {
 		} else if (!preConds_.equals(other.preConds_))
 			return false;
 		return true;
+	}
+
+	@Override
+	public int compareTo(Object arg0) {
+		if ((arg0 == null) || !(arg0 instanceof BackgroundKnowledge))
+			return -1;
+
+		BackgroundKnowledge other = (BackgroundKnowledge) arg0;
+		if (this.equals(other))
+			return 0;
+		
+		int result = 0;
+
+		// Compare by pre conds
+		Iterator<StringFact> thisIter = preConds_.iterator();
+		Iterator<StringFact> otherIter = other.preConds_.iterator();
+		// Iterate through the rules, until all matched, or a mismatch
+		while (thisIter.hasNext() || otherIter.hasNext()) {
+			// If either ruleset is smaller, return that as the smaller one.
+			if (!thisIter.hasNext())
+				return -1;
+			if (!otherIter.hasNext())
+				return 1;
+			
+			result = thisIter.next().compareTo(otherIter.next());
+			if (result != 0)
+				return result;
+		}
+		
+		// Compare by postCond
+		result = postCondition_.compareTo(other.postCondition_);
+		if (result != 0)
+			return result;
+
+		// Then by equivalence
+		if (equivalentRule_ != other.equivalentRule_) {
+			return (equivalentRule_) ? -1 : 1;
+		}
+
+		return 0;
 	}
 }

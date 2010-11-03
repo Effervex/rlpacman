@@ -68,9 +68,12 @@ public class ElitesData {
 	/**
 	 * Sets the slot numeracy mean of the slot to a value.
 	 * 
-	 * @param slot The slot for which the data is being recorded.
-	 * @param mean The mean of the slot usage.
-	 * @param sd The sd of the slot usage.
+	 * @param slot
+	 *            The slot for which the data is being recorded.
+	 * @param mean
+	 *            The mean of the slot usage.
+	 * @param sd
+	 *            The sd of the slot usage.
 	 */
 	public void setUsageStats(Slot slot, double mean, double sd) {
 		SlotData slotData = getSlotData(slot);
@@ -103,39 +106,39 @@ public class ElitesData {
 	/**
 	 * Gets the count for a slot.
 	 * 
-	 * @param slot The slot being searched for.
+	 * @param slot
+	 *            The slot being searched for.
 	 * @return The counts it has, or 0.
 	 */
 	public double getSlotCount(Slot slot) {
-		double count = 0;
 		if (slotData_.containsKey(slot))
-			count = slotData_.get(slot).getCount();
-		return count;
+			return slotData_.get(slot).getCount();
+		return 0;
 	}
 
 	/**
 	 * Gets the slot numeracy value.
 	 * 
-	 * @param slot The slot to get the data for.
+	 * @param slot
+	 *            The slot to get the data for.
 	 * @return The numeracy value, or 0 if not recorded.
 	 */
 	public double getSlotNumeracyMean(Slot slot) {
-		if (slotData_.containsKey(slot)) {
+		if (slotData_.containsKey(slot))
 			return slotData_.get(slot).getNumeracy();
-		}
 		return 0;
 	}
-	
+
 	/**
 	 * Gets the slot sd value.
 	 * 
-	 * @param slot The slot to get the data for.
+	 * @param slot
+	 *            The slot to get the data for.
 	 * @return The sd value, or 0 if not recorded.
 	 */
 	public double getSlotNumeracySD(Slot slot) {
-		if (slotData_.containsKey(slot)) {
+		if (slotData_.containsKey(slot))
 			return slotData_.get(slot).getSD();
-		}
 		return 0;
 	}
 
@@ -152,6 +155,24 @@ public class ElitesData {
 		return slotData_.get(slot);
 	}
 
+	@Override
+	public String toString() {
+		StringBuffer buffer = new StringBuffer();
+
+		buffer.append("Slot counts: \n");
+		for (Slot slot : slotData_.keySet()) {
+			buffer.append("\t" + slot.getAction() + ":\n" + slotData_.get(slot)
+					+ "\n");
+		}
+
+		buffer.append("Rule counts: \n");
+		for (GuidedRule gr : ruleCounts_.keySet()) {
+			buffer.append("\t" + gr + ": " + ruleCounts_.get(gr) + "\n");
+		}
+
+		return buffer.toString();
+	}
+
 	/**
 	 * A class for holding slot data.
 	 * 
@@ -161,7 +182,7 @@ public class ElitesData {
 		/** The number of times this slot is present in the elite policies. */
 		private double count_;
 
-		/** The raw count of the numbe of slots in the elite policies. */
+		/** The raw count of the number of slots in the elite policies. */
 		private int rawCount_;
 
 		/** The average position of the slot in the policies. */
@@ -183,7 +204,7 @@ public class ElitesData {
 		public void setNumeracy(double mean) {
 			numeracy_ = mean;
 		}
-		
+
 		public void setSD(double sd) {
 			sd_ = sd;
 		}
@@ -203,13 +224,23 @@ public class ElitesData {
 		public double getAverageOrdering() {
 			return position_ / rawCount_;
 		}
-		
+
 		public double getNumeracy() {
 			return numeracy_;
 		}
-		
+
 		public double getSD() {
 			return sd_;
+		}
+
+		@Override
+		public String toString() {
+			StringBuffer buffer = new StringBuffer("\tCount: " + count_);
+			buffer.append("\n\tRaw Count: " + rawCount_);
+			buffer.append("\n\tPosition: " + position_);
+			buffer.append("\n\tNumeracy: " + numeracy_);
+			buffer.append("\n\tNumeracy SD: " + sd_);
+			return buffer.toString();
 		}
 	}
 }

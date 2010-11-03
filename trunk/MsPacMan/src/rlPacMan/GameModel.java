@@ -65,7 +65,7 @@ public class GameModel {
 	Player m_player; // Pacman
 	PacMan m_pacMan; // Controller
 	Fruit m_fruit; // Wandering fruits
-	int m_highScore = 10000; // Default highscore
+	int m_highScore = 0; // Set highscore
 	int m_nextFreeUp = 10000; // Every this many points, earn another life
 	int m_doorLocX = 13; // Bad.. Hard code location of door
 	int m_doorLocY = 12; // Bad.. Hard code location of door

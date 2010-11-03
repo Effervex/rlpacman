@@ -28,14 +28,11 @@ public class LearningController {
 	public static final int TEST_ITERATIONS = 100;
 	/** The best policy found output file. */
 	private File policyFile_;
-	/** The generator states file. */
-	private File generatorFile_;
-	/** The generator states file. */
-	private File humanGeneratorFile_;
 	/** The performance output file. */
 	private File performanceFile_;
 	/** The folder to store the temp files. */
-	private static final File TEMP_FOLDER = new File("temp/");
+	private static final File TEMP_FOLDER = new File("temp"
+			+ File.separatorChar);
 	/** If this controller is using sliding window learning. */
 	private final boolean SLIDING_WINDOW = true;
 	/** If this controller is using cross-entrobeam learning. */
@@ -48,7 +45,7 @@ public class LearningController {
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 10;
+	private static final double POPULATION_CONSTANT = 30;
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
@@ -56,7 +53,12 @@ public class LearningController {
 	/** The internal prefix for messages to the agent regarding internal goal. */
 	public static final String INTERNAL_PREFIX = "internal";
 	/** The marker for the end of a successfully completed performance file. */
-	private static final String END_PERFORMANCE = "<--END-->";
+	public static final String END_PERFORMANCE = "<--END-->";
+	/**
+	 * The number of meta-iterations a rule goes without updates before being
+	 * pruned.
+	 */
+	private static final double PRUNING_ITERATIONS = 1;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The time at which the learning started */
@@ -101,8 +103,7 @@ public class LearningController {
 				repetitionsEnd = Integer.parseInt(repetitionsStr[1]);
 			}
 			Integer episodes = Integer.parseInt(bf.readLine());
-			String policyFile = bf.readLine();
-			String generatorFile = bf.readLine();
+			String elitesFile = bf.readLine();
 			String performanceFile = bf.readLine();
 
 			ArrayList<String> extraArgsList = new ArrayList<String>();
@@ -118,8 +119,8 @@ public class LearningController {
 			reader.close();
 
 			initialise(environmentClass, repetitionsStart, repetitionsEnd,
-					episodes, policyFile, generatorFile, performanceFile,
-					extraArgsList.toArray(new String[extraArgsList.size()]));
+					episodes, elitesFile, performanceFile, extraArgsList
+							.toArray(new String[extraArgsList.size()]));
 
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
@@ -134,6 +135,8 @@ public class LearningController {
 					loadedGeneratorFile_ = new File(args[i]);
 				} else if (args[i].equals("-t"))
 					runningTests_ = false;
+				else if (args[i].equals("-m"))
+					Module.saveAtEnd_ = true;
 			}
 
 		} catch (Exception e) {
@@ -153,34 +156,26 @@ public class LearningController {
 	 *            The last run number seed.
 	 * @param episodeCount
 	 *            The number of episodes to perform.
-	 * @param policyFile
+	 * @param elitesFile
 	 *            The output file for the best policy.
-	 * @param generatorFile
-	 *            The output file for the generators.
 	 * @param performanceFile
 	 *            The output file for the agent's performance.
 	 * @param extraArgs
 	 *            The extra arguments for the environment to take.
 	 */
 	private void initialise(String environmentClass, int repetitionsStart,
-			int repetitionsEnd, int episodeCount, String policyFile,
-			String generatorFile, String performanceFile, String[] extraArgs) {
+			int repetitionsEnd, int episodeCount, String elitesFile,
+			String performanceFile, String[] extraArgs) {
 		repetitionsStart_ = repetitionsStart;
 		repetitionsEnd_ = repetitionsEnd;
 		maxEpisodes_ = episodeCount;
 
 		// Create the output files if necessary
-		policyFile_ = new File(policyFile);
-		generatorFile_ = new File(generatorFile);
-		humanGeneratorFile_ = new File("readable-" + generatorFile);
+		policyFile_ = new File(elitesFile);
 		performanceFile_ = new File(performanceFile);
 		try {
 			if (!policyFile_.exists())
 				policyFile_.createNewFile();
-			if (!generatorFile_.exists())
-				generatorFile_.createNewFile();
-			if (!humanGeneratorFile_.exists())
-				humanGeneratorFile_.createNewFile();
 			if (!performanceFile_.exists())
 				performanceFile_.createNewFile();
 			TEMP_FOLDER.mkdir();
@@ -238,12 +233,13 @@ public class LearningController {
 			PolicyGenerator.getInstance().resetGenerator();
 		}
 
+		Module.saveAllModules();
+
 		RLGlue.RL_cleanup();
 
 		if (repetitionsStart_ == 0) {
 			try {
-				combineGenerators(repetitionsStart_, repetitionsEnd_);
-				compilePerformanceAverage(repetitionsStart_, repetitionsEnd_);
+				combineTempFiles(repetitionsEnd_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -300,7 +296,8 @@ public class LearningController {
 		// A value to track how many intervals since the last test.
 		int sinceLastTest = 0;
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
-			if (PolicyGenerator.getInstance().useModules_) {
+			if (PolicyGenerator.getInstance().useModules_
+					&& (loadedGeneratorFile_ == null)) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
 			}
@@ -315,8 +312,7 @@ public class LearningController {
 				finiteNum = maxEpisodes_ * testingStep;
 				if (maxEpisodes_ < 0)
 					finiteNum = Integer.MAX_VALUE;
-				population = (int) Math.max(SELECTION_RATIO * population,
-						POPULATION_CONSTANT);
+				population = (int) Math.ceil(SELECTION_RATIO * population);
 			}
 
 			int samples = 0;
@@ -404,13 +400,13 @@ public class LearningController {
 				if ((t == finiteNum - 1) || (sinceLastTest >= testingStep)
 						|| (t == 0)) {
 					testRecordAgent(localPolicy, run, episodePerformances, pvs,
-							finiteNum, t);
+							finiteNum, t, false);
 					sinceLastTest = 0;
 				}
 
 				// Run the post update operations
 				localPolicy.postUpdateOperations(population, Math.pow(
-						(1 - STEP_SIZE), 2));
+						(1 - STEP_SIZE), PRUNING_ITERATIONS));
 
 				t++;
 				sinceLastTest++;
@@ -427,13 +423,7 @@ public class LearningController {
 		// If the agent finished prematurely, note the results.
 		if (sinceLastTest > 0) {
 			testRecordAgent(localPolicy, run, episodePerformances, pvs,
-					finiteNum, t);
-		}
-
-		try {
-			savePerformance(episodePerformances, run, true);
-		} catch (Exception e) {
-			e.printStackTrace();
+					finiteNum, t, true);
 		}
 	}
 
@@ -452,10 +442,12 @@ public class LearningController {
 	 *            The maximum number of iterations to learn in.
 	 * @param t
 	 *            The current progress of the iterations.
+	 * @param finalTest
+	 *            If this test is the final test for the policy generator.
 	 */
 	private void testRecordAgent(PolicyGenerator localPolicy, int run,
 			ArrayList<Float> episodePerformances, List<PolicyValue> pvs,
-			int finiteNum, int t) {
+			int finiteNum, int t, boolean finalTest) {
 		// Test the agent and record the performances
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
@@ -464,23 +456,10 @@ public class LearningController {
 
 		// Save the results at each episode
 		try {
-			File tempGen = null;
-			if (localPolicy.isModuleGenerator())
-				tempGen = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-						+ localPolicy.getModuleName()
-						+ generatorFile_.getName());
-			else
-				tempGen = new File(TEMP_FOLDER + "/" + generatorFile_.getName()
-						+ run);
-			tempGen.createNewFile();
-			localPolicy.saveGenerators(tempGen);
 			saveElitePolicies(pvs);
 			// Output the episode averages
-			if (runningTests_)
-				savePerformance(episodePerformances, run, false);
-			File preGoalFile = new File(TEMP_FOLDER + "/preGoals.txt" + run);
-			preGoalFile.createNewFile();
-			localPolicy.savePreGoals(preGoalFile);
+			savePerformance(episodePerformances, run, finalTest);
+			localPolicy.saveAgentObservations(run);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -525,6 +504,8 @@ public class LearningController {
 	private List<PolicyValue> postUpdateModification(List<PolicyValue> pvs,
 			int iteration, double staleValue) {
 		// Remove any stale policies
+		// TODO May be a bad idea, though it does deal with shifting
+		// environments.
 		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
 			PolicyValue pv = iter.next();
 			if (iteration - pv.getIteration() >= staleValue) {
@@ -610,8 +591,6 @@ public class LearningController {
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
 		// Run through each rule in the policy generator, noting which ones
 		// require module learning.
-		// TODO Problem: Have duplicate facts here. Maybe just check the facts
-		// have not already been used.
 		SortedSet<ConstantPred> constantFacts = policyGenerator
 				.getConstantFacts();
 
@@ -721,11 +700,12 @@ public class LearningController {
 			modularGenerator = PolicyGenerator.newInstance(policyGenerator,
 					internalGoal.getFacts());
 		}
-		developPolicy(modularGenerator, -constantFacts.size() + modsComplete, 0);
+		developPolicy(modularGenerator, -constantFacts.size() + modsComplete,
+				-1);
 
 		// Save the module
-		Module.saveModule(internalGoal.getFacts(), StateSpec.getInstance()
-				.getEnvironmentName(), modularGenerator.getGenerator());
+		Module.saveModule(internalGoal.getFacts(), modularGenerator
+				.getGenerator());
 
 		modsComplete++;
 
@@ -758,6 +738,11 @@ public class LearningController {
 	 *         combinations of rules.
 	 */
 	private int determinePopulation(PolicyGenerator policyGenerator) {
+		// TODO Experiment with squared slot values, as they make sense in terms
+		// of fair testing. E.g. Slot of 3 rules with 0.33 prob results in 3
+		// samples per rule to get possible rule slot. But perhaps even include
+		// the elites value, so squared and / elites selection ratio. This could
+		// get a bit big, so perhaps use a log curve * pop const.
 		// If the generator is just a slot optimiser, use 50 * slot number
 		if (policyGenerator.isSlotOptimiser()) {
 			return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
@@ -846,22 +831,6 @@ public class LearningController {
 				System.out.println(score / AVERAGE_ITERATIONS + "\n");
 			}
 			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
-		}
-
-		// Write the state of the generators out in human readable form
-		try {
-			File output = null;
-			if (PolicyGenerator.getInstance().isModuleGenerator())
-				output = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-						+ PolicyGenerator.getInstance().getModuleName()
-						+ humanGeneratorFile_.getName());
-			else
-				output = new File(TEMP_FOLDER + "/"
-						+ humanGeneratorFile_.getName() + run);
-			output.createNewFile();
-			PolicyGenerator.getInstance().saveHumanGenerators(output);
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 
 		RLGlue.RL_env_message("unfreeze");
@@ -998,38 +967,37 @@ public class LearningController {
 	private void savePerformance(ArrayList<Float> episodeAverage, int run,
 			boolean finalWrite) throws Exception {
 		File tempPerf = null;
-		File detailedPerf = null;
 		if (PolicyGenerator.getInstance().isModuleGenerator()) {
-			tempPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-					+ PolicyGenerator.getInstance().getModuleName()
+			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
+					+ TEMP_FOLDER + File.separatorChar);
+			modTemps.mkdirs();
+			tempPerf = new File(modTemps, PolicyGenerator.getInstance()
+					.getModuleName()
 					+ performanceFile_.getName());
-			detailedPerf = new File(Module.MODULE_DIR + "/" + TEMP_FOLDER + "/"
-					+ PolicyGenerator.getInstance().getModuleName()
-					+ "detailed" + performanceFile_.getName());
 		} else {
-			tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_.getName()
-					+ run);
-			detailedPerf = new File(TEMP_FOLDER + "/" + "detailed"
-					+ performanceFile_.getName() + run);
+			TEMP_FOLDER.mkdir();
+			tempPerf = new File(TEMP_FOLDER, performanceFile_.getName() + run);
 		}
+
+		// Remove any old file if this is the first run
+		if (episodeAverage.size() == 1)
+			tempPerf.delete();
+
 		tempPerf.createNewFile();
-		detailedPerf.createNewFile();
-		FileWriter wr = new FileWriter(tempPerf);
+		FileWriter wr = new FileWriter(tempPerf, true);
 		BufferedWriter buf = new BufferedWriter(wr);
-		FileWriter detWR = new FileWriter(detailedPerf);
-		BufferedWriter detBuf = new BufferedWriter(detWR);
 
 		System.out.println("Average episode elite scores:");
-		for (float perf : episodeAverage) {
-			PolicyGenerator.getInstance().saveHumanGenerators(detBuf);
-			detBuf.write("\n");
-			PolicyGenerator.getInstance().saveGenerators(detBuf);
-			detBuf.write("\n\n" + perf + "\n");
-			detBuf.write("\n\n\n");
-			
-			buf.write(perf + "\n");
+		PolicyGenerator.getInstance().saveHumanGenerators(buf);
+		buf.write("\n");
+		PolicyGenerator.getInstance().saveGenerators(buf);
+		buf
+				.write("\n\n" + episodeAverage.get(episodeAverage.size() - 1)
+						+ "\n");
+		buf.write("\n\n\n");
+
+		for (Float perf : episodeAverage)
 			System.out.println(perf);
-		}
 
 		if (finalWrite) {
 			buf.write(END_PERFORMANCE + "\n");
@@ -1037,8 +1005,6 @@ public class LearningController {
 					+ toTimeFormat(System.currentTimeMillis() - runStart_));
 		}
 
-		detBuf.close();
-		detWR.close();
 		buf.close();
 		wr.close();
 	}
@@ -1095,56 +1061,43 @@ public class LearningController {
 	}
 
 	/**
-	 * Compiles the performance files togetrher into a single file, detailing
-	 * the average, min and max performances.
+	 * Compiles the performance files together into a single file, detailing the
+	 * average, min and max performances.
 	 * 
-	 * @param runStart
-	 *            The first run.
 	 * @param runEnd
 	 *            The last run.
 	 */
-	private void compilePerformanceAverage(int runStart, int runEnd)
-			throws Exception {
-		double[][] performances = new double[maxEpisodes_][runEnd - runStart];
+	private void combineTempFiles(int runEnd) throws Exception {
+		double[][] performances = new double[maxEpisodes_][runEnd];
 		float min = Float.MAX_VALUE;
 		int minIndex = -1;
 		float max = -Float.MAX_VALUE;
 		int maxIndex = -1;
 		// For every performance file
-		for (int i = runStart; i < runEnd; i++) {
+		for (int i = 0; i < runEnd; i++) {
 			File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_ + i);
-			FileReader reader = new FileReader(tempPerf);
-			BufferedReader buf = new BufferedReader(reader);
+			if (!PerformanceReader.readPerformanceFile(tempPerf))
+				System.err.println("Error reading performance file.");
 
-			// For every value within the performance file
-			float sum = 0;
-			float val = 0;
-			boolean noNote = false;
+			// Run through the performances and place them in the matrix
+			Float[] runPerformances = PerformanceReader.getPerformanceArray();
 			for (int e = 0; e < maxEpisodes_; e++) {
-				// Some performance files may be cut off, so just use the last
-				// recorded value.
-				String input = buf.readLine();
-				if ((input == null) || (input.equals(END_PERFORMANCE)))
-					noNote = true;
-				if (!noNote) {
-					val = Float.parseFloat(input);
-				}
-				performances[e][i - runStart] = val;
-				sum += val;
+				if (e < runPerformances.length)
+					performances[e][i] = runPerformances[e];
+				else
+					performances[e][i] = performances[e - 1][i];
 			}
 
+			float lastVal = runPerformances[runPerformances.length - 1];
 			// Find min or max runs
-			if (sum < min) {
-				min = sum;
-				minIndex = i - runStart;
+			if (lastVal < min) {
+				min = lastVal;
+				minIndex = i;
 			}
-			if (sum > max) {
-				max = sum;
-				maxIndex = i - runStart;
+			if (lastVal > max) {
+				max = lastVal;
+				maxIndex = i;
 			}
-
-			buf.close();
-			reader.close();
 		}
 
 		// Calculate the average and print out the stats
@@ -1168,21 +1121,6 @@ public class LearningController {
 
 		buf.close();
 		writer.close();
-	}
-
-	/**
-	 * Combines the generators into a single file, averaging the generator
-	 * values.
-	 * 
-	 * @param runStart
-	 *            The first run.
-	 * @param runEnd
-	 *            The last run.
-	 * @throws Exception
-	 *             Should something go awry...
-	 */
-	private void combineGenerators(int runStart, int runEnd) throws Exception {
-		// TODO Combine generators in a modular fashion
 	}
 
 	/**

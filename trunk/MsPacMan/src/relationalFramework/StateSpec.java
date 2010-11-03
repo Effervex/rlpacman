@@ -236,6 +236,7 @@ public abstract class StateSpec {
 	 *            The rete object.
 	 * @return A mapping of classes to guided predicate names.
 	 */
+	// TODO Can possibly change this to no longer use classes, but instead strings.
 	protected abstract Collection<StringFact> initialiseTypePredicateTemplates();
 
 	/**

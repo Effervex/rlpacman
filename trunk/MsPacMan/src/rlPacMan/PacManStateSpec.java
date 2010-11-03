@@ -310,8 +310,7 @@ public class PacManStateSpec extends StateSpec {
 	 */
 	public WeightedDirection applyAction(StringFact action, PacManState state) {
 		String[] arguments = action.getArguments();
-		double weight = determineWeight(Integer
-				.parseInt(arguments[1]));
+		double weight = determineWeight(Integer.parseInt(arguments[1]));
 
 		// Move towards static points (dots, powerdots, junctions)
 		if ((action.getFactName().equals("toDot"))

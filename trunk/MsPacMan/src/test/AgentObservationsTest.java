@@ -27,9 +27,9 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
-		sut_ = new AgentObservations();
+		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);		
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		sut_ = new AgentObservations();
 	}
 
 	private void assertBeliefs(ConditionBeliefs cb,
@@ -52,7 +52,7 @@ public class AgentObservationsTest {
 					+ trues, false);
 			assertTrue(sut_.getLearnedBackgroundKnowledge().contains(bk));
 		}
-		
+
 		for (String falses : neverTrue) {
 			BackgroundKnowledge bk = new BackgroundKnowledge(cbFact + " => "
 					+ "(not " + falses + ")", false);
@@ -66,6 +66,15 @@ public class AgentObservationsTest {
 			assertTrue(agentBeliefs.contains(StateSpec.toStringFact(fact)));
 		}
 		assertEquals(agentBeliefs.size(), beliefs.size());
+	}
+
+	private void assertGeneralBackgroundRules(String cbFact,
+			Collection<String> generals) {
+		for (String general : generals) {
+			BackgroundKnowledge bk = new BackgroundKnowledge(cbFact + " => "
+					+ general, false);
+			assertTrue(sut_.getLearnedBackgroundKnowledge().contains(bk));
+		}
 	}
 
 	@Test
@@ -115,14 +124,14 @@ public class AgentObservationsTest {
 		// Above
 		cb = condBeliefs.get("above");
 		alwaysTrue.clear();
+		alwaysTrue.add("(above ?X ?)");
+		alwaysTrue.add("(above ? ?Y)");
+		alwaysTrue.add("(on ?X ?)");
+		alwaysTrue.add("(on ? ?Y)");
 		occasionallyTrue.clear();
-		occasionallyTrue.add("(on ?X ?)");
 		occasionallyTrue.add("(on ?X ?Y)");
-		occasionallyTrue.add("(on ? ?Y)");
 		occasionallyTrue.add("(on ?Y ?)");
 		occasionallyTrue.add("(on ? ?X)");
-		occasionallyTrue.add("(above ?X ?)");
-		occasionallyTrue.add("(above ? ?Y)");
 		occasionallyTrue.add("(above ?Y ?)");
 		occasionallyTrue.add("(above ? ?X)");
 		occasionallyTrue.add("(clear ?X)");
@@ -138,11 +147,13 @@ public class AgentObservationsTest {
 		cb = condBeliefs.get("on");
 		alwaysTrue.clear();
 		alwaysTrue.add("(above ?X ?Y)");
+		alwaysTrue.add("(above ?X ?)");
+		alwaysTrue.add("(above ? ?Y)");
+		alwaysTrue.add("(on ?X ?)");
+		alwaysTrue.add("(on ? ?Y)");
 		occasionallyTrue.clear();
 		occasionallyTrue.add("(on ?Y ?)");
 		occasionallyTrue.add("(on ? ?X)");
-		occasionallyTrue.add("(above ?X ?)");
-		occasionallyTrue.add("(above ? ?Y)");
 		occasionallyTrue.add("(above ?Y ?)");
 		occasionallyTrue.add("(above ? ?X)");
 		occasionallyTrue.add("(clear ?X)");
@@ -152,11 +163,9 @@ public class AgentObservationsTest {
 		neverTrue.add("(onFloor ?X)");
 		neverTrue.add("(clear ?Y)");
 		neverTrue.add("(highest ?Y)");
-		neverTrue.add("(on ?X ?)");
-		neverTrue.add("(on ? ?Y)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
-		// Highest (Only 1 observation so no occasionals)
+		// Highest (Only 1 observation so no occasionnals)
 		cb = condBeliefs.get("highest");
 		alwaysTrue.clear();
 		alwaysTrue.add("(clear ?X)");
@@ -230,14 +239,14 @@ public class AgentObservationsTest {
 		// Above
 		cb = condBeliefs.get("above");
 		alwaysTrue.clear();
+		alwaysTrue.add("(above ?X ?)");
+		alwaysTrue.add("(above ? ?Y)");
+		alwaysTrue.add("(on ?X ?)");
+		alwaysTrue.add("(on ? ?Y)");
 		occasionallyTrue.clear();
-		occasionallyTrue.add("(on ?X ?)");
 		occasionallyTrue.add("(on ?X ?Y)");
-		occasionallyTrue.add("(on ? ?Y)");
 		occasionallyTrue.add("(on ?Y ?)");
 		occasionallyTrue.add("(on ? ?X)");
-		occasionallyTrue.add("(above ?X ?)");
-		occasionallyTrue.add("(above ? ?Y)");
 		occasionallyTrue.add("(above ?Y ?)");
 		occasionallyTrue.add("(above ? ?X)");
 		occasionallyTrue.add("(clear ?X)");
@@ -253,11 +262,13 @@ public class AgentObservationsTest {
 		cb = condBeliefs.get("on");
 		alwaysTrue.clear();
 		alwaysTrue.add("(above ?X ?Y)");
+		alwaysTrue.add("(above ?X ?)");
+		alwaysTrue.add("(above ? ?Y)");
+		alwaysTrue.add("(on ?X ?)");
+		alwaysTrue.add("(on ? ?Y)");
 		occasionallyTrue.clear();
 		occasionallyTrue.add("(on ?Y ?)");
 		occasionallyTrue.add("(on ? ?X)");
-		occasionallyTrue.add("(above ?X ?)");
-		occasionallyTrue.add("(above ? ?Y)");
 		occasionallyTrue.add("(above ?Y ?)");
 		occasionallyTrue.add("(above ? ?X)");
 		occasionallyTrue.add("(clear ?X)");
@@ -267,8 +278,6 @@ public class AgentObservationsTest {
 		neverTrue.add("(onFloor ?X)");
 		neverTrue.add("(clear ?Y)");
 		neverTrue.add("(highest ?Y)");
-		neverTrue.add("(on ?X ?)");
-		neverTrue.add("(on ? ?Y)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
 		// Highest (Only 1 observation so no occasionals)
