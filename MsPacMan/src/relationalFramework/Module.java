@@ -51,6 +51,9 @@ public class Module {
 	/** A mapping of loaded modules. */
 	private static final Map<String, Module> loadedModules_ = new HashMap<String, Module>();
 
+	/** Saves the modules at the end of the learning. */
+	public static boolean saveAtEnd_ = false;
+
 	/**
 	 * Creates a new module, using the goal as the module goal, and the slot
 	 * distribution to create the module rules.
@@ -65,9 +68,11 @@ public class Module {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = formName(facts);
+		int i = 0;
 		for (StringFact fact : facts) {
-			for (int i = 0; i < fact.getArguments().length; i++) {
+			for (int j = 0; j < fact.getArguments().length; j++) {
 				parameterTerms_.add(createModuleParameter(i));
+				i++;
 			}
 		}
 
@@ -77,7 +82,7 @@ public class Module {
 		for (Slot slot : orderedSlots) {
 			Slot removalSlot = slot.clone();
 			double repetitions = Math.round(slot.getSelectionProbability());
-			for (int i = 0; i < repetitions; i++) {
+			for (int j = 0; j < repetitions; j++) {
 				if (!removalSlot.isEmpty()) {
 					GuidedRule rule = removalSlot.getGenerator()
 							.sampleWithRemoval(true);
@@ -185,21 +190,43 @@ public class Module {
 	 * 
 	 * @param facts
 	 *            The goal the module works towards.
-	 * @param environment
-	 *            The environment the module exists within.
 	 * @param orderedDistribution
 	 *            The policy generator which solves the goal.
 	 */
-	public static void saveModule(ArrayList<StringFact> facts, String environment,
+	public static void saveModule(ArrayList<StringFact> facts,
 			OrderedDistribution<Slot> orderedDistribution) {
-		Module newModule = new Module(facts, orderedDistribution);
 		String modName = formName(facts);
-		nonExistantModules_.remove(modName);
-		loadedModules_.put(modName, newModule);
+		Module newModule = null;
+		if (!loadedModules_.containsKey(modName)) {
+			newModule = new Module(facts, orderedDistribution);
+			nonExistantModules_.remove(modName);
+			loadedModules_.put(modName, newModule);
+		} else
+			newModule = loadedModules_.get(modName);
 
+		if (!saveAtEnd_) {
+			saveModule(newModule);
+		}
+	}
+
+	/**
+	 * Internal module saving method. Takes in a list of facts that make up the
+	 * module, the environment name and the module itself.
+	 * 
+	 * @param newModule
+	 *            The module being saved.
+	 */
+	private static void saveModule(Module newModule) {
 		try {
+			// Module dir
+			File modPath = new File(MODULE_DIR + File.separatorChar
+					+ StateSpec.getInstance().getEnvironmentName()
+					+ File.separatorChar);
+			modPath.mkdirs();
+
 			File modLocation = new File(MODULE_DIR + File.separatorChar
-					+ environment + File.separatorChar + formName(facts)
+					+ StateSpec.getInstance().getEnvironmentName()
+					+ File.separatorChar + newModule.modulePredicate_
 					+ MODULE_SUFFIX);
 			if (modLocation.createNewFile()) {
 
@@ -210,13 +237,8 @@ public class Module {
 						.write(";; The parameter variables given to the module on loading.\n");
 				bf.write("(declare (variables");
 				// Write the parameters out for each fact in the module.
-				int j = 0;
-				for (StringFact fact : facts) {
-					int i = 0;
-					for (; i < fact.getArguments().length; i++) {
-						bf.write(" " + createModuleParameter(i + j));
-					}
-					j += i;
+				for (String param : newModule.getParameterTerms()) {
+					bf.write(" " + param);
 				}
 				bf.write("))\n");
 
@@ -232,11 +254,19 @@ public class Module {
 				writer.close();
 			} else {
 				System.err.println("Module file exists!");
-				System.err.println(facts.toString());
+				System.err.println(newModule);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Saves all modules in the currently loaded modules
+	 */
+	public static void saveAllModules() {
+		for (Module module : loadedModules_.values())
+			saveModule(module);
 	}
 
 	/**

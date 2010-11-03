@@ -172,7 +172,7 @@ public class StringFact implements Comparable<StringFact> {
 	public Map<String, String> createVariableTermReplacementMap() {
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
-			if (!Number.class.isAssignableFrom(factTypes_[i]))
+			if (!StateSpec.isNumberClass(factTypes_[i]))
 				replacementMap.put(arguments_[i], Covering
 						.getVariableTermString(i));
 		}

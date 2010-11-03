@@ -29,14 +29,14 @@ public class PacManStateSpecTest {
 		GuidedRule rule = new GuidedRule(
 				"(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
 		// 2 assertions in the body: clear, and block
-		assertEquals(rule.getConditions().size(), 4);
-		assertTrue(rule.getConditions().contains(
+		assertEquals(rule.getConditions(false).size(), 4);
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(distanceGhost ?Player ?Ghost 4)")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(pacman ?Player)")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(ghost ?Ghost)")));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));
@@ -49,17 +49,17 @@ public class PacManStateSpecTest {
 				"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
 						+ " => (fromGhost ?Ghost)");
 		// 2 assertions in the body: clear, and block
-		assertEquals(rule.getConditions().size(), 4);
+		assertEquals(rule.getConditions(false).size(), 4);
 		assertTrue(rule
-				.getConditions()
+				.getConditions(false)
 				.contains(
 						StateSpec
 								.toStringFact("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(pacman ?Player)")));
-		assertTrue(rule.getConditions().contains(
+		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(ghost ?Ghost)")));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));

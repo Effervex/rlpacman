@@ -133,30 +133,71 @@ public class OrderedDistribution<T> implements Collection<T> {
 	 * Updates the distribution to reflect the observed ordering of elements.
 	 * 
 	 * @param elementPositions
-	 *            The relative positions of the elements.
+	 *            The sampled relative positions of the elements.
 	 * @param stepSize
 	 *            The step size update parameter.
-	 * @return The KL divergence between the old probabilities and the new
+	 * @return The difference between the old probabilities and the new
 	 *         probabilities.
 	 */
 	public double updateDistribution(Map<T, Double> elementPositions,
 			double stepSize) {
 		double diff = 0;
 		for (ItemProb<T> element : elements_) {
-			if (elementPositions.containsKey(element.getItem())) {
-				// Get the old value
-				double oldValue = element.getProbability();
+			diff += updateElement(elementPositions, stepSize, element);
+		}
+		return diff;
+	}
 
-				// If the element doesn't exist, it has an order of 1 (last)
-				double newOrder = elementPositions.get(element.getItem());
-				// Generate the new value
-				double newValue = stepSize * newOrder + (1 - stepSize)
-						* oldValue;
-
-				element.setProbability(newValue);
-
-				diff += Math.abs(newValue - oldValue);
+	/**
+	 * Updates the distribution to reflect the observed ordering of elements
+	 * using individual step sizes.
+	 * 
+	 * @param elementPositions
+	 *            The sampled relative positions of the elements.
+	 * @param stepSizes
+	 *            The individual step sizes for each element.
+	 * @return The difference between the old probabilities and the new
+	 *         probabilities.
+	 */
+	public double updateDistribution(Map<T, Double> elementPositions,
+			Map<T, Double> stepSizes) {
+		double diff = 0;
+		for (ItemProb<T> element : elements_) {
+			if (stepSizes.containsKey(element.getItem())) {
+				diff += updateElement(elementPositions, stepSizes.get(element
+						.getItem()), element);
 			}
+		}
+		return diff;
+	}
+
+	/**
+	 * Updates a single element in the distribution.
+	 * 
+	 * @param elementPositions
+	 *            The sampled relative positions of the elements.
+	 * @param stepSize
+	 *            The step size to update the element by.
+	 * @param element
+	 *            The element to update.
+	 * @return The difference between the element's old value and the new
+	 *         one.
+	 */
+	private double updateElement(Map<T, Double> elementPositions,
+			double stepSize, ItemProb<T> element) {
+		double diff = 0;
+		if (elementPositions.containsKey(element.getItem())) {
+			// Get the old value
+			double oldValue = element.getProbability();
+
+			// If the element doesn't exist, it has an order of 1 (last)
+			double newOrder = elementPositions.get(element.getItem());
+			// Generate the new value
+			double newValue = stepSize * newOrder + (1 - stepSize) * oldValue;
+
+			element.setProbability(newValue);
+
+			diff = Math.abs(newValue - oldValue);
 		}
 		return diff;
 	}
@@ -336,14 +377,13 @@ public class OrderedDistribution<T> implements Collection<T> {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer("[");
+		StringBuffer buffer = new StringBuffer();
 		Iterator<ItemProb<T>> iter = elements_.iterator();
 		if (iter.hasNext())
 			buffer.append(iter.next());
 		while (iter.hasNext()) {
-			buffer.append(", " + iter.next());
+			buffer.append("\n" + iter.next());
 		}
-		buffer.append("]");
 		return buffer.toString();
 	}
 }

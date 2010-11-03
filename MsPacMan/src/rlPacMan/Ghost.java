@@ -14,7 +14,7 @@ class Ghost extends Thing {
 	public static final byte INKY = 2;
 	// Clyde (Orange) behaviour (Ignorant)
 	public static final byte CLYDE = 3;
-	
+
 	/** The density ratio of the ghosts. */
 	public static final double DENSITY_RADIUS = 10;
 
@@ -309,8 +309,8 @@ class Ghost extends Thing {
 			 * ghostEyeX = ghostX + ghostHeadDiameter / 4 - ghostEyeWidth / 2;
 			 * ghostEyeY = ghostY + ghostHeadDiameter / 5; ghostEyeBallX =
 			 * ghostEyeX + ghostEyeWidth / 2 - ghostEyeDiameter / 2;
-			 * ghostEyeBallY = ghostEyeY + ghostEyeHeight / 2 - ghostEyeDiameter /
-			 * 2;
+			 * ghostEyeBallY = ghostEyeY + ghostEyeHeight / 2 - ghostEyeDiameter
+			 * / 2;
 			 */
 			ghostEyeX = ghostX + ghostHeadDiameter / 4.0 - ghostEyeWidth / 2.0;
 			ghostEyeY = ghostY + ghostHeadDiameter / 5.0;
@@ -474,8 +474,9 @@ class Ghost extends Thing {
 				m_destinationX = -1;
 				m_destinationY = -1;
 			}
-			
-			if (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay) {
+
+			if ((m_nTicks2Flee > 0)
+					&& (m_nTicks2Flee < 2000 / m_gameModel.m_pacMan.m_delay)) {
 				flashing_ = true;
 			} else {
 				flashing_ = false;
@@ -835,7 +836,7 @@ class Ghost extends Thing {
 				targetY = m_targetY;
 			}
 		}
-		
+
 		// Modulo the x coordinate for wrapping
 		if ((targetX >= m_gameModel.m_gameSizeX) || (targetX < 0))
 			targetX = (targetX + m_gameModel.m_gameSizeX)
@@ -978,16 +979,16 @@ class Ghost extends Thing {
 						* (gameUI.CELL_LENGTH / (m_deltaMax * 2.0 - 1)));
 		pixelShrink_ = -pixelSize_ / 4;
 	}
-	
+
 	@Override
 	public String getObjectName() {
 		return "ghost";
 	}
-	
+
 	@Override
 	public String toString() {
 		String ghostString = null;
-		switch(m_type) {
+		switch (m_type) {
 		case BLINKY:
 			ghostString = "blinky";
 			break;

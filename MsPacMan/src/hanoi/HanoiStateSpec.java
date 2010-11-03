@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
-import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -92,13 +91,13 @@ public class HanoiStateSpec extends StateSpec {
 
 		// Defining the optimal policy (has to be split for even/odd)
 		String[] rules = new String[3];
-		rules[0] = "(numTiles even) (tile ?X) (notLastMoved ?X) "
+		rules[0] = "(numTiles even) (tile ?X) (not (lastMoved ?X)) "
 				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
 				+ "(nextTower ?Ta ?Tb) => (move ?X ?Ta ?Y ?Tb)";
-		rules[1] = "(numTiles odd) (tile ?X) (notLastMoved ?X) "
+		rules[1] = "(numTiles odd) (tile ?X) (not (lastMoved ?X)) "
 				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
 				+ "(prevTower ?Ta ?Tb) => (move ?X ?Ta ?Y ?Tb)";
-		rules[2] = "(tile ?X) (notLastMoved ?X) "
+		rules[2] = "(tile ?X) (not (lastMoved ?X)) "
 				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
 				+ "=> (move ?X ?Ta ?Y ?Tb)";
 
@@ -127,7 +126,7 @@ public class HanoiStateSpec extends StateSpec {
 		predicates.add(new StringFact("clear", structure));
 
 		// Above predicate
-		structure = new Class[2];
+		structure = new Class[3];
 		structure[0] = Tile.class;
 		structure[1] = Tile.class;
 		structure[2] = Tower.class;
@@ -140,19 +139,14 @@ public class HanoiStateSpec extends StateSpec {
 		predicates.add(new StringFact("smaller", structure));
 
 		// NumTiles predicate
-		structure = new Class[2];
+		structure = new Class[1];
 		structure[0] = EvenOdd.class;
 		predicates.add(new StringFact("numTiles", structure));
 
 		// LastMoved predicate
-		structure = new Class[2];
+		structure = new Class[1];
 		structure[0] = Tile.class;
 		predicates.add(new StringFact("lastMoved", structure));
-
-		// LastMoved predicate
-		structure = new Class[2];
-		structure[0] = Tile.class;
-		predicates.add(new StringFact("notLastMoved", structure));
 
 		// NextTower predicate
 		structure = new Class[2];

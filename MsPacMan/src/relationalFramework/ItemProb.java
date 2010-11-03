@@ -52,9 +52,9 @@ public class ItemProb<T> implements Comparable<ItemProb> {
 
 	// @Override
 	public int compareTo(ItemProb o) {
-		if (prob_ < o.prob_) {
+		if (prob_ > o.prob_) {
 			return -1;
-		} else if (prob_ > o.prob_) {
+		} else if (prob_ < o.prob_) {
 			return 1;
 		} else {
 			return Float.compare(element_.hashCode(), o.element_.hashCode());
@@ -62,28 +62,35 @@ public class ItemProb<T> implements Comparable<ItemProb> {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
-		if ((obj == null)
-				|| (!(obj instanceof ItemProb)))
-			return false;
-		ItemProb ip = (ItemProb) obj;
-		if (ip.element_.equals(element_)) {
-			if (ip.prob_ == prob_) {
-				return true;
-			}
-		}
-		return false;
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((element_ == null) ? 0 : element_.hashCode());
+		return result;
 	}
 
 	@Override
-	public int hashCode() {
-		return (int) (element_.hashCode() * prob_);
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ItemProb other = (ItemProb) obj;
+		if (element_ == null) {
+			if (other.element_ != null)
+				return false;
+		} else if (!element_.equals(other.element_))
+			return false;
+		return true;
 	}
 
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		buffer.append("(" + element_ + ": " + prob_ + ")");
+		buffer.append("(" + element_ + ":" + prob_ + ")");
 		return buffer.toString();
 	}
 }

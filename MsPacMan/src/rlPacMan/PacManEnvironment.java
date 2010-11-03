@@ -157,6 +157,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.m_bottomCanvas.setActionsList(null);
 		}
 		environment_.m_gameUI.m_bRedrawAll = false;
+		
+		// Set the highscore
+		if (model_.m_player.m_score > model_.m_highScore)
+			model_.m_highScore = model_.m_player.m_score;
 
 		Observation obs = formObservations(rete_);
 		Reward_observation_terminal rot = new Reward_observation_terminal(
@@ -191,6 +195,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 				optimalAgent.agent_message("formPreGoal");
 
 			// Return the state to normal
+			model_.m_highScore = 0;
 			resetEnvironment();
 		}
 	}
@@ -202,6 +207,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		boolean noDots = model_.noDots_;
 		boolean noPowerDots = model_.noPowerDots_;
 		boolean oneLife = model_.oneLife_;
+		int highScore = model_.m_highScore;
 
 		environment_.reinit();
 
@@ -209,6 +215,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_.noDots_ = noDots;
 		model_.noPowerDots_ = noPowerDots;
 		model_.oneLife_ = oneLife;
+		model_.m_highScore = highScore;
 		model_.setRandom(PolicyGenerator.random_);
 		rete_ = StateSpec.getInstance().getRete();
 

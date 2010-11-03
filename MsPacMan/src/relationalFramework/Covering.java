@@ -192,6 +192,7 @@ public class Covering {
 	 * @return -1 if no unification possible, 0 if perfect unification, 1 if
 	 *         unification with old state changed.
 	 */
+	@SuppressWarnings("unchecked")
 	private int unifyStates(Collection<StringFact> oldState,
 			Collection<StringFact> newState, String[] oldTerms,
 			boolean flexibleReplacement, BidiMap oldReplacementMap,
@@ -267,11 +268,13 @@ public class Covering {
 				boolean bothVariables = true;
 				String variable = getVariableTermString(i);
 				// Replace old term if necessary
-				if (oldTerm.charAt(0) != '?') {
+				if ((oldTerm.charAt(0) != '?')
+						|| (oldTerm.contains(Module.MOD_VARIABLE_PREFIX))) {
 					oldReplacementMap.put(oldTerm, variable);
 					bothVariables = false;
 				}
-				if (newTerm.charAt(0) != '?') {
+				if ((newTerm.charAt(0) != '?')
+						|| (newTerm.contains(Module.MOD_VARIABLE_PREFIX))) {
 					newReplacementMap.put(newTerm, variable);
 					bothVariables = false;
 				}
@@ -319,8 +322,6 @@ public class Covering {
 		// be present)
 		int generalisation = Integer.MAX_VALUE;
 		// Check against each item in the unity state.
-		// TODO Speed this up by assigning the facts to a map so they are
-		// quickly accessible.
 		for (StringFact unityFact : unityFacts) {
 			// Check it if the same fact
 			boolean sameFact = fact.getFactName().equals(
@@ -578,10 +579,11 @@ public class Covering {
 					GuidedRule prev = previousRules.get(i);
 
 					// Unify the prev rule and the inverse subbed rule
-					SortedSet<StringFact> ruleConditions = prev.getConditions();
+					SortedSet<StringFact> ruleConditions = prev
+							.getConditions(true);
 					String[] ruleTerms = prev.getActionTerms();
 					int changed = unifyStates(ruleConditions, inverseSubbed
-							.getConditions(), ruleTerms, inverseSubbed
+							.getConditions(false), ruleTerms, inverseSubbed
 							.getActionTerms());
 
 					if (changed == 1) {
@@ -603,8 +605,8 @@ public class Covering {
 
 		// Return the old, possibly modified rules and any new ones.
 		for (GuidedRule prev : previousRules) {
-			SortedSet<StringFact> ruleConds = simplifyRule(
-					prev.getConditions(), null, false);
+			SortedSet<StringFact> ruleConds = simplifyRule(prev
+					.getConditions(false), null, false);
 			if (ruleConds != null)
 				prev.setConditions(ruleConds, false);
 			prev.expandConditions();
@@ -678,7 +680,7 @@ public class Covering {
 		PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
 
 		// If we have a pre goal state
-		SortedSet<StringFact> ruleConditions = rule.getConditions();
+		SortedSet<StringFact> ruleConditions = rule.getConditions(false);
 		if (preGoal != null) {
 			Collection<StringFact> preGoalState = preGoal.getState();
 
@@ -760,6 +762,8 @@ public class Covering {
 	 * @return A collection of possible specialisations of the rule.
 	 */
 	public Set<GuidedRule> specialiseRule(GuidedRule rule) {
+		// TODO Look at using goal constants/module constants for rule
+		// specialisations.
 		Set<GuidedRule> specialisations = new HashSet<GuidedRule>();
 
 		String actionPred = rule.getActionPredicate();
@@ -768,7 +772,7 @@ public class Covering {
 				.getActionConditions(actionPred);
 		if (actionConditions == null)
 			return specialisations;
-		SortedSet<StringFact> conditions = rule.getConditions();
+		SortedSet<StringFact> conditions = rule.getConditions(false);
 		StringFact action = rule.getAction();
 		String[] actionTerms = action.getArguments();
 
@@ -784,6 +788,8 @@ public class Covering {
 			if (specConditions != null) {
 				GuidedRule specialisation = new GuidedRule(specConditions,
 						action, true);
+				specialisation.setQueryParams(rule.getQueryParameters());
+				specialisation.expandConditions();
 				if (!specialisations.contains(specialisation))
 					specialisations.add(specialisation);
 			}
@@ -827,7 +833,7 @@ public class Covering {
 
 		// Run through each condition
 		int c = 0;
-		for (StringFact condition : baseRule.getConditions()) {
+		for (StringFact condition : baseRule.getConditions(false)) {
 			for (int i = 0; i < condition.getArguments().length; i++) {
 				String arg = condition.getArguments()[i];
 				int suchThatIndex = arg.indexOf("&:");
@@ -1053,7 +1059,7 @@ public class Covering {
 			StringFact condition, int condSplitIndex, String replacementTerm) {
 		StringFact mutantFact = new StringFact(condition);
 		mutantFact.getArguments()[condSplitIndex] = replacementTerm;
-		SortedSet<StringFact> cloneConds = baseRule.getConditions();
+		SortedSet<StringFact> cloneConds = baseRule.getConditions(false);
 		cloneConds.remove(condition);
 		cloneConds.add(mutantFact);
 
@@ -1149,9 +1155,10 @@ public class Covering {
 								// Create the mutant
 								StringFact newCond = new StringFact(condFact);
 								newCond.getArguments()[i] = condArg;
-								if (!baseRule.getConditions().contains(newCond)) {
+								if (!baseRule.getConditions(false).contains(
+										newCond)) {
 									SortedSet<StringFact> mutatedConditions = new TreeSet<StringFact>(
-											baseRule.getConditions());
+											baseRule.getConditions(false));
 									mutatedConditions.remove(condFact);
 									mutatedConditions = simplifyRule(
 											mutatedConditions, newCond, false);
@@ -1179,9 +1186,9 @@ public class Covering {
 				// If we haven't looked at a replacement yet
 				if (reverseReplacementTerms.containsKey(condArg)) {
 					GuidedRule mutant = replaceActionTerm(baseRule
-							.getConditions(), baseRule.getAction(), condArg,
-							reverseReplacementTerms.get(condArg), preGoalState,
-							preGoalTerms);
+							.getConditions(false), baseRule.getAction(),
+							condArg, reverseReplacementTerms.get(condArg),
+							preGoalState, preGoalTerms);
 					if (mutant != null) {
 						mutant.setQueryParams(baseRule.getQueryParameters());
 						mutants.add(mutant);
@@ -1268,7 +1275,7 @@ public class Covering {
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
 			ActionChoice actionChoice, List<String> constants) {
 		// Scan the state first to create the term-mapped facts
-		// TODO May not need to do this, as the state could already be scanned.
+		// Check unifying pre-goal constants (specifically highest)
 		ao_.scanState(preGoalState);
 
 		Set<String> formedActions = new HashSet<String>();
@@ -1333,18 +1340,21 @@ public class Covering {
 	 * another.
 	 * 
 	 * @param otherCovering
-	 *            The other covering object.
+	 *            The other covering object to migrate the observations to.
 	 */
 	public void migrateAgentObservations(Covering otherCovering) {
-		otherCovering.backupPreGoals_ = otherCovering.ao_
-				.backupAndClearPreGoals();
-		ao_ = otherCovering.ao_;
+		if (backupPreGoals_ == null)
+			backupPreGoals_ = ao_.backupAndClearPreGoals();
+		else
+			ao_.clearPreGoal();
+		otherCovering.ao_ = ao_;
 	}
 
 	public void loadBackupPreGoal() {
 		if (backupPreGoals_ == null)
 			return;
 		ao_.loadPreGoals(backupPreGoals_);
+		backupPreGoals_ = null;
 	}
 
 	/**
@@ -1498,5 +1508,12 @@ public class Covering {
 	 */
 	public void clearPreGoalState() {
 		ao_.clearPreGoal();
+	}
+
+	/**
+	 * Saves the agent observations to file, in the agent obs directory.
+	 */
+	public void saveAgentObservations(int run) {
+		ao_.saveAgentObservations(run);
 	}
 }
