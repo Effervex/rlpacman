@@ -561,7 +561,8 @@ public class AgentObservations {
 				conditionRanges_ = new ArrayList<RangedCondition>();
 			else {
 				int index = conditionRanges_.indexOf(rc);
-				oldCond = conditionRanges_.remove(index);
+				if (index != -1)
+					oldCond = conditionRanges_.remove(index);
 			}
 			conditionRanges_.add(rc);
 

@@ -36,14 +36,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Move action
-		Class[] structure = new Class[2];
-		structure[0] = Block.class;
-		structure[1] = Block.class;
+		String[] structure = new String[2];
+		structure[0] = "block";
+		structure[1] = "block";
 		actions.add(new StringFact("move", structure));
 
 		// MoveFloor action
-		structure = new Class[1];
-		structure[0] = Block.class;
+		structure = new String[1];
+		structure[0] = "block";
 		actions.add(new StringFact("moveFloor", structure));
 
 		return actions;
@@ -161,40 +161,40 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// On predicate
-		Class[] structure = new Class[2];
-		structure[0] = Block.class;
-		structure[1] = Block.class;
+		String[] structure = new String[2];
+		structure[0] = "block";
+		structure[1] = "block";
 		predicates.add(new StringFact("on", structure));
 
 		// OnFloor predicate
-		structure = new Class[1];
-		structure[0] = Block.class;
+		structure = new String[1];
+		structure[0] = "block";
 		predicates.add(new StringFact("onFloor", structure));
 
 		// Clear predicate
-		structure = new Class[1];
-		structure[0] = Block.class;
+		structure = new String[1];
+		structure[0] = "block";
 		predicates.add(new StringFact("clear", structure));
 
 		// Above predicate
-		structure = new Class[2];
-		structure[0] = Block.class;
-		structure[1] = Block.class;
+		structure = new String[2];
+		structure[0] = "block";
+		structure[1] = "block";
 		predicates.add(new StringFact("above", structure));
 
 		// Highest predicate
-		structure = new Class[1];
-		structure[0] = Block.class;
+		structure = new String[1];
+		structure[0] = "block";
 		predicates.add(new StringFact("highest", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseTypePredicateTemplates() {
-		Collection<StringFact> typePreds = new ArrayList<StringFact>();
+	protected Map<String, String> initialiseTypePredicateTemplates() {
+		Map<String, String> typePreds = new HashMap<String, String>();
 
-		typePreds.add(new StringFact("block", new Class[]{Block.class}));
+		typePreds.put("block", null);
 
 		return typePreds;
 	}

@@ -232,7 +232,7 @@ public class GuidedRule {
 				for (int i = 0; i < arguments.length; i++) {
 					// Ignore numerical terms
 					if ((predicates.get(condition.getFactName()) == null)
-							|| (!StateSpec.isNumberClass(condition
+							|| (!StateSpec.isNumberType(condition
 									.getArgTypes()[i]))) {
 						// Adding variable terms
 						if (arguments[i].charAt(0) == '?') {

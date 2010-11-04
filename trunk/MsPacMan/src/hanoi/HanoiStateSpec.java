@@ -36,7 +36,7 @@ public class HanoiStateSpec extends StateSpec {
 		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Move action
-		Class[] structure = { Tile.class, Tower.class, Tile.class, Tower.class };
+		String[] structure = { "tile", "tower", "tile", "tower" };
 		actions.add(new StringFact("move", structure));
 
 		return actions;
@@ -45,10 +45,6 @@ public class HanoiStateSpec extends StateSpec {
 	@Override
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
-
-		// TowerBase -> Tile
-		bkMap.put("towerBaseImplication", new BackgroundKnowledge(
-				"(towerBase ?X) => (assert (tile ?X))", true));
 
 		// Block(Y) & !On(X,Y) -> Clear(Y)
 		bkMap.put("clearTileRule", new BackgroundKnowledge(
@@ -75,7 +71,7 @@ public class HanoiStateSpec extends StateSpec {
 
 		// Tile(Z) & On(X,Y) -> !On(X,Z)
 		bkMap.put("onRule", new BackgroundKnowledge(
-				"(tile ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
+				"(tile ?Z) (on ?X ?Y ?T) => (not (on ?X ?Z ?T))", false));
 
 		return bkMap;
 	}
@@ -113,64 +109,64 @@ public class HanoiStateSpec extends StateSpec {
 		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// On predicate
-		Class[] structure = new Class[3];
-		structure[0] = Tile.class;
-		structure[1] = Tile.class;
-		structure[2] = Tower.class;
+		String[] structure = new String[3];
+		structure[0] = "tile";
+		structure[1] = "tile";
+		structure[2] = "tower";
 		predicates.add(new StringFact("on", structure));
 
 		// Clear predicate
-		structure = new Class[2];
-		structure[0] = Tile.class;
-		structure[1] = Tower.class;
+		structure = new String[2];
+		structure[0] = "tile";
+		structure[1] = "tower";
 		predicates.add(new StringFact("clear", structure));
 
 		// Above predicate
-		structure = new Class[3];
-		structure[0] = Tile.class;
-		structure[1] = Tile.class;
-		structure[2] = Tower.class;
+		structure = new String[3];
+		structure[0] = "tile";
+		structure[1] = "tile";
+		structure[2] = "tower";
 		predicates.add(new StringFact("above", structure));
 
 		// Smaller predicate
-		structure = new Class[2];
-		structure[0] = Tile.class;
-		structure[1] = Tile.class;
+		structure = new String[2];
+		structure[0] = "tile";
+		structure[1] = "tile";
 		predicates.add(new StringFact("smaller", structure));
 
 		// NumTiles predicate
-		structure = new Class[1];
-		structure[0] = EvenOdd.class;
+		structure = new String[1];
+		structure[0] = "evenOdd";
 		predicates.add(new StringFact("numTiles", structure));
 
 		// LastMoved predicate
-		structure = new Class[1];
-		structure[0] = Tile.class;
+		structure = new String[1];
+		structure[0] = "tile";
 		predicates.add(new StringFact("lastMoved", structure));
 
 		// NextTower predicate
-		structure = new Class[2];
-		structure[0] = Tower.class;
-		structure[1] = Tower.class;
+		structure = new String[2];
+		structure[0] = "tower";
+		structure[1] = "tower";
 		predicates.add(new StringFact("nextTower", structure));
 
 		// PrevTower predicate
-		structure = new Class[2];
-		structure[0] = Tower.class;
-		structure[1] = Tower.class;
+		structure = new String[2];
+		structure[0] = "tower";
+		structure[1] = "tower";
 		predicates.add(new StringFact("prevTower", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseTypePredicateTemplates() {
-		Collection<StringFact> typePreds = new ArrayList<StringFact>();
+	protected Map<String, String> initialiseTypePredicateTemplates() {
+		Map<String, String> typePreds = new HashMap<String, String>();
 
-		typePreds.add(new StringFact("tile", new Class[] { Tile.class }));
-		typePreds.add(new StringFact("tower", new Class[] { Tower.class }));
-		typePreds.add(new StringFact("towerBase",
-				new Class[] { TowerBase.class }));
+		typePreds.put("tile", null);
+		typePreds.put("tower", null);
+		typePreds.put("towerBase", "tile");
+		typePreds.put("evenOdd", null);
 
 		return typePreds;
 	}

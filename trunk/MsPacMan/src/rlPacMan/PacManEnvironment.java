@@ -50,12 +50,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Initialise the observations
 		cacheDistanceGrids();
 
-		try {
-			Thread.sleep(512);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
 		return null;
 	}
 
@@ -82,9 +76,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;
-		} if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
+		}
+		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
 			StateSpec.reinitInstance(arg0.substring(5));
-			if (arg0.substring(4).contains("levelMax"))
+			if (arg0.substring(4).contains("levelMax")
+					|| arg0.substring(4).contains("oneLevel"))
 				model_.oneLife_ = true;
 		} else {
 			try {
@@ -157,7 +153,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.m_bottomCanvas.setActionsList(null);
 		}
 		environment_.m_gameUI.m_bRedrawAll = false;
-		
+
 		// Set the highscore
 		if (model_.m_player.m_score > model_.m_highScore)
 			model_.m_highScore = model_.m_player.m_score;
