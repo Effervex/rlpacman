@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
+import relationalFramework.Number;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -49,49 +50,49 @@ public class PacManStateSpec extends StateSpec {
 		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Actions have a type and a distance
-		Class[] structure = new Class[2];
-		structure[0] = Dot.class;
-		structure[1] = Integer.class;
+		String[] structure = new String[2];
+		structure[0] = "dot";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toDot", structure));
 
-		structure = new Class[2];
-		structure[0] = PowerDot.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "powerDot";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toPowerDot", structure));
 
-		structure = new Class[2];
-		structure[0] = PowerDot.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "powerDot";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("fromPowerDot", structure));
 
-		structure = new Class[2];
-		structure[0] = Fruit.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "fruit";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toFruit", structure));
 
-		structure = new Class[2];
-		structure[0] = Ghost.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "ghost";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toGhost", structure));
 
-		structure = new Class[2];
-		structure[0] = Ghost.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "ghost";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("fromGhost", structure));
 
-		structure = new Class[2];
-		structure[0] = GhostCentre.class;
-		structure[1] = Double.class;
+		structure = new String[2];
+		structure[0] = "ghostCentre";
+		structure[1] = Number.Double.toString();
 		actions.add(new StringFact("toGhostCentre", structure));
 
-		structure = new Class[2];
-		structure[0] = GhostCentre.class;
-		structure[1] = Double.class;
+		structure = new String[2];
+		structure[0] = "ghostCentre";
+		structure[1] = Number.Double.toString();
 		actions.add(new StringFact("fromGhostCentre", structure));
 
-		structure = new Class[2];
-		structure[0] = Junction.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "junction";
+		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toJunction", structure));
 
 		return actions;
@@ -117,13 +118,15 @@ public class PacManStateSpec extends StateSpec {
 			return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
 		} else if (envParameter_.equals("10000")) {
 			// Score maximisation
-			return "(highScore ?X) (score ?Y &:(>= ?Y ?X))";
-		} else if (envParameter_.equals("levelMax")) {
+			return "(score ?Y &:(>= ?Y 10000))";
+		} else if (envParameter_.equals("levelMax")
+				|| envParameter_.equals("oneLevel")) {
 			// Score maximisation over a single level
 			return "(level 2)";
 		}
 
-		return null;
+		// Score maximisation by default
+		return "(score ?Y &:(>= ?Y 10000))";
 	}
 
 	@Override
@@ -217,86 +220,85 @@ public class PacManStateSpec extends StateSpec {
 		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
 		// Score
-		Class[] structure = new Class[1];
-		structure[0] = Integer.class;
+		String[] structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("score", structure));
 
 		// High Score
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("highScore", structure));
 
 		// Lives
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("lives", structure));
 
 		// Level
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("level", structure));
 
 		// Edible
-		structure = new Class[1];
-		structure[0] = Ghost.class;
+		structure = new String[1];
+		structure[0] = "ghost";
 		predicates.add(new StringFact("edible", structure));
 
 		// Blinking
-		structure = new Class[1];
-		structure[0] = Ghost.class;
+		structure = new String[1];
+		structure[0] = "ghost";
 		predicates.add(new StringFact("blinking", structure));
 
 		// Distance Metrics
-		structure = new Class[3];
-		structure[0] = Player.class;
-		structure[1] = Dot.class;
-		structure[2] = Integer.class;
+		structure = new String[3];
+		structure[0] = "player";
+		structure[1] = "dot";
+		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceDot", structure));
 
-		structure = new Class[3];
-		structure[0] = Player.class;
-		structure[1] = PowerDot.class;
-		structure[2] = Integer.class;
+		structure = new String[3];
+		structure[0] = "player";
+		structure[1] = "powerDot";
+		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distancePowerDot", structure));
 
-		structure = new Class[3];
-		structure[0] = Player.class;
-		structure[1] = Ghost.class;
-		structure[2] = Integer.class;
+		structure = new String[3];
+		structure[0] = "player";
+		structure[1] = "ghost";
+		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceGhost", structure));
 
-		structure = new Class[3];
-		structure[0] = Player.class;
-		structure[1] = GhostCentre.class;
-		structure[2] = Double.class;
+		structure = new String[3];
+		structure[0] = "player";
+		structure[1] = "ghostCentre";
+		structure[2] = Number.Double.toString();
 		predicates.add(new StringFact("distanceGhostCentre", structure));
 
-		structure = new Class[3];
-		structure[0] = Player.class;
-		structure[1] = Fruit.class;
-		structure[2] = Integer.class;
+		structure = new String[3];
+		structure[0] = "player";
+		structure[1] = "fruit";
+		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceFruit", structure));
 
-		structure = new Class[2];
-		structure[0] = Junction.class;
-		structure[1] = Integer.class;
+		structure = new String[2];
+		structure[0] = "junction";
+		structure[1] = Number.Integer.toString();
 		predicates.add(new StringFact("junctionSafety", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseTypePredicateTemplates() {
-		Collection<StringFact> typeMap = new ArrayList<StringFact>();
+	protected Map<String, String> initialiseTypePredicateTemplates() {
+		Map<String, String> typeMap = new HashMap<String, String>();
 
-		typeMap.add(new StringFact("pacman", new Class[] { Player.class }));
-		typeMap.add(new StringFact("dot", new Class[] { Dot.class }));
-		typeMap.add(new StringFact("powerDot", new Class[] { PowerDot.class }));
-		typeMap.add(new StringFact("ghost", new Class[] { Ghost.class }));
-		typeMap.add(new StringFact("fruit", new Class[] { Fruit.class }));
-		typeMap.add(new StringFact("ghostCentre",
-				new Class[] { GhostCentre.class }));
-		typeMap.add(new StringFact("junction", new Class[] { Junction.class }));
+		typeMap.put("pacman", null);
+		typeMap.put("dot", null);
+		typeMap.put("powerDot", null);
+		typeMap.put("ghost", null);
+		typeMap.put("fruit", null);
+		typeMap.put("ghostCentre", null);
+		typeMap.put("junction", null);
 
 		return typeMap;
 	}

@@ -6,17 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import ch.idsia.benchmark.mario.engine.sprites.BulletBill;
-import ch.idsia.benchmark.mario.engine.sprites.CoinAnim;
-import ch.idsia.benchmark.mario.engine.sprites.Enemy;
-import ch.idsia.benchmark.mario.engine.sprites.FireFlower;
-import ch.idsia.benchmark.mario.engine.sprites.Fireball;
-import ch.idsia.benchmark.mario.engine.sprites.Mario;
-import ch.idsia.benchmark.mario.engine.sprites.Mushroom;
-import ch.idsia.benchmark.mario.engine.sprites.Shell;
-import ch.idsia.benchmark.mario.engine.sprites.Sprite;
-
 import relationalFramework.GuidedRule;
+import relationalFramework.Number;
 import relationalFramework.Policy;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -32,8 +23,8 @@ public class MarioStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("moveTo", "(thing ?X) (distance ?X ?Y)");
-		preconds.put("moveFrom", "(thing ?X) (distance ?X ?Y)");
+		preconds.put("jumpOnto", "(thing ?X) (distance ?X ?Y)");
+		preconds.put("jumpOver", "(thing ?X) (distance ?X ?Y)");
 
 		return preconds;
 	}
@@ -48,20 +39,15 @@ public class MarioStateSpec extends StateSpec {
 		Collection<StringFact> actions = new ArrayList<StringFact>();
 
 		// Actions have a type and a distance
-		Class[] structure = new Class[2];
-		structure[0] = Direction.class;
-		structure[1] = Integer.class;
-		actions.add(new StringFact("moveTo", structure));
+		String[] structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = Number.Integer.toString();
+		actions.add(new StringFact("jumpOnto", structure));
 
-		structure = new Class[2];
-		structure[0] = Direction.class;
-		structure[1] = Integer.class;
-		actions.add(new StringFact("moveFrom", structure));
-
-		structure = new Class[2];
-		structure[0] = Object.class;
-		structure[1] = Integer.class;
-		actions.add(new StringFact("jump", structure));
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = Number.Integer.toString();
+		actions.add(new StringFact("jumpOver", structure));
 
 		return actions;
 	}
@@ -70,13 +56,26 @@ public class MarioStateSpec extends StateSpec {
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
 
+		// TODO These rules should really be learned by the agent so remove
+		// later on.
+		// Squashable enemies
+		bckKnowledge.put("squashableRule", new BackgroundKnowledge(
+				"(enemy ?X) (not (spiky ?X)) "
+						+ "(not (pirahnaPlant ?X)) "
+						+ "=> (assert (squashable ?X))", true));
+
+		// Blastable enemies
+		bckKnowledge.put("blastableRule", new BackgroundKnowledge(
+				"(enemy ?X) (not (spiky ?X)) "
+						+ "=> (assert (blastable ?X))", true));
+
 		return bckKnowledge;
 	}
 
 	@Override
 	protected String initialiseGoalState(List<String> constants) {
 		// The goal is 0 units away.
-		return "(dir flag ? 0)";
+		return "(distance goal 0)";
 	}
 
 	@Override
@@ -86,7 +85,7 @@ public class MarioStateSpec extends StateSpec {
 		// Defining a good policy (basic at the moment)
 		ArrayList<String> rules = new ArrayList<String>();
 
-		rules.add("(dir flag ?X ?Y) (goal flag) => (moveTo ?X ?Y)");
+		rules.add("(distance goal ?Y) (flag goal) => (jumpOnto goal ?Y)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new GuidedRule(rule), false, false);
@@ -98,68 +97,100 @@ public class MarioStateSpec extends StateSpec {
 	protected Collection<StringFact> initialisePredicateTemplates() {
 		Collection<StringFact> predicates = new ArrayList<StringFact>();
 
-		// Numerical values
+		// Mario state
+		String[] structure = new String[1];
+		structure[0] = "marioPower";
+		predicates.add(new StringFact("marioState", structure));
+
 		// Coins (score)
-		Class[] structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("coins", structure));
 
 		// Lives
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("lives", structure));
 
 		// World
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("world", structure));
 
 		// Time
-		structure = new Class[1];
-		structure[0] = Integer.class;
+		structure = new String[1];
+		structure[0] = Number.Integer.toString();
 		predicates.add(new StringFact("time", structure));
 
 		// Distance
-		structure = new Class[2];
-		structure[0] = Thing.class;
-		structure[1] = Double.class;
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = Number.Double.toString();
 		predicates.add(new StringFact("distance", structure));
-		
-		// Flying
-		structure = new Class[1];
-		structure[0] = Enemy.class;
-		predicates.add(new StringFact("time", structure));
+
+		// Height diff
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = Number.Double.toString();
+		predicates.add(new StringFact("heightDiff", structure));
+
+		// Flying (enemy)
+		structure = new String[1];
+		structure[0] = "enemy";
+		predicates.add(new StringFact("flying", structure));
+
+		// Squashable (enemy)
+		structure = new String[1];
+		structure[0] = "enemy";
+		predicates.add(new StringFact("squashable", structure));
+
+		// Blastable (enemy)
+		structure = new String[1];
+		structure[0] = "enemy";
+		predicates.add(new StringFact("blastable", structure));
 
 		return predicates;
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseTypePredicateTemplates() {
-		Collection<StringFact> typeMap = new ArrayList<StringFact>();
+	protected Map<String, String> initialiseTypePredicateTemplates() {
+		Map<String, String> types = new HashMap<String, String>();
 
-		// Mario and misc items
-		typeMap.add(new StringFact("thing", new Class[] { Thing.class }));
-		typeMap.add(new StringFact("mario", new Class[] { Mario.class }));
-		typeMap.add(new StringFact("coin", new Class[] { CoinAnim.class }));
-		typeMap.add(new StringFact("mushroom", new Class[] { Mushroom.class }));
-		typeMap.add(new StringFact("fireFlower", new Class[] { FireFlower.class }));
-		typeMap.add(new StringFact("brick", new Class[] { Fruit.class }));
-		typeMap.add(new StringFact("questionBrick",
-				new Class[] { GhostCentre.class }));
-		typeMap.add(new StringFact("shell", new Class[] { Shell.class }));
-		typeMap.add(new StringFact("fireball", new Class[] { Fireball.class }));
-		
-		
+		// Everything is a 'thing'
+		types.put("thing", null);
+		types.put("flag", "thing");
+		types.put("pit", "thing");
+
+		// Collectable items
+		types.put("collectable", "thing");
+		types.put("coin", "collectable");
+		types.put("mushroom", "collectable");
+		types.put("fireFlower", "collectable");
+
+		// Solid objects
+		types.put("solid", "thing");
+		types.put("edge", "solid");
+		types.put("brick", "solid");
+		types.put("box", "brick");
+
+		// Mario and his state
+		types.put("mario", null);
+		types.put("marioPower", null);
+
 		// Enemies
-		typeMap.add(new StringFact("enemy", new Class[] { Enemy.class }));
-		typeMap.add(new StringFact("goomba", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("koopa", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("redKoopa", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("greenKoopa", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("spiky", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("pirahnaPlant", new Class[] { Junction.class }));
-		typeMap.add(new StringFact("bulletBill", new Class[] { BulletBill.class }));
+		types.put("enemy", "thing");
+		types.put("goomba", "enemy");
+		types.put("koopa", "enemy");
+		types.put("redKoopa", "koopa");
+		types.put("greenKoopa", "koopa");
+		types.put("spiky", "enemy");
+		types.put("pirahnaPlant", "enemy");
+		types.put("bulletBill", "enemy");
 
-		return typeMap;
+		// Fired projectiles
+		types.put("shell", "thing");
+		types.put("fireball", null);
+
+		return types;
 	}
 }

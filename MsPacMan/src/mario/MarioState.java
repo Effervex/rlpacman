@@ -24,24 +24,4 @@ public class MarioState extends State {
 	public MarioState(Object[] stateArray) {
 		super(stateArray);
 	}
-
-	public Ghost[] getGhosts() {
-		return (Ghost[]) getStateArray()[GHOST_ARRAY];
-	}
-
-	public Fruit getFruit() {
-		return (Fruit) getStateArray()[FRUIT];
-	}
-
-	public DistanceDir[][] getDistanceGrid() {
-		return (DistanceDir[][]) getStateArray()[DISTANCE_GRID];
-	}
-
-	public int getSafestJunction() {
-		return (Integer) getStateArray()[SAFEST_JUNCTION];
-	}
-
-	public Player getPlayer() {
-		return (Player) getStateArray()[PLAYER];
-	}
 }

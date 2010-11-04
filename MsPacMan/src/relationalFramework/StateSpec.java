@@ -53,7 +53,7 @@ public abstract class StateSpec {
 
 	/** The StringFact definition for the test predicate. */
 	private static final StringFact TEST_DEFINITION = new StringFact("test",
-			new Class[] { String.class });
+			new String[] { "testArgs" });
 
 	/** The singleton instance. */
 	private static StateSpec instance_;
@@ -65,11 +65,7 @@ public abstract class StateSpec {
 	private Map<String, StringFact> predicates_;
 
 	/** The type predicates, only used implicitly. */
-	@SuppressWarnings("unchecked")
-	private Map<Class, StringFact> typePredicates_;
-
-	/** The type predicates ordered by name. */
-	private Map<String, StringFact> typeNames_;
+	private Map<String, StringFact> typePredicates_;
 
 	/** The actions of the rules and their structure. */
 	private Map<String, StringFact> actions_;
@@ -110,22 +106,29 @@ public abstract class StateSpec {
 	/**
 	 * The constructor for a state specification.
 	 */
-	@SuppressWarnings("unchecked")
 	private final void initialise() {
 		try {
 			rete_ = new Rete();
 
 			environment_ = this.getClass().getPackage().getName();
 
-			// Type predicates
-			typePredicates_ = new HashMap<Class, StringFact>();
-			typeNames_ = new HashMap<String, StringFact>();
-			for (StringFact type : initialiseTypePredicateTemplates()) {
-				typePredicates_.put(type.getArgTypes()[0], type);
-				typeNames_.put(type.getFactName(), type);
-				defineTemplate(type.getFactName(), rete_);
+			// Type predicates and their hierarchy background rules.
+			typePredicates_ = new HashMap<String, StringFact>();
+			Map<String, String> typeAssertions = new HashMap<String, String>();
+			Map<String, String> typeHierarchy = initialiseTypePredicateTemplates();
+			for (String type : typeHierarchy.keySet()) {
+				typePredicates_.put(type, new StringFact(type,
+						new String[] { type }));
+				defineTemplate(type, rete_);
+
+				// Define background knowledge rule
+				if (typeHierarchy.get(type) != null) {
+					String assertion = "(" + type + " ?X) " + INFERS_ACTION
+							+ " (assert (" + typeHierarchy.get(type) + " ?X))";
+					typeAssertions.put(type + "ParentRule", assertion);
+				}
 			}
-			unnecessaries_ = formUnnecessaryString(typePredicates_.values());
+			unnecessaries_ = formUnnecessaryString(typePredicates_.keySet());
 
 			// Main predicates
 			predicates_ = new HashMap<String, StringFact>();
@@ -149,7 +152,15 @@ public abstract class StateSpec {
 			actionNum_ = initialiseActionsPerStep();
 
 			// Initialise the background knowledge rules
-			backgroundRules_ = initialiseBackgroundKnowledge();
+
+			// Type hierarchy rules
+			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
+			for (String name : typeAssertions.keySet())
+				backgroundRules_.put(name, new BackgroundKnowledge(
+						typeAssertions.get(name), true));
+			
+			// State Spec rules
+			backgroundRules_.putAll(initialiseBackgroundKnowledge());
 			for (String ruleNames : backgroundRules_.keySet()) {
 				if (backgroundRules_.get(ruleNames).assertInJess())
 					rete_.eval("(defrule " + ruleNames + " "
@@ -220,11 +231,10 @@ public abstract class StateSpec {
 	 *            The types that need not be in rules.
 	 * @return The regexp string.
 	 */
-	private String formUnnecessaryString(Collection<StringFact> types) {
+	private String formUnnecessaryString(Collection<String> types) {
 		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
-		for (StringFact type : types)
-			buffer.append("|(\\(" + type.getFactName() + " " + ACTION_TERM_REPL
-					+ "\\))");
+		for (String type : types)
+			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
 		buffer.append(")( |$)");
 		return buffer.toString();
 	}
@@ -234,10 +244,10 @@ public abstract class StateSpec {
 	 * 
 	 * @param rete
 	 *            The rete object.
-	 * @return A mapping of classes to guided predicate names.
+	 * @return A map of types, where the possibly null value corresponds to the
+	 *         keys parent in the type hierarchy.
 	 */
-	// TODO Can possibly change this to no longer use classes, but instead strings.
-	protected abstract Collection<StringFact> initialiseTypePredicateTemplates();
+	protected abstract Map<String, String> initialiseTypePredicateTemplates();
 
 	/**
 	 * Initialises the state predicates.
@@ -479,8 +489,10 @@ public abstract class StateSpec {
 	/**
 	 * Basic method which checks if an array contains a string.
 	 * 
-	 * @param array The array to search.
-	 * @param str The string to search for.
+	 * @param array
+	 *            The array to search.
+	 * @param str
+	 *            The string to search for.
 	 * @return True if the string is in the array, false otherwise.
 	 */
 	public static boolean arrayContains(String[] array, String str) {
@@ -542,7 +554,6 @@ public abstract class StateSpec {
 	 * @param termIndex
 	 *            The index where the first term is found.
 	 */
-	@SuppressWarnings("unchecked")
 	public Collection<StringFact> createTypeConds(StringFact fact) {
 		Collection<StringFact> typeConds = new HashSet<StringFact>();
 		// If the term itself is a type pred, return.
@@ -550,10 +561,10 @@ public abstract class StateSpec {
 			return typeConds;
 		}
 
-		Class[] classes = fact.getArgTypes();
-		for (int i = 0; i < classes.length; i++) {
+		String[] types = fact.getArgTypes();
+		for (int i = 0; i < types.length; i++) {
 			if (!fact.getArguments()[i].equals("?")) {
-				StringFact typeFact = typePredicates_.get(classes[i]);
+				StringFact typeFact = typePredicates_.get(types[i]);
 				if (typeFact != null) {
 					typeConds.add(new StringFact(typeFact, new String[] { fact
 							.getArguments()[i] }));
@@ -579,9 +590,20 @@ public abstract class StateSpec {
 		return true;
 	}
 
-	@SuppressWarnings("unchecked")
-	public static boolean isNumberClass(Class clazz) {
-		return Number.class.isAssignableFrom(clazz);
+	/**
+	 * Checks if a type name represents a number.
+	 * 
+	 * @param type
+	 *            The type name being checked.
+	 * @return True if it represents a number, false otherwise.
+	 */
+	public static boolean isNumberType(String type) {
+		try {
+			Number.valueOf(type);
+			return true;
+		} catch (IllegalArgumentException iae) {
+		}
+		return false;
 	}
 
 	public String getEnvironmentName() {
@@ -621,8 +643,8 @@ public abstract class StateSpec {
 			return predicates_.get(factName);
 		if (actions_.containsKey(factName))
 			return actions_.get(factName);
-		if (typeNames_.containsKey(factName))
-			return typeNames_.get(factName);
+		if (typePredicates_.containsKey(factName))
+			return typePredicates_.get(factName);
 		if (factName.equals("test"))
 			return TEST_DEFINITION;
 		return null;
@@ -655,37 +677,8 @@ public abstract class StateSpec {
 		return rete_;
 	}
 
-	/**
-	 * Gets the type predicate using the given key, if such a predicate exists.
-	 * 
-	 * @return The predicate associated with the class, or null if no such class
-	 *         key.
-	 */
-	public StringFact getTypePredicate(Class key) {
-		return typePredicates_.get(key);
-	}
-
-	/**
-	 * Gets the type predicate using a predicate as the key and an arg index.
-	 * 
-	 * @param predicate
-	 *            The name of the predicate.
-	 * @param argIndex
-	 *            The index of the argument for the term.
-	 * @return The appropriate type predicate for the term.
-	 */
-	public StringFact getTypePredicate(String predicate, int argIndex) {
-		if (isTypePredicate(predicate))
-			return typeNames_.get(predicate);
-
-		Class[] classes = predicates_.get(predicate).getArgTypes();
-		if (classes != null)
-			return getTypePredicate(classes[argIndex]);
-		return null;
-	}
-
 	public boolean isTypePredicate(String predicate) {
-		if (typeNames_.keySet().contains(predicate))
+		if (typePredicates_.containsKey(predicate))
 			return true;
 		return false;
 	}

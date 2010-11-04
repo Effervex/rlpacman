@@ -19,8 +19,7 @@ public class StringFact implements Comparable<StringFact> {
 	/** If this fact is negated (prefixed by not) */
 	private boolean negated_ = false;
 	/** The types of the fact arguments. */
-	@SuppressWarnings("unchecked")
-	private Class[] factTypes_;
+	private String[] factTypes_;
 	/** The actual arguments of the fact. */
 	private String[] arguments_;
 
@@ -32,8 +31,7 @@ public class StringFact implements Comparable<StringFact> {
 	 * @param factTypes
 	 *            The types of the fact.
 	 */
-	@SuppressWarnings("unchecked")
-	public StringFact(String factName, Class[] factTypes) {
+	public StringFact(String factName, String[] factTypes) {
 		factName_ = factName;
 		factTypes_ = factTypes;
 		arguments_ = new String[factTypes.length];
@@ -172,7 +170,7 @@ public class StringFact implements Comparable<StringFact> {
 	public Map<String, String> createVariableTermReplacementMap() {
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
-			if (!StateSpec.isNumberClass(factTypes_[i]))
+			if (!StateSpec.isNumberType(factTypes_[i]))
 				replacementMap.put(arguments_[i], Covering
 						.getVariableTermString(i));
 		}
@@ -193,8 +191,7 @@ public class StringFact implements Comparable<StringFact> {
 	 * 
 	 * @return The argument types.
 	 */
-	@SuppressWarnings("unchecked")
-	public Class[] getArgTypes() {
+	public String[] getArgTypes() {
 		return factTypes_;
 	}
 

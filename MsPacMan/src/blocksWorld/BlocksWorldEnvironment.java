@@ -45,9 +45,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	/** The state of the blocks world in base predicates. */
 	private Rete rete_;
 
-	/** The blocks contained within the environment. */
-	private Block[] blocks_;
-
 	/** The number of steps taken. */
 	private int steps_;
 
@@ -67,13 +64,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public void env_cleanup() {
 		rete_ = null;
 		state_ = null;
-		blocks_ = null;
 	}
 
 	// @Override
 	public String env_init() {
-		// Assign the blocks
-		blocks_ = createBlocks(numBlocks_);
 		return null;
 	}
 
@@ -96,8 +90,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			viewingMode_ = true;
 		try {
 			numBlocks_ = Integer.parseInt(arg0);
-			// Assign the blocks
-			blocks_ = createBlocks(numBlocks_);
 			optimalMap_ = new HashMap<BlocksState, Integer>();
 			return null;
 		} catch (Exception e) {
@@ -169,6 +161,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		steps_++;
 		ObjectObservations.getInstance().predicateKB = rete_;
 
+		// TODO Problem here with freshly created modules and reward.
 		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
 				/ nonOptimalSteps;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
@@ -222,23 +215,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		return new BlocksState(newState);
-	}
-
-	/**
-	 * Creates the block terms.
-	 * 
-	 * @param numBlocks
-	 *            The number of blocks.
-	 * @return The blocks array.
-	 */
-	private Block[] createBlocks(int numBlocks) {
-		Block[] blocks = new Block[numBlocks];
-		for (int i = 0; i < numBlocks; i++) {
-			String name = (char) ('a' + i) + "";
-			blocks[i] = new Block(name);
-		}
-
-		return blocks;
 	}
 
 	/**
@@ -298,16 +274,15 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			// Scanning through, making predicates (On, OnFloor, and Highest)
 			int[] heightMap = new int[worldState.length];
 			int maxHeight = 0;
-			List<Block> highestBlocks = new ArrayList<Block>();
+			List<Character> highestBlocks = new ArrayList<Character>();
 			for (int i = 0; i < worldState.length; i++) {
 				// On the floor
 				if (worldState[i] == 0) {
-					rete_.eval("(assert (onFloor " + blocks_[i].getName()
-							+ "))");
+					rete_.assertString("(onFloor " + (char) ('a' + i) + "))");
 				} else {
 					// On another block
-					rete_.eval("(assert (on " + blocks_[i].getName() + " "
-							+ blocks_[worldState[i] - 1].getName() + "))");
+					rete_.assertString("(on " + (char) ('a' + i) + " "
+							+ (char) ('a' + worldState[i] - 1) + "))");
 				}
 
 				// Finding the heights
@@ -320,16 +295,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 					highestBlocks.clear();
 				}
 				if (blockHeight == maxHeight) {
-					highestBlocks.add(blocks_[i]);
+					highestBlocks.add((char) ('a' + i));
 				}
 
 				// Assert the blocks
-				rete_.eval("(assert (block " + blocks_[i].getName() + "))");
+				rete_.assertString("(block " + (char) ('a' + i) + "))");
 			}
 
 			// Add the highest block/s
-			for (Block block : highestBlocks) {
-				rete_.eval("(assert (highest " + block.getName() + "))");
+			for (Character block : highestBlocks) {
+				rete_.assertString("(highest " + block + "))");
 			}
 
 			rete_.run();

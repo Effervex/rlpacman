@@ -7,8 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.TreeSet;
 
-import org.apache.commons.collections.CollectionUtils;
-
 import relationalFramework.Covering;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
@@ -192,7 +190,6 @@ public class ConditionBeliefs {
 	 * 
 	 * @return True if the collection hasn't been initialised yet.
 	 */
-	@SuppressWarnings("unchecked")
 	private boolean addNeverSeenPreds() {
 		if (firstState == false)
 			return false;
@@ -200,7 +197,7 @@ public class ConditionBeliefs {
 		// Run through every possible string fact and add those not present in
 		// the other lists.
 
-		MultiMap<Class, String> possibleTerms = createActionTerms(StateSpec
+		MultiMap<String, String> possibleTerms = createActionTerms(StateSpec
 				.getInstance().getStringFact(condition_));
 
 		// Run by the predicates
@@ -234,9 +231,8 @@ public class ConditionBeliefs {
 	 * @return A collection of facts representing the possible paired
 	 *         predicates.
 	 */
-	@SuppressWarnings("unchecked")
 	private Collection<StringFact> createPossibleFacts(String pred,
-			MultiMap<Class, String> possibleTerms) {
+			MultiMap<String, String> possibleTerms) {
 		Collection<StringFact> shapedFacts = new HashSet<StringFact>();
 
 		// Run through each base fact, shaping as it goes.
@@ -263,13 +259,12 @@ public class ConditionBeliefs {
 	 *            The predicate to form action term map from.
 	 * @return The mapping of argument type classes to argument variables.
 	 */
-	@SuppressWarnings("unchecked")
-	private MultiMap<Class, String> createActionTerms(StringFact predicate) {
-		MultiMap<Class, String> actionTerms = new MultiMap<Class, String>();
+	private MultiMap<String, String> createActionTerms(StringFact predicate) {
+		MultiMap<String, String> actionTerms = new MultiMap<String, String>();
 
-		Class[] argTypes = predicate.getArgTypes();
+		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
-			if (!StateSpec.isNumberClass(argTypes[i]))
+			if (!StateSpec.isNumberType(argTypes[i]))
 				actionTerms.put(argTypes[i], Covering.getVariableTermString(i));
 		}
 
@@ -291,12 +286,11 @@ public class ConditionBeliefs {
 	 * @param possibleFacts
 	 *            The list of facts to fill.
 	 */
-	@SuppressWarnings("unchecked")
 	private void formPossibleFact(String[] arguments, int index,
-			MultiMap<Class, String> possibleTerms, StringFact baseFact,
+			MultiMap<String, String> possibleTerms, StringFact baseFact,
 			Collection<StringFact> possibleFacts) {
 		// Base case, if index is outside arguments, build the fact
-		Class[] argTypes = baseFact.getArgTypes();
+		String[] argTypes = baseFact.getArgTypes();
 		if (index >= argTypes.length) {
 			// Check the arguments aren't anonymous and/or a generalisation of
 			// the condition itself.
@@ -329,7 +323,7 @@ public class ConditionBeliefs {
 		}
 
 		// For each term
-		MultiMap<Class, String> termsClone = new MultiMap<Class, String>(
+		MultiMap<String, String> termsClone = new MultiMap<String, String>(
 				possibleTerms);
 		for (String term : terms) {
 			arguments[index] = term;
