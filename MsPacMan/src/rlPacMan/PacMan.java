@@ -581,9 +581,12 @@ public class PacMan {
 
 		// Create PacMan instance
 		PacMan pacMan = new PacMan();
-
+		
 		// Initialize instance
 		pacMan.init(false);
+		
+		if ((args.length >= 1) && (args[0].equals("-one")))
+			pacMan.m_gameModel.oneLife_ = true;
 
 		pacMan.start();
 	}

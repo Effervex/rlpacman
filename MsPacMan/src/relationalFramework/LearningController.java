@@ -25,7 +25,7 @@ public class LearningController {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
 	/** The number of test episodes to run for performance measures. */
-	public static final int TEST_ITERATIONS = 100;
+	public static final int TEST_ITERATIONS = 10;
 	/** The best policy found output file. */
 	private File policyFile_;
 	/** The performance output file. */
@@ -589,6 +589,9 @@ public class LearningController {
 	 *            The current policy generator.
 	 */
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
+		// TODO Why create modules from the policy generator when the only one
+		// we need is the pre-goal itself? Just create module permutations of
+		// the pre-goal.
 		// Run through each rule in the policy generator, noting which ones
 		// require module learning.
 		SortedSet<ConstantPred> constantFacts = policyGenerator

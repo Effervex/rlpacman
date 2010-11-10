@@ -1,7 +1,6 @@
 blocksWorld.BlocksWorld
 10
 50
-bestBlocksPolicy.txt
-generatorBlocksOutput.txt
-blocksPerformance.txt
+blocksElites.txt
+blocksTest.txt
 10,"goal onab"

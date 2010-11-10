@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -357,10 +356,18 @@ public class PolicyGenerator {
 				if (!baseRule.isMutant() && !mutants.isEmpty()
 						&& (mutatedRules_.get(actionPred) != null)) {
 					// Run through the rules in the slot, removing any mutants
-					// not in the permanent mutant set.
+					// not in the permanent mutant set that have average or less
+					// probabilities
 					List<GuidedRule> removables = new ArrayList<GuidedRule>();
-					for (GuidedRule gr : ruleSlot.getGenerator()) {
-						if (gr.isMutant() && !mutants.contains(gr)) {
+					ProbabilityDistribution<GuidedRule> distribution = ruleSlot
+							.getGenerator();
+					for (GuidedRule gr : distribution) {
+						// If the rule is a mutant, not in the current mutants,
+						// and of average or less probability, remove it.
+						if (gr.isMutant()
+								&& !mutants.contains(gr)
+								&& (distribution.getProb(gr) <= (1.0 / distribution
+										.size()))) {
 							needToPause = true;
 							removables.add(gr);
 
@@ -738,30 +745,32 @@ public class PolicyGenerator {
 			// Only prune if the distribution is bigger than 1
 			if (distribution.size() > 1) {
 				double pruneProb = (1.0 / distribution.size()) * pruneConst;
-				boolean removed = false;
-				for (Iterator<GuidedRule> iter = distribution.iterator(); iter
-						.hasNext();) {
-					GuidedRule rule = iter.next();
-
-					if (distribution.getProb(rule) <= pruneProb) {
-						iter.remove();
-						distribution.remove(rule);
-						removed = true;
+				Collection<GuidedRule> removables = new ArrayList<GuidedRule>();
+				for (GuidedRule rule : distribution) {
+					double ruleProb = distribution.getProb(rule);
+					if ((ruleProb != -1) && (ruleProb <= pruneProb)) {
+						removables.add(rule);
 						// Note the rule in the no-create list
 						removedRules_.add(rule);
-
-						System.out.println("\tREMOVED RULE: " + rule);
 					}
 				}
-				if (removed)
+
+				// If rules are to be removed, remove them.
+				if (!removables.isEmpty()) {
+					for (GuidedRule rule : removables) {
+						distribution.remove(rule);
+						System.out.println("\tREMOVED RULE: " + rule);
+					}
+
 					distribution.normaliseProbs();
+				}
 			}
 
 			// Sample a rule from the slot and mutate it if it has seen
 			// sufficient states.
 			GuidedRule rule = distribution.sample(false);
 			if (distribution.isEmpty() || rule == null)
-				System.out.println("Problem... " + distribution);
+				System.out.println("Problem... " + slot);
 			if (rule.getUses() >= mutationUses)
 				mutateRule(rule, slot);
 		}
@@ -971,6 +980,7 @@ public class PolicyGenerator {
 		buf.write(slotGenerator_.toString() + "\n");
 		buf.write("Total Update Size: " + klDivergence_ + "\n");
 		buf.write("Converged Value: " + convergedValue_);
+		// TODO Serialise and save policy generator.
 	}
 
 	/**

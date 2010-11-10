@@ -101,6 +101,8 @@ public class ActionChoice {
 	 * @return The first list of actions.
 	 */
 	public RuleAction getFirstActionList() {
+		if (activeActions_.isEmpty())
+			return null;
 		return activeActions_.get(0);
 	}
 }
