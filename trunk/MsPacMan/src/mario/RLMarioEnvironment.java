@@ -1,6 +1,10 @@
 package mario;
 
-import java.util.ArrayList;
+import java.awt.Point;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import jess.Rete;
 
@@ -9,11 +13,10 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import ch.idsia.agents.controllers.human.HumanKeyboardAgent;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
-import ch.idsia.benchmark.mario.engine.sprites.Mario;
-import ch.idsia.benchmark.mario.engine.sprites.Sprite;
+import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.environments.Environment;
+import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.CmdLineOptions;
 
 import relationalFramework.ActionChoice;
@@ -21,23 +24,11 @@ import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
+import relationalFramework.StringFact;
 
-public class MarioEnvironment implements EnvironmentInterface {
-	private static final int CANNON_MUZZLE = -82;
-	private static final int CANNON_TRUNK = -80;
-	private static final int COIN_ANIM = Sprite.KIND_COIN_ANIM; // 1
-	private static final int BREAKABLE_BRICK = -20;
-	private static final int UNBREAKABLE_BRICK = -22; // a rock with animated
-	// question mark
-	private static final int BRICK = -24; // a rock with animated question mark
-	private static final int FLOWER_POT = -90;
-	private static final int BORDER_CANNOT_PASS_THROUGH = -60;
-	private static final int BORDER_HILL = -62;
-	// TODO:TASK:!H! : resolve (document why) this: FLOWER_POT_OR_CANNON = -85;
-	private static final int FLOWER_POT_OR_CANNON = -85;
-
+public class RLMarioEnvironment implements EnvironmentInterface {
 	private Rete rete_;
-	private Environment environment_;
+	private MarioEnvironment environment_;
 	private boolean experimentMode_ = false;
 	private CmdLineOptions cmdLineOptions_;
 
@@ -48,15 +39,15 @@ public class MarioEnvironment implements EnvironmentInterface {
 
 	@Override
 	public String env_init() {
-		environment_ = ch.idsia.benchmark.mario.environments.MarioEnvironment
-				.getInstance();
+		environment_ = MarioEnvironment.getInstance();
 		cmdLineOptions_ = new CmdLineOptions();
 		cmdLineOptions_.setVisualization(!experimentMode_);
-		//cmdLineOptions_.setEnemies("off");
-		cmdLineOptions_.setLevelRandSeed(51);
+		// cmdLineOptions_.setEnemies("off");
+		cmdLineOptions_.setLevelRandSeed(6);
 		cmdLineOptions_.setLevelDifficulty(1);
-		// cmdLineOptions_.setFPS(2);
-		// GlobalOptions.isShowReceptiveField = true;
+		// cmdLineOptions_.setFPS(10);
+		// cmdLineOptions_.setTimeLimit(50);
+//		 GlobalOptions.isShowReceptiveField = true;
 
 		return null;
 	}
@@ -87,14 +78,15 @@ public class MarioEnvironment implements EnvironmentInterface {
 			// Idle...
 		}
 
-		return formObservations(rete_, 0, 0);
+		return formObservations(rete_, 1, 0);
 	}
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Applying the action (up down left right or nothing)
-		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
-		environment_.performAction(chooseLowAction(actions.getActions()));
+		RuleAction action = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
+				.getFirstActionList();
+		environment_.performAction(chooseLowAction(action));
 
 		environment_.tick();
 		float reward = environment_.getIntermediateReward();
@@ -103,7 +95,7 @@ public class MarioEnvironment implements EnvironmentInterface {
 			// Idle...
 		}
 
-		Observation obs = formObservations(rete_, 0, 0);
+		Observation obs = formObservations(rete_, 1, 0);
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isTerminal());
 		return rot;
@@ -121,21 +113,26 @@ public class MarioEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Chooses a direction based off the chosen high actions to follow.
+	 * Chooses a direction based off the chosen high action to follow.
 	 * 
-	 * @param actions
-	 *            The prioritised actions the agent will take, joined together
-	 *            into a weighted singular direction to take.
+	 * @param ruleAction
+	 *            The action the agent will take. May be multiple versions of
+	 *            the same action with different arguments, based on what
+	 *            matched the action conditions.
 	 * @return The low action to use.
 	 */
-	private boolean[] chooseLowAction(ArrayList<RuleAction> actions) {
-		boolean[] actionArray = new boolean[Environment.numberOfButtons];
-		// TODO Taking actions.
-		actionArray[Mario.KEY_RIGHT] = true;
-		actionArray[Mario.KEY_SPEED] = true;
-		if (environment_.isMarioAbleToJump() || !environment_.isMarioOnGround())
-			actionArray[Mario.KEY_JUMP] = true;
-		return actionArray;
+	private boolean[] chooseLowAction(RuleAction ruleAction) {
+		if (ruleAction == null)
+			return new boolean[Environment.numberOfButtons];
+
+		// Find the action with the lowest distance; that will be the chosen
+		// action
+		List<StringFact> actions = ruleAction.getTriggerActions();
+		// Sort the facts by distance
+		Collections.sort(actions, new ActionComparator<StringFact>());
+		System.out.println(actions.get(0));
+		return ((RLMarioStateSpec) StateSpec.getInstance()).applyAction(actions
+				.get(0), environment_);
 	}
 
 	/**
@@ -191,8 +188,7 @@ public class MarioEnvironment implements EnvironmentInterface {
 			rete.assertString("(flag goal))");
 			rete.assertString("(distance goal "
 					+ environment_.getEvaluationInfo().levelLength + ")");
-			rete.assertString("(heightDiff goal "
-					+ 0 + ")");
+			rete.assertString("(heightDiff goal " + 0 + ")");
 			// Other details
 			rete.assertString("(coins "
 					+ environment_.getEvaluationInfo().coinsGained + ")");
@@ -204,6 +200,8 @@ public class MarioEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
 					.getInstance().generateValidActions(rete_);
+			 rete.eval("(facts)");
+			// System.out.println(ObjectObservations.getInstance().validActions);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -240,11 +238,11 @@ public class MarioEnvironment implements EnvironmentInterface {
 		// Brick
 		case (ObservationConstants.LVL_BRICK):
 		case (ObservationConstants.LVL_BREAKABLE_BRICK):
-			assertThing(rete, "brick", "brk", x, y, levelObs.length / 2);
+			assertThing(rete, "brick", "brk", x, y, false);
 			break;
 		// Box
 		case (ObservationConstants.LVL_UNBREAKABLE_BRICK):
-			assertThing(rete, "box", "box", x, y, levelObs.length / 2);
+			assertThing(rete, "box", "box", x, y, false);
 			break;
 		// Terrain
 		case (ObservationConstants.LVL_BORDER_HILL):
@@ -253,12 +251,12 @@ public class MarioEnvironment implements EnvironmentInterface {
 		case (ObservationConstants.LVL_FLOWER_POT):
 		case (ObservationConstants.LVL_FLOWER_POT_OR_CANNON):
 		case (ObservationConstants.LVL_BORDER_CANNOT_PASS_THROUGH):
-			if (isEdge(levelObs, x, y))
-				assertThing(rete, "edge", "ed", x, y, levelObs.length / 2);
+			// if (isEdge(levelObs, x, y))
+			// assertThing(rete, "edge", "ed", x, y, false);
 			break;
 		// Coin
 		case (ObservationConstants.LVL_COIN):
-			assertThing(rete, "coin", "coin", x, y, levelObs.length / 2);
+			assertThing(rete, "coin", "coin", x, y, false);
 			break;
 		}
 	}
@@ -322,47 +320,58 @@ public class MarioEnvironment implements EnvironmentInterface {
 		switch (enemyVal) {
 		// Enemies
 		case (ObservationConstants.ENMY_BULLET_BILL):
-			assertThing(rete, "bulletBill", "bb", x, y, enemyObs.length / 2);
+			assertThing(rete, "bulletBill", "bb", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_ENEMY_FLOWER):
-			assertThing(rete, "pirahnaPlant", "pp", x, y, enemyObs.length / 2);
+			assertThing(rete, "pirahnaPlant", "pp", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_GOOMBA_WINGED):
-			assertThing(rete, "flying", "gmba", x, y, enemyObs.length / 2);
+			assertThing(rete, "flying", "gmba", x, y, false);
 		case (ObservationConstants.ENMY_GOOMBA):
-			assertThing(rete, "goomba", "gmba", x, y, enemyObs.length / 2);
+			assertThing(rete, "goomba", "gmba", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_GREEN_KOOPA_WINGED):
-			assertThing(rete, "flying", "grKpa", x, y, enemyObs.length / 2);
+			assertThing(rete, "flying", "grKpa", x, y, false);
 		case (ObservationConstants.ENMY_GREEN_KOOPA):
-			assertThing(rete, "greenKoopa", "grKpa", x, y, enemyObs.length / 2);
+			assertThing(rete, "greenKoopa", "grKpa", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_RED_KOOPA_WINGED):
-			assertThing(rete, "flying", "redKpa", x, y, enemyObs.length / 2);
+			assertThing(rete, "flying", "redKpa", x, y, false);
 		case (ObservationConstants.ENMY_RED_KOOPA):
-			assertThing(rete, "redKoopa", "redKpa", x, y, enemyObs.length / 2);
+			assertThing(rete, "redKoopa", "redKpa", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_SPIKY_WINGED):
-			assertThing(rete, "flying", "spiky", x, y, enemyObs.length / 2);
+			assertThing(rete, "flying", "spiky", x, y, false);
 		case (ObservationConstants.ENMY_SPIKY):
-			assertThing(rete, "spiky", "spiky", x, y, enemyObs.length / 2);
+			assertThing(rete, "spiky", "spiky", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_GENERAL_ENEMY):
-			assertThing(rete, "enemy", "enemy", x, y, enemyObs.length / 2);
+			assertThing(rete, "enemy", "enemy", x, y, false);
 			break;
 		// Collectables
 		case (ObservationConstants.ENMY_FIRE_FLOWER):
-			assertThing(rete, "fireFlower", "ff", x, y, enemyObs.length / 2);
+			assertThing(rete, "fireFlower", "ff", x, y, false);
 			break;
 		case (ObservationConstants.ENMY_MUSHROOM):
-			assertThing(rete, "mushroom", "mush", x, y, enemyObs.length / 2);
+			assertThing(rete, "mushroom", "mush", x, y, false);
 			break;
 		// Projectiles
 		case (ObservationConstants.ENMY_FIREBALL):
-			assertThing(rete, "fireball", "fball", x, y, enemyObs.length / 2);
+			rete.assertString("(fireball fball)");
 			break;
 		case (ObservationConstants.ENMY_SHELL):
-			assertThing(rete, "shell", "shell", x, y, enemyObs.length / 2);
+			// Special checks for shells
+			if (environment_.isMarioCarrying()
+					&& (Math.abs(x
+							- environment_.getMarioReceptiveFieldCenter()[0]) <= 1)
+					&& (Math.abs(y
+							- environment_.getMarioReceptiveFieldCenter()[1]) <= 1)) {
+				// Mario may be carrying this very shell
+				// TODO Not asserting at the moment, but need to assert a
+				// carrying pred while Mario cannot jump on this shell.
+			} else {
+				assertThing(rete, "shell", "shell", x, y, true);
+			}
 			break;
 		}
 	}
@@ -380,21 +389,65 @@ public class MarioEnvironment implements EnvironmentInterface {
 	 *            The y loc of the thing.
 	 * @param y
 	 *            The x loc of the thing.
-	 * @param halfObsSize
-	 *            Half of the observation size for normalising values to Mario's
-	 *            position.
+	 * @param jumpInto
+	 *            If the object can be jumped into (from the side) rather than
+	 *            onto (from above)
 	 */
 	private void assertThing(Rete rete, String condition, String thingPrefix,
-			byte x, byte y, int halfObsSize) throws Exception {
-		String thing = thingPrefix + "_" + x + "_" + y;
+			byte x, byte y, boolean jumpInto) throws Exception {
+		// Can use Mario's current location to fix level object names
+		Point p = RLMarioStateSpec.determineGlobalPos(x, y, environment_);
+		String thing = thingPrefix + "_" + p.x + "_" + p.y;
 		rete.assertString("(" + condition + " " + thing + ")");
 
 		// Distance assertions.
-		double dist = Math.hypot(x - halfObsSize, y - halfObsSize);
+		int[] originPoint = environment_.getMarioReceptiveFieldCenter();
+		double dist = Math.hypot(x - originPoint[0], y - originPoint[1]);
 		rete.assertString("(distance " + thing + " " + dist + ")");
 
 		// Height diff
-		double heightDiff = halfObsSize - y;
+		double heightDiff = originPoint[1] - y;
 		rete.assertString("(heightDiff " + thing + " " + heightDiff + ")");
+
+		// Can jump on/over assertions
+		assertJumpOnOver(rete, thing, x, y, jumpInto);
+	}
+
+	/**
+	 * Asserts if Mario can jump onto/over the object in question. Note that for
+	 * some objects (like collectables) Mario need only jump into, not onto.
+	 * 
+	 * @param rete
+	 *            The Rete object to assert to.
+	 * @param thing
+	 *            The thing being possibly asserted.
+	 * @param x
+	 *            The x coord of the thing.
+	 * @param y
+	 *            The y coord of the thing.
+	 */
+	private void assertJumpOnOver(Rete rete, String thing, int x, int y,
+			boolean jumpInto) throws Exception {
+		// TODO Check if Mario can jump on something from his current position
+		// This assumes that he jumps from this point (or continues to jump)
+		// This will require on ground checks, velocity checks and possibly
+		// obstacle checks
+		if (PhysicsApproximator.canJumpTo(x, y, environment_, jumpInto)) {
+			rete.assertString("(canJumpOn " + thing + ")");
+		}
+	}
+
+	private class ActionComparator<T> implements Comparator<StringFact> {
+
+		@Override
+		public int compare(StringFact o1, StringFact o2) {
+			Double o1Val = Double.parseDouble(o1.getArguments()[o1
+					.getArgTypes().length - 1]);
+			Double o2Val = Double.parseDouble(o2.getArguments()[o2
+					.getArgTypes().length - 1]);
+
+			return o1Val.compareTo(o2Val);
+		}
+
 	}
 }

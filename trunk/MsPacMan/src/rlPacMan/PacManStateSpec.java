@@ -94,6 +94,8 @@ public class PacManStateSpec extends StateSpec {
 		structure[0] = "junction";
 		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("toJunction", structure));
+		
+		// TODO Add ghost density
 
 		return actions;
 	}

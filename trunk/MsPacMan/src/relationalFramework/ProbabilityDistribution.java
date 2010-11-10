@@ -16,6 +16,7 @@ import java.util.Random;
  */
 public class ProbabilityDistribution<T> implements Collection<T> {
 	/** The instances in the distribution with associated weights. */
+	// TODO Why not just have a map? Or even BidiMap?
 	private ArrayList<ItemProb<T>> itemProbs_;
 	/** The random number generator. */
 	protected Random random_;

@@ -1,7 +1,6 @@
 rlPacMan.PacMan
 10
-50
-bestPolicy.txt
-generatorOutput.txt
-performance.txt
-"20"
+100
+pacManElites.txt
+pacManTest.txt
+"goal levelMax"

@@ -1,6 +1,5 @@
 hanoi.Hanoi
 10
 50
-bestHanoiPolicy.txt
-generatorHanoiOutput.txt
+hanoiElites.txt
 hanoiPerformance.txt

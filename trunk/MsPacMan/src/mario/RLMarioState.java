@@ -8,7 +8,7 @@ import relationalFramework.State;
  * 
  * @author Sam Sarjant
  */
-public class MarioState extends State {
+public class RLMarioState extends State {
 	public static final int GHOST_ARRAY = 0;
 	public static final int FRUIT = 1;
 	public static final int DISTANCE_GRID = 2;
@@ -21,7 +21,7 @@ public class MarioState extends State {
 	 * @param stateArray
 	 *            The state array.
 	 */
-	public MarioState(Object[] stateArray) {
+	public RLMarioState(Object[] stateArray) {
 		super(stateArray);
 	}
 }
