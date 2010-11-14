@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,7 +11,8 @@ import java.util.Map;
  * 
  * @author Sam Sarjant
  */
-public class StringFact implements Comparable<StringFact> {
+public class StringFact implements Comparable<StringFact>, Serializable {
+	private static final long serialVersionUID = -7697442930084005787L;
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;

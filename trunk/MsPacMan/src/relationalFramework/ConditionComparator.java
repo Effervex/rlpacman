@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.Comparator;
 
 /**
@@ -9,7 +10,8 @@ import java.util.Comparator;
  * 
  * @author Sam Sarjant
  */
-public class ConditionComparator<T> implements Comparator<T> {
+public class ConditionComparator<T> implements Comparator<T>, Serializable {
+	private static final long serialVersionUID = -357269694510525864L;
 	private static Comparator<StringFact> instance_;
 	private final int BASE = 0;
 	private final int INEQ = 2;

@@ -73,6 +73,8 @@ public class LearningController {
 	private int maxSteps_;
 	/** The generator file to load. */
 	private File loadedGeneratorFile_;
+	/** The loaded serializable file. */
+	private File serializedFile_;
 	/*** If the algorithm is running tests throughout the learning. */
 	private boolean runningTests_ = true;
 
@@ -137,6 +139,12 @@ public class LearningController {
 					runningTests_ = false;
 				else if (args[i].equals("-m"))
 					Module.saveAtEnd_ = true;
+				else if (args[i].equals("-s")) {
+					i++;
+					loadedGeneratorFile_ = new File(args[i].substring(0,
+							args[i].lastIndexOf(".")));
+					serializedFile_ = new File(args[i]);
+				}
 			}
 
 		} catch (Exception e) {
@@ -210,16 +218,22 @@ public class LearningController {
 		// done in a previous experiment)
 		int[] startPoint = checkFiles(repetitionsStart_);
 		int run = startPoint[0];
-		// TODO Load the temp generators with all the necessary info
-		// (pre-goal too)
-		int iteration = -1;// startPoint[1];
+		int iteration = -1;
+		if (serializedFile_ != null)
+			iteration = startPoint[1];
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < repetitionsEnd_; run++) {
 			runStart_ = System.currentTimeMillis();
 			// Initialise a new policy generator.
-			PolicyGenerator localPolicy = PolicyGenerator.newInstance(run);
-			if (loadedGeneratorFile_ != null) {
+			PolicyGenerator localPolicy = null;
+			if (serializedFile_ != null)
+				localPolicy = PolicyGenerator
+						.loadPolicyGenerator(serializedFile_);
+			if (localPolicy == null)
+				localPolicy = PolicyGenerator.newInstance(run);
+
+			if (loadedGeneratorFile_ != null && serializedFile_ == null) {
 				localPolicy.loadGenerators(loadedGeneratorFile_);
 				localPolicy.freeze(true);
 			}
@@ -266,7 +280,7 @@ public class LearningController {
 
 		// Run the preliminary action discovery phase, only to create an initial
 		// number of rules.
-		if (loadedGeneratorFile_ == null)
+		if (loadedGeneratorFile_ == null || serializedFile_ == null)
 			preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
@@ -378,41 +392,12 @@ public class LearningController {
 			} while (pvs.size() < maxSize);
 
 			if (!restart) {
-				Collections.sort(pvs);
-				// Update the weights for all distributions using only the elite
-				// samples
-				int numElite = (int) Math.ceil(population * SELECTION_RATIO);
-				double alphaUpdate = STEP_SIZE / testingStep;
-				if (ENTROBEAM) {
-					numElite = population;
-				}
-
-				// Clean up the policy values
-				pvs = preUpdateModification(pvs, numElite);
-
-				localPolicy.updateDistributions(pvs, numElite, alphaUpdate);
-
-				pvs = postUpdateModification(pvs, t, testingStep);
-
-				// Only test the agent every number of steps, otherwise more
-				// time is spent testing than evaluating. (And at the first and
-				// last steps).
-				if ((t == finiteNum - 1) || (sinceLastTest >= testingStep)
-						|| (t == 0)) {
-					testRecordAgent(localPolicy, run, episodePerformances, pvs,
-							finiteNum, t, false);
-					sinceLastTest = 0;
-				}
-
-				// Run the post update operations
-				localPolicy.postUpdateOperations(population, Math.pow(
-						(1 - STEP_SIZE), PRUNING_ITERATIONS));
+				sinceLastTest = updateDistributions(localPolicy, pvs,
+						testingStep, t, population, sinceLastTest, finiteNum,
+						run, episodePerformances);
 
 				t++;
 				sinceLastTest++;
-
-				// Clear the restart
-				localPolicy.shouldRestart();
 			} else {
 				// Instead of starting over, just remove any policies
 				// containing non-existant or recently changed rules.
@@ -425,6 +410,72 @@ public class LearningController {
 			testRecordAgent(localPolicy, run, episodePerformances, pvs,
 					finiteNum, t, true);
 		}
+	}
+
+	/**
+	 * Updates the distributions using the observed elite samples as a target
+	 * distribution to move towards.
+	 * 
+	 * @param localPolicy
+	 *            The policy distribution to update.
+	 * @param elites
+	 *            The elite samples.
+	 * @param testingStep
+	 *            The number of steps to take before testing.
+	 * @param iteration
+	 *            The current iteration.
+	 * @param population
+	 *            The population value.
+	 * @param sinceLastTest
+	 *            How many iterations it has been since the last test.
+	 * @param finiteNum
+	 *            The maximum number of updates in the experiment.
+	 * @param run
+	 *            The current run number in the experiment.
+	 * @param episodePerformances
+	 *            A list of performances throughout the run.
+	 * @return How many iterations it has been since the last test.
+	 */
+	public int updateDistributions(PolicyGenerator localPolicy,
+			List<PolicyValue> elites, int testingStep, int iteration,
+			int population, int sinceLastTest, int finiteNum, int run,
+			ArrayList<Float> episodePerformances) {
+		Collections.sort(elites);
+		// Update the weights for all distributions using only the elite
+		// samples
+		int numElite = (int) Math.ceil(population * SELECTION_RATIO);
+		double alphaUpdate = STEP_SIZE / testingStep;
+		if (ENTROBEAM) {
+			numElite = population;
+		}
+
+		// Clean up the policy values
+		preUpdateModification(elites, numElite);
+
+		// TODO Examine this update code. It may be erroneous as it
+		// never seems to be happy with a single solution
+		localPolicy.updateDistributions(elites, numElite, alphaUpdate);
+
+		postUpdateModification(elites, iteration, testingStep);
+
+		// Only test the agent every number of steps, otherwise more
+		// time is spent testing than evaluating. (And at the first and
+		// last steps).
+		if ((iteration == finiteNum - 1) || (sinceLastTest >= testingStep)
+				|| (iteration == 0)) {
+			testRecordAgent(localPolicy, run, episodePerformances, elites,
+					finiteNum, iteration, false);
+			sinceLastTest = 0;
+		}
+
+		// Run the post update operations
+		localPolicy.postUpdateOperations(population, Math.pow((1 - STEP_SIZE),
+				PRUNING_ITERATIONS));
+
+		// Clear the restart
+		localPolicy.shouldRestart();
+
+		return sinceLastTest;
 	}
 
 	/**
@@ -477,8 +528,7 @@ public class LearningController {
 	 *            policy values should be.
 	 * @return The modified policy values list.
 	 */
-	private List<PolicyValue> preUpdateModification(List<PolicyValue> pvs,
-			int numElite) {
+	private void preUpdateModification(List<PolicyValue> pvs, int numElite) {
 		if (ENTROBEAM) {
 			if (pvs.size() > numElite) {
 				for (int i = pvs.size() - 1; i >= numElite; i--)
@@ -486,7 +536,6 @@ public class LearningController {
 			}
 		} else if (SLIDING_WINDOW)
 			pvs = pvs.subList(0, pvs.size() - numElite);
-		return pvs;
 	}
 
 	/**
@@ -501,18 +550,18 @@ public class LearningController {
 	 *            stale.
 	 * @return The cleaned list of policy values.
 	 */
-	private List<PolicyValue> postUpdateModification(List<PolicyValue> pvs,
-			int iteration, double staleValue) {
+	private void postUpdateModification(List<PolicyValue> pvs, int iteration,
+			int staleValue) {
 		// Remove any stale policies
-		// TODO May be a bad idea, though it does deal with shifting
-		// environments.
-		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
-			PolicyValue pv = iter.next();
-			if (iteration - pv.getIteration() >= staleValue) {
-				iter.remove();
+		// Only remove rules if the policy generator uses internal rewards
+		if (PolicyGenerator.getInstance().isModuleGenerator()) {
+			for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
+				PolicyValue pv = iter.next();
+				if (iteration - pv.getIteration() >= staleValue) {
+					iter.remove();
+				}
 			}
 		}
-		return pvs;
 	}
 
 	/**
@@ -544,6 +593,7 @@ public class LearningController {
 		}
 	}
 
+	@SuppressWarnings("unused")
 	private void printRuleWorths(PolicyGenerator localPolicy) {
 		System.out.println("\tRULE WORTHS");
 		Comparator<GuidedRule> comp = new Comparator<GuidedRule>() {
@@ -769,14 +819,12 @@ public class LearningController {
 	 * some rules to work with.
 	 */
 	private void preliminaryProcessing() {
-		while (!PolicyGenerator.getInstance().isSettled(false)) {
-			Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
-			System.out.println(pol);
-			// Send the agent a generated policy
-			ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-			RLGlue.RL_agent_message("Policy");
-			RLGlue.RL_episode(maxSteps_);
-		}
+		Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
+		System.out.println(pol);
+		// Send the agent a generated policy
+		ObjectObservations.getInstance().objectArray = new Policy[] { pol };
+		RLGlue.RL_agent_message("Policy");
+		RLGlue.RL_episode(maxSteps_);
 		PolicyGenerator.getInstance().shouldRestart();
 	}
 
@@ -983,7 +1031,7 @@ public class LearningController {
 		}
 
 		// Remove any old file if this is the first run
-		if (episodeAverage.size() == 1)
+		if (episodeAverage.size() == 1 && serializedFile_ == null)
 			tempPerf.delete();
 
 		tempPerf.createNewFile();
@@ -993,7 +1041,7 @@ public class LearningController {
 		System.out.println("Average episode elite scores:");
 		PolicyGenerator.getInstance().saveHumanGenerators(buf);
 		buf.write("\n");
-		PolicyGenerator.getInstance().saveGenerators(buf);
+		PolicyGenerator.getInstance().saveGenerators(buf, tempPerf.getPath());
 		buf
 				.write("\n\n" + episodeAverage.get(episodeAverage.size() - 1)
 						+ "\n");
@@ -1052,7 +1100,13 @@ public class LearningController {
 					result[1] = -1;
 					return result;
 				}
-				iteration++;
+
+				// If the value is a number, increment iteration
+				try {
+					Double.parseDouble(input);
+					iteration++;
+				} catch (Exception e) {
+				}
 			}
 
 			result[0] = run - 1;

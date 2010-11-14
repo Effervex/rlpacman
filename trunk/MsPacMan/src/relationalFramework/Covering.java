@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,7 +31,8 @@ import jess.Rete;
  * 
  * @author Samuel J. Sarjant
  */
-public class Covering {
+public class Covering implements Serializable {
+	private static final long serialVersionUID = -902117668118335074L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */

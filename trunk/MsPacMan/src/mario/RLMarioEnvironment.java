@@ -45,8 +45,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		// cmdLineOptions_.setEnemies("off");
 		cmdLineOptions_.setLevelRandSeed(6);
 		cmdLineOptions_.setLevelDifficulty(1);
-		// cmdLineOptions_.setFPS(10);
-		// cmdLineOptions_.setTimeLimit(50);
+		 cmdLineOptions_.setFPS(100);
+		 cmdLineOptions_.setTimeLimit(50);
 //		 GlobalOptions.isShowReceptiveField = true;
 
 		return null;
@@ -130,7 +130,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		List<StringFact> actions = ruleAction.getTriggerActions();
 		// Sort the facts by distance
 		Collections.sort(actions, new ActionComparator<StringFact>());
-		System.out.println(actions.get(0));
+//		System.out.println(actions.get(0));
 		return ((RLMarioStateSpec) StateSpec.getInstance()).applyAction(actions
 				.get(0), environment_);
 	}
@@ -200,7 +200,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
 					.getInstance().generateValidActions(rete_);
-			 rete.eval("(facts)");
+//			 rete.eval("(facts)");
 			// System.out.println(ObjectObservations.getInstance().validActions);
 
 		} catch (Exception e) {

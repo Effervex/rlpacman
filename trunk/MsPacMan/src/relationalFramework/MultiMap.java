@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -7,7 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class MultiMap<K, V> {
+public class MultiMap<K, V> implements Serializable {
+	private static final long serialVersionUID = -5907393112846626155L;
 	/** An inner map containing the values. C is implicitly of type V. */
 	private Map<K, List<V>> innerMap_;
 

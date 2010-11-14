@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -13,7 +14,9 @@ import java.util.Random;
  * 
  * @author Sam Sarjant
  */
-public class OrderedDistribution<T> implements Collection<T> {
+public class OrderedDistribution<T> implements Collection<T>, Serializable {
+	private static final long serialVersionUID = -3291722242732093402L;
+
 	/** The elements contained within the distribution. */
 	private Collection<ItemProb<T>> elements_;
 

@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -10,7 +11,8 @@ import relationalFramework.StringFact;
  * 
  * @author Samuel J. Sarjant
  */
-public class PreGoalInformation {
+public class PreGoalInformation implements Serializable {
+	private static final long serialVersionUID = -1535455560516107541L;
 	private Collection<StringFact> state_;
 	private String[] actionTerms_;
 	private int inactivity_ = 0;

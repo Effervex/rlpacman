@@ -1,12 +1,15 @@
 package relationalFramework.agentObservations;
 
+import java.io.Serializable;
+
 /**
  * A class to represent a range of values for a condition. Used for
  * recording the maximum values recorded by the covered rules.
  * 
  * @author Sam Sarjant
  */
-public class RangedCondition {
+public class RangedCondition implements Serializable {
+	private static final long serialVersionUID = 1330614870786844986L;
 	private String condition_;
 	private double minimum_;
 	private double maximum_;
