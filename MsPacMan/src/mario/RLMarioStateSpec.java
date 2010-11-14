@@ -235,7 +235,7 @@ public class RLMarioStateSpec extends StateSpec {
 	 *            The action to take.
 	 * @param environment
 	 *            The environment state.
-	 * @return A boolean array of keytroke actions to take at the time.
+	 * @return A boolean array of keystroke actions to take at the time.
 	 */
 	public boolean[] applyAction(StringFact action, MarioEnvironment environment) {
 		// Special case for chasing goal

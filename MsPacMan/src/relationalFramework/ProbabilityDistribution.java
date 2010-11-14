@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -14,7 +15,8 @@ import java.util.Random;
  * @author Samuel J. Sarjant
  * 
  */
-public class ProbabilityDistribution<T> implements Collection<T> {
+public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
+	private static final long serialVersionUID = 2969123277049255459L;
 	/** The instances in the distribution with associated weights. */
 	// TODO Why not just have a map? Or even BidiMap?
 	private ArrayList<ItemProb<T>> itemProbs_;

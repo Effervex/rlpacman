@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -11,7 +12,8 @@ import java.util.Collections;
  * 
  * @author Samuel J. Sarjant
  */
-public class ConstantPred implements Comparable<ConstantPred> {
+public class ConstantPred implements Comparable<ConstantPred>, Serializable {
+	private static final long serialVersionUID = -5469036689964742936L;
 	/** A sorted list of facts using only constant terms */
 	private ArrayList<StringFact> facts_;
 

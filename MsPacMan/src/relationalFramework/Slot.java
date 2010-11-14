@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -10,7 +11,9 @@ import java.util.regex.Pattern;
  * 
  * @author Samuel J. Sarjant
  */
-public class Slot {
+public class Slot implements Serializable {
+	private static final long serialVersionUID = -5763036574169433289L;
+
 	private static final String ELEMENT_DELIMITER = ":";
 
 	/** The maximum amount of variance the selection probability can have. */

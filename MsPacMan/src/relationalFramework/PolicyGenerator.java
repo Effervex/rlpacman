@@ -2,7 +2,12 @@ package relationalFramework;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -31,7 +36,9 @@ import jess.Rete;
  * 
  * @author Samuel J. Sarjant
  */
-public class PolicyGenerator {
+public class PolicyGenerator implements Serializable {
+	private static final long serialVersionUID = 2430275600656715124L;
+
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;
 
@@ -60,25 +67,25 @@ public class PolicyGenerator {
 	 * The last amount of difference in distribution probabilities from the
 	 * update.
 	 */
-	private double klDivergence_;
+	private transient double klDivergence_;
 
 	/** If this policy generator is being used for learning a module. */
-	private boolean moduleGenerator_;
+	private transient boolean moduleGenerator_;
 
 	/** The goal this generator is working towards if modular. */
-	private ArrayList<StringFact> moduleGoal_;
+	private transient ArrayList<StringFact> moduleGoal_;
 
 	/**
 	 * If this policy generator only updates the ordering of slots - no rule
 	 * creation or modification.
 	 */
-	private boolean slotOptimisation_ = false;
+	private transient boolean slotOptimisation_ = false;
 
 	/**
 	 * A flag for when the experiment needs to restart (due to new rules being
 	 * added/removed)
 	 */
-	private boolean restart_ = false;
+	private transient boolean restart_ = false;
 
 	/** If we're using weighted elite samples. */
 	public boolean weightedElites_ = false;
@@ -93,10 +100,10 @@ public class PolicyGenerator {
 	 * The maximum amount of change between the slots before it is considered
 	 * converged.
 	 */
-	private double convergedValue_ = 0;
+	private transient double convergedValue_ = 0;
 
 	/** The number of times in a row the updates have been convergent. */
-	private int convergedStrike_ = 0;
+	private transient int convergedStrike_ = 0;
 
 	/** The random number generator. */
 	public static Random random_ = new Random();
@@ -498,9 +505,6 @@ public class PolicyGenerator {
 		// If we're just optimising the slot ordering, then it's settled.
 		if (slotOptimisation_)
 			return true;
-		// Must have at least one pre-goal
-		if (!hasPreGoal())
-			return false;
 		// If checking pregoal, all pre-goals must be settled (or null)
 		if (checkPreGoal) {
 			for (String action : actionSet_.keySet()) {
@@ -894,6 +898,28 @@ public class PolicyGenerator {
 		instance_.covering_.loadBackupPreGoal();
 	}
 
+	/**
+	 * Loads a serialised policy generator.
+	 * 
+	 * @param serializedFile
+	 *            The serialised generator file to load.
+	 * @param run
+	 *            The run value.
+	 * @return The instantiated Policy Generator of the file.
+	 */
+	public static PolicyGenerator loadPolicyGenerator(File serializedFile) {
+		try {
+			FileInputStream fis = new FileInputStream(serializedFile);
+			ObjectInputStream ois = new ObjectInputStream(fis);
+			instance_ = (PolicyGenerator) ois.readObject();
+			ois.close();
+			return instance_;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
 	public boolean isFrozen() {
 		return frozen_;
 	}
@@ -974,13 +1000,31 @@ public class PolicyGenerator {
 	 * 
 	 * @param buf
 	 *            The predefined stream to write to.
+	 * @param performanceFile
+	 *            The path to the temporary performance file.
 	 */
-	public void saveGenerators(BufferedWriter buf) throws IOException {
+	public void saveGenerators(BufferedWriter buf, String performanceFile)
+			throws Exception {
 		// For each of the rule generators
 		buf.write(slotGenerator_.toString() + "\n");
 		buf.write("Total Update Size: " + klDivergence_ + "\n");
 		buf.write("Converged Value: " + convergedValue_);
-		// TODO Serialise and save policy generator.
+		// Serialise and save policy generator.
+		savePolicyGenerator(new File(performanceFile + ".ser"));
+	}
+
+	/**
+	 * Saves the policy generator in a serializable format.
+	 * 
+	 * @param serFile
+	 *            The file to serialize to.
+	 */
+	private void savePolicyGenerator(File serFile) throws Exception {
+		FileOutputStream fos = new FileOutputStream(serFile);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+
+		oos.writeObject(this);
+		oos.close();
 	}
 
 	/**

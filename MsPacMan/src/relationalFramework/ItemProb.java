@@ -1,9 +1,12 @@
 package relationalFramework;
 
+import java.io.Serializable;
+
 /**
  * A class for storing the items and associated probabilities.
  */
-public class ItemProb<T> implements Comparable<ItemProb> {
+public class ItemProb<T> implements Comparable<ItemProb>, Serializable {
+	private static final long serialVersionUID = -6821883735025271856L;
 	/** The element stored. */
 	private T element_;
 	/** The probability, or weight. */

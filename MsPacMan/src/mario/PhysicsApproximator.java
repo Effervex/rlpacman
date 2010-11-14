@@ -43,12 +43,11 @@ public class PhysicsApproximator {
 				if (originSquare[1] - y > MAX_JUMP_HEIGHT + extra)
 					return false;
 			} else {
-				// Mario cannot jump onto objects directly above him
-				if (x == originSquare[0] && y < originSquare[1])
+				// Mario cannot jump onto objects directly above/below him
+				if (x == originSquare[0] && y != originSquare[1])
 					return false;
 			}
 		} else {
-			// 
 		}
 		return true;
 	}

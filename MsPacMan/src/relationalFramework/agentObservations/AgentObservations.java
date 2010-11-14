@@ -3,6 +3,7 @@ package relationalFramework.agentObservations;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -26,7 +27,9 @@ import relationalFramework.StringFact;
  * 
  * @author Sam Sarjant
  */
-public class AgentObservations {
+public class AgentObservations implements Serializable {
+	private static final long serialVersionUID = 6392258862353075600L;
+
 	/** The amount of inactivity before an observation is considered converged. */
 	// TODO Set this as a better measure
 	public static final int INACTIVITY_THRESHOLD = 500;
@@ -492,7 +495,9 @@ public class AgentObservations {
 	 * 
 	 * @author Sam Sarjant
 	 */
-	private class ActionBasedObservations {
+	private class ActionBasedObservations implements Serializable {
+		private static final long serialVersionUID = 6572661453632055865L;
+
 		/** The pre-goal information. */
 		private PreGoalInformation pgi_;
 

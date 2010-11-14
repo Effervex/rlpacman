@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -18,7 +19,9 @@ import relationalFramework.StringFact;
  * 
  * @author Sam Sarjant
  */
-public class ConditionBeliefs {
+public class ConditionBeliefs implements Serializable {
+	private static final long serialVersionUID = 1256381798685341459L;
+
 	/** The condition this class represents as a base. */
 	private String condition_;
 

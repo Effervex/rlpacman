@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -17,7 +18,9 @@ import relationalFramework.StringFact;
  * 
  * @author Sam Sarjant
  */
-public class BackgroundKnowledge implements Comparable {
+public class BackgroundKnowledge implements Comparable, Serializable {
+	private static final long serialVersionUID = 8232254519459077567L;
+
 	/** The JESS compatible assertion string. */
 	private String assertionString_;
 

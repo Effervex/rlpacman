@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -18,7 +19,9 @@ import java.util.regex.Pattern;
  * 
  * @author Sam Sarjant
  */
-public class GuidedRule {
+public class GuidedRule implements Serializable {
+	private static final long serialVersionUID = -5925170406690146061L;
+
 	/**
 	 * The rule has to see 5 states without changing to be considered
 	 * artificially LGG.
