@@ -253,31 +253,31 @@ public class PacManStateSpec extends StateSpec {
 
 		// Distance Metrics
 		structure = new String[3];
-		structure[0] = "player";
+		structure[0] = "pacman";
 		structure[1] = "dot";
 		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceDot", structure));
 
 		structure = new String[3];
-		structure[0] = "player";
+		structure[0] = "pacman";
 		structure[1] = "powerDot";
 		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distancePowerDot", structure));
 
 		structure = new String[3];
-		structure[0] = "player";
+		structure[0] = "pacman";
 		structure[1] = "ghost";
 		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceGhost", structure));
 
 		structure = new String[3];
-		structure[0] = "player";
+		structure[0] = "pacman";
 		structure[1] = "ghostCentre";
 		structure[2] = Number.Double.toString();
 		predicates.add(new StringFact("distanceGhostCentre", structure));
 
 		structure = new String[3];
-		structure[0] = "player";
+		structure[0] = "pacman";
 		structure[1] = "fruit";
 		structure[2] = Number.Integer.toString();
 		predicates.add(new StringFact("distanceFruit", structure));

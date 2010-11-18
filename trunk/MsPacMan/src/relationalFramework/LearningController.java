@@ -45,7 +45,7 @@ public class LearningController {
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 30;
+	private static final double POPULATION_CONSTANT = 3;
 	/** The ratio of samples to use as 'elite' samples. */
 	private static final double SELECTION_RATIO = 0.1;
 	/** The rate at which the weights change. */
@@ -808,7 +808,7 @@ public class LearningController {
 					+ slot.getSelectionSD();
 			if (weight > 1)
 				weight = 1;
-			sumSlot += (slot.getGenerator().size() * weight);
+			sumSlot += (slot.size() * weight);
 		}
 		return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
 				.getGenerator().size()));

@@ -553,7 +553,7 @@ public class GuidedRule implements Serializable {
 	}
 
 	/**
-	 * Sets the new action terms, and modifies the action if necessary.
+	 * Sets the new action terms.
 	 * 
 	 * @param terms
 	 *            The new action terms.

@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
@@ -16,10 +17,9 @@ import java.util.Random;
  * 
  */
 public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = 2969123277049255459L;
+	private static final long serialVersionUID = -5600686052439795893L;
 	/** The instances in the distribution with associated weights. */
-	// TODO Why not just have a map? Or even BidiMap?
-	private ArrayList<ItemProb<T>> itemProbs_;
+	private Map<T, Double> itemProbs_;
 	/** The random number generator. */
 	protected Random random_;
 
@@ -28,7 +28,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public ProbabilityDistribution() {
 		random_ = new Random();
-		itemProbs_ = new ArrayList<ItemProb<T>>();
+		itemProbs_ = new MutableKeyMap<T, Double>();
 	}
 
 	/**
@@ -39,7 +39,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public ProbabilityDistribution(Random random) {
 		random_ = random;
-		itemProbs_ = new ArrayList<ItemProb<T>>();
+		itemProbs_ = new MutableKeyMap<T, Double>();
 	}
 
 	/**
@@ -60,14 +60,16 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 
 		double val = random_.nextDouble();
 		double tally = 0;
-		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
-		do {
-			ItemProb<T> current = iter.next();
-			tally += current.getProbability();
+		T lastItem = null;
+		for (T item : itemProbs_.keySet()) {
+			tally += itemProbs_.get(item);
 			if (val < tally)
-				return current.getItem();
-		} while ((tally < 1) && (iter.hasNext()));
-		return itemProbs_.get(0).getItem();
+				return item;
+
+			// Just in case
+			lastItem = item;
+		}
+		return lastItem;
 	}
 
 	/**
@@ -93,7 +95,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * @return True if the element was added.
 	 */
 	public boolean add(T element) {
-		itemProbs_.add(new ItemProb<T>(element, 1));
+		itemProbs_.put(element, 1d);
 		return true;
 	}
 
@@ -107,19 +109,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * @return True if the collection was modified.
 	 */
 	public boolean add(T element, double prob) {
-		itemProbs_.add(new ItemProb<T>(element, prob));
+		itemProbs_.put(element, prob);
 		return true;
-	}
-
-	/**
-	 * Gets the probability for the element at an index.
-	 * 
-	 * @param index
-	 *            The index of the element.
-	 * @return The probability for the element, or -1 if it doesn't exist.
-	 */
-	public double getProb(int index) {
-		return itemProbs_.get(index).getProbability();
 	}
 
 	/**
@@ -129,39 +120,26 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            The element with a probability.
 	 * @return The probability of the rule, or -1 if it isn't present.
 	 */
-	public double getProb(T element) {
-		int index = indexOf(element);
-		if (index == -1)
-			return -1;
-		return getProb(index);
+	public Double getProb(T element) {
+		return itemProbs_.get(element);
 	}
 
 	/**
-	 * Gets the element at an index.
+	 * Sets the probability of an element to a new probability. This may affect
+	 * the 'sums-to-one' criteria.
 	 * 
-	 * @param index
-	 *            The index of the element.
-	 * @return The element or null if out-of-bounds.
-	 */
-	public T getElement(int index) {
-		if (index >= itemProbs_.size())
-			return null;
-		return itemProbs_.get(index).getItem();
-	}
-
-	/**
-	 * Sets the probability of an element at an index to a new probability. This
-	 * may affect the 'sums-to-one' criteria.
-	 * 
-	 * @param index
-	 *            The index of the element being set.
+	 * @param element
+	 *            The element being set.
 	 * @param newProb
 	 *            The new probability of the value.
 	 * @return True if this contains the element, false otherwise.
 	 */
-	public boolean set(int index, double newProb) {
-		itemProbs_.get(index).setProbability(newProb);
-		return true;
+	public boolean set(T element, double newProb) {
+		if (itemProbs_.containsKey(element)) {
+			itemProbs_.put(element, newProb);
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -209,8 +187,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public boolean sumsToOne() {
 		double sum = 0;
-		for (ItemProb<T> ip : itemProbs_) {
-			sum += ip.getProbability();
+		for (Double d : itemProbs_.values()) {
+			sum += d;
 		}
 		if ((sum >= 0.9999) && (sum <= 1.0001))
 			return true;
@@ -223,19 +201,22 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public void normaliseProbs() {
 		// Get total
 		double sum = 0;
-		int count = 0;
-		for (ItemProb<T> ip : itemProbs_) {
-			sum += ip.getProbability();
-			count++;
+		for (Double d : itemProbs_.values()) {
+			sum += d;
 		}
 
+		// If already at 1, just return.
+		if ((sum >= 0.9999) && (sum <= 1.0001))
+			return;
+
 		// Normalise
-		for (ItemProb<T> ip : itemProbs_) {
+		int count = itemProbs_.size();
+		for (T element : itemProbs_.keySet()) {
 			// If the sum is 0, everything is equal.
 			if (sum == 0)
-				ip.setProbability(1.0 / count);
+				itemProbs_.put(element, 1.0 / count);
 			else
-				ip.setProbability(ip.getProbability() / sum);
+				itemProbs_.put(element, itemProbs_.get(element) / sum);
 		}
 	}
 
@@ -259,11 +240,11 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		}
 
 		// Set those below the average to 0 and (if binary) above to 1
-		for (int i = 0; i < size(); i++) {
-			if (getProb(i) < average) {
-				clone.set(i, 0);
+		for (T element : itemProbs_.keySet()) {
+			if (getProb(element) < average) {
+				clone.set(element, 0);
 			} else if (binary) {
-				clone.set(i, 1);
+				clone.set(element, 1);
 			}
 		}
 
@@ -280,13 +261,9 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * @return The elements of the distribution in order.
 	 */
 	public ArrayList<T> getOrderedElements() {
-		ArrayList<ItemProb<T>> ips = new ArrayList<ItemProb<T>>(itemProbs_);
-		Collections.sort(ips);
+		ArrayList<T> ordered = new ArrayList<T>(itemProbs_.keySet());
+		Collections.sort(ordered, new ProbabilityComparator<T>());
 
-		ArrayList<T> ordered = new ArrayList<T>();
-		for (ItemProb<T> ip : ips) {
-			ordered.add(ip.getItem());
-		}
 		return ordered;
 	}
 
@@ -297,14 +274,11 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * @return The non-zero elements of the distribution in order.
 	 */
 	public ArrayList<T> getNonZeroOrderedElements() {
-		ArrayList<ItemProb<T>> ips = new ArrayList<ItemProb<T>>(itemProbs_);
-		Collections.sort(ips);
-
-		ArrayList<T> ordered = new ArrayList<T>();
-		for (ItemProb<T> ip : ips) {
-			if (ip.getProbability() == 0)
-				return ordered;
-			ordered.add(ip.getItem());
+		ArrayList<T> ordered = getOrderedElements();
+		for (Iterator<T> iter = ordered.iterator(); iter.hasNext();) {
+			T element = iter.next();
+			if (itemProbs_.get(element) == 0)
+				iter.remove();
 		}
 		return ordered;
 	}
@@ -316,54 +290,12 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public ArrayList<T> getNonZero() {
 		ArrayList<T> nonZeroes = new ArrayList<T>();
-		for (ItemProb<T> ip : itemProbs_) {
-			if (ip.getProbability() > 0) {
-				nonZeroes.add(ip.getItem());
+		for (T element : itemProbs_.keySet()) {
+			if (itemProbs_.get(element) > 0) {
+				nonZeroes.add(element);
 			}
 		}
 		return nonZeroes;
-	}
-
-	/**
-	 * Removes the N worst items from this distribution and returns the average
-	 * weight of the top 2N items. Thus, the distribution must be no smaller
-	 * than 3N.
-	 * 
-	 * @param size
-	 *            The number of items to remove and half of the number of top
-	 *            items to use in the average weight.
-	 * @return The average value of the top 2N items.
-	 */
-	public double removeNWorst(int size) {
-		if (itemProbs_.size() < (3 * size))
-			return -1;
-		// Sort the values
-		ArrayList<ItemProb<T>> ips = new ArrayList<ItemProb<T>>(itemProbs_);
-		Collections.sort(ips);
-
-		ArrayList<ItemProb<T>> removables = new ArrayList<ItemProb<T>>();
-		Iterator<ItemProb<T>> iter = ips.iterator();
-		int i = 0;
-		// Note the first N items - they will be removed
-		for (; i < size; i++) {
-			removables.add(iter.next());
-		}
-		// Skip to the last X-2N items
-		for (; i < ips.size() - (2 * size); i++) {
-			iter.next();
-		}
-		// Note the values of the last 2N items and average them
-		double sum = 0;
-		for (; i < ips.size(); i++) {
-			sum += iter.next().getProbability();
-		}
-		sum /= (2 * size);
-
-		// Remove the rules (one at a time to avoid removing duplicates)
-		for (ItemProb<T> ip : removables) {
-			itemProbs_.remove(ip);
-		}
-		return sum;
 	}
 
 	/**
@@ -383,12 +315,12 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		double absoluteChange = 0;
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
-			for (ItemProb<T> ip : itemProbs_) {
+			for (T element : itemProbs_.keySet()) {
 				// Update every element within the distribution
-				Double itemCount = counts.get(ip.getItem());
+				Double itemCount = counts.get(element);
 				if (itemCount == null)
 					itemCount = 0d;
-				absoluteChange += Math.abs(updateElement(ip, numSamples,
+				absoluteChange += Math.abs(updateElement(element, numSamples,
 						itemCount, stepSize));
 			}
 
@@ -402,6 +334,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	/**
 	 * Updates a single element within the distribution.
 	 * 
+	 * @param element
+	 *            The element being updated.
 	 * @param numSamples
 	 *            The number of samples used for the counts.
 	 * @param count
@@ -410,15 +344,15 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            The step size for the update.
 	 * @return The KL divergence of the update.
 	 */
-	public double updateElement(ItemProb<T> element, double numSamples,
-			double count, double stepSize) {
-		double oldValue = element.getProbability();
+	public double updateElement(T element, double numSamples, double count,
+			double stepSize) {
+		double oldValue = itemProbs_.get(element);
 		// Calculate the new ratio.
 		double ratio = count / numSamples;
 		// Update the value
 		double newValue = stepSize * ratio + (1 - stepSize) * oldValue;
 		// Set the new value.
-		element.setProbability(newValue);
+		itemProbs_.put(element, newValue);
 
 		return klDivergence(oldValue, newValue);
 	}
@@ -443,37 +377,6 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Forms the probabilities of this generator into a string.
-	 * 
-	 * @param delimiter
-	 *            The delimiter to place between elements.
-	 * @return A string detailing the distribution probabilities.
-	 */
-	public String generatorString(String delimiter) {
-		StringBuffer strBuffer = new StringBuffer();
-		for (ItemProb<T> ip : itemProbs_) {
-			strBuffer.append(ip.getProbability() + delimiter);
-		}
-
-		return strBuffer.toString();
-	}
-
-	/**
-	 * Forms the probabilities of this generator into a string.
-	 * 
-	 * @param delimiter
-	 *            The delimiter to place between elements.
-	 * @return A string detailing the distribution probabilities.
-	 */
-	public void parseGeneratorString(String input, String delimiter) {
-		String[] split = input.split(delimiter);
-		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
-		for (int i = 0; i < split.length; i++) {
-			iter.next().setProbability(Double.parseDouble(split[i]));
-		}
-	}
-
-	/**
 	 * Clones this distribution. This is a shallow clone that does not clone the
 	 * elements. Also, the random generator is not cloned.
 	 * 
@@ -484,33 +387,13 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public ProbabilityDistribution<T> clone() {
 		ProbabilityDistribution<T> clone = new ProbabilityDistribution<T>(
 				random_);
-		for (ItemProb<T> ip : itemProbs_) {
-			clone.add(ip.getItem(), ip.getProbability());
-		}
+		clone.itemProbs_ = new MutableKeyMap<T, Double>(itemProbs_);
 		return clone;
 	}
 
-	// @Override
+	@Override
 	public int size() {
 		return itemProbs_.size();
-	}
-
-	/**
-	 * Gets the index of an element, or -1.
-	 * 
-	 * @param element
-	 *            The element being searched for.
-	 * @return The index of the element, or -1 if not present.
-	 */
-	public int indexOf(T element) {
-		int i = 0;
-		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
-		while (iter.hasNext()) {
-			if (iter.next().getItem().equals(element))
-				return i;
-			i++;
-		}
-		return -1;
 	}
 
 	/**
@@ -518,12 +401,9 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public void resetProbs() {
 		// Set all probabilities to one.
-		for (ItemProb<T> ip : itemProbs_) {
-			ip.setProbability(1);
+		for (T element : itemProbs_.keySet()) {
+			itemProbs_.put(element, 1.0 / itemProbs_.size());
 		}
-
-		// Normalise the probs
-		normaliseProbs();
 	}
 
 	/**
@@ -531,67 +411,45 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public void resetProbs(double prob) {
 		// Set all probabilities to a given value.
-		for (ItemProb<T> ip : itemProbs_) {
-			ip.setProbability(prob);
+		for (T element : itemProbs_.keySet()) {
+			itemProbs_.put(element, prob);
 		}
 	}
 
-	// @Override
+	@Override
 	public void clear() {
 		itemProbs_.clear();
 	}
 
-	// @Override
+	@Override
 	public boolean contains(Object arg0) {
-		if (arg0 == null)
-			return false;
-		T arg02 = (T) arg0;
-		if (indexOf(arg02) == -1)
-			return false;
-		return true;
+		return itemProbs_.containsKey(arg0);
 	}
 
-	// @Override
+	@Override
 	public boolean containsAll(Collection<?> arg0) {
-		if (arg0 == null)
-			return false;
-		for (Object obj : arg0) {
-			if (!contains(obj))
-				return false;
-		}
-		return true;
+		return itemProbs_.keySet().containsAll(arg0);
 	}
 
-	// @Override
+	@Override
 	public boolean isEmpty() {
-		if (itemProbs_.isEmpty())
+		return itemProbs_.isEmpty();
+	}
+
+	@Override
+	public Iterator<T> iterator() {
+		return itemProbs_.keySet().iterator();
+	}
+
+	@Override
+	public boolean remove(Object arg0) {
+		Double val = itemProbs_.remove(arg0);
+		if (val != null)
 			return true;
 		return false;
 	}
 
-	// @Override
-	public Iterator<T> iterator() {
-		ArrayList<T> items = new ArrayList<T>(itemProbs_.size());
-		for (ItemProb<T> ip : itemProbs_) {
-			items.add(ip.getItem());
-		}
-		return items.iterator();
-	}
-
 	@Override
-	@SuppressWarnings("unchecked")
-	public boolean remove(Object arg0) {
-		if (arg0 != null) {
-			int index = indexOf((T) arg0);
-			if (index != -1) {
-				itemProbs_.remove(index);
-				return true;
-			}
-		}
-		return false;
-	}
-
-	// @Override
 	public boolean removeAll(Collection<?> arg0) {
 		boolean changed = false;
 		for (Object obj : arg0) {
@@ -606,10 +464,10 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			throw new NullPointerException();
 
 		int size = itemProbs_.size();
-		for (Iterator<ItemProb<T>> iter = itemProbs_.iterator(); iter.hasNext();) {
-			ItemProb<T> element = iter.next();
-			if (!collection.contains(element.getItem()))
-				itemProbs_.remove(element);
+		for (Iterator<T> iter = iterator(); iter.hasNext();) {
+			T element = iter.next();
+			if (!collection.contains(element))
+				iter.remove();
 		}
 
 		// If the sizes haven't changed, return false.
@@ -620,12 +478,12 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		return true;
 	}
 
-	// @Override
+	@Override
 	public Object[] toArray() {
 		return null;
 	}
 
-	// @Override
+	@Override
 	@SuppressWarnings("hiding")
 	public <T> T[] toArray(T[] arg0) {
 		return null;
@@ -633,13 +491,14 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 
 	@Override
 	public String toString() {
-		Collections.sort(itemProbs_);
+		ArrayList<T> ordered = getOrderedElements();
 		StringBuffer buffer = new StringBuffer("{");
-		Iterator<ItemProb<T>> iter = itemProbs_.iterator();
-		if (iter.hasNext())
-			buffer.append(iter.next());
-		while (iter.hasNext()) {
-			buffer.append(", " + iter.next());
+		boolean first = true;
+		for (T element : ordered) {
+			if (!first)
+				buffer.append(", ");
+			buffer.append("(" + element + ":" + itemProbs_.get(element) + ")");
+			first = false;
 		}
 		buffer.append("}");
 		return buffer.toString();
@@ -649,12 +508,13 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 0;
-		for (ItemProb<T> ip : itemProbs_)
-			result += ip.hashCode();
+		for (T element : itemProbs_.keySet())
+			result += element.hashCode();
 		result = prime * result + 1;
 		return result;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -663,14 +523,34 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		ProbabilityDistribution other = (ProbabilityDistribution) obj;
+		ProbabilityDistribution<T> other = (ProbabilityDistribution<T>) obj;
 		if (itemProbs_ == null) {
 			if (other.itemProbs_ != null)
 				return false;
-		} else if (!itemProbs_.containsAll(other.itemProbs_))
-			return false;
-		else if (!other.itemProbs_.containsAll(itemProbs_))
+		} else if (!itemProbs_.keySet().equals(other.itemProbs_.keySet()))
 			return false;
 		return true;
+	}
+
+	/**
+	 * A class which compares 2 items based on their probability found within
+	 * the distribution, where a larger probability comes first.
+	 * 
+	 * @author Sam Sarjant
+	 * 
+	 * @param <S>
+	 *            The item type being compared.
+	 */
+	private class ProbabilityComparator<S extends T> implements Comparator<S> {
+		@Override
+		public int compare(S o1, S o2) {
+			// Compares by element probability within the item probs
+			if (getProb(o1) > getProb(o2))
+				return -1;
+			if (getProb(o1) < getProb(o2))
+				return 1;
+			return Double.compare(o1.hashCode(), o2.hashCode());
+		}
+
 	}
 }
