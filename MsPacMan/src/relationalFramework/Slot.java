@@ -19,6 +19,8 @@ public class Slot implements Serializable {
 	/** The maximum amount of variance the selection probability can have. */
 	public static final double MAX_SELECTION_VARIANCE = 0.5;
 
+	private static final String FIXED = "FIXED";
+
 	/** The rule generator within the slot. */
 	private ProbabilityDistribution<GuidedRule> ruleGenerator_;
 
@@ -226,13 +228,13 @@ public class Slot implements Serializable {
 		int threshold = (int) (influenceThreshold * influencedDistribution
 				.size());
 		// Run through the elements, modifying probabilities if necessary
-		for (int i = 0; i < influencedDistribution.size(); i++) {
-			int uses = influencedDistribution.getElement(i).getUses();
+		for (GuidedRule rule : influencedDistribution) {
+			int uses = rule.getUses();
 			if (uses < threshold) {
-				double newProb = influencedDistribution.getProb(i)
+				double newProb = influencedDistribution.getProb(rule)
 						* (threshold + 1 - uses) / influenceThreshold
 						* influenceBoost;
-				influencedDistribution.set(i, newProb);
+				influencedDistribution.set(rule, newProb);
 			}
 		}
 
@@ -265,6 +267,10 @@ public class Slot implements Serializable {
 		selectionVariance_ = sd;
 	}
 
+	public GuidedRule sample(boolean useMostLikely) {
+		return ruleGenerator_.sample(useMostLikely);
+	}
+
 	/**
 	 * If this slot is fixed (not necessarily frozen).
 	 * 
@@ -280,6 +286,10 @@ public class Slot implements Serializable {
 	public void fixSlot() {
 		fixed_ = true;
 		// TODO Fix the slot in place by creating a single rule for it
+	}
+
+	public int size() {
+		return ruleGenerator_.size();
 	}
 
 	/**
@@ -358,8 +368,8 @@ public class Slot implements Serializable {
 		if (fixed_)
 			buffer.append("FIXED" + ELEMENT_DELIMITER);
 		buffer.append(action_ + "{");
-		for (int i = 0; i < ruleGenerator_.size(); i++) {
-			if (ruleGenerator_.getProb(i) > 0)
+		for (GuidedRule rule : ruleGenerator_) {
+			if (ruleGenerator_.getProb(rule) > 0)
 				buffer.append(ruleGenerator_.toString());
 		}
 		buffer.append("}");
@@ -377,9 +387,9 @@ public class Slot implements Serializable {
 		int index = 0;
 		// Checking if slot is fixed
 		boolean fixed = false;
-		int fixIndex = "FIXED".length() + ELEMENT_DELIMITER.length();
+		int fixIndex = FIXED.length() + ELEMENT_DELIMITER.length();
 		if (slotString.substring(0, fixIndex).equals(
-				"FIXED" + ELEMENT_DELIMITER)) {
+				FIXED + ELEMENT_DELIMITER)) {
 			fixed = true;
 			index = fixIndex;
 		}

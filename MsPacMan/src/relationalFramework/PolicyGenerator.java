@@ -37,7 +37,8 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = 2430275600656715124L;
+
+	private static final long serialVersionUID = -2589393553440436119L;
 
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;
@@ -200,7 +201,7 @@ public class PolicyGenerator implements Serializable {
 							INFLUENCE_BOOST).sample(false);
 					gr.incrementRuleUses();
 				} else
-					gr = slot.getGenerator().sample(false);
+					gr = slot.sample(false);
 				if (gr != null) {
 					policy.addRule(gr, true, false);
 					slot.getGenerator().remove(gr);
@@ -267,7 +268,7 @@ public class PolicyGenerator implements Serializable {
 					slot.addNewRule(coveredRule);
 				}
 
-				// If the rule is maximally general, mutate and store it
+				// Add to the covered rules
 				coveredRules_.putContains(action.getFactName(), coveredRule);
 
 				// Mutate unless already mutated
@@ -752,7 +753,7 @@ public class PolicyGenerator implements Serializable {
 				Collection<GuidedRule> removables = new ArrayList<GuidedRule>();
 				for (GuidedRule rule : distribution) {
 					double ruleProb = distribution.getProb(rule);
-					if ((ruleProb != -1) && (ruleProb <= pruneProb)) {
+					if (ruleProb <= pruneProb) {
 						removables.add(rule);
 						// Note the rule in the no-create list
 						removedRules_.add(rule);
@@ -964,7 +965,7 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public boolean contains(GuidedRule gr) {
 		for (Slot slot : slotGenerator_) {
-			if (slot.getGenerator().contains(gr))
+			if (slot.contains(gr))
 				return true;
 		}
 		return false;

@@ -1,6 +1,6 @@
 package mario;
 
-import java.awt.Point;
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -233,27 +233,28 @@ public class RLMarioStateSpec extends StateSpec {
 	 * 
 	 * @param action
 	 *            The action to take.
-	 * @param environment
-	 *            The environment state.
 	 * @return A boolean array of keystroke actions to take at the time.
 	 */
-	public boolean[] applyAction(StringFact action, MarioEnvironment environment) {
-		// Special case for chasing goal
-		if (action.getArguments()[0].equals("goal")) {
-			boolean[] toGoal = new boolean[Environment.numberOfButtons];
-			toGoal[Environment.MARIO_KEY_RIGHT] = true;
-			toGoal[Environment.MARIO_KEY_SPEED] = true;
-			// if (environment.isMarioAbleToJump()
-			// || !environment.isMarioOnGround())
-			// toGoal[Environment.MARIO_KEY_JUMP] = true;
-			return toGoal;
+	public boolean[] applyAction(StringFact action) {
+		boolean[] actionArray = null;
+		// If no actions available, just move right.
+		// This should never happen in the final version.
+		if (action == null) {
+			actionArray = new boolean[Environment.numberOfKeys];
+			actionArray[Environment.MARIO_KEY_RIGHT] = true;
+			actionArray[Environment.MARIO_KEY_SPEED] = true;
+		} else {
+			// Extract the coords of he thing to take action upon and apply the
+			// actions.
+			String[] argSplit = action.getArguments()[0].split("_");
+			float x = Float.parseFloat(argSplit[1]);
+			float y = Float.parseFloat(argSplit[2]);
+			// TODO Jump onto and jump over are different values.
+			actionArray = PhysicsApproximator.getInstance().jumpTo(x, y);
 		}
-		String[] argSplit = action.getArguments()[0].split("_");
-		int x = Integer.parseInt(argSplit[1]);
-		int y = Integer.parseInt(argSplit[2]);
-		Point p = determineLocalPos(x, y, environment);
-		// TODO Jump onto and jump over are different values.
-		return PhysicsApproximator.jumpTo(p.x, p.y, environment);
+
+		PhysicsApproximator.getInstance().applyAction(actionArray);
+		return actionArray;
 	}
 
 	/**
@@ -267,34 +268,18 @@ public class RLMarioStateSpec extends StateSpec {
 	 *            The Mario environment.
 	 * @return The global x and y positions.
 	 */
-	public static Point determineGlobalPos(int x, int y,
+	public static Point2D.Float determineGlobalPos(int x, int y,
 			MarioEnvironment environment) {
+		// TODO Ensure this is working correctly - I haven't checked it. It's
+		// probably still int'ing.
 		float[] marioPos = environment.getMarioFloatPos();
-		int globalX = (int) ((marioPos[0] + LevelScene.cellSize
+		float globalX = (int) ((marioPos[0] + LevelScene.cellSize
 				* (x - (environment.getReceptiveFieldWidth() / 2))) / LevelScene.cellSize);
-		int globalY = (int) ((marioPos[1] + LevelScene.cellSize
+		globalX = (globalX + 0.5f) * LevelScene.cellSize;
+		float globalY = (int) ((marioPos[1] + LevelScene.cellSize
 				* (y - (environment.getReceptiveFieldHeight() / 2))) / LevelScene.cellSize);
-		return new Point(globalX, globalY);
-	}
+		globalY = (globalY + 0.5f) * LevelScene.cellSize;
 
-	/**
-	 * Determines the global position of the relative coords given.
-	 * 
-	 * @param x
-	 *            The global x pos.
-	 * @param y
-	 *            The global y pos.
-	 * @param environment
-	 *            The Mario environment.
-	 * @return The local x and y positions.
-	 */
-	public static Point determineLocalPos(int x, int y,
-			MarioEnvironment environment) {
-		float[] marioPos = environment.getMarioFloatPos();
-		int localX = (int) ((LevelScene.cellSize * x - marioPos[0])
-				/ LevelScene.cellSize + (environment.getReceptiveFieldWidth() / 2));
-		int localY = (int) ((LevelScene.cellSize * y - marioPos[1])
-				/ LevelScene.cellSize + (environment.getReceptiveFieldHeight() / 2));
-		return new Point(localX + 1, localY + 1);
+		return new Point2D.Float(globalX, globalY);
 	}
 }

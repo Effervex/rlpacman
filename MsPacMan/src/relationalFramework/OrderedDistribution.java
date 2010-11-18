@@ -15,17 +15,17 @@ import java.util.Random;
  * @author Sam Sarjant
  */
 public class OrderedDistribution<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = -3291722242732093402L;
+	private static final long serialVersionUID = 1157875397663702332L;
 
 	/** The elements contained within the distribution. */
-	private Collection<ItemProb<T>> elements_;
+	private Map<T, Double> elements_;
 
 	/** The random number generator. */
 	private Random random_;
 
 	public OrderedDistribution(Random random) {
 		random_ = random;
-		elements_ = new ArrayList<ItemProb<T>>();
+		elements_ = new MutableKeyMap<T, Double>();
 	}
 
 	/**
@@ -36,10 +36,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public OrderedDistribution<T> clone() {
 		OrderedDistribution<T> clone = new OrderedDistribution<T>(random_);
-
-		for (ItemProb<T> ip : elements_) {
-			clone.add(ip.getItem(), ip.getProbability());
-		}
+		clone.elements_ = new MutableKeyMap<T, Double>(elements_);
 
 		return clone;
 	}
@@ -59,12 +56,12 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		// and the value asked for.
 		ProbabilityDistribution<T> distribution = new ProbabilityDistribution<T>(
 				random_);
-		for (ItemProb<T> ip : elements_) {
+		for (T element : elements_.keySet()) {
 			// Weight it such that 0 difference has full weight and a curve
 			// drops from there to 0 weight at difference of 1.
-			double difference = Math.abs(order - ip.getProbability());
+			double difference = Math.abs(order - elements_.get(element));
 			double weight = 1 - Math.sqrt(Math.sin(difference * Math.PI / 2));
-			distribution.add(ip.getItem(), weight);
+			distribution.add(element, weight);
 		}
 		distribution.normaliseProbs();
 
@@ -111,10 +108,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 * @return The elements contained within the distribution.
 	 */
 	public Collection<T> getElements() {
-		Collection<T> elements = new ArrayList<T>();
-		for (ItemProb<T> ip : elements_)
-			elements.add(ip.getItem());
-		return elements;
+		return elements_.keySet();
 	}
 
 	/**
@@ -145,7 +139,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	public double updateDistribution(Map<T, Double> elementPositions,
 			double stepSize) {
 		double diff = 0;
-		for (ItemProb<T> element : elements_) {
+		for (T element : elements_.keySet()) {
 			diff += updateElement(elementPositions, stepSize, element);
 		}
 		return diff;
@@ -165,10 +159,10 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	public double updateDistribution(Map<T, Double> elementPositions,
 			Map<T, Double> stepSizes) {
 		double diff = 0;
-		for (ItemProb<T> element : elements_) {
-			if (stepSizes.containsKey(element.getItem())) {
-				diff += updateElement(elementPositions, stepSizes.get(element
-						.getItem()), element);
+		for (T element : elements_.keySet()) {
+			if (stepSizes.containsKey(element)) {
+				diff += updateElement(elementPositions, stepSizes.get(element),
+						element);
 			}
 		}
 		return diff;
@@ -183,22 +177,21 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 *            The step size to update the element by.
 	 * @param element
 	 *            The element to update.
-	 * @return The difference between the element's old value and the new
-	 *         one.
+	 * @return The difference between the element's old value and the new one.
 	 */
 	private double updateElement(Map<T, Double> elementPositions,
-			double stepSize, ItemProb<T> element) {
+			double stepSize, T element) {
 		double diff = 0;
-		if (elementPositions.containsKey(element.getItem())) {
+		if (elementPositions.containsKey(element)) {
 			// Get the old value
-			double oldValue = element.getProbability();
+			double oldValue = elements_.get(element);
 
 			// If the element doesn't exist, it has an order of 1 (last)
-			double newOrder = elementPositions.get(element.getItem());
+			double newOrder = elementPositions.get(element);
 			// Generate the new value
 			double newValue = stepSize * newOrder + (1 - stepSize) * oldValue;
 
-			element.setProbability(newValue);
+			elements_.put(element, newValue);
 
 			diff = Math.abs(newValue - oldValue);
 		}
@@ -224,21 +217,6 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Finds the element's itemprob in the distribution
-	 * 
-	 * @param element
-	 *            The element to be found.
-	 * @return The itemprob for the element or null if it isn't there.
-	 */
-	private ItemProb<T> find(T element) {
-		for (ItemProb<T> ip : elements_) {
-			if (ip.getItem().equals(element))
-				return ip;
-		}
-		return null;
-	}
-
-	/**
 	 * Adds an element to the distribution with a default order of in the
 	 * middle.
 	 * 
@@ -248,7 +226,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 */
 	@Override
 	public boolean add(T e) {
-		elements_.add(new ItemProb<T>(e, 0.5));
+		elements_.put(e, 0.5);
 		return true;
 	}
 
@@ -266,7 +244,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 			order = 0;
 		if (order > 1)
 			order = 1;
-		elements_.add(new ItemProb<T>(e, order));
+		elements_.put(e, order);
 		return true;
 	}
 
@@ -285,18 +263,12 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 
 	@Override
 	public boolean contains(Object o) {
-		if (find((T) o) != null)
-			return false;
-		return true;
+		return elements_.containsKey(o);
 	}
 
 	@Override
 	public boolean containsAll(Collection<?> c) {
-		for (Iterator iter = c.iterator(); iter.hasNext();) {
-			if (!contains(iter.next()))
-				return false;
-		}
-		return true;
+		return elements_.keySet().containsAll(c);
 	}
 
 	@Override
@@ -306,19 +278,15 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 
 	@Override
 	public Iterator<T> iterator() {
-		ArrayList<T> items = new ArrayList<T>(elements_.size());
-		for (ItemProb<T> ip : elements_) {
-			items.add(ip.getItem());
-		}
-		return items.iterator();
+		return elements_.keySet().iterator();
 	}
 
 	@Override
 	public boolean remove(Object o) {
-		ItemProb<T> element = find((T) o);
-		if (element == null)
+		Double val = elements_.remove(o);
+		if (val == null)
 			return false;
-		return elements_.remove(element);
+		return true;
 	}
 
 	@Override
@@ -336,10 +304,10 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 			throw new NullPointerException();
 
 		int size = elements_.size();
-		for (Iterator<ItemProb<T>> iter = elements_.iterator(); iter.hasNext();) {
-			ItemProb<T> element = iter.next();
-			if (!c.contains(element.getItem()))
-				elements_.remove(element);
+		for (Iterator<T> iter = iterator(); iter.hasNext();) {
+			T element = iter.next();
+			if (!c.contains(element))
+				iter.remove();
 		}
 
 		// If the sizes haven't changed, return false.
@@ -359,6 +327,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		return null;
 	}
 
+	@SuppressWarnings("hiding")
 	@Override
 	public <T> T[] toArray(T[] a) {
 		return null;
@@ -369,23 +338,21 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 * 
 	 * @param element
 	 *            The element to find the ordering for.
-	 * @return An ordering between 0 and 1 inclusive or -1 if not present.
+	 * @return An ordering between 0 and 1 inclusive or null if not present.
 	 */
-	public double getOrdering(T element) {
-		ItemProb<T> ip = find(element);
-		if (ip != null)
-			return ip.getProbability();
-		return -1;
+	public Double getOrdering(T element) {
+		return elements_.get(element);
 	}
 
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
-		Iterator<ItemProb<T>> iter = elements_.iterator();
-		if (iter.hasNext())
-			buffer.append(iter.next());
-		while (iter.hasNext()) {
-			buffer.append("\n" + iter.next());
+		boolean first = true;
+		for (T element : elements_.keySet()) {
+			if (!first)
+				buffer.append("\n");
+			buffer.append("(" + element + ":" + elements_.get(element) + ")");
+			first = false;
 		}
 		return buffer.toString();
 	}

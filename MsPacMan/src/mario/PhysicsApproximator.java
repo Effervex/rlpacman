@@ -1,5 +1,8 @@
 package mario;
 
+import mario.robinbaumgarten.astar.LevelScene;
+import mario.robinbaumgarten.astar.level.Level;
+
 import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
@@ -11,7 +14,29 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
  * @author Sam Sarjant
  */
 public class PhysicsApproximator {
-	public static final int MAX_JUMP_HEIGHT = 5;
+	private static final int TIMEOUT = 30;
+	private static final int MAX_JUMP_HEIGHT = 0;
+	private static PhysicsApproximator instance_;
+
+	private PhysicsApproximator() {
+		initialise();
+	}
+
+	public static PhysicsApproximator getInstance() {
+		if (instance_ == null)
+			instance_ = new PhysicsApproximator();
+		return instance_;
+	}
+
+	private LevelScene levelScene_;
+	private float[] lastMarioPos_;
+
+	public void initialise() {
+		levelScene_ = new LevelScene();
+		levelScene_.init();
+		levelScene_.level = new Level(1500, 15);
+		lastMarioPos_ = new float[2];
+	}
 
 	/**
 	 * Checks if Mario can jump to a given point from his current location,
@@ -27,29 +52,42 @@ public class PhysicsApproximator {
 	 *            If Mario only has to jump into the space, not onto.
 	 * @return True if Mario can jump to the point, false otherwise.
 	 */
-	public static boolean canJumpTo(int x, int y, MarioEnvironment environment,
-			boolean jumpInto) {
-		int[] originSquare = environment.getMarioReceptiveFieldCenter();
-		// Mario cannot reach jump onto objects above his jump height
-		if (originSquare[1] - y >= MAX_JUMP_HEIGHT)
-			return false;
-
-		// Handling Mario being on the ground
-		if (environment.isMarioOnGround()) {
+	public boolean canJumpTo(float x, float y, MarioEnvironment environment,
+			boolean jumpInto) throws Exception {
+		float cellSize = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
+		// If we have to jump on the thing, move the jump point up one tile
+		if (!jumpInto)
+			y -= cellSize;
+		
+		// Cut out possibilities if Mario is on the ground
+		if (levelScene_.mario.isOnGround()) {
 			if (jumpInto) {
-				// Mario can jump into objects above him to a particular height
-				// (assuming nothing is blocking)
-				int extra = (environment.getMarioMode() > 0) ? 1 : 0;
-				if (originSquare[1] - y > MAX_JUMP_HEIGHT + extra)
-					return false;
-			} else {
-				// Mario cannot jump onto objects directly above/below him
-				if (x == originSquare[0] && y != originSquare[1])
+				// Mario can jump into objects above him to a particular
+				// height (assuming nothing is blocking)
+				float extra = (environment.getMarioMode() > 0) ? cellSize * 1.5f
+						: cellSize * 0.5f;
+				if (environment.getMarioFloatPos()[1] - y > MAX_JUMP_HEIGHT + extra)
 					return false;
 			}
-		} else {
 		}
-		return true;
+
+		// Use the simulation to check if Mario can jump to that point by taking
+		// the regular actions.
+		LevelScene workingScene = (LevelScene) levelScene_.clone();
+		int count = 0;
+		do {
+			workingScene.mario.setKeys(jumpTo(x, y, workingScene));
+			workingScene.tick();
+			// If Mario's coordinates are 'reasonably' close to the point in
+			// question, return true.
+			// Reasonably = half a cell's distance
+			if ((Math.abs(workingScene.mario.x - x) <= cellSize)
+					&& (Math.abs(workingScene.mario.y - y) <= cellSize))
+				return true;
+			count++;
+		} while (!workingScene.mario.isOnGround() && count < TIMEOUT);
+
+		return false;
 	}
 
 	/**
@@ -60,47 +98,113 @@ public class PhysicsApproximator {
 	 *            The x location of the place to jump to.
 	 * @param y
 	 *            The y location of the place to jump to.
-	 * @param environment
-	 *            The environment state/
 	 * @return A boolean array of keystroke actions to take.
 	 */
-	public static boolean[] jumpTo(int x, int y, MarioEnvironment environment) {
-		boolean[] actionArray = new boolean[Environment.numberOfButtons];
-		int[] originPoint = environment.getMarioReceptiveFieldCenter();
+	public boolean[] jumpTo(float x, float y) {
+		boolean[] actionArray = jumpTo(x, y, levelScene_);
 
+		return actionArray;
+	}
+
+	/**
+	 * The meat of the jump to method which actually does the calculations for
+	 * jumping to a given point.
+	 * 
+	 * @param x
+	 *            The x point to jump to.
+	 * @param y
+	 *            The y point to jump to.
+	 * @param levelScene
+	 *            The simulated level scene.
+	 * @return A boolean array of actions required to jump to the point.
+	 */
+	private boolean[] jumpTo(float x, float y, LevelScene levelScene) {
+		boolean[] actionArray = new boolean[Environment.numberOfKeys];
 		actionArray[Mario.KEY_SPEED] = true;
+		float marioX = levelScene.mario.x;
+		float marioY = levelScene.mario.y;
+		int cellSize = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
 
 		// If the object is to Mario's right
-		if (x > originPoint[0]) {
+		if (x > marioX) {
 			// If the object is above Mario and he is not adjacent to it, move
 			// towards it
-			if (y < originPoint[1]) {
-				if (x > originPoint[0] + 1)
+			if (y < marioY) {
+				if (x > marioX + cellSize)
 					actionArray[Environment.MARIO_KEY_RIGHT] = true;
 				else {
+					// Decelerate
 					actionArray[Environment.MARIO_KEY_LEFT] = true;
 					actionArray[Mario.KEY_SPEED] = false;
 				}
 			} else
 				actionArray[Environment.MARIO_KEY_RIGHT] = true;
-		} else if (x < originPoint[0]) {
+		} else if (x < marioX) {
 			// If the object is above Mario and he is not adjacent to it, move
 			// towards it
-			if (y < originPoint[1]) {
-				if (x < originPoint[0] - 1)
+			if (y < marioY) {
+				if (x < marioX - cellSize)
 					actionArray[Environment.MARIO_KEY_LEFT] = true;
 				else {
+					// Decelerate
 					actionArray[Environment.MARIO_KEY_RIGHT] = true;
 					actionArray[Mario.KEY_SPEED] = false;
 				}
 			} else
 				actionArray[Environment.MARIO_KEY_LEFT] = true;
+		} else {
+			// Mario is at the same x as the object
+			// Adjust velocity so he remains above the object
+			if (levelScene.mario.xa > 0)
+				actionArray[Mario.KEY_LEFT] = true;
+			else if (levelScene.mario.xa < 0)
+				actionArray[Mario.KEY_RIGHT] = true;
 		}
 
-		// actionArray[Mario.KEY_RIGHT] = true;
-		// actionArray[Mario.KEY_SPEED] = true;
-		if (environment.isMarioAbleToJump() || !environment.isMarioOnGround())
+		if (levelScene.mario.mayJump() || !levelScene.mario.isOnGround())
 			actionArray[Mario.KEY_JUMP] = true;
+
 		return actionArray;
+	}
+
+	/**
+	 * Applies the chosen action to the simulated level scene.
+	 * 
+	 * @param actionArray
+	 *            The actions to apply.
+	 */
+	public void applyAction(boolean[] actionArray) {
+		levelScene_.mario.setKeys(actionArray);
+		levelScene_.tick();
+	}
+
+	/**
+	 * Synchronises the actula observations with the simulated observations.
+	 * 
+	 * @param levelObs
+	 *            The level observations.
+	 * @param enemyPos
+	 *            The enemy positions in float.
+	 * @param marioPos
+	 *            Mario's actual position in float.
+	 */
+	public void synchroniseSimulation(byte[][] levelObs, float[] enemyPos,
+			float[] marioPos) {
+		// If Mario's sim coords are off
+		if (levelScene_.mario.x != marioPos[0]
+				|| levelScene_.mario.y != marioPos[1]) {
+			levelScene_.mario.x = marioPos[0];
+			levelScene_.mario.xa = (marioPos[0] - lastMarioPos_[0]) * 0.89f;
+			if (Math.abs(levelScene_.mario.y - marioPos[1]) > 0.1f)
+				levelScene_.mario.ya = (marioPos[1] - lastMarioPos_[1]) * 0.85f;
+
+			levelScene_.mario.y = marioPos[1];
+		}
+
+		levelScene_.setLevelScene(levelObs);
+		levelScene_.setEnemies(enemyPos);
+
+		lastMarioPos_[0] = marioPos[0];
+		lastMarioPos_[1] = marioPos[1];
 	}
 }
