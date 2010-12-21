@@ -186,7 +186,7 @@ public class ElitesData {
 		private int rawCount_;
 
 		/** The average position of the slot in the policies. */
-		private double position_;
+		private Double position_ = null;
 
 		/** The average number of slots per policy. */
 		private double numeracy_;
@@ -214,6 +214,8 @@ public class ElitesData {
 		}
 
 		public void addOrdering(double relValue) {
+			if (position_ == null)
+				position_ = 0d;
 			position_ += relValue;
 		}
 
@@ -222,6 +224,8 @@ public class ElitesData {
 		}
 
 		public double getAverageOrdering() {
+			if (position_ == null)
+				return 0.5d;
 			return position_ / rawCount_;
 		}
 

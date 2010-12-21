@@ -25,6 +25,12 @@ import org.rlcommunity.rlglue.codec.types.Observation;
  * @author Sam Sarjant
  */
 public class PolicyActor implements AgentInterface {
+	/**
+	 * The internal reward the agent receives at every step when learning
+	 * modularly.
+	 */
+	private static final double INTERNAL_STEPWISE_REWARD = -1;
+
 	/** The current agent policy. */
 	private Policy policy_;
 
@@ -303,7 +309,7 @@ public class PolicyActor implements AgentInterface {
 			Collection<Fact> prevState) {
 		// Assigning reward
 		if (!internalGoalMet_) {
-			internalReward_ += totalReward_ / totalSteps_;
+			internalReward_ += INTERNAL_STEPWISE_REWARD;
 		}
 
 		// Check each predicate in the state
@@ -443,9 +449,6 @@ public class PolicyActor implements AgentInterface {
 	 *            The temporary goal.
 	 */
 	private void formPlaceholderPreGoalState(String[] temporaryGoal) {
-		if (PolicyGenerator.getInstance().isSettled(true))
-			return;
-
 		// The constants are the terms used in the fact
 		List<String> placeholderConstants = new ArrayList<String>(
 				temporaryGoal.length - 1);

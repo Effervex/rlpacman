@@ -6,6 +6,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Reads a performance file in and notes down the performance array, the last
@@ -14,8 +16,7 @@ import java.util.ArrayList;
  * @author Sam Sarjant
  */
 public class PerformanceReader {
-	private static Float[] performanceArray_;
-	private static float performanceSum_;
+	private static SortedMap<Integer, Float> performanceMap_;
 	private static String readableGenerator_;
 	private static String generator_;
 
@@ -27,19 +28,18 @@ public class PerformanceReader {
 	 *            The performance file to read.
 	 * @return True if the file was read successfully, false otherwise.
 	 */
-	public static boolean readPerformanceFile(File perfFile) throws Exception {
-		performanceSum_ = 0;
-		performanceArray_ = null;
+	public static boolean readPerformanceFile(File perfFile, boolean byEpisode)
+			throws Exception {
+		performanceMap_ = new TreeMap<Integer, Float>();
 		readableGenerator_ = null;
 		generator_ = null;
 		FileReader reader = new FileReader(perfFile);
 		BufferedReader buf = new BufferedReader(reader);
 
 		// For every value within the performance file
-		ArrayList<Float> performances = new ArrayList<Float>();
-		float val = 0;
 		boolean noNote = false;
 		String input = buf.readLine();
+		int regularCEcount = 1;
 		while (input != null) {
 			// Check for end of file
 			if ((input == null)
@@ -62,7 +62,18 @@ public class PerformanceReader {
 				while (input.equals(""))
 					input = buf.readLine();
 
-				val = Float.parseFloat(input);
+				String[] split = input.split("\t");
+				int ep = 0;
+				float val = 0;
+				if (split.length == 2) {
+					ep = Integer.parseInt(split[0]);
+					val = Float.parseFloat(split[1]);
+				} else if (split.length == 1) {
+					ep = regularCEcount;
+					val = Float.parseFloat(split[0]);
+				}
+				if (!byEpisode)
+					ep = regularCEcount;
 
 				input = buf.readLine();
 				while ((input != null) && input.equals(""))
@@ -70,13 +81,10 @@ public class PerformanceReader {
 
 				// Some performance files may be cut off, so just use the
 				// last recorded value.
-				performances.add(val);
-				performanceSum_ += val;
+				performanceMap_.put(ep, val);
+				regularCEcount++;
 			}
 		}
-
-		performanceArray_ = performances
-				.toArray(new Float[performances.size()]);
 
 		buf.close();
 		reader.close();
@@ -95,16 +103,16 @@ public class PerformanceReader {
 	 */
 	public static void extractPerformance(File input, File output) {
 		try {
-			readPerformanceFile(input);
+			readPerformanceFile(input, true);
 
 			if (!output.exists())
 				output.createNewFile();
 			FileWriter writer = new FileWriter(output);
 			BufferedWriter bf = new BufferedWriter(writer);
 
-			Float[] perfs = getPerformanceArray();
-			for (Float perf : perfs) {
-				bf.write(perf + "\n");
+			SortedMap<Integer, Float> perfs = getPerformanceArray();
+			for (Integer ep : perfs.keySet()) {
+				bf.write(ep + "\t" + perfs.get(ep) + "\n");
 			}
 
 			bf.close();
@@ -137,12 +145,8 @@ public class PerformanceReader {
 		}
 	}
 
-	public static Float[] getPerformanceArray() {
-		return performanceArray_;
-	}
-
-	public static float getPerformanceSum() {
-		return performanceSum_ / performanceArray_.length;
+	public static SortedMap<Integer, Float> getPerformanceArray() {
+		return performanceMap_;
 	}
 
 	public static String getReadableGenerator() {

@@ -119,4 +119,11 @@ public class AStarAgent implements Agent
 	public void integrateObservation(Environment environment) {
 		action = getAction(environment);
 	}
+
+	@Override
+	public void setObservationDetails(int rfWidth, int rfHeight, int egoRow,
+			int egoCol) {
+		// TODO Auto-generated method stub
+		
+	}
 }

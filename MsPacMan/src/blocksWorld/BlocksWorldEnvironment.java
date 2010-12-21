@@ -347,7 +347,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The minimal number of steps to take for solving.
 	 */
 	private int optimalSteps() {
-		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
+		Policy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
 		steps_ = 0;
 
 		// Check it hasn't already solved the state

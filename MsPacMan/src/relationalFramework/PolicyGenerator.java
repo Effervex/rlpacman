@@ -37,7 +37,6 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-
 	private static final long serialVersionUID = -2589393553440436119L;
 
 	/** The probability distributions defining the policy generator. */
@@ -357,25 +356,19 @@ public class PolicyGenerator implements Serializable {
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (removeOld) {
-
-				// If the rule isn't a mutant rule, we have mutants and have
-				// already created temp mutants, run through the mutations and
-				// remove unnecessary temp mutants.
-				if (!baseRule.isMutant() && !mutants.isEmpty()
+				if (!mutants.isEmpty()
 						&& (mutatedRules_.get(actionPred) != null)) {
-					// Run through the rules in the slot, removing any mutants
-					// not in the permanent mutant set that have average or less
-					// probabilities
+					// Run through the rules in the slot, removing any direct
+					// mutants of the base rule not in the current set of direct
+					// mutants.
 					List<GuidedRule> removables = new ArrayList<GuidedRule>();
 					ProbabilityDistribution<GuidedRule> distribution = ruleSlot
 							.getGenerator();
 					for (GuidedRule gr : distribution) {
 						// If the rule is a mutant, not in the current mutants,
 						// and of average or less probability, remove it.
-						if (gr.isMutant()
-								&& !mutants.contains(gr)
-								&& (distribution.getProb(gr) <= (1.0 / distribution
-										.size()))) {
+						if (gr.getParentRule() == baseRule
+								&& !mutants.contains(gr)) {
 							needToPause = true;
 							removables.add(gr);
 
@@ -491,34 +484,6 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public boolean hasPreGoal() {
 		return covering_.hasPreGoal();
-	}
-
-	/**
-	 * Checks if the state has settled. This means that the pre-goal has settled
-	 * and there are no non-LGG rules.
-	 * 
-	 * @param checkPreGoal
-	 *            If we're considering the pre-goal for settling.
-	 * 
-	 * @return True if the generator values are settled, false otherwise.
-	 */
-	public boolean isSettled(boolean checkPreGoal) {
-		// If we're just optimising the slot ordering, then it's settled.
-		if (slotOptimisation_)
-			return true;
-		// If checking pregoal, all pre-goals must be settled (or null)
-		if (checkPreGoal) {
-			for (String action : actionSet_.keySet()) {
-				if ((covering_.getPreGoalState(action) != null)
-						&& !covering_.isPreGoalSettled(action))
-					return false;
-			}
-		}
-
-		// Rules need to have been created at one point
-		if (coveredRules_.isKeysEmpty())
-			return false;
-		return true;
 	}
 
 	/**
@@ -987,6 +952,7 @@ public class PolicyGenerator implements Serializable {
 				rule.setSpawned(null);
 				slot.addNewRule(rule);
 				coveredRules_.put(action, rule);
+				mutateRule(rule, slot);
 			}
 		}
 	}
@@ -1092,7 +1058,7 @@ public class PolicyGenerator implements Serializable {
 				random_);
 
 		try {
-			if (!PerformanceReader.readPerformanceFile(input))
+			if (!PerformanceReader.readPerformanceFile(input, false))
 				throw new ParseException();
 			String generatorStr = PerformanceReader.getGenerator();
 

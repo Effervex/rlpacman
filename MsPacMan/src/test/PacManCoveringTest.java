@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -50,7 +51,7 @@ public class PacManCoveringTest {
 							+ " "
 							+ (interval * (i + 1))
 							+ ")) (ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-					false, true, null);
+					rule);
 			int hashCode = mutant.hashCode();
 			assertTrue(results.contains(mutant));
 		}
@@ -59,7 +60,7 @@ public class PacManCoveringTest {
 		rule = new GuidedRule(
 				"(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 9.0 18.0)) "
 						+ "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)");
-		rule.setMutant(true);
+		rule.setMutant(rule);
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(0, results.size());
 
@@ -69,7 +70,7 @@ public class PacManCoveringTest {
 				"(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
 						+ "(edible ?X) (ghost ?X) (pacman player) => "
 						+ "(toGhost ?X ?__Num0)");
-		rule.setMutant(true);
+		rule.setMutant(rule);
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(Covering.NUM_DISCRETE_RANGES, results.size());
 		interval = 36 / Covering.NUM_DISCRETE_RANGES;
@@ -81,7 +82,7 @@ public class PacManCoveringTest {
 									+ " "
 									+ (interval * (i + 1))
 									+ ")) (edible ?X) (ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-							false, true, null)));
+							rule)));
 		}
 
 		// Specialising a range with a single numerical pregoal
@@ -112,14 +113,14 @@ public class PacManCoveringTest {
 										+ " "
 										+ (interval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num3)",
-								false, true, null)));
+										rule)));
 			}
 
 			// The point itself
 			assertTrue(results.contains(new GuidedRule(
 					"(distanceDot player ?X " + point
 							+ ") (dot ?X) (pacman player) => (toDot ?X "
-							+ point + ")", false, true, null)));
+							+ point + ")", rule)));
 		}
 
 		// Specialising a range to a ranged pre-goal
@@ -155,7 +156,7 @@ public class PacManCoveringTest {
 										+ " "
 										+ (interval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-								false, true, null)));
+										rule)));
 			}
 
 			// Pre-goal intervals
@@ -167,7 +168,7 @@ public class PacManCoveringTest {
 										+ " "
 										+ (startPoint + midInterval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-								false, true, null)));
+										rule)));
 
 			// Pre-goal range
 			assertTrue(results
@@ -177,7 +178,7 @@ public class PacManCoveringTest {
 									+ " "
 									+ endPoint
 									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-							false, true, null)));
+									rule)));
 		}
 
 		// Special case: Range goes through 0 (no pregoal)
@@ -200,7 +201,7 @@ public class PacManCoveringTest {
 							+ (-16 + beforeInterval * i) + " "
 							+ (-16 + beforeInterval * (i + 1))
 							+ ")) (junction ?X) => (toJunction ?X ?__Num0)",
-					false, true, null)));
+							rule)));
 
 		// After interval(s)
 		for (int i = 0; i < afterIntervals; i++)
@@ -209,7 +210,7 @@ public class PacManCoveringTest {
 							+ (afterInterval * i) + " "
 							+ (afterInterval * (i + 1))
 							+ ")) (junction ?X) => (toJunction ?X ?__Num0)",
-					false, true, null)));
+							rule)));
 	}
 
 	@Test
@@ -273,10 +274,13 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 2.0))")));
+		assertTrue(oldState
+				.contains(StateSpec
+						.toStringFact("(distanceDot a b ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ " 1.0 2.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
@@ -295,10 +299,12 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index
+						+ " -1.0 2.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
@@ -317,11 +323,12 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index
-				+ " -1.0 2.567483E-64))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index
+						+ " -1.0 2.567483E-64))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
@@ -340,10 +347,12 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ?X ? ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " -1.0 2.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot ?X ? ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index
+						+ " -1.0 2.0))")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 
@@ -364,10 +373,11 @@ public class PacManCoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 
@@ -388,10 +398,11 @@ public class PacManCoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 
@@ -412,10 +423,12 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " -2.0 1.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + index
+						+ " -2.0 1.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
 		index++;
@@ -443,10 +456,11 @@ public class PacManCoveringTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot a b ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+		assertTrue(oldState.contains(StateSpec
+				.toStringFact("(distanceDot a b ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0&:("
+						+ StateSpec.BETWEEN_RANGE + " ?"
+						+ Covering.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + "0");
 		index++;
@@ -474,10 +488,13 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState
+				.contains(StateSpec
+						.toStringFact("(distanceDot ? ?X ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
@@ -502,10 +519,13 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState
+				.contains(StateSpec
+						.toStringFact("(distanceDot ? ?X ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
@@ -529,12 +549,35 @@ public class PacManCoveringTest {
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(distanceDot ? ?X ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + "&:("
-				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ Covering.RANGE_VARIABLE_PREFIX + index + " 1.0 5.0))")));
+		assertTrue(oldState
+				.contains(StateSpec
+						.toStringFact("(distanceDot ? ?X ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
+								+ Covering.RANGE_VARIABLE_PREFIX + index
+								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Covering.RANGE_VARIABLE_PREFIX + index);
+	}
+
+	@Test
+	public void testSpecialiseRule() {
+		// Set up the allowable conditions
+		Collection<StringFact> conditions = new HashSet<StringFact>();
+		conditions.add(StateSpec.toStringFact("(edible ?X)"));
+		conditions.add(StateSpec.toStringFact("(blinking ?X)"));
+		sut_.setAllowedActionConditions("toGhost", conditions);
+
+		GuidedRule rule = new GuidedRule(
+				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (pacman player) => (toGhost ?X ?__Num6)");
+		Set<GuidedRule> specialisations = sut_.specialiseRule(rule);
+		GuidedRule mutant = new GuidedRule(
+				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (blinking ?X) (pacman player) => (toGhost ?X ?__Num6)");
+		assertTrue(specialisations.contains(mutant));
+		mutant = new GuidedRule(
+				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (not (blinking ?X)) (pacman player) => (toGhost ?X ?__Num6)");
+		assertTrue(specialisations.contains(mutant));
+		assertEquals(specialisations.size(), 2);
 	}
 }

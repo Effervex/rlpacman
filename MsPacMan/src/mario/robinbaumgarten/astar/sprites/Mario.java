@@ -315,7 +315,6 @@ public class Mario extends Sprite implements Cloneable
             world.addSprite(new Fireball(world, x+facing*6, y-20, facing));
         }
 
-        world.paused = GlobalOptions.isPauseWorld;
         canShoot = !keys[KEY_SPEED];
 
         mayJump = (onGround || sliding) && !keys[KEY_JUMP];
