@@ -312,6 +312,7 @@ public class DistanceGridCache {
 	 * @return The distance grid for the given parameters.
 	 */
 	public DistanceDir[][] getGrid(int level, int originX, int originY) {
+		level = (level - 1) % GameModel.MAX_LEVELS + 1;
 		DistanceGrid grid = grids_.get(level - 1)[originX][originY];
 		if (grid == null)
 			return null;
@@ -331,6 +332,7 @@ public class DistanceGridCache {
 	 */
 	public Collection<Junction> getCloseJunctions(int level, int originX,
 			int originY) {
+		level = (level - 1) % GameModel.MAX_LEVELS + 1;
 		return grids_.get(level - 1)[originX][originY].getCloseJunctions();
 	}
 

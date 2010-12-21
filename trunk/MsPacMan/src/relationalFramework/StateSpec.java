@@ -88,8 +88,8 @@ public abstract class StateSpec {
 	/** The parameter of the environment. */
 	protected String envParameter_;
 
-	/** The optimal policy for the goal. */
-	private Policy optimalPolicy_;
+	/** The hand coded policy for the goal. */
+	private Policy handCodedPolicy_;
 
 	/** The LogicFactory for the experiment. */
 	private Rete rete_;
@@ -193,7 +193,7 @@ public abstract class StateSpec {
 			}
 
 			// Initialise the optimal policy
-			optimalPolicy_ = initialiseOptimalPolicy();
+			handCodedPolicy_ = initialiseOptimalPolicy();
 
 			queryNames_ = new HashMap<GuidedRule, String>();
 			queryCount_ = 0;
@@ -655,8 +655,8 @@ public abstract class StateSpec {
 	 * 
 	 * @return The policy that is optimal.
 	 */
-	public Policy getOptimalPolicy() {
-		return optimalPolicy_;
+	public Policy getHandCodedPolicy() {
+		return handCodedPolicy_;
 	}
 
 	public List<String> getConstants() {

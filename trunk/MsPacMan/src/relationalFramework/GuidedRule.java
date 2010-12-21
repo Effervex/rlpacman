@@ -46,6 +46,9 @@ public class GuidedRule implements Serializable {
 	/** If this slot is a mutation. */
 	private boolean mutant_ = false;
 
+	/** If the slot is a mutant, the parent of the mutant. */
+	private GuidedRule mutantParent_;
+
 	/** If this rule has spawned any mutant rules yet. */
 	private Integer hasSpawned_ = null;
 
@@ -95,12 +98,12 @@ public class GuidedRule implements Serializable {
 	 *            The conditions for the rule.
 	 * @param action
 	 *            The actions for the rule.
-	 * @param mutant
-	 *            If this rule is a mutant rule.
+	 * @param parent
+	 *            If this rule has a parent - hence is a mutant (null if not).
 	 */
 	@SuppressWarnings("unchecked")
 	public GuidedRule(Collection<StringFact> conditions, StringFact action,
-			boolean mutant) {
+			GuidedRule parent) {
 		if (!(conditions instanceof SortedSet)) {
 			ruleConditions_ = new TreeSet<StringFact>(ConditionComparator
 					.getInstance());
@@ -108,23 +111,11 @@ public class GuidedRule implements Serializable {
 		} else
 			ruleConditions_ = (SortedSet<StringFact>) conditions;
 		ruleAction_ = new StringFact(action);
-		mutant_ = mutant;
+		if (parent != null)
+			setMutant(parent);
 		slot_ = null;
 		findConstants();
 		ruleHash_ = hashCode();
-	}
-
-	/**
-	 * A constructor taking the rule and slot.
-	 * 
-	 * @param rule
-	 *            The rule this rule represents
-	 * @param slot
-	 *            The slot this rule is under.
-	 */
-	public GuidedRule(String ruleString, Slot slot) {
-		this(ruleString);
-		slot_ = slot;
 	}
 
 	/**
@@ -132,18 +123,14 @@ public class GuidedRule implements Serializable {
 	 * 
 	 * @param ruleString
 	 *            The string representing this rule.
-	 * @param maxGeneral
-	 *            If this rule is maximally general.
-	 * @param mutant
-	 *            If this rule is a mutant (implying max general is false).
-	 * @param slot
-	 *            The slot this rule starts under.
+	 * @param parent
+	 *            If this rule has a parent - hence is a mutant (null if not).
 	 */
-	public GuidedRule(String ruleString, boolean maxGeneral, boolean mutant,
-			Slot slot) {
+	public GuidedRule(String ruleString, GuidedRule parent) {
 		this(ruleString);
-		mutant_ = mutant;
-		slot_ = slot;
+		if (parent != null) {
+			setMutant(parent);
+		}
 	}
 
 	/**
@@ -235,8 +222,8 @@ public class GuidedRule implements Serializable {
 				for (int i = 0; i < arguments.length; i++) {
 					// Ignore numerical terms
 					if ((predicates.get(condition.getFactName()) == null)
-							|| (!StateSpec.isNumberType(condition
-									.getArgTypes()[i]))) {
+							|| (!StateSpec
+									.isNumberType(condition.getArgTypes()[i]))) {
 						// Adding variable terms
 						if (arguments[i].charAt(0) == '?') {
 							if (arguments[i].length() > 1)
@@ -400,7 +387,8 @@ public class GuidedRule implements Serializable {
 	 */
 	public SortedSet<StringFact> getConditions(boolean withoutInequals) {
 		if (withoutInequals) {
-			SortedSet<StringFact> conds = new TreeSet<StringFact>(ruleConditions_.comparator());
+			SortedSet<StringFact> conds = new TreeSet<StringFact>(
+					ruleConditions_.comparator());
 			for (StringFact cond : ruleConditions_) {
 				if (!cond.getFactName().equals("test"))
 					conds.add(cond);
@@ -570,8 +558,13 @@ public class GuidedRule implements Serializable {
 		return mutant_;
 	}
 
-	public void setMutant(boolean mutant) {
-		mutant_ = mutant;
+	public GuidedRule getParentRule() {
+		return mutantParent_;
+	}
+
+	public void setMutant(GuidedRule parent) {
+		mutant_ = true;
+		mutantParent_ = parent;
 	}
 
 	/**
@@ -630,7 +623,7 @@ public class GuidedRule implements Serializable {
 		Collection<StringFact> cloneConds = new ArrayList<StringFact>();
 		for (StringFact cond : ruleConditions_)
 			cloneConds.add(new StringFact(cond));
-		GuidedRule clone = new GuidedRule(cloneConds, ruleAction_, mutant_);
+		GuidedRule clone = new GuidedRule(cloneConds, ruleAction_, mutantParent_);
 		clone.hasSpawned_ = hasSpawned_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;

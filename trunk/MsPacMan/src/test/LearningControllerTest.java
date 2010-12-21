@@ -4,6 +4,8 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
@@ -52,9 +54,9 @@ public class LearningControllerTest {
 		pol.addRule(ruleSlot.getGenerator().sample(true), false, false);
 		elites.add(new PolicyValue(pol, 500, 3));
 		
-		ArrayList<Float> episodePerformances = new ArrayList<Float>();
+		SortedMap<Integer, Float> episodePerformances = new TreeMap<Integer, Float>();
 
 		int sinceLastTest = sut_.updateDistributions(localPolicy, elites, 10,
-				1, 3, 0, 100, 0, episodePerformances);
+				1, 3, 0, 100, 0, episodePerformances, 30);
 	}
 }

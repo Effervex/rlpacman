@@ -15,6 +15,7 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
+import relationalFramework.LearningController;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -22,6 +23,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import test.LearningControllerTest;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;
@@ -34,6 +36,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private PacManLowAction lastDirection_;
 	private DistanceDir[][] distanceGrid_;
 	private Collection<Junction> closeJunctions_;
+	private boolean skipHandCodedPolicy_ = false;
+	private boolean testHandCodedPolicy_ = false;
 
 	@Override
 	public void env_cleanup() {
@@ -76,12 +80,15 @@ public class PacManEnvironment implements EnvironmentInterface {
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;
-		}
+		} else if (arg0.equals("skipOptimal"))
+			skipHandCodedPolicy_ = true;
+		else if (arg0.equals("testHandCoded"))
+			testHandCodedPolicy_ = true;
 		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
 			StateSpec.reinitInstance(arg0.substring(5));
-			if (arg0.substring(4).contains("levelMax")
-					|| arg0.substring(4).contains("oneLevel"))
-				model_.oneLife_ = true;
+			// if (arg0.substring(4).contains("levelMax")
+			// || arg0.substring(4).contains("oneLevel"))
+			// model_.oneLife_ = true;
 		} else {
 			try {
 				int delay = Integer.parseInt(arg0);
@@ -98,9 +105,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 		resetEnvironment();
 
 		// Run the optimal policy if it hasn't yet been run
-		if (!PolicyGenerator.getInstance().hasPreGoal()
-				&& !PolicyGenerator.getInstance().isFrozen()) {
-			optimalPolicy();
+		if (testHandCodedPolicy_
+				|| (!skipHandCodedPolicy_
+						&& !PolicyGenerator.getInstance().hasPreGoal() && !PolicyGenerator
+						.getInstance().isFrozen())) {
+			handCodedPolicy();
 		}
 
 		// If we're not in full experiment mode, redraw the scene.
@@ -165,22 +174,26 @@ public class PacManEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Runs the optimal policy until a pre-goal is obtained.
+	 * Runs the hand-coded policy until a pre-goal is obtained.
 	 */
-	private void optimalPolicy() {
-		Policy optimalPolicy = StateSpec.getInstance().getOptimalPolicy();
+	private void handCodedPolicy() {
+		Policy handCodedPolicy = StateSpec.getInstance().getHandCodedPolicy();
+
+		// A special case for testing the policy for score
+		if (testHandCodedPolicy_)
+			testHandCodedPolicy(handCodedPolicy);
 
 		// Run the policy through the environment until goal is satisfied.
 		while (!PolicyGenerator.getInstance().hasPreGoal()) {
-			PolicyActor optimalAgent = new PolicyActor();
-			ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
-			optimalAgent.agent_message("Optimal");
-			optimalAgent.agent_message("Policy");
-			Action act = optimalAgent.agent_start(formObservations(rete_));
+			PolicyActor handCodedAgent = new PolicyActor();
+			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
+			handCodedAgent.agent_message("Optimal");
+			handCodedAgent.agent_message("Policy");
+			Action act = handCodedAgent.agent_start(formObservations(rete_));
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);
 			while ((rot == null) || !rot.isTerminal()) {
-				optimalAgent.agent_step(rot.r, rot.o);
+				handCodedAgent.agent_step(rot.r, rot.o);
 				rot = env_step(act);
 			}
 
@@ -188,12 +201,47 @@ public class PacManEnvironment implements EnvironmentInterface {
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)
 					&& !PolicyGenerator.getInstance().hasPreGoal())
-				optimalAgent.agent_message("formPreGoal");
+				handCodedAgent.agent_message("formPreGoal");
 
 			// Return the state to normal
 			model_.m_highScore = 0;
 			resetEnvironment();
 		}
+	}
+
+	/**
+	 * Tests the optimal policy a number of times to find the average
+	 * performance.
+	 * 
+	 * @param handCodedPolicy
+	 *            The optimal policy.
+	 */
+	private void testHandCodedPolicy(Policy handCodedPolicy) {
+		int repetitions = LearningController.AVERAGE_ITERATIONS
+				* LearningController.TEST_ITERATIONS;
+		double score = 0;
+		for (int i = 0; i < repetitions; i++) {
+			PolicyActor handCodedAgent = new PolicyActor();
+			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
+			handCodedAgent.agent_message("Optimal");
+			handCodedAgent.agent_message("Policy");
+			Action act = handCodedAgent.agent_start(formObservations(rete_));
+			// Loop until the task is complete
+			Reward_observation_terminal rot = env_step(act);
+			while ((rot == null) || !rot.isTerminal()) {
+				handCodedAgent.agent_step(rot.r, rot.o);
+				rot = env_step(act);
+				score += rot.r;
+			}
+
+			// Return the state to normal
+			model_.m_highScore = 0;
+			resetEnvironment();
+			System.out.println("Hand-coded testing " + (100.0 * (i + 1)) / repetitions + "% complete");
+		}
+		System.out.println("Hand coded policy achieves average score of:");
+		System.out.println(score / repetitions);
+		System.exit(1);
 	}
 
 	/**

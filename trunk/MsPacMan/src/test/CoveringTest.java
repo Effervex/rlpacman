@@ -1461,11 +1461,9 @@ public class CoveringTest {
 		Collection<GuidedRule> results = sut_.specialiseToPreGoal(rule);
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", false,
-				true, null)));
+				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", false, true,
-				null)));
+				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", rule)));
 
 		// Full covering
 		rule = new GuidedRule(
@@ -1474,7 +1472,7 @@ public class CoveringTest {
 		assertEquals(1, results.size());
 		assertTrue(results.contains(new GuidedRule(
 				"(clear ?X) (clear ?Y) (onFloor ?X) (on ?Y ?) => (move ?X ?Y)",
-				false, true, null)));
+				rule)));
 
 		// Empty case
 		pregoal.clear();
@@ -1504,9 +1502,9 @@ public class CoveringTest {
 		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
 		assertTrue(results.contains(new GuidedRule(
-				"(clear a) (clear ?Y) => (move a ?Y)", false, true, null)));
+				"(clear a) (clear ?Y) => (move a ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear b) => (move ?X b)", false, true, null)));
+				"(clear ?X) (clear b) => (move ?X b)", rule)));
 		assertEquals(2, results.size());
 
 		// Constant to variable (invalid!)
@@ -1535,15 +1533,13 @@ public class CoveringTest {
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(4, results.size());
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", false,
-				true, null)));
+				"(clear ?X) (clear ?Y) (onFloor ?X) => (move ?X ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", false, true,
-				null)));
+				"(clear ?X) (clear ?Y) (on ?Y ?) => (move ?X ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(clear a) (clear ?Y) => (move a ?Y)", false, true, null)));
+				"(clear a) (clear ?Y) => (move a ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(clear ?X) (clear b) => (move ?X b)", false, true, null)));
+				"(clear ?X) (clear b) => (move ?X b)", rule)));
 
 		// Inner predicate specialisation
 		pregoal.clear();
@@ -1555,9 +1551,9 @@ public class CoveringTest {
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(
-				"(on ?X a) (on ?Y ?) => (move ?X ?Y)", false, true, null)));
+				"(on ?X a) (on ?Y ?) => (move ?X ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(on ?X ?) (on ?Y b) => (move ?X ?Y)", false, true, null)));
+				"(on ?X ?) (on ?Y b) => (move ?X ?Y)", rule)));
 
 		// Inner predicate specialisation with terms
 		pregoal.clear();
@@ -1569,7 +1565,7 @@ public class CoveringTest {
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(1, results.size());
 		assertTrue(results.contains(new GuidedRule("(on ?X a) => (move ?X a)",
-				false, true, null)));
+				rule)));
 
 		// Adding constant facts
 		pregoal.clear();
@@ -1587,10 +1583,10 @@ public class CoveringTest {
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(
 				"(clear ?X) (onFloor a) (clear ?Y) (on ?Y ?) => (move ?X ?Y)",
-				false, true, null)));
+				rule)));
 		assertTrue(results.contains(new GuidedRule(
 				"(clear ?X) (onFloor ?X) (clear ?Y) (on b ?) => (move ?X ?Y)",
-				false, true, null)));
+				rule)));
 
 		// Constant substitution 2
 		pregoal.clear();
@@ -1604,9 +1600,9 @@ public class CoveringTest {
 		results = sut_.specialiseToPreGoal(rule);
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(
-				"(on a ?Y) (clear a) => (move a ?Y)", false, true, null)));
+				"(on a ?Y) (clear a) => (move a ?Y)", rule)));
 		assertTrue(results.contains(new GuidedRule(
-				"(on ?X b) (clear ?X) => (move ?X b)", false, true, null)));
+				"(on ?X b) (clear ?X) => (move ?X b)", rule)));
 
 		// Secondary mutation case
 		pregoal.clear();
@@ -1623,11 +1619,11 @@ public class CoveringTest {
 		assertEquals(2, results.size());
 		assertTrue(results.contains(new GuidedRule(
 				"(on ?X a) (clear ?X) (block ?X) (block a) => (moveFloor ?X)",
-				false, true, null)));
+				rule)));
 		assertTrue(results
 				.contains(new GuidedRule(
 						"(clear ?X) (above ?X a) (block ?X) (block a) => (moveFloor ?X)",
-						false, true, null)));
+						rule)));
 
 		pregoal.clear();
 		pregoal.add(StateSpec.toStringFact("(block ?X)"));
@@ -1644,7 +1640,7 @@ public class CoveringTest {
 		assertEquals(1, results.size());
 		assertTrue(results.contains(new GuidedRule(
 				"(on ?X ?_MOD_a) (clear ?X) (block ?X) => (moveFloor ?X)",
-				false, true, null)));
+				rule)));
 	}
 
 	@Test

@@ -568,7 +568,7 @@ public class Covering implements Serializable {
 
 			// Inversely substitute the terms for variables (in string form)
 			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action,
-					false);
+					null);
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -739,7 +739,7 @@ public class Covering implements Serializable {
 								ruleConditions, preGoalFact, false);
 						if (mutatedConditions != null) {
 							GuidedRule mutant = new GuidedRule(
-									mutatedConditions, rule.getAction(), true);
+									mutatedConditions, rule.getAction(), rule);
 							mutant.setQueryParams(rule.getQueryParameters());
 							mutant.expandConditions();
 							mutants.add(mutant);
@@ -789,7 +789,7 @@ public class Covering implements Serializable {
 					condition, true);
 			if (specConditions != null) {
 				GuidedRule specialisation = new GuidedRule(specConditions,
-						action, true);
+						action, rule);
 				specialisation.setQueryParams(rule.getQueryParameters());
 				specialisation.expandConditions();
 				if (!specialisations.contains(specialisation))
@@ -802,7 +802,7 @@ public class Covering implements Serializable {
 			specConditions = simplifyRule(conditions, negCondition, true);
 			if (specConditions != null) {
 				GuidedRule specialisation = new GuidedRule(specConditions,
-						action, true);
+						action, rule);
 				if (!specialisations.contains(specialisation))
 					specialisations.add(specialisation);
 			}
@@ -1066,7 +1066,7 @@ public class Covering implements Serializable {
 		cloneConds.add(mutantFact);
 
 		GuidedRule mutant = new GuidedRule(cloneConds, baseRule.getAction(),
-				true);
+				baseRule);
 		mutant.setQueryParams(baseRule.getQueryParameters());
 		return mutant;
 	}
@@ -1167,7 +1167,7 @@ public class Covering implements Serializable {
 									if (mutatedConditions != null) {
 										GuidedRule mutant = new GuidedRule(
 												mutatedConditions, baseRule
-														.getAction(), true);
+														.getAction(), baseRule);
 										mutant.setQueryParams(baseRule
 												.getQueryParameters());
 										// Here, needs to add inequals and types
@@ -1187,10 +1187,9 @@ public class Covering implements Serializable {
 
 				// If we haven't looked at a replacement yet
 				if (reverseReplacementTerms.containsKey(condArg)) {
-					GuidedRule mutant = replaceActionTerm(baseRule
-							.getConditions(false), baseRule.getAction(),
-							condArg, reverseReplacementTerms.get(condArg),
-							preGoalState, preGoalTerms);
+					GuidedRule mutant = replaceActionTerm(baseRule, condArg,
+							reverseReplacementTerms.get(condArg), preGoalState,
+							preGoalTerms);
 					if (mutant != null) {
 						mutant.setQueryParams(baseRule.getQueryParameters());
 						mutants.add(mutant);
@@ -1214,11 +1213,7 @@ public class Covering implements Serializable {
 
 	/**
 	 * Replaces an action term with the action term used in the pre-goal.
-	 * 
-	 * @param ruleConditions
-	 *            The rule conditions in the to-be-mutated rule.
-	 * @param ruleAction
-	 *            The rule action in the to-be-mutated rule.
+	 * @param baseRule TODO
 	 * @param replacedTerm
 	 *            The term to be replaced.
 	 * @param replacementTerm
@@ -1230,10 +1225,12 @@ public class Covering implements Serializable {
 	 * 
 	 * @return The mutant rule.
 	 */
-	private GuidedRule replaceActionTerm(SortedSet<StringFact> ruleConditions,
-			StringFact ruleAction, String replacedTerm, String replacementTerm,
-			Collection<StringFact> preGoalState, String[] preGoalTerms) {
+	private GuidedRule replaceActionTerm(GuidedRule baseRule,
+			String replacedTerm, String replacementTerm, Collection<StringFact> preGoalState,
+			String[] preGoalTerms) {
 		// Replace the variables with their replacements.
+		SortedSet<StringFact> ruleConditions = baseRule.getConditions(false);
+		StringFact ruleAction = baseRule.getAction();
 		SortedSet<StringFact> replacementConds = new TreeSet<StringFact>(
 				ConditionComparator.getInstance());
 		for (StringFact condition : ruleConditions) {
@@ -1253,7 +1250,7 @@ public class Covering implements Serializable {
 				.getArguments(), preGoalTerms) == 0) {
 			// Adding the mutated rule
 			GuidedRule mutant = new GuidedRule(replacementConds, ruleAction,
-					true);
+					baseRule);
 			// Should only need to add inequals here.
 			mutant.expandConditions();
 			return mutant;

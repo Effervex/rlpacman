@@ -25,7 +25,7 @@ public class LearningController {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
 	/** The number of test episodes to run for performance measures. */
-	public static final int TEST_ITERATIONS = 10;
+	public static final int TEST_ITERATIONS = 50;
 	/** The best policy found output file. */
 	private File policyFile_;
 	/** The performance output file. */
@@ -45,20 +45,22 @@ public class LearningController {
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 3;
+	private static final double POPULATION_CONSTANT = 50;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double SELECTION_RATIO = 0.1;
+	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
 	/** The internal prefix for messages to the agent regarding internal goal. */
 	public static final String INTERNAL_PREFIX = "internal";
 	/** The marker for the end of a successfully completed performance file. */
 	public static final String END_PERFORMANCE = "<--END-->";
+	/** The gap between performance checks per episode. */
+	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 1000;
 	/**
 	 * The number of meta-iterations a rule goes without updates before being
 	 * pruned.
 	 */
-	private static final double PRUNING_ITERATIONS = 1;
+	private static final int PRUNING_ITERATIONS = 2;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The time at which the learning started */
@@ -77,6 +79,8 @@ public class LearningController {
 	private File serializedFile_;
 	/*** If the algorithm is running tests throughout the learning. */
 	private boolean runningTests_ = true;
+	/** If the performance is saved by episode or by CE iteration. */
+	private boolean performanceByEpisode_ = true;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -253,7 +257,7 @@ public class LearningController {
 
 		if (repetitionsStart_ == 0) {
 			try {
-				combineTempFiles(repetitionsEnd_);
+				combineTempFiles(repetitionsEnd_, performanceByEpisode_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -284,7 +288,7 @@ public class LearningController {
 			preliminaryProcessing();
 
 		// The outer loop, for refinement episode by episode
-		ArrayList<Float> episodePerformances = new ArrayList<Float>();
+		SortedMap<Integer, Float> episodePerformances = new TreeMap<Integer, Float>();
 
 		// Forming a population of solutions
 		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
@@ -309,6 +313,7 @@ public class LearningController {
 
 		// A value to track how many intervals since the last test.
 		int sinceLastTest = 0;
+		int numEpisodes = 0;
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
 			if (PolicyGenerator.getInstance().useModules_
 					&& (loadedGeneratorFile_ == null)) {
@@ -348,6 +353,7 @@ public class LearningController {
 
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+					numEpisodes++;
 					RLGlue.RL_episode(maxSteps_);
 					if (localPolicy.isModuleGenerator())
 						score += Double.parseDouble(RLGlue
@@ -394,7 +400,7 @@ public class LearningController {
 			if (!restart) {
 				sinceLastTest = updateDistributions(localPolicy, pvs,
 						testingStep, t, population, sinceLastTest, finiteNum,
-						run, episodePerformances);
+						run, episodePerformances, numEpisodes);
 
 				t++;
 				sinceLastTest++;
@@ -408,7 +414,7 @@ public class LearningController {
 		// If the agent finished prematurely, note the results.
 		if (sinceLastTest > 0) {
 			testRecordAgent(localPolicy, run, episodePerformances, pvs,
-					finiteNum, t, true);
+					finiteNum, t, true, numEpisodes);
 		}
 	}
 
@@ -433,13 +439,16 @@ public class LearningController {
 	 * @param run
 	 *            The current run number in the experiment.
 	 * @param episodePerformances
-	 *            A list of performances throughout the run.
+	 *            A list of performances throughout the run mapped by number of
+	 *            episodes encountered.
+	 * @param numEpisodes
+	 *            The number of episodes passed.
 	 * @return How many iterations it has been since the last test.
 	 */
 	public int updateDistributions(PolicyGenerator localPolicy,
 			List<PolicyValue> elites, int testingStep, int iteration,
 			int population, int sinceLastTest, int finiteNum, int run,
-			ArrayList<Float> episodePerformances) {
+			SortedMap<Integer, Float> episodePerformances, int numEpisodes) {
 		Collections.sort(elites);
 		// Update the weights for all distributions using only the elite
 		// samples
@@ -464,7 +473,7 @@ public class LearningController {
 		if ((iteration == finiteNum - 1) || (sinceLastTest >= testingStep)
 				|| (iteration == 0)) {
 			testRecordAgent(localPolicy, run, episodePerformances, elites,
-					finiteNum, iteration, false);
+					finiteNum, iteration, false, numEpisodes);
 			sinceLastTest = 0;
 		}
 
@@ -486,7 +495,7 @@ public class LearningController {
 	 * @param run
 	 *            The current run.
 	 * @param episodePerformances
-	 *            The previous episode performances.
+	 *            The previous episode performances mapped by episode number.
 	 * @param pvs
 	 *            The elite policy values.
 	 * @param finiteNum
@@ -495,14 +504,17 @@ public class LearningController {
 	 *            The current progress of the iterations.
 	 * @param finalTest
 	 *            If this test is the final test for the policy generator.
+	 * @param numEpisodes
+	 *            The number of episodes passed.
 	 */
 	private void testRecordAgent(PolicyGenerator localPolicy, int run,
-			ArrayList<Float> episodePerformances, List<PolicyValue> pvs,
-			int finiteNum, int t, boolean finalTest) {
+			SortedMap<Integer, Float> episodePerformances,
+			List<PolicyValue> pvs, int finiteNum, int t, boolean finalTest,
+			int numEpisodes) {
 		// Test the agent and record the performances
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
-		episodePerformances.add(testAgent(t, maxSteps_, run,
+		episodePerformances.put(numEpisodes, testAgent(t, maxSteps_, run,
 				(repetitionsEnd_ - repetitionsStart_), expProg));
 
 		// Save the results at each episode
@@ -552,6 +564,7 @@ public class LearningController {
 	 */
 	private void postUpdateModification(List<PolicyValue> pvs, int iteration,
 			int staleValue) {
+		// TODO Re-test stale policies and receive a new value for them.
 		// Remove any stale policies
 		// Only remove rules if the policy generator uses internal rewards
 		if (PolicyGenerator.getInstance().isModuleGenerator()) {
@@ -1010,13 +1023,14 @@ public class LearningController {
 	/**
 	 * Saves the performance to file and outputs them.
 	 * 
-	 * @param episodeAverage
-	 *            The saved episode average performances.
+	 * @param episodePerformances
+	 *            The saved episode average performances mapped by number of
+	 *            episodes passed.
 	 * @param finalWrite
 	 *            If this write was the final write for the run.
 	 */
-	private void savePerformance(ArrayList<Float> episodeAverage, int run,
-			boolean finalWrite) throws Exception {
+	private void savePerformance(SortedMap<Integer, Float> episodePerformances,
+			int run, boolean finalWrite) throws Exception {
 		File tempPerf = null;
 		if (PolicyGenerator.getInstance().isModuleGenerator()) {
 			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
@@ -1031,7 +1045,7 @@ public class LearningController {
 		}
 
 		// Remove any old file if this is the first run
-		if (episodeAverage.size() == 1 && serializedFile_ == null)
+		if (episodePerformances.size() == 1 && serializedFile_ == null)
 			tempPerf.delete();
 
 		tempPerf.createNewFile();
@@ -1042,13 +1056,14 @@ public class LearningController {
 		PolicyGenerator.getInstance().saveHumanGenerators(buf);
 		buf.write("\n");
 		PolicyGenerator.getInstance().saveGenerators(buf, tempPerf.getPath());
-		buf
-				.write("\n\n" + episodeAverage.get(episodeAverage.size() - 1)
-						+ "\n");
+		int lastKey = episodePerformances.lastKey();
+		buf.write("\n\n" + lastKey + "\t" + episodePerformances.get(lastKey)
+				+ "\n");
 		buf.write("\n\n\n");
 
-		for (Float perf : episodeAverage)
-			System.out.println(perf);
+		for (Integer episode : episodePerformances.keySet())
+			System.out.println(episode + "\t"
+					+ episodePerformances.get(episode));
 
 		if (finalWrite) {
 			buf.write(END_PERFORMANCE + "\n");
@@ -1103,8 +1118,12 @@ public class LearningController {
 
 				// If the value is a number, increment iteration
 				try {
-					Double.parseDouble(input);
-					iteration++;
+					String[] split = input.split("\t");
+					if (split.length == 2) {
+						Integer.parseInt(split[0]);
+						Double.parseDouble(split[1]);
+						iteration++;
+					}
 				} catch (Exception e) {
 				}
 			}
@@ -1123,51 +1142,121 @@ public class LearningController {
 	 * 
 	 * @param runEnd
 	 *            The last run.
+	 * @param byEpisode
+	 *            If the performances are being combined by episode (in
+	 *            intervals) or by regular CE interval.
 	 */
-	private void combineTempFiles(int runEnd) throws Exception {
-		double[][] performances = new double[maxEpisodes_][runEnd];
+	private void combineTempFiles(int runEnd, boolean byEpisode)
+			throws Exception {
+		List<List<Float>> performances = new ArrayList<List<Float>>();
 		float min = Float.MAX_VALUE;
-		int minIndex = -1;
+		int minRun = -1;
 		float max = -Float.MAX_VALUE;
-		int maxIndex = -1;
+		int maxRun = -1;
 		// For every performance file
 		for (int i = 0; i < runEnd; i++) {
 			File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_ + i);
-			if (!PerformanceReader.readPerformanceFile(tempPerf))
+			if (!PerformanceReader.readPerformanceFile(tempPerf, true)) {
 				System.err.println("Error reading performance file.");
+				return;
+			}
+
+			List<Float> runPerformanceList = new ArrayList<Float>();
+			performances.add(runPerformanceList);
 
 			// Run through the performances and place them in the matrix
-			Float[] runPerformances = PerformanceReader.getPerformanceArray();
-			for (int e = 0; e < maxEpisodes_; e++) {
-				if (e < runPerformances.length)
-					performances[e][i] = runPerformances[e];
-				else
-					performances[e][i] = performances[e - 1][i];
+			SortedMap<Integer, Float> runPerformances = PerformanceReader
+					.getPerformanceArray();
+			if (byEpisode) {
+				Iterator<Integer> iter = runPerformances.keySet().iterator();
+				Integer current = iter.next();
+				Integer previous = 0;
+				int currentEpisode = 0;
+				// Run through the performances, using linear interpolation to
+				// get estimates of the performance at a given interval.
+				do {
+					// If the current segment is further along than the current
+					// value, advance to the next value.
+					while (currentEpisode > current) {
+						previous = current;
+						if (iter.hasNext())
+							current = iter.next();
+						else
+							break;
+					}
+
+					float interpolated = 0;
+					if (previous == current) {
+						interpolated = runPerformances.get(current);
+					} else {
+						float prevVal = (previous == 0) ? 0 : runPerformances
+								.get(previous);
+						float currentVal = runPerformances.get(current);
+						interpolated = (currentVal - prevVal)
+								* (1f * (currentEpisode - previous) / (current - previous))
+								+ prevVal;
+					}
+
+					// Add to the performances
+					runPerformanceList.add(interpolated);
+
+					// To the next increment
+					currentEpisode += PERFORMANCE_EPISODE_GAP_SIZE;
+				} while (currentEpisode <= runPerformances.lastKey());
+				System.out.println(runPerformanceList.get(runPerformanceList.size() - 1));
+			} else {
+				// Take the values directly from the run performances
+				for (Integer key : runPerformances.keySet())
+					runPerformanceList.add(runPerformances.get(key));
 			}
 
-			float lastVal = runPerformances[runPerformances.length - 1];
 			// Find min or max runs
-			if (lastVal < min) {
-				min = lastVal;
-				minIndex = i;
+			float runVal = runPerformances.get(runPerformances.lastKey());
+			if (runVal < min) {
+				min = runVal;
+				minRun = i;
 			}
-			if (lastVal > max) {
-				max = lastVal;
-				maxIndex = i;
+			if (runVal > max) {
+				max = runVal;
+				maxRun = i;
 			}
 		}
 
 		// Calculate the average and print out the stats
 		FileWriter writer = new FileWriter(performanceFile_);
 		BufferedWriter buf = new BufferedWriter(writer);
-		buf.write("Average\tSD\tMin\tMax\n");
-		for (int e = 0; e < performances.length; e++) {
+		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
+		boolean moreEpisodes = true;
+		int index = 0;
+		while (moreEpisodes) {
+			moreEpisodes = false;
+			// Compile the array of performances for the given index
+			double[] performanceArray = new double[performances.size()];
+			double maxVal = 0;
+			double minVal = 0;
+			for (int run = 0; run < performanceArray.length; run++) {
+				List<Float> runPerformanceList = performances.get(run);
+				int thisIndex = Math.min(index, runPerformanceList.size() - 1);
+				if (index < runPerformanceList.size())
+					moreEpisodes = true;
+				performanceArray[run] = runPerformanceList.get(thisIndex);
+
+				// Max and min
+				if (run == minRun)
+					minVal = performanceArray[run];
+				if (run == maxRun)
+					maxVal = performanceArray[run];
+			}
+
+			// Find the statistics
 			Mean mean = new Mean();
 			StandardDeviation sd = new StandardDeviation();
-			buf.write(mean.evaluate(performances[e]) + "\t"
-					+ sd.evaluate(performances[e]) + "\t"
-					+ performances[e][minIndex] + "\t"
-					+ performances[e][maxIndex] + "\n");
+			int episodeNum = (byEpisode) ? index * PERFORMANCE_EPISODE_GAP_SIZE
+					: index + 1;
+			buf.write(episodeNum + "\t" + mean.evaluate(performanceArray)
+					+ "\t" + sd.evaluate(performanceArray) + "\t" + minVal
+					+ "\t" + maxVal + "\n");
+			index++;
 		}
 
 		buf.write("Total Run Time: "

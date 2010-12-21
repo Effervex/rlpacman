@@ -404,7 +404,8 @@ public class Slot implements Serializable {
 		Pattern p = Pattern.compile("\\((.+? => .+?):([0-9.]+)\\)");
 		Matcher m = p.matcher(slotString.substring(bracketIndex + 1));
 		while (m.find()) {
-			GuidedRule guidedRule = new GuidedRule(m.group(1), slot);
+			GuidedRule guidedRule = new GuidedRule(m.group(1));
+			guidedRule.setSlot(slot);
 			double prob = Double.parseDouble(m.group(2));
 			slot.addNewRule(guidedRule, prob);
 		}

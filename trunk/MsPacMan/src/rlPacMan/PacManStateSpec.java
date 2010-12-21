@@ -117,7 +117,7 @@ public class PacManStateSpec extends StateSpec {
 
 		if (envParameter_.equals("lvl10")) {
 			// Actual goal condition
-			return "(level 10) (not (dot ?X)) (not (powerDot ?X))";
+			return "(level 11)";
 		} else if (envParameter_.equals("10000")) {
 			// Score maximisation
 			return "(score ?Y &:(>= ?Y 10000))";
