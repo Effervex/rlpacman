@@ -567,8 +567,7 @@ public class Covering implements Serializable {
 			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action);
 
 			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action,
-					null);
+			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action, null);
 
 			// Unify with the previous rules, unless it causes the rule to
 			// become invalid
@@ -1213,7 +1212,9 @@ public class Covering implements Serializable {
 
 	/**
 	 * Replaces an action term with the action term used in the pre-goal.
-	 * @param baseRule TODO
+	 * 
+	 * @param baseRule
+	 *            The base rule that is being specialised.
 	 * @param replacedTerm
 	 *            The term to be replaced.
 	 * @param replacementTerm
@@ -1226,8 +1227,8 @@ public class Covering implements Serializable {
 	 * @return The mutant rule.
 	 */
 	private GuidedRule replaceActionTerm(GuidedRule baseRule,
-			String replacedTerm, String replacementTerm, Collection<StringFact> preGoalState,
-			String[] preGoalTerms) {
+			String replacedTerm, String replacementTerm,
+			Collection<StringFact> preGoalState, String[] preGoalTerms) {
 		// Replace the variables with their replacements.
 		SortedSet<StringFact> ruleConditions = baseRule.getConditions(false);
 		StringFact ruleAction = baseRule.getAction();

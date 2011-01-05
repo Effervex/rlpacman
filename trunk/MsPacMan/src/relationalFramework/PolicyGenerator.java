@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.Stack;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -74,6 +75,9 @@ public class PolicyGenerator implements Serializable {
 
 	/** The goal this generator is working towards if modular. */
 	private transient ArrayList<StringFact> moduleGoal_;
+
+	/** Policies awaiting testing. */
+	private Stack<Policy> awaitingTest_;
 
 	/**
 	 * If this policy generator only updates the ordering of slots - no rule
@@ -163,6 +167,9 @@ public class PolicyGenerator implements Serializable {
 	 *         distributions.
 	 */
 	public Policy generatePolicy(boolean influenceUntestedRules) {
+		if (!awaitingTest_.isEmpty())
+			return awaitingTest_.pop();
+		
 		Policy policy = new Policy();
 
 		// Clone the ordered distribution so slots and rules from slots can be
@@ -543,6 +550,8 @@ public class PolicyGenerator implements Serializable {
 		coveredRules_.clear();
 		mutatedRules_.clear();
 		removedRules_.clear();
+
+		awaitingTest_ = new Stack<Policy>();
 	}
 
 	/**
@@ -1106,5 +1115,15 @@ public class PolicyGenerator implements Serializable {
 		}
 
 		slotGenerator_ = loadedDist;
+	}
+
+	/**
+	 * Retests a policy by adding it to a stack of policies for use later when a
+	 * generated policy is requested.
+	 * 
+	 * @param policy The policy to retest.
+	 */
+	public void retestPolicy(Policy policy) {
+		awaitingTest_.push(policy);
 	}
 }
