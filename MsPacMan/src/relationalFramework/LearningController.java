@@ -61,6 +61,7 @@ public class LearningController {
 	 * pruned.
 	 */
 	private static final int PRUNING_ITERATIONS = 2;
+
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The time at which the learning started */
@@ -346,6 +347,7 @@ public class LearningController {
 			int maxSize = (t == 0) ? population * 2 : population;
 			do {
 				Policy pol = localPolicy.generatePolicy(true);
+
 				System.out.println(pol);
 				// Send the agent a generated policy
 				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
@@ -465,7 +467,7 @@ public class LearningController {
 		// never seems to be happy with a single solution
 		localPolicy.updateDistributions(elites, numElite, alphaUpdate);
 
-		postUpdateModification(elites, iteration, testingStep);
+		postUpdateModification(elites, iteration, testingStep, localPolicy);
 
 		// Only test the agent every number of steps, otherwise more
 		// time is spent testing than evaluating. (And at the first and
@@ -560,19 +562,17 @@ public class LearningController {
 	 * @param staleValue
 	 *            The number of iterations to pass before a policy value becomes
 	 *            stale.
+	 * @param localPolicy The local policy generator.
 	 * @return The cleaned list of policy values.
 	 */
 	private void postUpdateModification(List<PolicyValue> pvs, int iteration,
-			int staleValue) {
-		// TODO Re-test stale policies and receive a new value for them.
+			int staleValue, PolicyGenerator localPolicy) {
 		// Remove any stale policies
-		// Only remove rules if the policy generator uses internal rewards
-		if (PolicyGenerator.getInstance().isModuleGenerator()) {
-			for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
-				PolicyValue pv = iter.next();
-				if (iteration - pv.getIteration() >= staleValue) {
-					iter.remove();
-				}
+		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
+			PolicyValue pv = iter.next();
+			if (iteration - pv.getIteration() >= staleValue) {
+				localPolicy.retestPolicy(pv.getPolicy());
+				iter.remove();
 			}
 		}
 	}
@@ -809,6 +809,7 @@ public class LearningController {
 		// samples per rule to get possible rule slot. But perhaps even include
 		// the elites value, so squared and / elites selection ratio. This could
 		// get a bit big, so perhaps use a log curve * pop const.
+
 		// If the generator is just a slot optimiser, use 50 * slot number
 		if (policyGenerator.isSlotOptimiser()) {
 			return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
@@ -858,6 +859,8 @@ public class LearningController {
 	public float testAgent(int episode, int maxSteps, int run, int runs,
 			double expProg) {
 		float averageScore = 0;
+		// TODO Perhaps this isn't correct, as it changes the probabilities,
+		// resulting in unfair testing.
 		RLGlue.RL_env_message("freeze");
 		if (runningTests_) {
 			System.out.println();
@@ -1202,7 +1205,8 @@ public class LearningController {
 					// To the next increment
 					currentEpisode += PERFORMANCE_EPISODE_GAP_SIZE;
 				} while (currentEpisode <= runPerformances.lastKey());
-				System.out.println(runPerformanceList.get(runPerformanceList.size() - 1));
+				System.out.println(runPerformanceList.get(runPerformanceList
+						.size() - 1));
 			} else {
 				// Take the values directly from the run performances
 				for (Integer key : runPerformances.keySet())
