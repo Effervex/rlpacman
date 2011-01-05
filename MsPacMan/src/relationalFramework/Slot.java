@@ -5,6 +5,9 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.math.distribution.PoissonDistribution;
+import org.apache.commons.math.distribution.PoissonDistributionImpl;
+
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
  * within and any other pertinent information.
@@ -36,14 +39,8 @@ public class Slot implements Serializable {
 	/** The chance of this slot being selected. */
 	private double selectionProb_;
 
-	/** The variance on the chances of the slot being selected. */
-	private double selectionVariance_;
-
-	/**
-	 * The current selection probability of the slot being used. Reset every
-	 * time the slot is called upon for selection.
-	 */
-	private double currentSelectionProb_;
+	/** The number of times the slot should be used. */
+	private int numSlotUses_;
 
 	/**
 	 * The constructor for a new Slot.
@@ -56,8 +53,7 @@ public class Slot implements Serializable {
 		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>(
 				PolicyGenerator.random_);
 		selectionProb_ = 1.0;
-		selectionVariance_ = MAX_SELECTION_VARIANCE;
-		currentSelectionProb_ = 0;
+		numSlotUses_ = 0;
 	}
 
 	/**
@@ -146,32 +142,32 @@ public class Slot implements Serializable {
 	 */
 	public boolean[] shouldUseSlot(Random random, boolean frozen) {
 		boolean[] useSlot = new boolean[2];
-		if (currentSelectionProb_ <= 0) {
+		if (numSlotUses_ <= 0) {
 			// The slot has not been sampled yet and needs to set a selection
 			// probability.
 			if (frozen) {
 				// If frozen, just use the rounded value for selection
-				currentSelectionProb_ = Math.round(selectionProb_);
+				numSlotUses_ = (int) Math.round(selectionProb_);
 			} else {
-				// Selection prob becomes a gaussian value centred about the
-				// selection prob.
-				double gauss = random.nextGaussian();
-				currentSelectionProb_ = selectionProb_ + gauss
-						* selectionVariance_;
+				// Selection prob is determined by a Poisson distribution
+				PoissonDistribution p = new PoissonDistributionImpl(
+						selectionProb_);
+				try {
+					double cumulativeProb = random.nextDouble();
+					numSlotUses_ = p
+							.inverseCumulativeProbability(cumulativeProb) + 1;
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		}
 
-		// Randomly use the slot with probability currentSelectionProb
-		if (random.nextDouble() < currentSelectionProb_)
+		// Use the slot if available, and remove it if no more uses are left.
+		if (numSlotUses_ > 0)
 			useSlot[0] = true;
-		else
-			useSlot[0] = false;
-
-		currentSelectionProb_ -= 1;
-		if (currentSelectionProb_ > 0)
+		numSlotUses_--;
+		if (numSlotUses_ > 0)
 			useSlot[1] = true;
-		else
-			useSlot[1] = false;
 
 		return useSlot;
 	}
@@ -187,15 +183,8 @@ public class Slot implements Serializable {
 	 * @param stepSize
 	 *            The amount the value should update by.
 	 */
-	public void updateSelectionValues(double mean, double variance,
-			double stepSize) {
+	public void updateSelectionValues(double mean, double stepSize) {
 		selectionProb_ = mean * stepSize + (1 - stepSize) * selectionProb_;
-		selectionVariance_ = variance * stepSize + (1 - stepSize)
-				* selectionVariance_;
-
-		// Capping variance at max.
-		if (selectionVariance_ > MAX_SELECTION_VARIANCE)
-			selectionVariance_ = MAX_SELECTION_VARIANCE;
 	}
 
 	/**
@@ -255,16 +244,8 @@ public class Slot implements Serializable {
 		return selectionProb_;
 	}
 
-	public double getSelectionSD() {
-		return selectionVariance_;
-	}
-
 	public void setSelectionProb(double prob) {
 		selectionProb_ = prob;
-	}
-
-	public void setSelectionSD(double sd) {
-		selectionVariance_ = sd;
 	}
 
 	public GuidedRule sample(boolean useMostLikely) {
@@ -302,9 +283,8 @@ public class Slot implements Serializable {
 	public Slot clone() {
 		Slot clone = new Slot(action_);
 		clone.selectionProb_ = selectionProb_;
-		clone.selectionVariance_ = selectionVariance_;
 		clone.fixed_ = fixed_;
-		clone.currentSelectionProb_ = currentSelectionProb_;
+		clone.numSlotUses_ = numSlotUses_;
 		clone.ruleGenerator_ = ruleGenerator_.clone();
 		if (backupGenerator_ != null)
 			clone.backupGenerator_ = backupGenerator_.clone();
@@ -350,8 +330,7 @@ public class Slot implements Serializable {
 	public String toString() {
 		String result = (fixed_) ? "FIXED " : "";
 		return result + "Slot (" + action_.toString() + ") "
-				+ ruleGenerator_.toString() + "," + selectionProb_ + ","
-				+ selectionVariance_;
+				+ ruleGenerator_.toString() + "," + selectionProb_;
 	}
 
 	public boolean isEmpty() {
@@ -388,8 +367,7 @@ public class Slot implements Serializable {
 		// Checking if slot is fixed
 		boolean fixed = false;
 		int fixIndex = FIXED.length() + ELEMENT_DELIMITER.length();
-		if (slotString.substring(0, fixIndex).equals(
-				FIXED + ELEMENT_DELIMITER)) {
+		if (slotString.substring(0, fixIndex).equals(FIXED + ELEMENT_DELIMITER)) {
 			fixed = true;
 			index = fixIndex;
 		}

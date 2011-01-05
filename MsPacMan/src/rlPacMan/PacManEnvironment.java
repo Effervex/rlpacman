@@ -23,7 +23,6 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-import test.LearningControllerTest;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;

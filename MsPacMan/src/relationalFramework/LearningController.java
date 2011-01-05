@@ -817,8 +817,7 @@ public class LearningController {
 
 		double sumSlot = 0;
 		for (Slot slot : policyGenerator.getGenerator()) {
-			double weight = slot.getSelectionProbability()
-					+ slot.getSelectionSD();
+			double weight = slot.getSelectionProbability();
 			if (weight > 1)
 				weight = 1;
 			sumSlot += (slot.size() * weight);

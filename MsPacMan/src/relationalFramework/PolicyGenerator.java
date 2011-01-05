@@ -174,6 +174,7 @@ public class PolicyGenerator implements Serializable {
 		}
 
 		int i = 0;
+		boolean emptyPolicy = true;
 		while (!removalDist.isEmpty()) {
 			Slot slot = null;
 			if (!dynamicSlotNumber_ || slotOptimisation_) {
@@ -191,23 +192,31 @@ public class PolicyGenerator implements Serializable {
 					slot = null;
 			}
 
-			if ((slot != null) && (!slot.isEmpty())) {
-				// If influencing towards untested rules, skew the slot
-				// distribution towards lesser used rules.
-				GuidedRule gr = null;
-				if (influenceUntestedRules) {
-					gr = slot.getInfluencedDistribution(INFLUENCE_THRESHOLD,
-							INFLUENCE_BOOST).sample(false);
-					gr.incrementRuleUses();
-				} else
-					gr = slot.sample(false);
-				if (gr != null) {
-					policy.addRule(gr, true, false);
-					slot.getGenerator().remove(gr);
-					slot.getGenerator().normaliseProbs();
+			if (slot != null) {
+				emptyPolicy = false;
+				if (!slot.isEmpty()) {
+					// If influencing towards untested rules, skew the slot
+					// distribution towards lesser used rules.
+					GuidedRule gr = null;
+					if (influenceUntestedRules) {
+						gr = slot.getInfluencedDistribution(
+								INFLUENCE_THRESHOLD, INFLUENCE_BOOST).sample(
+								false);
+						gr.incrementRuleUses();
+					} else
+						gr = slot.sample(false);
+					if (gr != null) {
+						policy.addRule(gr, true, false);
+						slot.getGenerator().remove(gr);
+						slot.getGenerator().normaliseProbs();
+					}
 				}
 			}
 		}
+
+		// If the policy is empty while there are available slots, try again
+		if (emptyPolicy)
+			return generatePolicy(influenceUntestedRules);
 
 		// Append the general rules as well (if they aren't already in there) to
 		// ensure unnecessary covering isn't triggered.
@@ -575,8 +584,7 @@ public class PolicyGenerator implements Serializable {
 			for (Slot slot : slotGenerator_) {
 				// Slot selection values
 				double mean = ed.getSlotNumeracyMean(slot);
-				double sd = ed.getSlotNumeracySD(slot);
-				slot.updateSelectionValues(mean, sd, stepSize);
+				slot.updateSelectionValues(mean, stepSize);
 
 				double numeracyBalancedStepSize = stepSize * mean;
 				klDivergence_ += slot.getGenerator().updateDistribution(
@@ -1067,7 +1075,7 @@ public class PolicyGenerator implements Serializable {
 			// e.g. (move{((on a b) (cat c) => (move c))}),0.6532
 			Pattern p = Pattern.compile("\\(Slot \\((\\w+)\\) " // Slot (move)
 					+ "\\{(.*?)\\}" // <rules>
-					+ ",([\\d.E-]+),([\\d.E-]+):([\\d.E-]+)\\)"); // ),0.6532,1.3:0.4
+					+ ",([\\d.E-]+)(?:,([\\d.E-]+))?:([\\d.E-]+)\\)"); // ),0.6532,1.3:0.4
 			Matcher m = p.matcher(generatorStr);
 
 			while (m.find()) {
@@ -1075,8 +1083,7 @@ public class PolicyGenerator implements Serializable {
 				Slot slot = new Slot(m.group(1));
 				String rules = m.group(2);
 				slot.setSelectionProb(Double.parseDouble(m.group(3)));
-				slot.setSelectionSD(Double.parseDouble(m.group(4)));
-				Double slotOrder = Double.parseDouble(m.group(5));
+				Double slotOrder = Double.parseDouble(m.group(4));
 
 				// Add the rules to the slot
 				Pattern rp = Pattern.compile("\\(((?:\\(.+?\\) )+=> \\(.+?\\))" // Rule
