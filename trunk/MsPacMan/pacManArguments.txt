@@ -3,4 +3,4 @@ rlPacMan.PacMan
 100
 pacManElites.txt
 pacManTest.txt
-"goal 10000"
+"goal levelMax"
