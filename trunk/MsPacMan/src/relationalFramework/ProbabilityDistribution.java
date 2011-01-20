@@ -123,6 +123,22 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public Double getProb(T element) {
 		return itemProbs_.get(element);
 	}
+	
+	/**
+	 * Gets the element equal to the argument element.
+	 * 
+	 * @param equalElement The element equal to another element in this distribution.
+	 * @return The element or null.
+	 */
+	public T getElement(T equalElement) {
+		Iterator<T> iter = iterator();
+		while(iter.hasNext()) {
+			T element = iter.next();
+			if (element.equals(equalElement))
+				return element;
+		}
+		return null;
+	}
 
 	/**
 	 * Sets the probability of an element to a new probability. This may affect

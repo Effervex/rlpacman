@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,7 @@ public class GuidedRule implements Serializable {
 	private boolean mutant_ = false;
 
 	/** If the slot is a mutant, the parent of the mutant. */
-	private GuidedRule mutantParent_;
+	private Set<GuidedRule> mutantParents_;
 
 	/** If this rule has spawned any mutant rules yet. */
 	private Integer hasSpawned_ = null;
@@ -116,6 +117,18 @@ public class GuidedRule implements Serializable {
 		slot_ = null;
 		findConstants();
 		ruleHash_ = hashCode();
+	}
+
+	/**
+	 * A private constructor used only for the clone.
+	 * 
+	 * @param conditions
+	 *            The conditions for the rule.
+	 * @param action
+	 *            The actions for the rule.
+	 */
+	private GuidedRule(Collection<StringFact> cloneConds, StringFact ruleAction) {
+		this(cloneConds, ruleAction, null);
 	}
 
 	/**
@@ -558,13 +571,63 @@ public class GuidedRule implements Serializable {
 		return mutant_;
 	}
 
-	public GuidedRule getParentRule() {
-		return mutantParent_;
+	public Set<GuidedRule> getParentRules() {
+		return mutantParents_;
 	}
 
+	/**
+	 * Adds all parents to this rule.
+	 * 
+	 * @param parentRules
+	 *            The parent rules to add.
+	 */
+	public void addParents(Set<GuidedRule> parentRules) {
+		if (mutantParents_ == null)
+			mutantParents_ = new HashSet<GuidedRule>();
+		mutantParents_.addAll(parentRules);
+	}
+
+	/**
+	 * Returns true if the rule has no parents.
+	 * 
+	 * @return True if the rule now has no parents.
+	 */
+	public boolean isWithoutParents() {
+		return (mutantParents_ == null) || (mutantParents_.isEmpty());
+	}
+
+	/**
+	 * Removes a parent rule from this rule, possibly nullifying the set of
+	 * parent rules for this rule.
+	 * 
+	 * @param parent
+	 *            The parent rule to remove.
+	 */
+	public void removeParent(GuidedRule parent) {
+		mutantParents_.remove(parent);
+		if (mutantParents_.isEmpty())
+			mutantParents_ = null;
+	}
+
+	/**
+	 * Removes the fact that this rule is a mutant and removes any parents.
+	 */
+	public void removeMutation() {
+		mutant_ = false;
+		mutantParents_ = null;
+	}
+
+	/**
+	 * Sets this rule as a mutant and adds the parent rule.
+	 * 
+	 * @param parent
+	 *            The parent rule to add.
+	 */
 	public void setMutant(GuidedRule parent) {
+		if (mutantParents_ == null)
+			mutantParents_ = new HashSet<GuidedRule>();
 		mutant_ = true;
-		mutantParent_ = parent;
+		mutantParents_.add(parent);
 	}
 
 	/**
@@ -623,10 +686,13 @@ public class GuidedRule implements Serializable {
 		Collection<StringFact> cloneConds = new ArrayList<StringFact>();
 		for (StringFact cond : ruleConditions_)
 			cloneConds.add(new StringFact(cond));
-		GuidedRule clone = new GuidedRule(cloneConds, ruleAction_, mutantParent_);
+		GuidedRule clone = new GuidedRule(cloneConds, ruleAction_);
 		clone.hasSpawned_ = hasSpawned_;
 		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
+		clone.mutant_ = mutant_;
+		if (mutantParents_ != null)
+			clone.mutantParents_ = new HashSet<GuidedRule>(mutantParents_);
 
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);

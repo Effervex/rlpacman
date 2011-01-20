@@ -29,10 +29,6 @@ public class ModuleTest {
 		ArrayList<GuidedRule> rules = new ArrayList<GuidedRule>();
 		rules.add(new GuidedRule(
 				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", params));
-		rules
-				.add(new GuidedRule(
-						"(above ?X ?_MOD_a) (clear ?X) (clear ?Y) => (move ?X ?Y)",
-						params));
 		assertEquals(rules, result.getModuleRules());
 
 		// Null module

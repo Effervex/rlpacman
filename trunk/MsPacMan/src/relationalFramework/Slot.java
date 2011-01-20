@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +34,9 @@ public class Slot implements Serializable {
 	/** The action which all rules within lead to. */
 	private String action_;
 
+	/** The facts used in this slot split, if it has any. */
+	private Collection<StringFact> slotSplitFacts_;
+
 	/** If this slot is fixed. */
 	private boolean fixed_ = false;
 
@@ -54,6 +58,20 @@ public class Slot implements Serializable {
 				PolicyGenerator.random_);
 		selectionProb_ = 1.0;
 		numSlotUses_ = 0;
+	}
+
+	/**
+	 * A constructor for a specialised slot which only contains rules concerning
+	 * the splitFacts facts.
+	 * 
+	 * @param action
+	 *            The action the slot rules lead to.
+	 * @param slotConditions
+	 *            The facts present in all rules in this slot.
+	 */
+	public Slot(String action, Collection<StringFact> slotConditions) {
+		this(action);
+		slotSplitFacts_ = slotConditions;
 	}
 
 	/**
@@ -247,6 +265,10 @@ public class Slot implements Serializable {
 	public void setSelectionProb(double prob) {
 		selectionProb_ = prob;
 	}
+	
+	public Collection<StringFact> getSlotSplitFacts() {
+		return slotSplitFacts_;
+	}
 
 	public GuidedRule sample(boolean useMostLikely) {
 		return ruleGenerator_.sample(useMostLikely);
@@ -305,6 +327,11 @@ public class Slot implements Serializable {
 				return false;
 		} else if (!action_.equals(other.action_))
 			return false;
+		if (slotSplitFacts_ == null) {
+			if (other.slotSplitFacts_ != null)
+				return false;
+		} else if (!slotSplitFacts_.equals(other.slotSplitFacts_))
+			return false;
 		if (fixed_ != other.fixed_)
 			return false;
 		if (ruleGenerator_ == null) {
@@ -323,14 +350,28 @@ public class Slot implements Serializable {
 		result = prime * result + (fixed_ ? 1231 : 1237);
 		result = prime * result
 				+ ((ruleGenerator_ == null) ? 0 : ruleGenerator_.hashCode());
+		result = prime * result
+		+ ((slotSplitFacts_ == null) ? 0 : slotSplitFacts_.hashCode());
 		return result;
 	}
 
 	@Override
 	public String toString() {
-		String result = (fixed_) ? "FIXED " : "";
-		return result + "Slot (" + action_.toString() + ") "
-				+ ruleGenerator_.toString() + "," + selectionProb_;
+		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
+		buffer.append("Slot (");
+		if (slotSplitFacts_ != null) {
+			boolean first = true;
+			for (StringFact fact : slotSplitFacts_) {
+				if (!first)
+					buffer.append(" ");
+				buffer.append(fact);
+				first = false;
+			}
+			buffer.append(" -> ");
+		}
+		buffer.append(action_.toString() + ")");
+//		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_);
+		return buffer.toString();
 	}
 
 	public boolean isEmpty() {
@@ -343,6 +384,7 @@ public class Slot implements Serializable {
 	 * @return This slot in string format.
 	 */
 	public String toParsableString() {
+		// TODO Deal with slot split facts
 		StringBuffer buffer = new StringBuffer();
 		if (fixed_)
 			buffer.append("FIXED" + ELEMENT_DELIMITER);
@@ -363,6 +405,7 @@ public class Slot implements Serializable {
 	 * @return A new slot, which can be formatted into the same input string.
 	 */
 	public static Slot parseSlotString(String slotString) {
+		// TODO Deal with slot split facts
 		int index = 0;
 		// Checking if slot is fixed
 		boolean fixed = false;
