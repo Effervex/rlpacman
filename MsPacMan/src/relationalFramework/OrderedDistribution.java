@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * An ordered distribution is a distribution which attempts to optimise the
@@ -348,6 +349,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		boolean first = true;
+		Set<T> elements = elements_.keySet();
 		for (T element : elements_.keySet()) {
 			if (!first)
 				buffer.append("\n");

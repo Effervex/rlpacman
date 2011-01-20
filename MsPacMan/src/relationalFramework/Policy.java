@@ -387,7 +387,7 @@ public class Policy {
 		if (!alreadyCovered) {
 			if (actionsFound < actionsReturnedModified) {
 				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
-						.triggerCovering(state, validActions, activatedActions,
+						.triggerRLGGCovering(state, validActions, activatedActions,
 								true);
 
 				if (coveredRules != null) {
@@ -400,7 +400,7 @@ public class Policy {
 							actionsReturned, optimal, true, noteTriggered);
 				}
 			} else {
-				PolicyGenerator.getInstance().triggerCovering(state,
+				PolicyGenerator.getInstance().triggerRLGGCovering(state,
 						validActions, activatedActions, false);
 			}
 		}

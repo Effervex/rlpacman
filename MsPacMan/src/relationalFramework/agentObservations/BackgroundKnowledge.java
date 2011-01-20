@@ -8,17 +8,19 @@ import java.util.SortedSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import relationalFramework.Covering;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.Unification;
 
 /**
  * A class representing background knowledge assertions
  * 
  * @author Sam Sarjant
  */
-public class BackgroundKnowledge implements Comparable, Serializable {
+public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
+		Serializable {
 	private static final long serialVersionUID = 8232254519459077567L;
 
 	/** The JESS compatible assertion string. */
@@ -104,8 +106,9 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 		Collection<StringFact> preConds = new ArrayList<StringFact>(preConds_
 				.size());
 		for (StringFact preCond : preConds_) {
-			StringFact replacedFact = new StringFact(preCond, replacementTerms
-					.inverseBidiMap(), true);
+			StringFact replacedFact = new StringFact(preCond);
+			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
+					true);
 			preConds.add(replacedFact);
 		}
 
@@ -132,17 +135,15 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 	 * 
 	 * @param ruleConds
 	 *            The rule conditions to simplify.
-	 * @param coveringObj
-	 *            The covering object to use unify with.
 	 * @param testForIllegalRule
 	 *            If the conditions are being tested for illegal conditions too.
 	 * @return True if the conditions were simplified, false otherwise.
 	 */
 	public boolean simplify(SortedSet<StringFact> ruleConds,
-			Covering coveringObj, boolean testForIllegalRule) {
+			boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
-		int result = coveringObj.unifyStates(getAllConditions(), ruleConds,
+		int result = Unification.getInstance().unifyStates(getAllConditions(), ruleConds,
 				replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
@@ -155,18 +156,19 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 		// Simplify to the left for equivalent background knowledge
 		if (equivalentRule_) {
 			replacementTerms.clear();
-			StringFact unifiedEquiv = coveringObj.unifyFact(getPostCond(null),
+			StringFact unifiedEquiv = Unification.getInstance().unifyFact(getPostCond(null),
 					ruleConds, new DualHashBidiMap(), replacementTerms,
 					new String[0], true);
 			if (unifiedEquiv != null) {
 				unifiedEquiv.replaceArguments(
 						replacementTerms.inverseBidiMap(), true);
-				ruleConds.remove(unifiedEquiv);
-				Collection<StringFact> equivFacts = getPreConds(replacementTerms);
-				for (StringFact equivFact : equivFacts) {
-					if (!ruleConds.contains(equivFact)) {
-						ruleConds.add(equivFact);
-						changed = true;
+				if (ruleConds.remove(unifiedEquiv)) {
+					Collection<StringFact> equivFacts = getPreConds(replacementTerms);
+					for (StringFact equivFact : equivFacts) {
+						if (!ruleConds.contains(equivFact)) {
+							ruleConds.add(equivFact);
+							changed = true;
+						}
 					}
 				}
 			}
@@ -174,7 +176,7 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 
 		if (testForIllegalRule) {
 			replacementTerms.clear();
-			result = coveringObj.unifyStates(getConjugatedConditions(),
+			result = Unification.getInstance().unifyStates(getConjugatedConditions(),
 					ruleConds, replacementTerms);
 			// If the rule is found to be illegal using the conjugated
 			// conditions, remove the illegal condition
@@ -187,6 +189,10 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 		}
 
 		return changed;
+	}
+
+	public boolean isEquivalence() {
+		return equivalentRule_;
 	}
 
 	/**
@@ -241,15 +247,16 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 	}
 
 	@Override
-	public int compareTo(Object arg0) {
-		if ((arg0 == null) || !(arg0 instanceof BackgroundKnowledge))
+	public int compareTo(BackgroundKnowledge other) {
+		if (other == null)
 			return -1;
 
-		BackgroundKnowledge other = (BackgroundKnowledge) arg0;
-		if (this.equals(other))
-			return 0;
-		
 		int result = 0;
+
+		// Compare by equivalence
+		if (equivalentRule_ != other.equivalentRule_) {
+			return (equivalentRule_) ? -1 : 1;
+		}
 
 		// Compare by pre conds
 		Iterator<StringFact> thisIter = preConds_.iterator();
@@ -261,21 +268,16 @@ public class BackgroundKnowledge implements Comparable, Serializable {
 				return -1;
 			if (!otherIter.hasNext())
 				return 1;
-			
+
 			result = thisIter.next().compareTo(otherIter.next());
 			if (result != 0)
 				return result;
 		}
-		
+
 		// Compare by postCond
 		result = postCondition_.compareTo(other.postCondition_);
 		if (result != 0)
 			return result;
-
-		// Then by equivalence
-		if (equivalentRule_ != other.equivalentRule_) {
-			return (equivalentRule_) ? -1 : 1;
-		}
 
 		return 0;
 	}

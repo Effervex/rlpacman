@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 
 import jess.Fact;
@@ -14,7 +15,8 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.Covering;
+import blocksWorld.BlocksWorldStateSpec;
+
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
@@ -27,7 +29,7 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);		
+		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = new AgentObservations();
 	}
@@ -38,42 +40,37 @@ public class AgentObservationsTest {
 		assertBeliefs2(alwaysTrue, cb.getAlwaysTrue());
 		assertBeliefs2(occasionallyTrue, cb.getOccasionallyTrue());
 		assertBeliefs2(neverTrue, cb.getNeverTrue());
-
-		// Asserting background knowledge
-		StringFact cbFact = StateSpec.getInstance().getStringFact(
-				cb.getCondition());
-		String[] arguments = new String[cbFact.getArguments().length];
-		for (int i = 0; i < arguments.length; i++)
-			arguments[i] = Covering.getVariableTermString(i);
-		cbFact = new StringFact(cbFact, arguments);
-
-		for (String trues : alwaysTrue) {
-			BackgroundKnowledge bk = new BackgroundKnowledge(cbFact + " => "
-					+ trues, false);
-			assertTrue(sut_.getLearnedBackgroundKnowledge().contains(bk));
-		}
-
-		for (String falses : neverTrue) {
-			BackgroundKnowledge bk = new BackgroundKnowledge(cbFact + " => "
-					+ "(not " + falses + ")", false);
-			assertTrue(sut_.getLearnedBackgroundKnowledge().contains(bk));
-		}
 	}
 
 	private void assertBeliefs2(Collection<String> beliefs,
 			Collection<StringFact> agentBeliefs) {
 		for (String fact : beliefs) {
-			assertTrue(agentBeliefs.contains(StateSpec.toStringFact(fact)));
+			assertTrue(fact + " not found.", agentBeliefs.contains(StateSpec
+					.toStringFact(fact)));
 		}
 		assertEquals(agentBeliefs.size(), beliefs.size());
 	}
 
-	private void assertGeneralBackgroundRules(String cbFact,
-			Collection<String> generals) {
-		for (String general : generals) {
-			BackgroundKnowledge bk = new BackgroundKnowledge(cbFact + " => "
-					+ general, false);
-			assertTrue(sut_.getLearnedBackgroundKnowledge().contains(bk));
+	private void assertRules(Collection<String[]> equivalencePairs,
+			String relation) {
+		for (String[] pair : equivalencePairs) {
+			BackgroundKnowledge bk = new BackgroundKnowledge(pair[0] + relation
+					+ pair[1], false);
+			assertTrue(bk.toString() + " not found.", sut_
+					.getLearnedBackgroundKnowledge().contains(bk));
+			sut_.getLearnedBackgroundKnowledge().remove(bk);
+		}
+	}
+
+	private void assertBeliefContains(String condition, byte byteHash,
+			String alwaysTrue,
+			Map<String, Map<Byte, ConditionBeliefs>> negatedCondBeliefs) {
+		if (negatedCondBeliefs.containsKey(condition)
+				&& negatedCondBeliefs.get(condition).containsKey(byteHash)) {
+			ConditionBeliefs cb = negatedCondBeliefs.get(condition).get(
+					byteHash);
+			assertTrue(alwaysTrue + " not present in " + cb, cb.getAlwaysTrue()
+					.contains(StateSpec.toStringFact(alwaysTrue)));
 		}
 	}
 
@@ -87,9 +84,9 @@ public class AgentObservationsTest {
 		state.eval("(assert (clear e))");
 		state.eval("(assert (clear c))");
 		state.eval("(assert (highest e))");
+		state.eval("(assert (on d a))");
 		state.eval("(assert (on e b))");
 		state.eval("(assert (on b f))");
-		state.eval("(assert (on d a))");
 		state.eval("(assert (above e b))");
 		state.eval("(assert (above e f))");
 		state.eval("(assert (above b f))");
@@ -190,6 +187,52 @@ public class AgentObservationsTest {
 		neverTrue.add("(above ?X ?)");
 		neverTrue.add("(highest ?X)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
+
+		// Testing learned equivalence relations
+		Collection<String[]> equivalencePairs = new HashSet<String[]>();
+		equivalencePairs.add(new String[] { "(above ?X ?)", "(on ?X ?)" });
+		equivalencePairs.add(new String[] { "(above ? ?Y)", "(on ? ?Y)" });
+		equivalencePairs
+				.add(new String[] { "(onFloor ?X)", "(not (on ?X ?))" });
+		equivalencePairs.add(new String[] { "(onFloor ?X)",
+				"(not (above ?X ?))" });
+		equivalencePairs
+				.add(new String[] { "(on ?X ?)", "(not (onFloor ?X))" });
+		equivalencePairs.add(new String[] { "(above ?X ?)",
+				"(not (onFloor ?X))" });
+		equivalencePairs.add(new String[] { "(on ? ?Y)", "(not (clear ?Y))" });
+		equivalencePairs
+				.add(new String[] { "(above ? ?Y)", "(not (clear ?Y))" });
+		equivalencePairs
+				.add(new String[] { "(clear ?X)", "(not (above ? ?X))" });
+		equivalencePairs.add(new String[] { "(clear ?X)", "(not (on ? ?X))" });
+		assertRules(equivalencePairs, " <=> ");
+
+		Collection<String[]> inferencePairs = new HashSet<String[]>();
+		inferencePairs.add(new String[] { "(highest ?X)", "(clear ?X)" });
+		inferencePairs.add(new String[] { "(highest ?X)", "(on ?X ?)" });
+		inferencePairs.add(new String[] { "(highest ?X)", "(above ?X ?)" });
+		inferencePairs
+				.add(new String[] { "(highest ?X)", "(not (above ? ?X))" });
+		inferencePairs.add(new String[] { "(highest ?X)", "(not (on ? ?X))" });
+		inferencePairs
+				.add(new String[] { "(highest ?X)", "(not (onFloor ?X))" });
+		inferencePairs.add(new String[] { "(above ?X ?Y)", "(above ?X ?)" });
+		inferencePairs.add(new String[] { "(above ?X ?Y)", "(above ? ?Y)" });
+		inferencePairs
+				.add(new String[] { "(above ?X ?Y)", "(not (highest ?Y))" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(on ?X ?)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(on ? ?Y)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(above ?X ?Y)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(not (highest ?Y))" });
+		inferencePairs
+				.add(new String[] { "(onFloor ?X)", "(not (highest ?X))" });
+		assertRules(inferencePairs, " => ");
+		// Remove any state spec, and the rules should be empty
+		for (BackgroundKnowledge stateSpecBK : BlocksWorldStateSpec
+				.getInstance().getBackgroundKnowledgeConditions())
+			sut_.getLearnedBackgroundKnowledge().remove(stateSpecBK);
+		assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
 
 		// Cover another different (flat) state
 		// [a][b][c][d][e][f]
@@ -305,6 +348,87 @@ public class AgentObservationsTest {
 		neverTrue.add("(on ?X ?)");
 		neverTrue.add("(above ?X ?)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
+
+		// Testing learned equivalence relations
+		equivalencePairs.clear();
+		equivalencePairs.add(new String[] { "(above ?X ?)", "(on ?X ?)" });
+		equivalencePairs.add(new String[] { "(above ? ?Y)", "(on ? ?Y)" });
+		equivalencePairs
+				.add(new String[] { "(onFloor ?X)", "(not (on ?X ?))" });
+		equivalencePairs.add(new String[] { "(onFloor ?X)",
+				"(not (above ?X ?))" });
+		equivalencePairs
+				.add(new String[] { "(on ?X ?)", "(not (onFloor ?X))" });
+		equivalencePairs.add(new String[] { "(above ?X ?)",
+				"(not (onFloor ?X))" });
+		equivalencePairs.add(new String[] { "(on ? ?Y)", "(not (clear ?Y))" });
+		equivalencePairs
+				.add(new String[] { "(above ? ?Y)", "(not (clear ?Y))" });
+		equivalencePairs
+				.add(new String[] { "(clear ?X)", "(not (above ? ?X))" });
+		equivalencePairs.add(new String[] { "(clear ?X)", "(not (on ? ?X))" });
+		assertRules(equivalencePairs, " <=> ");
+
+		inferencePairs.clear();
+		inferencePairs.add(new String[] { "(highest ?X)", "(clear ?X)" });
+		inferencePairs
+				.add(new String[] { "(highest ?X)", "(not (above ? ?X))" });
+		inferencePairs.add(new String[] { "(highest ?X)", "(not (on ? ?X))" });
+		inferencePairs.add(new String[] { "(above ?X ?Y)", "(above ?X ?)" });
+		inferencePairs.add(new String[] { "(above ?X ?Y)", "(above ? ?Y)" });
+		inferencePairs
+				.add(new String[] { "(above ?X ?Y)", "(not (highest ?Y))" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(on ?X ?)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(on ? ?Y)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(above ?X ?Y)" });
+		inferencePairs.add(new String[] { "(on ?X ?Y)", "(not (highest ?Y))" });
+		assertRules(inferencePairs, " => ");
+		// Remove any state spec, and the rules should be empty
+		for (BackgroundKnowledge stateSpecBK : BlocksWorldStateSpec
+				.getInstance().getBackgroundKnowledgeConditions())
+			sut_.getLearnedBackgroundKnowledge().remove(stateSpecBK);
+		assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
+	}
+
+	@Test
+	public void testLearnNegatedConditionBeliefs() throws Exception {
+		Rete state = StateSpec.getInstance().getRete();
+		state.eval("(assert (above e f))");
+		state.eval("(assert (clear c))");
+		state.eval("(assert (on e b))");
+		state.eval("(assert (clear d))");
+		state.eval("(assert (clear e))");
+		state.eval("(assert (highest e))");
+		state.eval("(assert (on b f))");
+		state.eval("(assert (on d a))");
+		state.eval("(assert (above e b))");
+		state.eval("(assert (above b f))");
+		state.eval("(assert (above d a))");
+		state.eval("(assert (onFloor c))");
+		state.eval("(assert (onFloor a))");
+		state.eval("(assert (onFloor f))");
+		state.eval("(assert (block a))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block c))");
+		state.eval("(assert (block d))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (block f))");
+		Collection<Fact> facts = StateSpec.extractFacts(state);
+		sut_.scanState(facts);
+
+		// Check the negated assertion rules that should always hold
+		Map<String, Map<Byte, ConditionBeliefs>> negatedConds = sut_
+				.getNegatedConditionBeliefs();
+		byte byteHash = 1;
+		assertBeliefContains("above", byteHash, "(onFloor ?X)", negatedConds);
+		assertBeliefContains("on", byteHash, "(onFloor ?X)", negatedConds);
+		assertBeliefContains("above", byteHash = 2, "(clear ?Y)", negatedConds);
+		assertBeliefContains("on", byteHash, "(clear ?Y)", negatedConds);
+		assertBeliefContains("clear", byteHash = 1, "(above ? ?X)",
+				negatedConds);
+		assertBeliefContains("clear", byteHash, "(on ? ?X)", negatedConds);
+		assertBeliefContains("onFloor", byteHash, "(above ?X ?)", negatedConds);
+		assertBeliefContains("onFloor", byteHash, "(on ?X ?)", negatedConds);
 	}
 
 	@Test
@@ -352,22 +476,8 @@ public class AgentObservationsTest {
 		assertTrue(relevantFacts
 				.contains(StateSpec.toStringFact("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 9);
-		// Testing the action conditions
-		Collection<StringFact> actionConditions = sut_
-				.getActionConditions("move");
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(highest ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(on ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(above ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(onFloor ?X)")));
-		assertEquals(actionConditions.size(), 6);
+		// Testing the action conditions (empty as we have only one action)
+		assertTrue(sut_.getSpecialisationConditions("move").isEmpty());
 
 		// A different move action
 		relevantFacts = sut_.gatherActionFacts(StateSpec
@@ -383,26 +493,26 @@ public class AgentObservationsTest {
 				.contains(StateSpec.toStringFact("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 7);
 		// Testing the action conditions
-		actionConditions = sut_.getActionConditions("move");
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
+		Collection<StringFact> specialisationConditions = sut_
+				.getSpecialisationConditions("move");
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?Y))")));
+		// These two are equivalent to above
+		assertFalse(specialisationConditions.contains(StateSpec
 				.toStringFact("(on ?X ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertFalse(specialisationConditions.contains(StateSpec
 				.toStringFact("(on ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?X ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?Y)")));
-		assertEquals(actionConditions.size(), 9);
+		assertEquals(specialisationConditions.size(), 6);
 
 		// And another
 		relevantFacts = sut_.gatherActionFacts(StateSpec
@@ -422,27 +532,27 @@ public class AgentObservationsTest {
 				.contains(StateSpec.toStringFact("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 9);
 		// Testing the action conditions
-		actionConditions = sut_.getActionConditions("move");
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
-				.toStringFact("(clear ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
+		specialisationConditions = sut_.getSpecialisationConditions("move");
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?Y)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?X))")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?Y))")));
+		assertFalse(specialisationConditions.contains(StateSpec
 				.toStringFact("(on ?X ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertFalse(specialisationConditions.contains(StateSpec
 				.toStringFact("(on ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?X ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?Y ?)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?X)")));
-		assertTrue(actionConditions.contains(StateSpec
+		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?Y)")));
-		assertEquals(actionConditions.size(), 10);
+		assertEquals(specialisationConditions.size(), 8);
 	}
 }

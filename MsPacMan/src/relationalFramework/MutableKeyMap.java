@@ -4,10 +4,21 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * A mapping class which can have mutable keys (keys that change while within
+ * the map). This is at the cost of speed, so large collections of objects
+ * should not be used.
+ * 
+ * @author Sam Sarjant
+ * 
+ * @param <K> The mutable key.
+ * @param <V> The value.
+ */
 public class MutableKeyMap<K, V> implements Map<K, V>, Serializable {
 	private static final long serialVersionUID = -8073411368437257886L;
 	private List<K> keys_;
@@ -17,7 +28,7 @@ public class MutableKeyMap<K, V> implements Map<K, V>, Serializable {
 		keys_ = new ArrayList<K>();
 		values_ = new ArrayList<V>();
 	}
-	
+
 	public MutableKeyMap(Map<K, V> m) {
 		this();
 		putAll(m);
@@ -104,4 +115,19 @@ public class MutableKeyMap<K, V> implements Map<K, V>, Serializable {
 		return values_;
 	}
 
+	@Override
+	public String toString() {
+		StringBuffer buffer = new StringBuffer("{");
+		Iterator<K> keyIter = keys_.iterator();
+		Iterator<V> valueIter = values_.iterator();
+		boolean first = true;
+		while (keyIter.hasNext()) {
+			if (!first)
+				buffer.append(", ");
+			buffer.append(keyIter.next() + "=" + valueIter.next());
+			first = false;
+		}
+		buffer.append("}");
+		return buffer.toString();
+	}
 }

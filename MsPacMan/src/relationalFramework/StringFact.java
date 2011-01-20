@@ -87,23 +87,6 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	}
 
 	/**
-	 * Constructor for a clone StringFact with the arguments replaced.
-	 * 
-	 * @param stringFact
-	 *            The StringFact to clone.
-	 * @param replacementMap
-	 *            The replacement map for the arguments.
-	 * @param retainOtherArgs
-	 *            If arguments that have no replacement should be retained (or
-	 *            turned anonymous).
-	 */
-	public StringFact(StringFact stringFact,
-			Map<String, String> replacementMap, boolean retainOtherArgs) {
-		this(stringFact);
-		replaceArguments(replacementMap, retainOtherArgs);
-	}
-
-	/**
 	 * Replaces all occurrences of an argument with another value.
 	 * 
 	 * @param replacementMap
@@ -111,10 +94,12 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 * @param retainOtherArgs
 	 *            If arguments that have no replacement should be retained (or
 	 *            turned anonymous).
+	 * @return True if the fact is still valid (not anonymous)
 	 */
-	public void replaceArguments(Map<String, String> replacementMap,
+	public boolean replaceArguments(Map<String, String> replacementMap,
 			boolean retainOtherArgs) {
 		String[] newArguments = Arrays.copyOf(arguments_, arguments_.length);
+		boolean notAnonymous = false;
 		for (int i = 0; i < arguments_.length; i++) {
 			boolean hasReplacement = false;
 			for (String key : replacementMap.keySet()) {
@@ -126,8 +111,12 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 
 			if (!retainOtherArgs && !hasReplacement)
 				newArguments[i] = "?";
+
+			if (!newArguments[i].equals("?"))
+				notAnonymous = true;
 		}
 		arguments_ = newArguments;
+		return notAnonymous;
 	}
 
 	/**
@@ -141,7 +130,7 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		// Run through the arguments, replacing variable args with the
 		// replacements.
 		for (int i = 0; i < arguments_.length; i++) {
-			int termIndex = Covering.getVariableTermIndex(arguments_[i]);
+			int termIndex = RuleCreation.getVariableTermIndex(arguments_[i]);
 			if (termIndex != -1)
 				arguments_[i] = replacements[termIndex];
 		}
@@ -173,7 +162,7 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i]))
-				replacementMap.put(arguments_[i], Covering
+				replacementMap.put(arguments_[i], RuleCreation
 						.getVariableTermString(i));
 		}
 		return replacementMap;
@@ -238,6 +227,11 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		}
 
 		int result = factName_.compareTo(sf.factName_);
+		if (result != 0)
+			return result;
+
+		// Compare by number of arguments (complexity)
+		result = Double.compare(arguments_.length, sf.arguments_.length);
 		if (result != 0)
 			return result;
 

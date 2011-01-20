@@ -8,7 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.TreeSet;
 
-import relationalFramework.Covering;
+import relationalFramework.RuleCreation;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -41,10 +41,16 @@ public class ConditionBeliefs implements Serializable {
 	private Collection<StringFact> occasionallyTrue_;
 
 	/**
-	 * The set of conditions with predicate condition_ that are more general
+	 * The set of conditions with predicate condition that are more general
 	 * version of this condition.
 	 */
 	private Collection<StringFact> disallowed_;
+
+	/**
+	 * The argument index for the condition belief. Only used for negated
+	 * condition beliefs.
+	 */
+	private byte argIndex_ = -1;
 
 	/**
 	 * The initialisation for condition beliefs, taking the condition, and the
@@ -62,29 +68,67 @@ public class ConditionBeliefs implements Serializable {
 	}
 
 	/**
+	 * A constructor for a negated, argument-index specific condition beliefs
+	 * object.
+	 * 
+	 * @param factName
+	 *            The (negated) fact name.
+	 * @param argIndex
+	 *            he argument index this condition beliefs object represents.
+	 */
+	public ConditionBeliefs(String factName, byte argIndex) {
+		this(factName);
+		argIndex_ = argIndex;
+	}
+
+	/**
 	 * Notes a true relative fact to the condition. Note that the fact arguments
 	 * must all be variables or anonymous.
 	 * 
 	 * @param trueFacts
 	 *            The relative facts that were true under a single observation.
+	 * @param untrueFacts
+	 *            The relative facts that are untrue with regards to the true
+	 *            facts. To be filled.
+	 * @param addGeneralities
+	 *            If more general versions of the main predicate should be
+	 *            added.
 	 * @return True if the condition beliefs changed at all.
 	 */
-	public boolean noteTrueRelativeFacts(Collection<StringFact> trueFacts) {
+	public boolean noteTrueRelativeFacts(Collection<StringFact> trueFacts,
+			Collection<StringFact> untrueFacts, boolean addGeneralities) {
 		// If this is our first state, all true facts are always true, and all
 		// others are always false.
 		if (firstState) {
 			alwaysTrue_.addAll(trueFacts);
 			addNeverSeenPreds();
-			rearrangeGeneralRules();
+			if (addGeneralities)
+				rearrangeGeneralRules();
+			// TODO A shambles here...
+			if (untrueFacts != null) {
+				// Note the untrue facts
+				untrueFacts.addAll(neverTrue_);
+			}
 			return true;
 		}
 		// If the condition has no relations don't bother updating.
 		else if (alwaysTrue_.isEmpty() && neverTrue_.isEmpty())
 			return false;
+		
+		// Clone the collection so no changes are made.
+		trueFacts = new HashSet<StringFact>(trueFacts);
 
 		// Expand the true facts first
 		trueFacts.addAll(generateGenerals(trueFacts));
 		
+		if (untrueFacts != null) {
+			// Note the untrue facts
+			untrueFacts.addAll(alwaysTrue_);
+			untrueFacts.addAll(occasionallyTrue_);
+			untrueFacts.addAll(neverTrue_);
+			untrueFacts.removeAll(trueFacts);
+		}
+
 		// Filter the disallowed facts
 		trueFacts.removeAll(disallowed_);
 
@@ -98,7 +142,8 @@ public class ConditionBeliefs implements Serializable {
 			neverTrue_.removeAll(union);
 			int occSize = occasionallyTrue_.size();
 			occasionallyTrue_.addAll(union);
-			rearrangeGeneralRules();
+			if (addGeneralities)
+				rearrangeGeneralRules();
 			if (occasionallyTrue_.size() != occSize)
 				return true;
 			else
@@ -120,11 +165,6 @@ public class ConditionBeliefs implements Serializable {
 		occasionallyTrue_.removeAll(generals);
 		neverTrue_.removeAll(generals);
 		alwaysTrue_.addAll(generals);
-
-		generals = generateGenerals(neverTrue_);
-		occasionallyTrue_.removeAll(generals);
-		alwaysTrue_.removeAll(generals);
-		neverTrue_.addAll(generals);
 
 		// Add general rules to always true
 		for (StringFact general : disallowed_) {
@@ -199,7 +239,6 @@ public class ConditionBeliefs implements Serializable {
 
 		// Run through every possible string fact and add those not present in
 		// the other lists.
-
 		MultiMap<String, String> possibleTerms = createActionTerms(StateSpec
 				.getInstance().getStringFact(condition_));
 
@@ -213,7 +252,8 @@ public class ConditionBeliefs implements Serializable {
 			}
 
 			// If the same pred, remove the disallowed values from always true
-			// as well.
+			// as well. TODO Is this necessary? I mean, the generalities are put
+			// right back in
 			if (pred.equals(condition_))
 				alwaysTrue_.removeAll(disallowed_);
 		}
@@ -247,7 +287,7 @@ public class ConditionBeliefs implements Serializable {
 		if (pred.equals(condition_)) {
 			String[] baseArgs = new String[predFact.getArguments().length];
 			for (int i = 0; i < baseArgs.length; i++)
-				baseArgs[i] = Covering.getVariableTermString(i);
+				baseArgs[i] = RuleCreation.getVariableTermString(i);
 			shapedFacts.remove(new StringFact(predFact, baseArgs));
 		}
 
@@ -268,7 +308,8 @@ public class ConditionBeliefs implements Serializable {
 		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
 			if (!StateSpec.isNumberType(argTypes[i]))
-				actionTerms.put(argTypes[i], Covering.getVariableTermString(i));
+				actionTerms.put(argTypes[i], RuleCreation
+						.getVariableTermString(i));
 		}
 
 		return actionTerms;
@@ -301,7 +342,7 @@ public class ConditionBeliefs implements Serializable {
 			for (int i = 0; i < arguments.length; i++) {
 				if (!arguments[i].equals("?")
 						&& !(baseFact.getFactName().equals(condition_) && arguments[i]
-								.equals(Covering.getVariableTermString(i)))) {
+								.equals(RuleCreation.getVariableTermString(i)))) {
 					keepRule = true;
 					break;
 				}
@@ -373,6 +414,7 @@ public class ConditionBeliefs implements Serializable {
 				* result
 				+ ((occasionallyTrue_ == null) ? 0 : occasionallyTrue_
 						.hashCode());
+		result = prime * result + argIndex_;
 		return result;
 	}
 
@@ -385,6 +427,8 @@ public class ConditionBeliefs implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		ConditionBeliefs other = (ConditionBeliefs) obj;
+		if (argIndex_ != other.argIndex_)
+			return false;
 		if (alwaysTrue_ == null) {
 			if (other.alwaysTrue_ != null)
 				return false;
@@ -412,7 +456,20 @@ public class ConditionBeliefs implements Serializable {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer(condition_ + ":\n");
+		StringBuffer buffer = new StringBuffer();
+		if (argIndex_ != -1) {
+			buffer.append("!" + condition_ + "(");
+			for (int i = 0; (1 << i) <= argIndex_; i++) {
+				if (i != 0)
+					buffer.append(" ");
+				if ((argIndex_ & (1 << i)) != 0)
+					buffer.append(RuleCreation.getVariableTermString(i));
+				else
+					buffer.append("?");
+			}
+			buffer.append("):\n");
+		} else
+			buffer.append(condition_ + ":\n");
 		buffer.append("\tAlways True: " + alwaysTrue_.toString() + "\n");
 		buffer.append("\tNever True: " + neverTrue_.toString() + "\n");
 		buffer.append("\tSometimes True: " + occasionallyTrue_.toString());

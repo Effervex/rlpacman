@@ -1,7 +1,6 @@
 package mario;
 
 import java.awt.geom.Point2D;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -45,7 +44,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		// cmdLineOptions_.setEnemies("off");
 		cmdLineOptions_.setLevelRandSeed(6);
 		cmdLineOptions_.setLevelDifficulty(1);
-		cmdLineOptions_.setFPS(3);
+		//cmdLineOptions_.setFPS(3);
 		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
