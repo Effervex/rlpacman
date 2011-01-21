@@ -610,6 +610,16 @@ public class GuidedRule implements Serializable {
 	}
 
 	/**
+	 * Removes a group of parents from a rule.
+	 * 
+	 * @param parents The group of parents to remove.
+	 */
+	public void removeParents(Collection<GuidedRule> parents) {
+		for (GuidedRule parent : parents)
+			removeParent(parent);
+	}
+
+	/**
 	 * Removes the fact that this rule is a mutant and removes any parents.
 	 */
 	public void removeMutation() {

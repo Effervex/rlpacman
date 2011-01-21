@@ -368,15 +368,18 @@ public class PolicyGenerator implements Serializable {
 			double parentsProb = 0;
 			ProbabilityDistribution<GuidedRule> distribution = rule.getSlot()
 					.getGenerator();
+			Collection<GuidedRule> removedParents = new HashSet<GuidedRule>();
 			for (GuidedRule parent : rule.getParentRules()) {
 				Double parentProb = distribution.getProb(parent);
 				if (parentProb == null)
-					rule.removeParent(parent);
+					removedParents.add(parent);
 				else
 					parentProb += parentProb;
 			}
 
-			parentsProb /= rule.getParentRules().size();
+			rule.removeParents(removedParents);
+			if (rule.getParentRules() != null)
+				parentsProb /= rule.getParentRules().size();
 
 			if (distribution.getProb(rule) < parentsProb)
 				return false;
