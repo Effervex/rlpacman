@@ -44,6 +44,18 @@ public class Policy {
 	}
 
 	/**
+	 * A constructor for a new policy using the same rules from an old policy.
+	 * 
+	 * @param policy The old policy.
+	 */
+	public Policy(Policy policy) {
+		this();
+		policyRules_.addAll(policy.policyRules_);
+		lggRules_.addAll(policy.lggRules_);
+		policySize_ = policy.policySize_;
+	}
+
+	/**
 	 * Adds a rule to the policy, adding necessary modular rules if the rule
 	 * contains constant facts.
 	 * 
@@ -245,17 +257,6 @@ public class Policy {
 
 	@Override
 	public String toString() {
-		return toString(true);
-	}
-
-	/**
-	 * A method for displaying the policy with optional modular rules.
-	 * 
-	 * @param withModules
-	 *            If displaying modules.
-	 * @return The policy in string format.
-	 */
-	public String toString(boolean withModules) {
 		if (policyRules_.isEmpty())
 			return "<EMPTY POLICY>";
 
@@ -265,9 +266,35 @@ public class Policy {
 				if (!isCoveredRule(rule))
 					buffer.append(StateSpec.getInstance().encodeRule(rule)
 							+ "\n");
-			} else if (withModules) {
+			} else {
 				buffer.append("MODULAR: "
 						+ StateSpec.getInstance().encodeRule(rule) + "\n");
+			}
+		}
+		return buffer.toString();
+	}
+
+	/**
+	 * A method for displaying only the rules used within the policy.
+	 * 
+	 * @return The policy in string format, minus the unused rules.
+	 */
+	public String toOnlyUsedString() {
+		if (policyRules_.isEmpty())
+			return "<EMPTY POLICY>";
+
+		StringBuffer buffer = new StringBuffer("Policy:\n");
+		boolean empty = true;
+		for (GuidedRule rule : policyRules_) {
+			// Don't display module rules or unused rules
+			if (!rule.isLoadedModuleRule() && triggeredRules_.contains(rule)) {
+				// Ignore the last covered rules.
+				if (empty || !isCoveredRule(rule)) {
+					buffer.append(StateSpec.getInstance().encodeRule(rule)
+							+ "\n");
+					if (!isCoveredRule(rule))
+						empty = false;
+				}
 			}
 		}
 		return buffer.toString();
@@ -387,8 +414,8 @@ public class Policy {
 		if (!alreadyCovered) {
 			if (actionsFound < actionsReturnedModified) {
 				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
-						.triggerRLGGCovering(state, validActions, activatedActions,
-								true);
+						.triggerRLGGCovering(state, validActions,
+								activatedActions, true);
 
 				if (coveredRules != null) {
 					// Add any new rules to the policy

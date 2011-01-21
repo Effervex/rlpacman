@@ -376,7 +376,6 @@ public class LearningController {
 				if (restart)
 					break;
 
-				pol.parameterArgs(null);
 				PolicyValue thisPolicy = new PolicyValue(pol, score, t);
 				pvs.add(thisPolicy);
 				// Storing the best policy
@@ -1014,7 +1013,7 @@ public class LearningController {
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		for (PolicyValue pv : elites) {
-			buf.write(pv.getPolicy().toString(false) + "\n");
+			buf.write(pv.getPolicy().toOnlyUsedString() + "\n");
 			buf.write(pv.getValue() + "\n\n");
 		}
 

@@ -438,13 +438,29 @@ public class PolicyGenerator implements Serializable {
 			}
 		}
 
-		// TODO Change this.
-		// Add the slots, removing unnecessary ones.
-		Collection<Slot> oldValues = oldCurrentSlots.values();
-		Collection<Slot> newValues = currentSlots_.values();
-		oldValues.removeAll(newValues);
-		slotGenerator_.removeAll(oldValues);
-		slotGenerator_.addAll(newValues);
+		addSlots(currentSlots_.values(), oldCurrentSlots.values());
+	}
+
+	/**
+	 * Adds the new slots to the slot generator.
+	 * 
+	 * @param newSlots
+	 *            The set of slots to add.
+	 * @param oldSlots
+	 *            The set of slots currently present in the generator.
+	 */
+	private void addSlots(Collection<Slot> newSlots, Collection<Slot> oldSlots) {
+		// Add the slots, removing unnecessary ones, but maintaining slot
+		// values.
+		oldSlots.removeAll(newSlots);
+		slotGenerator_.removeAll(oldSlots);
+		for (Slot newSlot : newSlots) {
+			if (slotGenerator_.contains(newSlot))
+				slotGenerator_
+						.add(newSlot, slotGenerator_.getOrdering(newSlot));
+			else
+				slotGenerator_.add(newSlot);
+		}
 	}
 
 	/**
@@ -1253,6 +1269,6 @@ public class PolicyGenerator implements Serializable {
 	 *            The policy to retest.
 	 */
 	public void retestPolicy(Policy policy) {
-		awaitingTest_.push(policy);
+		awaitingTest_.push(new Policy(policy));
 	}
 }

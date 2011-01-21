@@ -197,6 +197,8 @@ public abstract class StateSpec {
 
 			queryNames_ = new HashMap<GuidedRule, String>();
 			queryCount_ = 0;
+			
+			Unification.getInstance().resetRangeIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
