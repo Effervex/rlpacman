@@ -1011,15 +1011,17 @@ public class RuleCreationTest {
 		conditions.add(StateSpec.toStringFact("(on ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(above ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(highest ?X)"));
+		conditions.add(StateSpec.toStringFact("(not (highest ?X))"));
 		conditions.add(StateSpec.toStringFact("(clear ?X)"));
+		
 		sut_.setAllowedActionConditions("moveFloor", conditions);
 		conditions = new HashSet<StringFact>();
-		conditions.add(StateSpec.toStringFact("(on ?X ?)"));
-		conditions.add(StateSpec.toStringFact("(on ?Y ?)"));
 		conditions.add(StateSpec.toStringFact("(above ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(above ?Y ?)"));
 		conditions.add(StateSpec.toStringFact("(highest ?X)"));
 		conditions.add(StateSpec.toStringFact("(highest ?Y)"));
+		conditions.add(StateSpec.toStringFact("(not (highest ?X))"));
+		conditions.add(StateSpec.toStringFact("(not (highest ?Y))"));
 		conditions.add(StateSpec.toStringFact("(clear ?X)"));
 		conditions.add(StateSpec.toStringFact("(clear ?Y)"));
 		conditions.add(StateSpec.toStringFact("(onFloor ?X)"));
@@ -1072,19 +1074,12 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear a) (on ?X ?) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
-				"(clear a) (on ?X ?) (not (clear ?X)) => (moveFloor ?X)");
-		assertTrue(results.contains(mutant));
-		assertEquals(results.size(), 4);
+		assertEquals(results.size(), 3);
 
 		// Harder action
 		rule = new GuidedRule("(clear a) (clear ?Y) => (move a ?Y)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new GuidedRule("(clear a) (clear ?Y) (on a ?) => (move a ?Y)");
-		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (clear ?Y) (on ?Y ?) => (move a ?Y)");
-		assertTrue(results.contains(mutant));
 		mutant = new GuidedRule(
 				"(clear a) (clear ?Y) (above a ?) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
@@ -1102,12 +1097,6 @@ public class RuleCreationTest {
 				"(clear a) (clear ?Y) (onFloor ?Y) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		mutant = new GuidedRule(
-				"(clear a) (clear ?Y) (not (above a ?)) => (move a ?Y)");
-		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
-				"(clear a) (clear ?Y) (not (above ?Y ?)) => (move a ?Y)");
-		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
 				"(clear a) (clear ?Y) (not (highest a)) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		mutant = new GuidedRule(
@@ -1121,12 +1110,12 @@ public class RuleCreationTest {
 				"(clear a) (clear ?Y) (not (onFloor ?Y)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
 		mutant = new GuidedRule(
-				"(clear a) (clear ?Y) (not (on a ?)) => (move a ?Y)");
+				"(clear a) (clear ?Y) (not (above a ?)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
 		mutant = new GuidedRule(
-				"(clear a) (clear ?Y) (not (on ?Y ?)) => (move a ?Y)");
+				"(clear a) (clear ?Y) (not (above ?Y ?)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
-		assertEquals(results.size(), 12);
+		assertEquals(results.size(), 8);
 
 		// Avoiding impossible specialisations
 		rule = new GuidedRule(

@@ -3,6 +3,7 @@ package relationalFramework;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +27,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 
 	public OrderedDistribution(Random random) {
 		random_ = random;
-		elements_ = new MutableKeyMap<T, Double>();
+		elements_ = new HashMap<T, Double>();
 	}
 
 	/**
@@ -37,7 +38,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public OrderedDistribution<T> clone() {
 		OrderedDistribution<T> clone = new OrderedDistribution<T>(random_);
-		clone.elements_ = new MutableKeyMap<T, Double>(elements_);
+		clone.elements_ = new HashMap<T, Double>(elements_);
 
 		return clone;
 	}
@@ -349,7 +350,6 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		boolean first = true;
-		Set<T> elements = elements_.keySet();
 		for (T element : elements_.keySet()) {
 			if (!first)
 				buffer.append("\n");

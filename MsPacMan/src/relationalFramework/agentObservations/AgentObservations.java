@@ -406,7 +406,7 @@ public class AgentObservations implements Serializable {
 	 * Gathers all relevant facts for a particular action and returns them.
 	 * 
 	 * @param action
-	 *            The action (wit arguments).
+	 *            The action (with arguments).
 	 * @return The relevant facts pertaining to the action.
 	 */
 	public Collection<StringFact> gatherActionFacts(StringFact action) {

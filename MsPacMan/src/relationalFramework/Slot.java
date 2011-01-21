@@ -1,6 +1,7 @@
 package relationalFramework;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Random;
 import java.util.regex.Matcher;
@@ -265,7 +266,7 @@ public class Slot implements Serializable {
 	public void setSelectionProb(double prob) {
 		selectionProb_ = prob;
 	}
-	
+
 	public Collection<StringFact> getSlotSplitFacts() {
 		return slotSplitFacts_;
 	}
@@ -308,6 +309,8 @@ public class Slot implements Serializable {
 		clone.fixed_ = fixed_;
 		clone.numSlotUses_ = numSlotUses_;
 		clone.ruleGenerator_ = ruleGenerator_.clone();
+		if (slotSplitFacts_ != null)
+			clone.slotSplitFacts_ = new ArrayList<StringFact>(slotSplitFacts_);
 		if (backupGenerator_ != null)
 			clone.backupGenerator_ = backupGenerator_.clone();
 		return clone;
@@ -334,11 +337,6 @@ public class Slot implements Serializable {
 			return false;
 		if (fixed_ != other.fixed_)
 			return false;
-		if (ruleGenerator_ == null) {
-			if (other.ruleGenerator_ != null)
-				return false;
-		} else if (!ruleGenerator_.equals(other.ruleGenerator_))
-			return false;
 		return true;
 	}
 
@@ -349,9 +347,7 @@ public class Slot implements Serializable {
 		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
 		result = prime * result + (fixed_ ? 1231 : 1237);
 		result = prime * result
-				+ ((ruleGenerator_ == null) ? 0 : ruleGenerator_.hashCode());
-		result = prime * result
-		+ ((slotSplitFacts_ == null) ? 0 : slotSplitFacts_.hashCode());
+				+ ((slotSplitFacts_ == null) ? 0 : slotSplitFacts_.hashCode());
 		return result;
 	}
 
@@ -370,7 +366,7 @@ public class Slot implements Serializable {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
-//		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_);
+		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_);
 		return buffer.toString();
 	}
 

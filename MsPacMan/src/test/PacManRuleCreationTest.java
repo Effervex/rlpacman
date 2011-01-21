@@ -219,6 +219,8 @@ public class PacManRuleCreationTest {
 		Collection<StringFact> conditions = new HashSet<StringFact>();
 		conditions.add(StateSpec.toStringFact("(edible ?X)"));
 		conditions.add(StateSpec.toStringFact("(blinking ?X)"));
+		conditions.add(StateSpec.toStringFact("(not (edible ?X))"));
+		conditions.add(StateSpec.toStringFact("(not (blinking ?X))"));
 		sut_.setAllowedActionConditions("toGhost", conditions);
 
 		GuidedRule rule = new GuidedRule(
