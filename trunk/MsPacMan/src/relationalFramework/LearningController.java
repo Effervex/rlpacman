@@ -870,8 +870,7 @@ public class LearningController {
 			long startTime = System.currentTimeMillis();
 
 			// Run the agent through several test iterations, resampling the
-			// agent
-			// at each step
+			// agent at each step
 			for (int i = 0; i < TEST_ITERATIONS; i++) {
 				estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
 

@@ -2,7 +2,11 @@ package relationalFramework.agentObservations;
 
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,7 +36,15 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = 6392258862353075600L;
+	private static final long serialVersionUID = 4320256186162040547L;
+
+	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
+
+	private static final String CONDITION_BELIEF_FILE = "conditionBeliefs.txt";
+
+	private static final String PREGOAL_FILE = "preGoal.txt";
+
+	private static final String SERIALISATION_FILE = "agentObservations.ser";
 
 	/** The amount of inactivity before an observation is considered converged. */
 	// TODO Set this as a better measure
@@ -43,7 +55,7 @@ public class AgentObservations implements Serializable {
 			"agentObservations/");
 
 	/** A hash code to track when an observation changes. */
-	private Integer observationHash_ = null;
+	private transient Integer observationHash_ = null;
 
 	/** The agent's beliefs about the condition inter-relations. */
 	private Map<String, ConditionBeliefs> conditionBeliefs_;
@@ -62,6 +74,12 @@ public class AgentObservations implements Serializable {
 
 	/** The rules about the environment learned by the agent. */
 	private SortedSet<BackgroundKnowledge> learnedEnvironmentRules_;
+
+	/**
+	 * The same rules organised into a mapping based on what predicates are
+	 * present in the rule.
+	 */
+	private MultiMap<String, BackgroundKnowledge> mappedEnvironmentRules_;
 
 	/** A transient group of facts indexed by terms used within. */
 	private MultiMap<String, StringFact> termMappedFacts_;
@@ -275,9 +293,17 @@ public class AgentObservations implements Serializable {
 	 */
 	private SortedSet<BackgroundKnowledge> formBackgroundKnowledge() {
 		SortedSet<BackgroundKnowledge> backgroundKnowledge = new TreeSet<BackgroundKnowledge>();
+
 		// Add the knowledge provided by the state specification
-		backgroundKnowledge.addAll(StateSpec.getInstance()
-				.getBackgroundKnowledgeConditions());
+		Collection<BackgroundKnowledge> stateSpecKnowledge = StateSpec
+				.getInstance().getBackgroundKnowledgeConditions();
+		backgroundKnowledge.addAll(stateSpecKnowledge);
+		mappedEnvironmentRules_ = new MultiMap<String, BackgroundKnowledge>();
+		for (BackgroundKnowledge bckKnow : stateSpecKnowledge) {
+			Collection<String> relevantPreds = bckKnow.getRelevantPreds();
+			for (String pred : relevantPreds)
+				mappedEnvironmentRules_.putContains(pred, bckKnow);
+		}
 
 		// Run through every condition in the beliefs
 		// Form equivalence (<=>) relations wherever possible
@@ -364,11 +390,16 @@ public class AgentObservations implements Serializable {
 		}
 
 		// Return a standard inference rule.
+		BackgroundKnowledge bckKnow = null;
 		if (negationType)
-			return new BackgroundKnowledge(left + relation + right, false);
+			bckKnow = new BackgroundKnowledge(left + relation + right, false);
 		else
-			return new BackgroundKnowledge(left + relation + "(not " + right
+			bckKnow = new BackgroundKnowledge(left + relation + "(not " + right
 					+ ")", false);
+		mappedEnvironmentRules_.putContains(left.getFactName(), bckKnow);
+		if (relation.equals(" <=> "))
+			mappedEnvironmentRules_.putContains(right.getFactName(), bckKnow);
+		return bckKnow;
 	}
 
 	/**
@@ -458,12 +489,51 @@ public class AgentObservations implements Serializable {
 	 */
 	public boolean simplifyRule(SortedSet<StringFact> simplified,
 			boolean testForIllegalRule, boolean onlyEquivalencies) {
-		boolean changed = false;
-		for (BackgroundKnowledge bckKnow : learnedEnvironmentRules_) {
-			if (!onlyEquivalencies || bckKnow.isEquivalence())
-				changed |= bckKnow.simplify(simplified, testForIllegalRule);
+		boolean changedOverall = false;
+		// Note which facts have already been tested, so changes don't restart
+		// the process.
+		SortedSet<StringFact> testedFacts = new TreeSet<StringFact>(simplified
+				.comparator());
+		boolean changedThisIter = true;
+
+		// Check each fact for simplifications, and check new facts when they're
+		// added
+		while (changedThisIter) {
+			SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
+			changedThisIter = false;
+			// Iterate through the facts in the conditions
+			for (StringFact fact : new TreeSet<StringFact>(simplified)) {
+				// Only test untested facts, facts still present in
+				// simplified and facts associated with rules.
+				if (!testedFacts.contains(fact)
+						&& simplified.contains(fact)
+						&& mappedEnvironmentRules_.containsKey(fact
+								.getFactName())) {
+					// Test against every background knowledge regarding this
+					// fact pred.
+					for (BackgroundKnowledge bckKnow : mappedEnvironmentRules_
+							.get(fact.getFactName())) {
+						// If the knowledge hasn't been tested and is an
+						// equivalence if only testing equivalences
+						if (!testedBackground.contains(bckKnow)
+								&& (!onlyEquivalencies || bckKnow
+										.isEquivalence())) {
+							// If the simplification process changes things
+							if (bckKnow
+									.simplify(simplified, testForIllegalRule)) {
+								changedThisIter = true;
+								testedBackground.clear();
+							} else
+								testedBackground.add(bckKnow);
+						}
+					}
+					testedFacts.add(fact);
+				}
+			}
+			changedOverall |= changedThisIter;
 		}
-		return changed;
+
+		return changedOverall;
 	}
 
 	/**
@@ -645,7 +715,7 @@ public class AgentObservations implements Serializable {
 	/**
 	 * Saves agent observations to file in the agent observations directory.
 	 */
-	public void saveAgentObservations(int run) {
+	public void saveAgentObservations() {
 		try {
 			// Make the environment directory if necessary
 			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
@@ -655,7 +725,7 @@ public class AgentObservations implements Serializable {
 
 			// Condition beliefs
 			File condBeliefFile = new File(environmentDir,
-					"conditionBeliefs.txt" + run);
+					CONDITION_BELIEF_FILE);
 			condBeliefFile.createNewFile();
 			FileWriter wr = new FileWriter(condBeliefFile);
 			BufferedWriter buf = new BufferedWriter(wr);
@@ -676,7 +746,7 @@ public class AgentObservations implements Serializable {
 
 			// Action Conditions and ranges
 			File actionCondsFile = new File(environmentDir,
-					"actionConditions&Ranges.txt" + run);
+					ACTION_CONDITIONS_FILE);
 			actionCondsFile.createNewFile();
 			wr = new FileWriter(actionCondsFile);
 			buf = new BufferedWriter(wr);
@@ -700,7 +770,7 @@ public class AgentObservations implements Serializable {
 			wr.close();
 
 			// Pre goal saving
-			File preGoalFile = new File(environmentDir, "preGoal.txt" + run);
+			File preGoalFile = new File(environmentDir, PREGOAL_FILE);
 			preGoalFile.createNewFile();
 			wr = new FileWriter(preGoalFile);
 			buf = new BufferedWriter(wr);
@@ -716,9 +786,36 @@ public class AgentObservations implements Serializable {
 
 			buf.close();
 			wr.close();
+
+			// Serialise observations
+			File serialisedFile = new File(environmentDir, SERIALISATION_FILE);
+			serialisedFile.createNewFile();
+			FileOutputStream fos = new FileOutputStream(serialisedFile);
+			ObjectOutputStream oos = new ObjectOutputStream(fos);
+			oos.writeObject(this);
+
+			oos.close();
+			fos.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public static AgentObservations loadAgentObservations() {
+		try {
+			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
+					.getInstance().getEnvironmentName()
+					+ File.separatorChar);
+			File serialisedFile = new File(environmentDir, SERIALISATION_FILE);
+			if (serialisedFile.exists()) {
+				FileInputStream fis = new FileInputStream(serialisedFile);
+				ObjectInputStream ois = new ObjectInputStream(fis);
+				return (AgentObservations) ois.readObject();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	/**

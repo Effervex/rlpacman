@@ -103,7 +103,7 @@ public class PolicyActor implements AgentInterface {
 			// Only form pre-goal if the generator isn't a module.
 			if (!PolicyGenerator.getInstance().isModuleGenerator())
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, StateSpec.getInstance().getConstants());
+						prevActions_);
 		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
 			String[] oldGoal = null;
@@ -173,7 +173,7 @@ public class PolicyActor implements AgentInterface {
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)) {
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, StateSpec.getInstance().getConstants());
+						prevActions_);
 			}
 		}
 
@@ -498,7 +498,7 @@ public class PolicyActor implements AgentInterface {
 
 			// Forming the pre-goal with placeholder constants
 			PolicyGenerator.getInstance().formPreGoalState(prevStateClone,
-					prevActions_, placeholderConstants);
+					prevActions_);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

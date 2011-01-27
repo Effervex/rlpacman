@@ -62,7 +62,7 @@ public class PolicyGenerator implements Serializable {
 	private MultiMap<String, GuidedRule> rlggRules_;
 
 	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
-	private MultiMap<String, GuidedRule> mutatedRules_;
+	private MultiMap<Slot, GuidedRule> mutatedRules_;
 
 	/** The collection of rules that have been removed. */
 	private Collection<GuidedRule> removedRules_;
@@ -153,7 +153,7 @@ public class PolicyGenerator implements Serializable {
 		actionSet_ = StateSpec.getInstance().getActions();
 		rlggRules_ = new MultiMap<String, GuidedRule>();
 		ruleCreation_ = new RuleCreation();
-		mutatedRules_ = new MultiMap<String, GuidedRule>();
+		mutatedRules_ = new MultiMap<Slot, GuidedRule>();
 		removedRules_ = new HashSet<GuidedRule>();
 		klDivergence_ = Double.MAX_VALUE;
 
@@ -185,6 +185,7 @@ public class PolicyGenerator implements Serializable {
 
 		int i = 0;
 		boolean emptyPolicy = true;
+		// TODO Deal with Poisson probabilities here.
 		while (!removalDist.isEmpty()) {
 			Slot slot = null;
 			if (!dynamicSlotNumber_ || slotOptimisation_) {
@@ -288,10 +289,10 @@ public class PolicyGenerator implements Serializable {
 
 				// Add to the covered rules
 				rlggRules_.putContains(action.getFactName(), coveredRule);
-
-				// Split the slots
-				splitSlots();
 			}
+
+			// Split the slots
+			splitSlots();
 
 			if (createNewRules)
 				Collections.shuffle(covered, random_);
@@ -396,6 +397,7 @@ public class PolicyGenerator implements Serializable {
 		// Split each rlgg slot, removing old unnecessary slots if needed
 		MultiMap<String, Slot> oldCurrentSlots = new MultiMap<String, Slot>(
 				currentSlots_);
+		boolean changed = false;
 		for (GuidedRule rlgg : rlggRules_.values()) {
 			// Only re-split the slots if the observation hash has changed.
 			if (ruleCanMutate(rlgg, -1, ruleCreation_.getMutationHash(rlgg
@@ -438,10 +440,13 @@ public class PolicyGenerator implements Serializable {
 				currentSlots_.clearValues(rlgg.getActionPredicate());
 				currentSlots_.putCollection(rlgg.getActionPredicate(),
 						splitSlots);
+				changed = true;
 			}
 		}
 
-		addSlots(currentSlots_.values(), oldCurrentSlots.values());
+		// If the slots have changed, add the new ones (removing the old).
+		if (changed)
+			addSlots(currentSlots_.values(), oldCurrentSlots.values());
 	}
 
 	/**
@@ -457,11 +462,13 @@ public class PolicyGenerator implements Serializable {
 		// values.
 		oldSlots.removeAll(newSlots);
 		slotGenerator_.removeAll(oldSlots);
+		// TODO Try to retain any rules in the old slot.
 		for (Slot newSlot : newSlots) {
-			if (slotGenerator_.contains(newSlot))
-				slotGenerator_
-						.add(newSlot, slotGenerator_.getOrdering(newSlot));
-			else
+			if (slotGenerator_.contains(newSlot)) {
+				double ordering = slotGenerator_.getOrdering(newSlot);
+				slotGenerator_.remove(newSlot);
+				slotGenerator_.add(newSlot, ordering);
+			} else
 				slotGenerator_.add(newSlot);
 		}
 	}
@@ -500,18 +507,19 @@ public class PolicyGenerator implements Serializable {
 				}
 			}
 
+			// TODO General rules are still being created when there are slots
+			// dedicated to them
+			// TODO Pac-Man old range rules not being removed.
 			Set<GuidedRule> mutants = ruleCreation_
 					.specialiseToPreGoal(baseRule);
 			if (ruleSlot.getSlotSplitFacts() != null)
 				mutants.addAll(ruleCreation_.specialiseRule(baseRule));
 			baseRule.setSpawned(preGoalHash);
 
-			String actionPred = baseRule.getActionPredicate();
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (removeOld) {
-				if (!mutants.isEmpty()
-						&& (mutatedRules_.get(actionPred) != null)) {
+				if (!mutants.isEmpty() && (mutatedRules_.get(ruleSlot) != null)) {
 					// Run through the rules in the slot, removing any direct
 					// mutants of the base rule not in the current set of direct
 					// mutants.
@@ -544,7 +552,7 @@ public class PolicyGenerator implements Serializable {
 
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
-					mutatedRules_.get(actionPred).removeAll(removables);
+					mutatedRules_.get(ruleSlot).removeAll(removables);
 				}
 			} else {
 				restart_ = false;
@@ -565,7 +573,7 @@ public class PolicyGenerator implements Serializable {
 						}
 					}
 
-					mutatedRules_.putContains(ruleSlot.getAction(), gr);
+					mutatedRules_.putContains(ruleSlot, gr);
 				}
 			}
 
@@ -589,15 +597,13 @@ public class PolicyGenerator implements Serializable {
 	 *            The pre-goal state seen by the agent.
 	 * @param actions
 	 *            The final action(s) taken by the agent.
-	 * @param constants
-	 *            The constants used in the pre-goal formation.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actions, List<String> constants) {
+			ActionChoice actions) {
 		if (!frozen_ && !slotOptimisation_) {
 			// Form the pre-goal using the final action/s as a parameter.
 			Collection<String> settledGoals = ruleCreation_.formPreGoalState(
-					preGoalState, actions, constants);
+					preGoalState, actions);
 			String actionPred = actions.getActionPreds();
 			if (debugMode_) {
 				try {
@@ -1207,7 +1213,7 @@ public class PolicyGenerator implements Serializable {
 	 * Saves the agent observations to file.
 	 */
 	public void saveAgentObservations(int run) {
-		ruleCreation_.saveAgentObservations(run);
+		ruleCreation_.saveAgentObservations();
 	}
 
 	/**
@@ -1273,5 +1279,16 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public void retestPolicy(Policy policy) {
 		awaitingTest_.push(new Policy(policy));
+	}
+
+	/**
+	 * Testing method. Gets the pregoal for move.
+	 * 
+	 * @param actionPred
+	 *            The name of the action.
+	 * @return The pre-goal for that action.
+	 */
+	public Collection<StringFact> getPreGoal(String actionPred) {
+		return ruleCreation_.getPreGoalState(actionPred);
 	}
 }

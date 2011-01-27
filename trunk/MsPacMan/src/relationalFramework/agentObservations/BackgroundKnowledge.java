@@ -3,6 +3,7 @@ package relationalFramework.agentObservations;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.SortedSet;
 import org.apache.commons.collections.BidiMap;
@@ -131,6 +132,22 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	}
 
 	/**
+	 * Gets the fact predicates relevant to this background knowledge. That's
+	 * both sides if equivalence relation otherwise just the left side preds.
+	 * 
+	 * @return The relevant preds.
+	 */
+	public Collection<String> getRelevantPreds() {
+		Collection<String> relevantPreds = new HashSet<String>();
+		for (StringFact lhs : preConds_) {
+			relevantPreds.add(lhs.getFactName());
+		}
+		if (equivalentRule_)
+			relevantPreds.add(postCondition_.getFactName());
+		return relevantPreds;
+	}
+
+	/**
 	 * Simplifies a set of rule conditions using this background knowledge.
 	 * 
 	 * @param ruleConds
@@ -143,8 +160,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
-		int result = Unification.getInstance().unifyStates(getAllConditions(), ruleConds,
-				replacementTerms);
+		int result = Unification.getInstance().unifyStates(getAllConditions(),
+				ruleConds, replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
 		if (result == 0) {
@@ -156,9 +173,9 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		// Simplify to the left for equivalent background knowledge
 		if (equivalentRule_) {
 			replacementTerms.clear();
-			StringFact unifiedEquiv = Unification.getInstance().unifyFact(getPostCond(null),
-					ruleConds, new DualHashBidiMap(), replacementTerms,
-					new String[0], true);
+			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
+					getPostCond(null), ruleConds, new DualHashBidiMap(),
+					replacementTerms, new String[0], true);
 			if (unifiedEquiv != null) {
 				unifiedEquiv.replaceArguments(
 						replacementTerms.inverseBidiMap(), true);
@@ -176,8 +193,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 		if (testForIllegalRule) {
 			replacementTerms.clear();
-			result = Unification.getInstance().unifyStates(getConjugatedConditions(),
-					ruleConds, replacementTerms);
+			result = Unification.getInstance().unifyStates(
+					getConjugatedConditions(), ruleConds, replacementTerms);
 			// If the rule is found to be illegal using the conjugated
 			// conditions, remove the illegal condition
 			if (result == 0) {
