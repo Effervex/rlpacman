@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.AgentObservations;
@@ -172,7 +174,7 @@ public class RuleCreation implements Serializable {
 		// Return the old, possibly modified rules and any new ones.
 		for (GuidedRule prev : previousRules) {
 			SortedSet<StringFact> ruleConds = simplifyRule(prev
-					.getConditions(false), null, false);
+					.getConditions(false), null, false, true);
 			if (ruleConds != null)
 				prev.setConditions(ruleConds, false);
 			prev.expandConditions();
@@ -194,28 +196,34 @@ public class RuleCreation implements Serializable {
 	 * @param testForIllegalRule
 	 *            If the conditions need to be tested for illegal combinations
 	 *            as well (use background knowledge in conjugated form)
+	 * @param checkConditionUnification
+	 *            If the added condition is checked if it already unifies with
+	 *            existing conditions.
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
 	public SortedSet<StringFact> simplifyRule(SortedSet<StringFact> ruleConds,
-			StringFact condition, boolean testForIllegalRule) {
+			StringFact condition, boolean testForIllegalRule,
+			boolean checkConditionUnification) {
 		SortedSet<StringFact> simplified = new TreeSet<StringFact>(ruleConds);
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
-			StringFact unification = Unification.getInstance().unifyFact(
-					condition, ruleConds, new DualHashBidiMap(),
-					new DualHashBidiMap(), new String[0], false);
-			if (unification != null)
-				return null;
+			if (checkConditionUnification) {
+				StringFact unification = Unification.getInstance().unifyFact(
+						condition, ruleConds, new DualHashBidiMap(),
+						new DualHashBidiMap(), new String[0], false);
+				if (unification != null)
+					return null;
 
-			condition.swapNegated();
-			StringFact negUnification = Unification.getInstance().unifyFact(
-					condition, ruleConds, new DualHashBidiMap(),
-					new DualHashBidiMap(), new String[0], false);
-			condition.swapNegated();
-			if (negUnification != null)
-				return null;
+				condition.swapNegated();
+				StringFact negUnification = Unification.getInstance()
+						.unifyFact(condition, ruleConds, new DualHashBidiMap(),
+								new DualHashBidiMap(), new String[0], false);
+				condition.swapNegated();
+				if (negUnification != null)
+					return null;
+			}
 
 			simplified.add(condition);
 		}
@@ -228,6 +236,74 @@ public class RuleCreation implements Serializable {
 		return simplified;
 	}
 
+	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
+		String actionPred = rule.getActionPredicate();
+		PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
+
+		// If we have a pre goal state
+		SortedSet<StringFact> ruleConditions = rule.getConditions(false);
+		if (preGoal != null) {
+			Collection<StringFact> preGoalState = preGoal.getState();
+
+			// Form a replacement terms map and possibly create term swapped
+			// specialisations
+			BidiMap replacementTerms = new DualHashBidiMap();
+			String[] ruleTerms = rule.getAction().getArguments();
+			String[] preGoalTerms = preGoal.getActionTerms();
+			for (int i = 0; i < preGoalTerms.length; i++) {
+				if (!preGoalTerms[i].equals(ruleTerms[i])) {
+					replacementTerms.put(preGoalTerms[i], ruleTerms[i]);
+
+					// Try to create term swapped specialisations
+					if (preGoalTerms[i].charAt(0) != '?'
+							&& ruleTerms[i].charAt(0) == '?') {
+						SortedSet<StringFact> specConditions = new TreeSet<StringFact>(
+								ruleConditions.comparator());
+						for (StringFact condition : ruleConditions) {
+							StringFact replacement = new StringFact(condition);
+							replacement.replaceArguments(ruleTerms[i],
+									preGoalTerms[i]);
+							specConditions.add(replacement);
+						}
+						StringFact replAction = new StringFact(rule.getAction());
+						replAction.replaceArguments(ruleTerms[i],
+								preGoalTerms[i]);
+
+						// Create the mutant
+						GuidedRule mutant = new GuidedRule(specConditions,
+								replAction, rule);
+						mutant.setQueryParams(rule.getQueryParameters());
+						mutant.expandConditions();
+						mutants.add(mutant);
+					}
+				}
+			}
+
+			// Attempt to add each condition in the pre-goal (using action terms
+			// where appropriate)
+			for (StringFact preGoalFact : preGoalState) {
+				StringFact replacedFact = new StringFact(preGoalFact);
+				replacedFact.replaceArguments(replacementTerms, true);
+				SortedSet<StringFact> specConditions = simplifyRule(
+						ruleConditions, replacedFact, true, false);
+				// Add the rule
+				if (specConditions != null) {
+					GuidedRule mutant = new GuidedRule(specConditions, rule
+							.getAction(), rule);
+					mutant.setQueryParams(rule.getQueryParameters());
+					mutant.expandConditions();
+					mutants.add(mutant);
+				}
+			}
+		} else {
+			// Split any ranges up
+			mutants.addAll(splitRanges(rule, null, 0, rule.isMutant()));
+		}
+
+		return mutants;
+	}
+
 	/**
 	 * Specialises a rule towards conditions seen in the pre-goal state.
 	 * 
@@ -236,7 +312,7 @@ public class RuleCreation implements Serializable {
 	 * @return All single-step mutations the rule can take towards matching the
 	 *         pre-goal state.
 	 */
-	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule, boolean fda) {
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 
 		// Get a single fact or variable specialisation from the pre goal for
@@ -299,7 +375,7 @@ public class RuleCreation implements Serializable {
 					// If the fact isn't in the rule, we have a mutation
 					if (!ruleConditions.contains(preGoalFact)) {
 						SortedSet<StringFact> mutatedConditions = simplifyRule(
-								ruleConditions, preGoalFact, false);
+								ruleConditions, preGoalFact, false, true);
 						if (mutatedConditions != null) {
 							GuidedRule mutant = new GuidedRule(
 									mutatedConditions, rule.getAction(), rule);
@@ -349,7 +425,7 @@ public class RuleCreation implements Serializable {
 
 			// Check for the regular condition
 			SortedSet<StringFact> specConditions = simplifyRule(conditions,
-					condition, true);
+					condition, true, true);
 			if (specConditions != null) {
 				GuidedRule specialisation = new GuidedRule(specConditions,
 						action, rule);
@@ -683,12 +759,10 @@ public class RuleCreation implements Serializable {
 						if (!ceaseMutation
 								&& !preGoalArg.equals(StateSpec.ANONYMOUS)) {
 							// 5a. If the cond term is ? and the preds match,
-							// use
-							// the fact term
+							// use the fact term
 							boolean continueCreation = true;
 							// If the condition is anonymous, replace it with
-							// any
-							// term
+							// any term
 							if (condArg.equals(StateSpec.ANONYMOUS))
 								condArg = replacedTerm;
 							// Otherwise, a variable can be replaced with a
@@ -715,7 +789,8 @@ public class RuleCreation implements Serializable {
 											baseRule.getConditions(false));
 									mutatedConditions.remove(condFact);
 									mutatedConditions = simplifyRule(
-											mutatedConditions, newCond, false);
+											mutatedConditions, newCond, false,
+											true);
 									if (mutatedConditions != null) {
 										GuidedRule mutant = new GuidedRule(
 												mutatedConditions, baseRule
@@ -800,8 +875,8 @@ public class RuleCreation implements Serializable {
 
 		// 4b. If the new cond is valid (through unification),
 		// keep it and note that the replacement has occurred
-		if (Unification.getInstance().unifyStates(replacementConds, preGoalState, ruleAction
-				.getArguments(), preGoalTerms) == 0) {
+		if (Unification.getInstance().unifyStates(replacementConds,
+				preGoalState, ruleAction.getArguments(), preGoalTerms) == 0) {
 			// Adding the mutated rule
 			GuidedRule mutant = new GuidedRule(replacementConds, ruleAction,
 					baseRule);
@@ -821,12 +896,10 @@ public class RuleCreation implements Serializable {
 	 *            The pre-goal state seen by the agent.
 	 * @param actions
 	 *            The final action/s taken by the agent.
-	 * @param constants
-	 *            The list of constants used in forming the pre-goal state.
 	 * @return A collection of actions which have settled pre-goals.
 	 */
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actionChoice, List<String> constants) {
+			ActionChoice actionChoice) {
 		// Scan the state first to create the term-mapped facts
 		// Check unifying pre-goal constants (specifically highest)
 		ao_.scanState(preGoalState);
@@ -853,10 +926,10 @@ public class RuleCreation implements Serializable {
 						} else {
 							// Unify the two states and check if it has changed
 							// at all.
-							int result = Unification.getInstance().unifyStates(preGoal.getState(),
-									preGoalStringState, preGoal
-											.getActionTerms(), action
-											.getArguments());
+							int result = Unification.getInstance().unifyStates(
+									preGoal.getState(), preGoalStringState,
+									preGoal.getActionTerms(),
+									action.getArguments());
 
 							// If the states unified, reset the counter,
 							// otherwise increment.
@@ -901,6 +974,22 @@ public class RuleCreation implements Serializable {
 		else
 			ao_.clearPreGoal();
 		otherCovering.ao_ = ao_;
+	}
+
+	/**
+	 * Saves the agent observations to file, in the agent obs directory.
+	 */
+	public void saveAgentObservations() {
+		ao_.saveAgentObservations();
+	}
+
+	/**
+	 * Loads the agent observations from file.
+	 */
+	public void loadAgentObservations() {
+		AgentObservations ao = AgentObservations.loadAgentObservations();
+		if (ao != null)
+			ao_ = ao;
 	}
 
 	public void loadBackupPreGoal() {
@@ -1061,13 +1150,6 @@ public class RuleCreation implements Serializable {
 	 */
 	public void clearPreGoalState() {
 		ao_.clearPreGoal();
-	}
-
-	/**
-	 * Saves the agent observations to file, in the agent obs directory.
-	 */
-	public void saveAgentObservations(int run) {
-		ao_.saveAgentObservations(run);
 	}
 
 	/**
