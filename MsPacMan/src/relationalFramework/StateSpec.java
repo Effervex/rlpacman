@@ -104,6 +104,64 @@ public abstract class StateSpec {
 	private int queryCount_;
 
 	/**
+	 * Extract the terms from a set of facts.
+	 * 
+	 * @param facts
+	 *            The facts to extract the terms from.
+	 * @return The terms in a list.
+	 */
+	private List<String> extractTerms(String facts) {
+		List<String> terms = new ArrayList<String>();
+		// ?X ?x ?_4 ?g4 ?#...
+		Pattern p = Pattern.compile("\\?[A-Za-z$*=+/<>_?#.][\\w$*=+/<>_?#.]*");
+		Matcher m = p.matcher(facts);
+		while (m.find()) {
+			// Removing the '?'
+			String term = m.group().substring(1);
+			if (!terms.contains(term))
+				terms.add(term);
+		}
+
+		return terms;
+	}
+
+	/**
+	 * Forms the unnecessaries regexp replacement string to only replace
+	 * unnecessary type facts that are present in the action.
+	 * 
+	 * @param terms
+	 *            The action terms of the rule.
+	 * @return A regexp modified to match the rule.
+	 */
+	private String formRuleSpecificRegexp(String[] terms) {
+		StringBuffer actionRepl = new StringBuffer("(");
+		boolean first = true;
+		for (String term : terms) {
+			if (!first)
+				actionRepl.append("|");
+			actionRepl.append("(" + Pattern.quote(term) + ")");
+			first = false;
+		}
+		actionRepl.append(")");
+		return unnecessaries_.replace(ACTION_TERM_REPL, actionRepl.toString());
+	}
+
+	/**
+	 * Forms the unnecessary facts regexp string.
+	 * 
+	 * @param types
+	 *            The types that need not be in rules.
+	 * @return The regexp string.
+	 */
+	private String formUnnecessaryString(Collection<String> types) {
+		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
+		for (String type : types)
+			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
+		buffer.append(")( |$)");
+		return buffer.toString();
+	}
+
+	/**
 	 * The constructor for a state specification.
 	 */
 	private final void initialise() {
@@ -205,65 +263,11 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Extract the terms from a set of facts.
+	 * Initialises the rules for finding valid actions.
 	 * 
-	 * @param facts
-	 *            The facts to extract the terms from.
-	 * @return The terms in a list.
+	 * @return A map of actions and the pure preconditions to be valid.
 	 */
-	private List<String> extractTerms(String facts) {
-		List<String> terms = new ArrayList<String>();
-		// ?X ?x ?_4 ?g4 ?#...
-		Pattern p = Pattern.compile("\\?[A-Za-z$*=+/<>_?#.][\\w$*=+/<>_?#.]*");
-		Matcher m = p.matcher(facts);
-		while (m.find()) {
-			// Removing the '?'
-			String term = m.group().substring(1);
-			if (!terms.contains(term))
-				terms.add(term);
-		}
-
-		return terms;
-	}
-
-	/**
-	 * Forms the unnecessary facts regexp string.
-	 * 
-	 * @param types
-	 *            The types that need not be in rules.
-	 * @return The regexp string.
-	 */
-	private String formUnnecessaryString(Collection<String> types) {
-		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
-		for (String type : types)
-			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
-		buffer.append(")( |$)");
-		return buffer.toString();
-	}
-
-	/**
-	 * Initialises the state type predicates.
-	 * 
-	 * @param rete
-	 *            The rete object.
-	 * @return A map of types, where the possibly null value corresponds to the
-	 *         keys parent in the type hierarchy.
-	 */
-	protected abstract Map<String, String> initialiseTypePredicateTemplates();
-
-	/**
-	 * Initialises the state predicates.
-	 * 
-	 * @return The list of guided predicate names.
-	 */
-	protected abstract Collection<StringFact> initialisePredicateTemplates();
-
-	/**
-	 * Initialises the state actions.
-	 * 
-	 * @return The list of guided actions.
-	 */
-	protected abstract Collection<StringFact> initialiseActionTemplates();
+	protected abstract Map<String, String> initialiseActionPreconditions();
 
 	/**
 	 * Initialises the number of actions to take per time step.
@@ -273,11 +277,19 @@ public abstract class StateSpec {
 	protected abstract int initialiseActionsPerStep();
 
 	/**
-	 * Initialises the rules for finding valid actions.
+	 * Initialises the state actions.
 	 * 
-	 * @return A map of actions and the pure preconditions to be valid.
+	 * @return The list of guided actions.
 	 */
-	protected abstract Map<String, String> initialiseActionPreconditions();
+	protected abstract Collection<StringFact> initialiseActionTemplates();
+
+	/**
+	 * Initialises the background knowledge.
+	 * 
+	 * @return A mapping of rule names to the pure rules themselves (just pre =>
+	 *         post).
+	 */
+	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
 
 	/**
 	 * Initialises the goal state.
@@ -299,12 +311,71 @@ public abstract class StateSpec {
 	protected abstract Policy initialiseOptimalPolicy();
 
 	/**
-	 * Initialises the background knowledge.
+	 * Initialises the state predicates.
 	 * 
-	 * @return A mapping of rule names to the pure rules themselves (just pre =>
-	 *         post).
+	 * @return The list of guided predicate names.
 	 */
-	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
+	protected abstract Collection<StringFact> initialisePredicateTemplates();
+
+	/**
+	 * Initialises the state type predicates.
+	 * 
+	 * @param rete
+	 *            The rete object.
+	 * @return A map of types, where the possibly null value corresponds to the
+	 *         keys parent in the type hierarchy.
+	 */
+	protected abstract Map<String, String> initialiseTypePredicateTemplates();
+
+	/**
+	 * Adds type predicates to the rule from a fact if they are not already
+	 * there.
+	 * 
+	 * @param fact
+	 *            The fact.
+	 * @param termIndex
+	 *            The index where the first term is found.
+	 */
+	public Collection<StringFact> createTypeConds(StringFact fact) {
+		Collection<StringFact> typeConds = new HashSet<StringFact>();
+		// If the term itself is a type pred, return.
+		if (isTypePredicate(fact.getFactName())) {
+			return typeConds;
+		}
+
+		String[] types = fact.getArgTypes();
+		for (int i = 0; i < types.length; i++) {
+			if (!fact.getArguments()[i].equals("?")) {
+				StringFact typeFact = typePredicates_.get(types[i]);
+				if (typeFact != null) {
+					typeConds.add(new StringFact(typeFact, new String[] { fact
+							.getArguments()[i] }));
+				}
+			}
+		}
+		return typeConds;
+	}
+
+	/**
+	 * Creates a template for a fact using the given arguments and asserts it to
+	 * the rete object. Returns the name of the fact template.
+	 * 
+	 * @param factName
+	 *            The name of the fact template.
+	 * @param rete
+	 *            The rete object being asserted to.
+	 * @return The name of the fact template.
+	 */
+	public String defineTemplate(String factName, Rete rete) {
+		try {
+			rete
+					.eval("(deftemplate " + factName
+							+ " (declare (ordered TRUE)))");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return factName;
+	}
 
 	/**
 	 * Creates a string representation of a rule, in a light, easy-to-read, and
@@ -334,27 +405,6 @@ public abstract class StateSpec {
 			}
 		}
 		return replacement;
-	}
-
-	/**
-	 * Forms the unnecessaries regexp replacement string to only replace
-	 * unnecessary type facts that are present in the action.
-	 * 
-	 * @param terms
-	 *            The action terms of the rule.
-	 * @return A regexp modified to match the rule.
-	 */
-	private String formRuleSpecificRegexp(String[] terms) {
-		StringBuffer actionRepl = new StringBuffer("(");
-		boolean first = true;
-		for (String term : terms) {
-			if (!first)
-				actionRepl.append("|");
-			actionRepl.append("(" + Pattern.quote(term) + ")");
-			first = false;
-		}
-		actionRepl.append(")");
-		return unnecessaries_.replace(ACTION_TERM_REPL, actionRepl.toString());
 	}
 
 	/**
@@ -392,100 +442,187 @@ public abstract class StateSpec {
 		return validActions;
 	}
 
-	/**
-	 * Splits a fact up into an array format, with the first index the fact
-	 * name.
-	 * 
-	 * @param fact
-	 *            The fact being split.
-	 * @return A string array of the facts.
-	 */
-	public static String[] splitFact(String fact) {
-		Pattern p = Pattern
-				.compile("(?:[^()\\s:]|(?:\\?.+&:\\(.+?\\)))+(?= |\\)|$)");
-		Matcher m = p.matcher(fact);
-		ArrayList<String> matches = new ArrayList<String>();
-		while (m.find())
-			matches.add(m.group());
+	public Map<String, StringFact> getActions() {
+		return actions_;
+	}
 
-		return matches.toArray(new String[matches.size()]);
+	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
+		return backgroundRules_.values();
+	}
+
+	public List<String> getConstants() {
+		return constants_;
+	}
+
+	public String getEnvironmentName() {
+		return environment_;
+	}
+
+	public String getGoalState() {
+		return goalState_;
 	}
 
 	/**
-	 * Transforms a String fact into a StringFact.
+	 * Gets the optimal policy for the problem. Or at least gets a good policy.
 	 * 
-	 * @param fact
-	 *            The String fact.
-	 * @return A StringFact version of the fact.
+	 * @return The policy that is optimal.
 	 */
-	public static StringFact toStringFact(String fact) {
-		String[] condSplit = StateSpec.splitFact(fact);
-		int offset = 1;
-		boolean negated = false;
-		// Negated case
-		if (condSplit[0].equals("not")) {
-			offset = 2;
-			negated = true;
-		}
-		// Test case
-		if (condSplit[0].equals("test")) {
-			StringBuffer testedGroup = new StringBuffer("(");
-			boolean first = true;
-			for (int i = 1; i < condSplit.length; i++) {
-				if (!first)
-					testedGroup.append(" ");
-				testedGroup.append(condSplit[i]);
-				first = false;
+	public Policy getHandCodedPolicy() {
+		return handCodedPolicy_;
+	}
+
+	public int getNumReturnedActions() {
+		return actionNum_;
+	}
+
+	public Map<String, StringFact> getPredicates() {
+		return predicates_;
+	}
+
+	public Rete getRete() {
+		return rete_;
+	}
+
+	/**
+	 * Gets or creates a rule query for a guided rule.
+	 * 
+	 * @param gr
+	 *            The guided rule associated with a query.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(GuidedRule gr) {
+		String result = queryNames_.get(gr);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				// If the rule has parameters, declare them as variables.
+				if (gr.getQueryParameters() == null) {
+					rete_.eval("(defquery " + result + " "
+							+ gr.getStringConditions() + ")");
+				} else {
+					StringBuffer declares = new StringBuffer(
+							"(declare (variables");
+
+					for (String param : gr.getQueryParameters()) {
+						declares.append(" " + param);
+					}
+					declares.append("))");
+
+					rete_.eval("(defquery " + result + " "
+							+ declares.toString() + " "
+							+ gr.getStringConditions() + ")");
+				}
+				queryNames_.put(gr, result);
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-			testedGroup.append(")");
-			condSplit = new String[2];
-			condSplit[0] = "test";
-			condSplit[1] = testedGroup.toString();
 		}
-		String[] arguments = new String[condSplit.length - offset];
-		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
-		return new StringFact(StateSpec.getInstance().getStringFact(
-				condSplit[offset - 1]), arguments, negated);
+
+		return result;
 	}
 
 	/**
-	 * Reforms a fact back together again from a split array.
+	 * Gets a string fact by the fact name.
 	 * 
-	 * @param factSplit
-	 *            The split fact.
-	 * @return A string representation of the fact.
+	 * @param factName
+	 *            The fact name.
+	 * @return The StringFact corresponding to the fact name, or null if
+	 *         non-existant.
 	 */
-	public static String reformFact(String[] factSplit) {
-		StringBuffer buffer = new StringBuffer("(" + factSplit[0]);
-		// Reforming negation
-		if (factSplit[0].equals("not"))
-			return buffer.toString()
-					+ " "
-					+ reformFact(Arrays.copyOfRange(factSplit, 1,
-							factSplit.length)) + ")";
-
-		for (int i = 1; i < factSplit.length; i++) {
-			buffer.append(" " + factSplit[i]);
-		}
-		buffer.append(")");
-		return buffer.toString();
+	public StringFact getStringFact(String factName) {
+		if (predicates_.containsKey(factName))
+			return predicates_.get(factName);
+		if (actions_.containsKey(factName))
+			return actions_.get(factName);
+		if (typePredicates_.containsKey(factName))
+			return typePredicates_.get(factName);
+		if (factName.equals("test"))
+			return TEST_DEFINITION;
+		return null;
+	}
+	
+	public Map<String, StringFact> getTypePredicates() {
+		return typePredicates_;
 	}
 
 	/**
-	 * Extracts a collection of facts from the state.
+	 * Checks if the current state is a goal state by looking for the terminal
+	 * fact.
 	 * 
-	 * @param state
-	 *            The rete state to extract facts from.
-	 * @return A collection of facts in the state.
+	 * @param rete
+	 *            The state.
+	 * @return True if we're in the goal state, false otherwise.
 	 */
-	@SuppressWarnings("unchecked")
-	public static Collection<Fact> extractFacts(Rete state) {
-		Collection<Fact> facts = new ArrayList<Fact>();
-		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
-			facts.add(factIter.next());
+	public boolean isGoal(Rete rete) {
+		try {
+			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
+					new ValueVector());
+			if (result.next())
+				return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
+	public boolean isTypePredicate(String predicate) {
+		if (typePredicates_.containsKey(predicate))
+			return true;
+		return false;
+	}
+
+	/**
+	 * Checks if the predicate is useful (not action or inequal).
+	 * 
+	 * @param predicate
+	 *            The predicate being checked.
+	 * @return True if the predicate is useful, false if it is action, inequal
+	 *         or otherwise.
+	 */
+	public boolean isUsefulPredicate(String predicate) {
+		if (predicate.equals("test"))
+			return false;
+		if (predicate.equals(VALID_ACTIONS))
+			return false;
+		if (predicate.equals("initial-fact"))
+			return false;
+		return true;
+	}
+
+	/**
+	 * This should really only be used by the test class.
+	 * 
+	 * @param constants
+	 *            The constants set in the state.
+	 */
+	public void setConstants(List<String> constants) {
+		constants_ = constants;
+	}
+
+	@Override
+	public String toString() {
+		return "StateSpec";
+	}
+
+	/**
+	 * Adds an array element to a list of arrays if the array is not already in
+	 * there.
+	 * 
+	 * @param addTo
+	 *            The list to add to.
+	 * @param addFrom
+	 *            The list to add from, if the terms are not contained.
+	 */
+	public static boolean addContainsArray(List<String[]> arrayList,
+			String[] array) {
+		Iterator<String[]> iter = arrayList.iterator();
+		while (iter.hasNext()) {
+			if (Arrays.equals(iter.next(), array))
+				return false;
 		}
 
-		return facts;
+		arrayList.add(array);
+		return true;
 	}
 
 	/**
@@ -548,32 +685,41 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Adds type predicates to the rule from a fact if they are not already
-	 * there.
+	 * Extracts a collection of facts from the state.
 	 * 
-	 * @param fact
-	 *            The fact.
-	 * @param termIndex
-	 *            The index where the first term is found.
+	 * @param state
+	 *            The rete state to extract facts from.
+	 * @return A collection of facts in the state.
 	 */
-	public Collection<StringFact> createTypeConds(StringFact fact) {
-		Collection<StringFact> typeConds = new HashSet<StringFact>();
-		// If the term itself is a type pred, return.
-		if (isTypePredicate(fact.getFactName())) {
-			return typeConds;
+	@SuppressWarnings("unchecked")
+	public static Collection<Fact> extractFacts(Rete state) {
+		Collection<Fact> facts = new ArrayList<Fact>();
+		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
+			facts.add(factIter.next());
 		}
 
-		String[] types = fact.getArgTypes();
-		for (int i = 0; i < types.length; i++) {
-			if (!fact.getArguments()[i].equals("?")) {
-				StringFact typeFact = typePredicates_.get(types[i]);
-				if (typeFact != null) {
-					typeConds.add(new StringFact(typeFact, new String[] { fact
-							.getArguments()[i] }));
-				}
-			}
+		return facts;
+	}
+
+	/**
+	 * Gets the singleton instance of the state spec.
+	 * 
+	 * @return The instance.
+	 */
+	public static StateSpec getInstance() {
+		return instance_;
+	}
+
+	public static StateSpec initInstance(String classPrefix) {
+		try {
+			instance_ = (StateSpec) Class.forName(
+					classPrefix + StateSpec.class.getSimpleName())
+					.newInstance();
+			instance_.initialise();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		return typeConds;
+		return instance_;
 	}
 
 	/**
@@ -608,225 +754,27 @@ public abstract class StateSpec {
 		return false;
 	}
 
-	public String getEnvironmentName() {
-		return environment_;
-	}
-
-	public Map<String, StringFact> getPredicates() {
-		return predicates_;
-	}
-
-	public Map<String, StringFact> getActions() {
-		return actions_;
-	}
-
-	public int getNumReturnedActions() {
-		return actionNum_;
-	}
-
-	public String getGoalState() {
-		return goalState_;
-	}
-
-	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
-		return backgroundRules_.values();
-	}
-
 	/**
-	 * Gets a string fact by the fact name.
+	 * Reforms a fact back together again from a split array.
 	 * 
-	 * @param factName
-	 *            The fact name.
-	 * @return The StringFact corresponding to the fact name, or null if
-	 *         non-existant.
+	 * @param factSplit
+	 *            The split fact.
+	 * @return A string representation of the fact.
 	 */
-	public StringFact getStringFact(String factName) {
-		if (predicates_.containsKey(factName))
-			return predicates_.get(factName);
-		if (actions_.containsKey(factName))
-			return actions_.get(factName);
-		if (typePredicates_.containsKey(factName))
-			return typePredicates_.get(factName);
-		if (factName.equals("test"))
-			return TEST_DEFINITION;
-		return null;
-	}
+	public static String reformFact(String[] factSplit) {
+		StringBuffer buffer = new StringBuffer("(" + factSplit[0]);
+		// Reforming negation
+		if (factSplit[0].equals("not"))
+			return buffer.toString()
+					+ " "
+					+ reformFact(Arrays.copyOfRange(factSplit, 1,
+							factSplit.length)) + ")";
 
-	/**
-	 * Gets the optimal policy for the problem. Or at least gets a good policy.
-	 * 
-	 * @return The policy that is optimal.
-	 */
-	public Policy getHandCodedPolicy() {
-		return handCodedPolicy_;
-	}
-
-	public List<String> getConstants() {
-		return constants_;
-	}
-
-	/**
-	 * This should really only be used by the test class.
-	 * 
-	 * @param constants
-	 *            The constants set in the state.
-	 */
-	public void setConstants(List<String> constants) {
-		constants_ = constants;
-	}
-
-	public Rete getRete() {
-		return rete_;
-	}
-
-	public boolean isTypePredicate(String predicate) {
-		if (typePredicates_.containsKey(predicate))
-			return true;
-		return false;
-	}
-
-	/**
-	 * Checks if the predicate is useful (not action or inequal).
-	 * 
-	 * @param predicate
-	 *            The predicate being checked.
-	 * @return True if the predicate is useful, false if it is action, inequal
-	 *         or otherwise.
-	 */
-	public boolean isUsefulPredicate(String predicate) {
-		if (predicate.equals("test"))
-			return false;
-		if (predicate.equals(VALID_ACTIONS))
-			return false;
-		if (predicate.equals("initial-fact"))
-			return false;
-		return true;
-	}
-
-	/**
-	 * Checks if the current state is a goal state by looking for the terminal
-	 * fact.
-	 * 
-	 * @param rete
-	 *            The state.
-	 * @return True if we're in the goal state, false otherwise.
-	 */
-	public boolean isGoal(Rete rete) {
-		try {
-			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
-					new ValueVector());
-			if (result.next())
-				return true;
-		} catch (Exception e) {
-			e.printStackTrace();
+		for (int i = 1; i < factSplit.length; i++) {
+			buffer.append(" " + factSplit[i]);
 		}
-		return false;
-	}
-
-	/**
-	 * Gets or creates a rule query for a guided rule.
-	 * 
-	 * @param gr
-	 *            The guided rule associated with a query.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(GuidedRule gr) {
-		String result = queryNames_.get(gr);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() == null) {
-					rete_.eval("(defquery " + result + " "
-							+ gr.getStringConditions() + ")");
-				} else {
-					StringBuffer declares = new StringBuffer(
-							"(declare (variables");
-
-					for (String param : gr.getQueryParameters()) {
-						declares.append(" " + param);
-					}
-					declares.append("))");
-
-					rete_.eval("(defquery " + result + " "
-							+ declares.toString() + " "
-							+ gr.getStringConditions() + ")");
-				}
-				queryNames_.put(gr, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
-	@Override
-	public String toString() {
-		return "StateSpec";
-	}
-
-	/**
-	 * Creates a template for a fact using the given arguments and asserts it to
-	 * the rete object. Returns the name of the fact template.
-	 * 
-	 * @param factName
-	 *            The name of the fact template.
-	 * @param rete
-	 *            The rete object being asserted to.
-	 * @return The name of the fact template.
-	 */
-	public String defineTemplate(String factName, Rete rete) {
-		try {
-			rete
-					.eval("(deftemplate " + factName
-							+ " (declare (ordered TRUE)))");
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return factName;
-	}
-
-	/**
-	 * Adds an array element to a list of arrays if the array is not already in
-	 * there.
-	 * 
-	 * @param addTo
-	 *            The list to add to.
-	 * @param addFrom
-	 *            The list to add from, if the terms are not contained.
-	 */
-	public static boolean addContainsArray(List<String[]> arrayList,
-			String[] array) {
-		Iterator<String[]> iter = arrayList.iterator();
-		while (iter.hasNext()) {
-			if (Arrays.equals(iter.next(), array))
-				return false;
-		}
-
-		arrayList.add(array);
-		return true;
-	}
-
-	/**
-	 * Gets the singleton instance of the state spec.
-	 * 
-	 * @return The instance.
-	 */
-	public static StateSpec getInstance() {
-		return instance_;
-	}
-
-	public static StateSpec initInstance(String classPrefix) {
-		try {
-			instance_ = (StateSpec) Class.forName(
-					classPrefix + StateSpec.class.getSimpleName())
-					.newInstance();
-			instance_.initialise();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return instance_;
+		buffer.append(")");
+		return buffer.toString();
 	}
 
 	public static void reinitInstance() {
@@ -852,5 +800,61 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Splits a fact up into an array format, with the first index the fact
+	 * name.
+	 * 
+	 * @param fact
+	 *            The fact being split.
+	 * @return A string array of the facts.
+	 */
+	public static String[] splitFact(String fact) {
+		Pattern p = Pattern
+				.compile("(?:[^()\\s:]|(?:\\?.+&:\\(.+?\\)))+(?= |\\)|$)");
+		Matcher m = p.matcher(fact);
+		ArrayList<String> matches = new ArrayList<String>();
+		while (m.find())
+			matches.add(m.group());
+
+		return matches.toArray(new String[matches.size()]);
+	}
+
+	/**
+	 * Transforms a String fact into a StringFact.
+	 * 
+	 * @param fact
+	 *            The String fact.
+	 * @return A StringFact version of the fact.
+	 */
+	public static StringFact toStringFact(String fact) {
+		String[] condSplit = StateSpec.splitFact(fact);
+		int offset = 1;
+		boolean negated = false;
+		// Negated case
+		if (condSplit[0].equals("not")) {
+			offset = 2;
+			negated = true;
+		}
+		// Test case
+		if (condSplit[0].equals("test")) {
+			StringBuffer testedGroup = new StringBuffer("(");
+			boolean first = true;
+			for (int i = 1; i < condSplit.length; i++) {
+				if (!first)
+					testedGroup.append(" ");
+				testedGroup.append(condSplit[i]);
+				first = false;
+			}
+			testedGroup.append(")");
+			condSplit = new String[2];
+			condSplit[0] = "test";
+			condSplit[1] = testedGroup.toString();
+		}
+		String[] arguments = new String[condSplit.length - offset];
+		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
+		return new StringFact(StateSpec.getInstance().getStringFact(
+				condSplit[offset - 1]), arguments, negated);
 	}
 }

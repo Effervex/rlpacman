@@ -113,7 +113,7 @@ public class PacManRuleCreationTest {
 										+ " "
 										+ (interval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num3)",
-										rule)));
+								rule)));
 			}
 
 			// The point itself
@@ -156,7 +156,7 @@ public class PacManRuleCreationTest {
 										+ " "
 										+ (interval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-										rule)));
+								rule)));
 			}
 
 			// Pre-goal intervals
@@ -168,7 +168,7 @@ public class PacManRuleCreationTest {
 										+ " "
 										+ (startPoint + midInterval * (i + 1))
 										+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-										rule)));
+								rule)));
 
 			// Pre-goal range
 			assertTrue(results
@@ -178,7 +178,7 @@ public class PacManRuleCreationTest {
 									+ " "
 									+ endPoint
 									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-									rule)));
+							rule)));
 		}
 
 		// Special case: Range goes through 0 (no pregoal)
@@ -201,7 +201,7 @@ public class PacManRuleCreationTest {
 							+ (-16 + beforeInterval * i) + " "
 							+ (-16 + beforeInterval * (i + 1))
 							+ ")) (junction ?X) => (toJunction ?X ?__Num0)",
-							rule)));
+					rule)));
 
 		// After interval(s)
 		for (int i = 0; i < afterIntervals; i++)
@@ -210,7 +210,101 @@ public class PacManRuleCreationTest {
 							+ (afterInterval * i) + " "
 							+ (afterInterval * (i + 1))
 							+ ")) (junction ?X) => (toJunction ?X ?__Num0)",
+					rule)));
+
+		// Early stage mutations
+		pregoal.clear();
+		pregoal.add(StateSpec.toStringFact("(dot ?X)"));
+		pregoal.add(StateSpec.toStringFact("(pacman player)"));
+		pregoal.add(StateSpec.toStringFact("(distanceDot player ?X "
+				+ "?__Num3&:(betweenRange ?__Num3 3.0 4.0))"));
+		sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X ?__Num3)"), pregoal);
+
+		rule = new GuidedRule(
+				"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 10.0 12.0)) "
+						+ "(dot ?X) (pacman player) => (toDot ?X ?__Num0)");
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(results.size(), 7);
+		// The regular intervals
+		for (int i = 0; i < RuleCreation.NUM_DISCRETE_RANGES; i++) {
+			double start = 10.0 + i * (2.0 / RuleCreation.NUM_DISCRETE_RANGES);
+			double end = start + (2.0 / RuleCreation.NUM_DISCRETE_RANGES);
+			assertTrue(results
+					.contains(new GuidedRule(
+							"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+									+ start
+									+ " "
+									+ end
+									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
 							rule)));
+		}
+
+		// Pre-goal intervals
+		for (int i = 0; i < 2; i++) {
+			double start = 3.0 + i * 0.5;
+			double end = start + 0.5;
+			assertTrue(results
+					.contains(new GuidedRule(
+							"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+									+ start
+									+ " "
+									+ end
+									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+							rule)));
+		}
+
+		// Pre-goal range
+		assertTrue(results
+				.contains(new GuidedRule(
+						"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 3.0 4.0)) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+						rule)));
+		
+		// Bigger pre-goal range than RLGG range
+		pregoal.clear();
+		pregoal.add(StateSpec.toStringFact("(dot ?X)"));
+		pregoal.add(StateSpec.toStringFact("(pacman player)"));
+		pregoal.add(StateSpec.toStringFact("(distanceDot player ?X "
+				+ "?__Num3&:(betweenRange ?__Num3 3.0 5.0))"));
+		sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X ?__Num3)"), pregoal);
+
+		rule = new GuidedRule(
+				"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 10.0 11.0)) "
+						+ "(dot ?X) (pacman player) => (toDot ?X ?__Num0)");
+		results = sut_.specialiseToPreGoal(rule);
+		assertEquals(results.size(), 9);
+		// The regular intervals
+		for (int i = 0; i < RuleCreation.NUM_DISCRETE_RANGES; i++) {
+			double start = 10.0 + i * (1.0 / RuleCreation.NUM_DISCRETE_RANGES);
+			double end = start + (1.0 / RuleCreation.NUM_DISCRETE_RANGES);
+			assertTrue(results
+					.contains(new GuidedRule(
+							"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+									+ start
+									+ " "
+									+ end
+									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+							rule)));
+		}
+
+		// Pre-goal intervals
+		for (int i = 0; i < RuleCreation.NUM_DISCRETE_RANGES; i++) {
+			double start = 3.0 + i * 0.5;
+			double end = start + 0.5;
+			assertTrue(results
+					.contains(new GuidedRule(
+							"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 "
+									+ start
+									+ " "
+									+ end
+									+ ")) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+							rule)));
+		}
+
+		// Pre-goal range
+		assertTrue(results
+				.contains(new GuidedRule(
+						"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 3.0 5.0)) (dot ?X) (pacman player) => (toDot ?X ?__Num0)",
+						rule)));
 	}
 
 	@Test

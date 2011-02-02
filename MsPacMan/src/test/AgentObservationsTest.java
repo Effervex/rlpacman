@@ -10,8 +10,6 @@ import java.util.Map;
 import jess.Fact;
 import jess.Rete;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -28,8 +26,6 @@ public class AgentObservationsTest {
 
 	@Before
 	public void setUp() throws Exception {
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = new AgentObservations();
 	}
@@ -388,6 +384,39 @@ public class AgentObservationsTest {
 				.getInstance().getBackgroundKnowledgeConditions())
 			sut_.getLearnedBackgroundKnowledge().remove(stateSpecBK);
 		assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
+	}
+	
+	@Test
+	public void testPacManScanState() {
+		StateSpec.initInstance("rlPacMan.PacMan");
+		sut_ = new AgentObservations();
+		
+//		Rete state = StateSpec.getInstance().getRete();
+//		state.eval("(assert (dot d))");
+//		state.eval("(assert (dot e))");
+//		state.eval("(assert (dot c))");
+//		state.eval("(assert (thing ))");
+//		state.eval("(assert (thing e))");
+//		state.eval("(assert (on d a))");
+//		state.eval("(assert (on e b))");
+//		state.eval("(assert (on b f))");
+//		state.eval("(assert (above e b))");
+//		state.eval("(assert (above e f))");
+//		state.eval("(assert (above b f))");
+//		state.eval("(assert (above d a))");
+//		state.eval("(assert (onFloor c))");
+//		state.eval("(assert (onFloor a))");
+//		state.eval("(assert (onFloor f))");
+//		state.eval("(assert (block a))");
+//		state.eval("(assert (block b))");
+//		state.eval("(assert (block c))");
+//		state.eval("(assert (block d))");
+//		state.eval("(assert (block e))");
+//		state.eval("(assert (block f))");
+//		Collection<Fact> facts = StateSpec.extractFacts(state);
+//
+//		sut_.scanState(facts);
+//		Map<String, ConditionBeliefs> condBeliefs = sut_.getConditionBeliefs();
 	}
 
 	@Test

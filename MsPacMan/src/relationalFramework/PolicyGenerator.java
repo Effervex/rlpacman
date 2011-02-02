@@ -20,13 +20,9 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.Stack;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
-
-import com.sun.xml.internal.messaging.saaj.packaging.mime.internet.ParseException;
 
 import jess.Fact;
 import jess.Rete;
@@ -38,7 +34,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = -2589393553440436119L;
+	private static final long serialVersionUID = -1511473311104846771L;
 
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;
@@ -66,6 +62,12 @@ public class PolicyGenerator implements Serializable {
 
 	/** The collection of rules that have been removed. */
 	private Collection<GuidedRule> removedRules_;
+
+	/**
+	 * The collection of currently active rules, so no duplicate rules are
+	 * created.
+	 */
+	private Collection<GuidedRule> currentRules_;
 
 	/**
 	 * The last amount of difference in distribution probabilities from the
@@ -155,6 +157,7 @@ public class PolicyGenerator implements Serializable {
 		ruleCreation_ = new RuleCreation();
 		mutatedRules_ = new MultiMap<Slot, GuidedRule>();
 		removedRules_ = new HashSet<GuidedRule>();
+		currentRules_ = new HashSet<GuidedRule>();
 		klDivergence_ = Double.MAX_VALUE;
 
 		resetGenerator();
@@ -175,8 +178,8 @@ public class PolicyGenerator implements Serializable {
 
 		Policy policy = new Policy();
 
-		// Clone the ordered distribution so slots and rules from slots can be
-		// removed without consequence.
+		// Clone the ordered distribution and normalise it so the largest slot
+		// usage value is at least 1.
 		OrderedDistribution<Slot> removalDist = new OrderedDistribution<Slot>(
 				random_);
 		for (Slot slot : slotGenerator_) {
@@ -185,16 +188,15 @@ public class PolicyGenerator implements Serializable {
 
 		int i = 0;
 		boolean emptyPolicy = true;
-		// TODO Deal with Poisson probabilities here.
 		while (!removalDist.isEmpty()) {
 			Slot slot = null;
 			if (!dynamicSlotNumber_ || slotOptimisation_) {
 				// Sample with removal, getting the most likely if frozen.
 				slot = removalDist.sampleWithRemoval(i, slotGenerator_.size(),
-						frozen_);
+						false);
 			} else {
-				slot = removalDist.sample(i, slotGenerator_.size(), frozen_);
-				boolean[] useSlot = slot.shouldUseSlot(random_, frozen_);
+				slot = removalDist.sample(i, slotGenerator_.size(), false);
+				boolean[] useSlot = slot.shouldUseSlot(random_);
 				// If we are removing the slot, remove it
 				if (!useSlot[1])
 					removalDist.remove(slot);
@@ -395,8 +397,9 @@ public class PolicyGenerator implements Serializable {
 	 */
 	private void splitSlots() {
 		// Split each rlgg slot, removing old unnecessary slots if needed
-		MultiMap<String, Slot> oldCurrentSlots = new MultiMap<String, Slot>(
-				currentSlots_);
+		currentRules_.clear();
+		currentRules_.addAll(rlggRules_.values());
+
 		boolean changed = false;
 		for (GuidedRule rlgg : rlggRules_.values()) {
 			// Only re-split the slots if the observation hash has changed.
@@ -410,8 +413,10 @@ public class PolicyGenerator implements Serializable {
 						e.printStackTrace();
 					}
 				}
+				// Clear the current slots of this action
+				String action = rlgg.getActionPredicate();
+				currentSlots_.clearValues(action);
 
-				Collection<Slot> splitSlots = new HashSet<Slot>();
 				SortedSet<StringFact> rlggConditions = rlgg
 						.getConditions(false);
 				Slot rlggSlot = rlgg.getSlot();
@@ -428,48 +433,33 @@ public class PolicyGenerator implements Serializable {
 					Slot splitSlot = new Slot(rlggSlot.getAction(),
 							slotConditions);
 					splitSlot.addNewRule(seedRule);
+
+					// Check if the slot already exists
+					Slot existingSlot = slotGenerator_.getElement(splitSlot);
+					if (existingSlot != null
+							&& existingSlot.getSeedRule().equals(seedRule)) {
+						splitSlot = existingSlot;
+						seedRule = existingSlot.getSeedRule();
+					}
+
+					currentRules_.add(seedRule);
 					// Mutate new rules for the slot
 					mutateRule(seedRule, splitSlot, -1);
 
-					splitSlots.add(splitSlot);
+					currentSlots_.put(action, splitSlot);
 				}
 
 				// Mutate the rlgg slot to create any remaining mutations
 				mutateRule(rlgg, rlggSlot, -1);
-				splitSlots.add(rlggSlot);
-				currentSlots_.clearValues(rlgg.getActionPredicate());
-				currentSlots_.putCollection(rlgg.getActionPredicate(),
-						splitSlots);
+				currentSlots_.put(action, rlggSlot);
 				changed = true;
 			}
 		}
 
 		// If the slots have changed, add the new ones (removing the old).
-		if (changed)
-			addSlots(currentSlots_.values(), oldCurrentSlots.values());
-	}
-
-	/**
-	 * Adds the new slots to the slot generator.
-	 * 
-	 * @param newSlots
-	 *            The set of slots to add.
-	 * @param oldSlots
-	 *            The set of slots currently present in the generator.
-	 */
-	private void addSlots(Collection<Slot> newSlots, Collection<Slot> oldSlots) {
-		// Add the slots, removing unnecessary ones, but maintaining slot
-		// values.
-		oldSlots.removeAll(newSlots);
-		slotGenerator_.removeAll(oldSlots);
-		// TODO Try to retain any rules in the old slot.
-		for (Slot newSlot : newSlots) {
-			if (slotGenerator_.contains(newSlot)) {
-				double ordering = slotGenerator_.getOrdering(newSlot);
-				slotGenerator_.remove(newSlot);
-				slotGenerator_.add(newSlot, ordering);
-			} else
-				slotGenerator_.add(newSlot);
+		if (changed) {
+			slotGenerator_.retainAll(currentSlots_.values());
+			slotGenerator_.addContainsAll(currentSlots_.values());
 		}
 	}
 
@@ -507,8 +497,6 @@ public class PolicyGenerator implements Serializable {
 				}
 			}
 
-			// TODO General rules are still being created when there are slots
-			// dedicated to them
 			// TODO Pac-Man old range rules not being removed.
 			Set<GuidedRule> mutants = ruleCreation_
 					.specialiseToPreGoal(baseRule);
@@ -516,10 +504,13 @@ public class PolicyGenerator implements Serializable {
 				mutants.addAll(ruleCreation_.specialiseRule(baseRule));
 			baseRule.setSpawned(preGoalHash);
 
+			// Ensure no duplicate rules.
+			mutants.removeAll(currentRules_);
+
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (removeOld) {
-				if (!mutants.isEmpty() && (mutatedRules_.get(ruleSlot) != null)) {
+				if (mutatedRules_.get(ruleSlot) != null) {
 					// Run through the rules in the slot, removing any direct
 					// mutants of the base rule not in the current set of direct
 					// mutants.
@@ -574,6 +565,7 @@ public class PolicyGenerator implements Serializable {
 					}
 
 					mutatedRules_.putContains(ruleSlot, gr);
+					currentRules_.addAll(mutants);
 				}
 			}
 
@@ -702,6 +694,7 @@ public class PolicyGenerator implements Serializable {
 		rlggRules_.clear();
 		mutatedRules_.clear();
 		removedRules_.clear();
+		currentRules_.clear();
 
 		awaitingTest_ = new Stack<Policy>();
 	}
@@ -745,7 +738,8 @@ public class PolicyGenerator implements Serializable {
 			for (Slot slot : slotGenerator_) {
 				// Slot selection values
 				double mean = ed.getSlotNumeracyMean(slot);
-				slot.updateSelectionValues(mean, stepSize);
+				double sd = ed.getSlotNumeracySD(slot);
+				slot.updateSelectionValues(mean, sd, stepSize);
 
 				double numeracyBalancedStepSize = stepSize * mean;
 				klDivergence_ += slot.getGenerator().updateDistribution(
@@ -891,6 +885,7 @@ public class PolicyGenerator implements Serializable {
 						removables.add(rule);
 						// Note the rule in the no-create list
 						removedRules_.add(rule);
+						currentRules_.remove(rule);
 					}
 				}
 
@@ -1165,7 +1160,7 @@ public class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Saves the geneartors to an existing stream.
+	 * Saves the generators to an existing stream.
 	 * 
 	 * @param buf
 	 *            The stream to save the generators to.
@@ -1214,60 +1209,6 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public void saveAgentObservations(int run) {
 		ruleCreation_.saveAgentObservations();
-	}
-
-	/**
-	 * Loads the generators/distributions from file.
-	 * 
-	 * @param file
-	 *            The file to load from.
-	 * @return The policy generator to load to.
-	 */
-	public void loadGenerators(File input) {
-		OrderedDistribution<Slot> loadedDist = new OrderedDistribution<Slot>(
-				random_);
-
-		try {
-			if (!PerformanceReader.readPerformanceFile(input, false))
-				throw new ParseException();
-			String generatorStr = PerformanceReader.getGenerator();
-
-			// Parse the slots, line by line
-			// Slot action, rules, and slot ordering
-			// e.g. (move{((on a b) (cat c) => (move c))}),0.6532
-			Pattern p = Pattern.compile("\\(Slot \\((\\w+)\\) " // Slot (move)
-					+ "\\{(.*?)\\}" // <rules>
-					+ ",([\\d.E-]+)(?:,([\\d.E-]+))?:([\\d.E-]+)\\)"); // ),0.6532,1.3:0.4
-			Matcher m = p.matcher(generatorStr);
-
-			while (m.find()) {
-				// Split the input up
-				Slot slot = new Slot(m.group(1));
-				String rules = m.group(2);
-				slot.setSelectionProb(Double.parseDouble(m.group(3)));
-				Double slotOrder = Double.parseDouble(m.group(4));
-
-				// Add the rules to the slot
-				Pattern rp = Pattern.compile("\\(((?:\\(.+?\\) )+=> \\(.+?\\))" // Rule
-						+ ":([\\d.E-]+)\\)"); // Rule Prob
-				Matcher rm = rp.matcher(rules);
-				while (rm.find()) {
-					GuidedRule rule = new GuidedRule(rm.group(1));
-					Double ruleProb = Double.parseDouble(rm.group(2));
-
-					slot.addRule(rule, ruleProb);
-				}
-
-				// Add the slot to the distribution.
-				loadedDist.add(slot, slotOrder);
-			}
-		} catch (Exception e) {
-			System.err
-					.println("Error parsing generator file. Not loading generator.");
-			e.printStackTrace();
-		}
-
-		slotGenerator_ = loadedDist;
 	}
 
 	/**

@@ -36,7 +36,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = 4320256186162040547L;
+	private static final long serialVersionUID = 2324961327171636118L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -82,7 +82,7 @@ public class AgentObservations implements Serializable {
 	private MultiMap<String, BackgroundKnowledge> mappedEnvironmentRules_;
 
 	/** A transient group of facts indexed by terms used within. */
-	private MultiMap<String, StringFact> termMappedFacts_;
+	private transient MultiMap<String, StringFact> termMappedFacts_;
 
 	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
@@ -122,9 +122,8 @@ public class AgentObservations implements Serializable {
 				System.arraycopy(split, 1, arguments, 0, arguments.length);
 				StringFact strFact = new StringFact(StateSpec.getInstance()
 						.getStringFact(split[0]), arguments);
-				// TODO Turn this off for types
-				if (!StateSpec.getInstance().isTypePredicate(split[0]))
-					stateFacts.add(strFact);
+
+				stateFacts.add(strFact);
 
 				// Run through the arguments and index the fact by term
 				for (int i = 0; i < arguments.length; i++) {
@@ -171,11 +170,12 @@ public class AgentObservations implements Serializable {
 				Collection<StringFact> termFacts = termMappedFacts_.get(term);
 				if (termFacts != null) {
 					for (StringFact termFact : termFacts) {
-						// Don't include the fact itself or type facts in the
-						// condition beliefs. TODO Turn off the type
-						// restriction.
-						if (!StateSpec.getInstance().isTypePredicate(
-								termFact.getFactName())) {
+						// Only note facts if type status matches (types note
+						// types, and non-types note non-types)
+						if (StateSpec.getInstance().isTypePredicate(
+								baseFact.getFactName()) == StateSpec
+								.getInstance().isTypePredicate(
+										termFact.getFactName())) {
 							StringFact relativeFact = new StringFact(termFact);
 							relativeFact
 									.replaceArguments(replacementMap, false);
@@ -824,10 +824,10 @@ public class AgentObservations implements Serializable {
 	 * @author Sam Sarjant
 	 */
 	private class ActionBasedObservations implements Serializable {
-		private static final long serialVersionUID = 6572661453632055865L;
+		private static final long serialVersionUID = 1167175828246036292L;
 
 		/** The pre-goal information. */
-		private PreGoalInformation pgi_;
+		private transient PreGoalInformation pgi_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<StringFact> invariantActionConditions_;

@@ -161,7 +161,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		steps_++;
 		ObjectObservations.getInstance().predicateKB = rete_;
 
-		// TODO Problem here with freshly created modules and reward.
 		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
 				/ nonOptimalSteps;
 		Reward_observation_terminal rot = new Reward_observation_terminal(

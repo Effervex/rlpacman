@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -22,12 +23,19 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	/** The elements contained within the distribution. */
 	private Map<T, Double> elements_;
 
+	/**
+	 * A map for accessing an element using an equal (but not necessarily the
+	 * same) object.
+	 */
+	private Map<T, T> elementSelfMapping_;
+
 	/** The random number generator. */
 	private Random random_;
 
 	public OrderedDistribution(Random random) {
 		random_ = random;
 		elements_ = new HashMap<T, Double>();
+		elementSelfMapping_ = new HashMap<T, T>();
 	}
 
 	/**
@@ -39,6 +47,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	public OrderedDistribution<T> clone() {
 		OrderedDistribution<T> clone = new OrderedDistribution<T>(random_);
 		clone.elements_ = new HashMap<T, Double>(elements_);
+		clone.elementSelfMapping_ = new HashMap<T, T>(elementSelfMapping_);
 
 		return clone;
 	}
@@ -79,7 +88,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 *            The number of elements being sampled for relative value
 	 *            calculation.
 	 * @param useMostLikely
-	 *            Whether to simply use the most likely or just sample randomly.
+	 *            If the most likely element is to be chosen.
 	 * @return The element sampled.
 	 */
 	public T sample(int index, int numElements, boolean useMostLikely) {
@@ -95,7 +104,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 *            The number of elements being sampled for relative value
 	 *            calculation.
 	 * @param useMostLikely
-	 *            Whether to simply use the most likely or just sample randomly.
+	 *            If the most likely element is to be chosen.
 	 * @return The element sampled.
 	 */
 	public T sampleWithRemoval(int index, int numElements, boolean useMostLikely) {
@@ -111,6 +120,17 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public Collection<T> getElements() {
 		return elements_.keySet();
+	}
+
+	/**
+	 * Gets a particular element using an equal element as the key.
+	 * 
+	 * @param equalElement
+	 *            The equal element.
+	 * @return An element equal to the element but not necessarily the same.
+	 */
+	public T getElement(T equalElement) {
+		return elementSelfMapping_.get(equalElement);
 	}
 
 	/**
@@ -229,6 +249,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public boolean add(T e) {
 		elements_.put(e, 0.5);
+		elementSelfMapping_.put(e, e);
 		return true;
 	}
 
@@ -247,6 +268,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		if (order > 1)
 			order = 1;
 		elements_.put(e, order);
+		elementSelfMapping_.put(e, e);
 		return true;
 	}
 
@@ -258,9 +280,19 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		return val;
 	}
 
+	public boolean addContainsAll(Collection<? extends T> c) {
+		boolean val = false;
+		for (T t : c) {
+			if (!contains(t))
+				val |= add(t);
+		}
+		return val;
+	}
+
 	@Override
 	public void clear() {
 		elements_.clear();
+		elementSelfMapping_.clear();
 	}
 
 	@Override
@@ -286,6 +318,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public boolean remove(Object o) {
 		Double val = elements_.remove(o);
+		elementSelfMapping_.remove(o);
 		if (val == null)
 			return false;
 		return true;
@@ -306,10 +339,10 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 			throw new NullPointerException();
 
 		int size = elements_.size();
-		for (Iterator<T> iter = iterator(); iter.hasNext();) {
-			T element = iter.next();
+		Set<T> elementSet = new HashSet<T>(elements_.keySet());
+		for (T element : elementSet) {
 			if (!c.contains(element))
-				iter.remove();
+				remove(element);
 		}
 
 		// If the sizes haven't changed, return false.
