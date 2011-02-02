@@ -55,7 +55,7 @@ public class LearningController {
 	/** The marker for the end of a successfully completed performance file. */
 	public static final String END_PERFORMANCE = "<--END-->";
 	/** The gap between performance checks per episode. */
-	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 1000;
+	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 100;
 	/**
 	 * The number of meta-iterations a rule goes without updates before being
 	 * pruned.
@@ -237,11 +237,6 @@ public class LearningController {
 						.loadPolicyGenerator(serializedFile_);
 			if (localPolicy == null)
 				localPolicy = PolicyGenerator.newInstance(run);
-
-			if (loadedGeneratorFile_ != null && serializedFile_ == null) {
-				localPolicy.loadGenerators(loadedGeneratorFile_);
-				localPolicy.freeze(true);
-			}
 
 			developPolicy(localPolicy, run, iteration);
 

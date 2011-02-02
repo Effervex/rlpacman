@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 
 import relationalFramework.RuleCreation;
@@ -104,7 +105,6 @@ public class ConditionBeliefs implements Serializable {
 			addNeverSeenPreds();
 			if (addGeneralities)
 				rearrangeGeneralRules();
-			// TODO A shambles here...
 			if (untrueFacts != null) {
 				// Note the untrue facts
 				untrueFacts.addAll(neverTrue_);
@@ -114,13 +114,13 @@ public class ConditionBeliefs implements Serializable {
 		// If the condition has no relations don't bother updating.
 		else if (alwaysTrue_.isEmpty() && neverTrue_.isEmpty())
 			return false;
-		
+
 		// Clone the collection so no changes are made.
 		trueFacts = new HashSet<StringFact>(trueFacts);
 
 		// Expand the true facts first
 		trueFacts.addAll(generateGenerals(trueFacts));
-		
+
 		if (untrueFacts != null) {
 			// Note the untrue facts
 			untrueFacts.addAll(alwaysTrue_);
@@ -243,7 +243,12 @@ public class ConditionBeliefs implements Serializable {
 				.getInstance().getStringFact(condition_));
 
 		// Run by the predicates
-		for (String pred : StateSpec.getInstance().getPredicates().keySet()) {
+		Set<String> predicates = null;
+		if (StateSpec.getInstance().isTypePredicate(condition_))
+			predicates = StateSpec.getInstance().getTypePredicates().keySet();
+		else
+			predicates = StateSpec.getInstance().getPredicates().keySet();
+		for (String pred : predicates) {
 			// Run by the possible combinations within the predicates.
 			for (StringFact fact : createPossibleFacts(pred, possibleTerms)) {
 				if (!alwaysTrue_.contains(fact)
@@ -252,8 +257,7 @@ public class ConditionBeliefs implements Serializable {
 			}
 
 			// If the same pred, remove the disallowed values from always true
-			// as well. TODO Is this necessary? I mean, the generalities are put
-			// right back in
+			// as well.
 			if (pred.equals(condition_))
 				alwaysTrue_.removeAll(disallowed_);
 		}

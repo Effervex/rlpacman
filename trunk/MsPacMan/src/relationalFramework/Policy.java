@@ -46,7 +46,8 @@ public class Policy {
 	/**
 	 * A constructor for a new policy using the same rules from an old policy.
 	 * 
-	 * @param policy The old policy.
+	 * @param policy
+	 *            The old policy.
 	 */
 	public Policy(Policy policy) {
 		this();
@@ -284,17 +285,10 @@ public class Policy {
 			return "<EMPTY POLICY>";
 
 		StringBuffer buffer = new StringBuffer("Policy:\n");
-		boolean empty = true;
 		for (GuidedRule rule : policyRules_) {
 			// Don't display module rules or unused rules
 			if (!rule.isLoadedModuleRule() && triggeredRules_.contains(rule)) {
-				// Ignore the last covered rules.
-				if (empty || !isCoveredRule(rule)) {
-					buffer.append(StateSpec.getInstance().encodeRule(rule)
-							+ "\n");
-					if (!isCoveredRule(rule))
-						empty = false;
-				}
+				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
 			}
 		}
 		return buffer.toString();

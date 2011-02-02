@@ -34,7 +34,6 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = new RuleCreation();
-		sut_.loadAgentObservations();
 	}
 
 	@Test
@@ -994,6 +993,22 @@ public class RuleCreationTest {
 		assertTrue(results
 				.contains(new GuidedRule(
 						"(on ?X ?_MOD_a) (clear ?X) (block ?X) => (moveFloor ?X)",
+						rule)));
+
+		pregoal.clear();
+		pregoal.add(StateSpec.toStringFact("(above d j)"));
+		pregoal.add(StateSpec.toStringFact("(clear d)"));
+		pregoal.add(StateSpec.toStringFact("(on d j)"));
+		pregoal.add(StateSpec.toStringFact("(block d)"));
+		pregoal.add(StateSpec.toStringFact("(highest d)"));
+		sut_.setPreGoal(StateSpec.toStringFact("(moveFloor d)"), pregoal);
+
+		rule = new GuidedRule(
+				"(clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
+		results = sut_.specialiseToPreGoal(rule);
+		assertFalse(results
+				.contains(new GuidedRule(
+						"(above ?X ?) (highest ?X) (not (highest ?X)) => (moveFloor ?X)",
 						rule)));
 	}
 

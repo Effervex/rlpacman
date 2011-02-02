@@ -1,6 +1,5 @@
 package relationalFramework;
 
-import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,7 +52,7 @@ public class RuleCreation implements Serializable {
 	 * Basic constructor.
 	 */
 	public RuleCreation() {
-		ao_ = new AgentObservations();
+		ao_ = loadAgentObservations();
 	}
 
 	/**
@@ -215,15 +214,15 @@ public class RuleCreation implements Serializable {
 						new DualHashBidiMap(), new String[0], false);
 				if (unification != null)
 					return null;
-
-				condition.swapNegated();
-				StringFact negUnification = Unification.getInstance()
-						.unifyFact(condition, ruleConds, new DualHashBidiMap(),
-								new DualHashBidiMap(), new String[0], false);
-				condition.swapNegated();
-				if (negUnification != null)
-					return null;
 			}
+
+			condition.swapNegated();
+			StringFact negUnification = Unification.getInstance().unifyFact(
+					condition, ruleConds, new DualHashBidiMap(),
+					new DualHashBidiMap(), new String[0], false);
+			condition.swapNegated();
+			if (negUnification != null)
+				return null;
 
 			simplified.add(condition);
 		}
@@ -236,6 +235,15 @@ public class RuleCreation implements Serializable {
 		return simplified;
 	}
 
+	/**
+	 * Specialises a rule towards conditions seen in the pre-goal state.
+	 * 
+	 * @param rule
+	 *            The rule to specialise.
+	 * @return All single-step mutations the rule can take towards matching the
+	 *         pre-goal state.
+	 */
+	@SuppressWarnings("unchecked")
 	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 		String actionPred = rule.getActionPredicate();
@@ -252,7 +260,8 @@ public class RuleCreation implements Serializable {
 			String[] ruleTerms = rule.getAction().getArguments();
 			String[] preGoalTerms = preGoal.getActionTerms();
 			for (int i = 0; i < preGoalTerms.length; i++) {
-				if (!preGoalTerms[i].equals(ruleTerms[i])) {
+				if (!preGoalTerms[i].equals(ruleTerms[i])
+						&& !StateSpec.isNumber(preGoalTerms[i])) {
 					replacementTerms.put(preGoalTerms[i], ruleTerms[i]);
 
 					// Try to create term swapped specialisations
@@ -283,17 +292,26 @@ public class RuleCreation implements Serializable {
 			// Attempt to add each condition in the pre-goal (using action terms
 			// where appropriate)
 			for (StringFact preGoalFact : preGoalState) {
-				StringFact replacedFact = new StringFact(preGoalFact);
-				replacedFact.replaceArguments(replacementTerms, true);
-				SortedSet<StringFact> specConditions = simplifyRule(
-						ruleConditions, replacedFact, true, false);
-				// Add the rule
-				if (specConditions != null) {
-					GuidedRule mutant = new GuidedRule(specConditions, rule
-							.getAction(), rule);
-					mutant.setQueryParams(rule.getQueryParameters());
-					mutant.expandConditions();
-					mutants.add(mutant);
+				// Check if the fact is numerical
+				ArrayList<Integer> indices = checkForNumerical(preGoalFact);
+				if (!indices.isEmpty()) {
+					// Split any ranges up
+					for (Integer index : indices)
+						mutants.addAll(splitRanges(rule, preGoalFact, index,
+								rule.isMutant()));
+				} else {
+					StringFact replacedFact = new StringFact(preGoalFact);
+					replacedFact.replaceArguments(replacementTerms, true);
+					SortedSet<StringFact> specConditions = simplifyRule(
+							ruleConditions, replacedFact, true, false);
+					// Add the rule
+					if (specConditions != null) {
+						GuidedRule mutant = new GuidedRule(specConditions, rule
+								.getAction(), rule);
+						mutant.setQueryParams(rule.getQueryParameters());
+						mutant.expandConditions();
+						mutants.add(mutant);
+					}
 				}
 			}
 		} else {
@@ -305,93 +323,20 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * Specialises a rule towards conditions seen in the pre-goal state.
+	 * Checks a fact for the presence of numerical arguments.
 	 * 
-	 * @param rule
-	 *            The rule to specialise.
-	 * @return All single-step mutations the rule can take towards matching the
-	 *         pre-goal state.
+	 * @param fact
+	 *            The fact to check.
+	 * @return Returns the indices of any numerical arguments.
 	 */
-	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule, boolean fda) {
-		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
-
-		// Get a single fact or variable specialisation from the pre goal for
-		// each mutation
-		String actionPred = rule.getActionPredicate();
-		PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
-
-		// If we have a pre goal state
-		SortedSet<StringFact> ruleConditions = rule.getConditions(false);
-		if (preGoal != null) {
-			Collection<StringFact> preGoalState = preGoal.getState();
-
-			// Form a replacement terms map.
-			Map<String, String> replacementTerms = new HashMap<String, String>();
-			Map<String, String> reverseReplacementTerms = new HashMap<String, String>();
-			String[] ruleTerms = rule.getAction().getArguments();
-			String[] preGoalTerms = preGoal.getActionTerms();
-			for (int i = 0; i < preGoalTerms.length; i++) {
-				if (!preGoalTerms[i].equals(ruleTerms[i])) {
-					replacementTerms.put(preGoalTerms[i], ruleTerms[i]);
-					// Only reverse replace if the term is a variable
-					if (ruleTerms[i].charAt(0) == '?')
-						reverseReplacementTerms.put(ruleTerms[i],
-								preGoalTerms[i]);
-				}
-			}
-
-			// Algorithm detail:
-			// 1. Run through each fact in the pre-goal
-			// 2. Run through each cond in the rule conditions
-			// 3. If the fact pred isn't in the cond preds, add it, replacing
-			// pre-goal terms with rule terms
-			// 4a. If the fact pred matches the rule pred, try replacing all
-			// occurrences of each cond term with the fact term in every cond
-			// 4b. If the new cond is valid (through unification), keep it and
-			// note that the replacement has occured
-			// 5a. If the cond term is ? and the preds match, use the fact term
-			// 5b. If the cond term is a variable, the preds match and the fact
-			// term isn't part of the action, use the fact term.
-
-			// 1. Run through each fact in the pre-goal
-			for (StringFact preGoalFact : preGoalState) {
-				boolean hasPred = false;
-
-				// 2. Run through each cond in the rule conditions
-				for (StringFact condFact : ruleConditions) {
-					hasPred |= factMutation(rule, mutants, preGoalState,
-							replacementTerms, reverseReplacementTerms,
-							condFact, preGoalFact, preGoalTerms, rule
-									.isMutant());
-				}
-
-				// 3. If the fact pred isn't in the cond preds, add it,
-				// replacing pre-goal terms with rule terms
-				if (!hasPred) {
-					// Replace pre-goal action terms with local rule terms
-					preGoalFact = new StringFact(preGoalFact);
-					preGoalFact.replaceArguments(replacementTerms, true);
-
-					// If the fact isn't in the rule, we have a mutation
-					if (!ruleConditions.contains(preGoalFact)) {
-						SortedSet<StringFact> mutatedConditions = simplifyRule(
-								ruleConditions, preGoalFact, false, true);
-						if (mutatedConditions != null) {
-							GuidedRule mutant = new GuidedRule(
-									mutatedConditions, rule.getAction(), rule);
-							mutant.setQueryParams(rule.getQueryParameters());
-							mutant.expandConditions();
-							mutants.add(mutant);
-						}
-					}
-				}
-			}
-		} else {
-			// Split any ranges up
-			mutants.addAll(splitRanges(rule, null, 0, rule.isMutant()));
+	private ArrayList<Integer> checkForNumerical(StringFact fact) {
+		ArrayList<Integer> numericalIndices = new ArrayList<Integer>();
+		String[] argTypes = fact.getArgTypes();
+		for (int i = 0; i < argTypes.length; i++) {
+			if (StateSpec.isNumberType(argTypes[i]))
+				numericalIndices.add(i);
 		}
-
-		return mutants;
+		return numericalIndices;
 	}
 
 	/**
@@ -573,11 +518,7 @@ public class RuleCreation implements Serializable {
 				String[] preGoalRangeSplit = StateSpec.splitFact(preGoalTerm
 						.substring(preGoalSuchThatIndex + 2));
 				double startPoint = Double.parseDouble(preGoalRangeSplit[2]);
-				if (startPoint < min)
-					startPoint = min;
 				double endPoint = Double.parseDouble(preGoalRangeSplit[3]);
-				if (endPoint > max)
-					endPoint = max;
 
 				if (startPoint * endPoint < 0)
 					values.add(0d);
@@ -585,6 +526,10 @@ public class RuleCreation implements Serializable {
 				// Determine the ranges
 				values.add(startPoint);
 				values.add(endPoint);
+
+				// Modify the range split if necessary
+				if (((endPoint - startPoint) / NUM_DISCRETE_RANGES) > rangeSplit)
+					rangeSplit = (endPoint - startPoint) / NUM_DISCRETE_RANGES;
 
 				Collections.sort(values);
 				subranges.addAll(createRangedMutations(baseRule, c, condition,
@@ -986,10 +931,12 @@ public class RuleCreation implements Serializable {
 	/**
 	 * Loads the agent observations from file.
 	 */
-	public void loadAgentObservations() {
+	private AgentObservations loadAgentObservations() {
 		AgentObservations ao = AgentObservations.loadAgentObservations();
 		if (ao != null)
-			ao_ = ao;
+			return ao;
+		else
+			return new AgentObservations();
 	}
 
 	public void loadBackupPreGoal() {

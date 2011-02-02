@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +47,7 @@ public class GuidedRule implements Serializable {
 	private boolean mutant_ = false;
 
 	/** If the slot is a mutant, the parent of the mutant. */
-	private Set<GuidedRule> mutantParents_;
+	private Collection<GuidedRule> mutantParents_;
 
 	/** If this rule has spawned any mutant rules yet. */
 	private Integer hasSpawned_ = null;
@@ -571,7 +570,7 @@ public class GuidedRule implements Serializable {
 		return mutant_;
 	}
 
-	public Set<GuidedRule> getParentRules() {
+	public Collection<GuidedRule> getParentRules() {
 		return mutantParents_;
 	}
 
@@ -581,9 +580,9 @@ public class GuidedRule implements Serializable {
 	 * @param parentRules
 	 *            The parent rules to add.
 	 */
-	public void addParents(Set<GuidedRule> parentRules) {
+	public void addParents(Collection<GuidedRule> parentRules) {
 		if (mutantParents_ == null)
-			mutantParents_ = new HashSet<GuidedRule>();
+			mutantParents_ = new ArrayList<GuidedRule>();
 		mutantParents_.addAll(parentRules);
 	}
 
@@ -635,7 +634,7 @@ public class GuidedRule implements Serializable {
 	 */
 	public void setMutant(GuidedRule parent) {
 		if (mutantParents_ == null)
-			mutantParents_ = new HashSet<GuidedRule>();
+			mutantParents_ = new ArrayList<GuidedRule>();
 		mutant_ = true;
 		mutantParents_.add(parent);
 	}
@@ -702,7 +701,7 @@ public class GuidedRule implements Serializable {
 		clone.statesSeen_ = statesSeen_;
 		clone.mutant_ = mutant_;
 		if (mutantParents_ != null)
-			clone.mutantParents_ = new HashSet<GuidedRule>(mutantParents_);
+			clone.mutantParents_ = new ArrayList<GuidedRule>(mutantParents_);
 
 		if (queryParams_ != null)
 			clone.queryParams_ = new ArrayList<String>(queryParams_);

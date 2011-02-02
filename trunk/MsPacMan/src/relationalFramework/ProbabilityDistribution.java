@@ -5,9 +5,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * A class representing a probability distribution of values. These values are
@@ -123,16 +125,17 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public Double getProb(T element) {
 		return itemProbs_.get(element);
 	}
-	
+
 	/**
 	 * Gets the element equal to the argument element.
 	 * 
-	 * @param equalElement The element equal to another element in this distribution.
+	 * @param equalElement
+	 *            The element equal to another element in this distribution.
 	 * @return The element or null.
 	 */
 	public T getElement(T equalElement) {
 		Iterator<T> iter = iterator();
-		while(iter.hasNext()) {
+		while (iter.hasNext()) {
 			T element = iter.next();
 			if (element.equals(equalElement))
 				return element;
@@ -480,10 +483,10 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			throw new NullPointerException();
 
 		int size = itemProbs_.size();
-		for (Iterator<T> iter = iterator(); iter.hasNext();) {
-			T element = iter.next();
+		Set<T> elementSet = new HashSet<T>(itemProbs_.keySet());
+		for (T element : elementSet) {
 			if (!collection.contains(element))
-				iter.remove();
+				remove(element);
 		}
 
 		// If the sizes haven't changed, return false.

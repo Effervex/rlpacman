@@ -7,9 +7,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.math.distribution.PoissonDistribution;
-import org.apache.commons.math.distribution.PoissonDistributionImpl;
-
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
  * within and any other pertinent information.
@@ -38,11 +35,17 @@ public class Slot implements Serializable {
 	/** The facts used in this slot split, if it has any. */
 	private Collection<StringFact> slotSplitFacts_;
 
+	/** The seed (first) rule for the slot. */
+	private GuidedRule seedRule_;
+
 	/** If this slot is fixed. */
 	private boolean fixed_ = false;
 
 	/** The chance of this slot being selected. */
 	private double selectionProb_;
+
+	/** The variance on the chances of the slot being selected. */
+	private double selectionSD_;
 
 	/** The number of times the slot should be used. */
 	private int numSlotUses_;
@@ -58,6 +61,7 @@ public class Slot implements Serializable {
 		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>(
 				PolicyGenerator.random_);
 		selectionProb_ = 1.0;
+		selectionSD_ = 0.5;
 		numSlotUses_ = 0;
 	}
 
@@ -83,6 +87,9 @@ public class Slot implements Serializable {
 	 *            The rule being added.
 	 */
 	public void addNewRule(GuidedRule guidedRule) {
+		if (seedRule_ == null)
+			seedRule_ = guidedRule;
+
 		if (!ruleGenerator_.contains(guidedRule)) {
 			if (ruleGenerator_.isEmpty())
 				ruleGenerator_.add(guidedRule, 1);
@@ -93,20 +100,6 @@ public class Slot implements Serializable {
 			}
 			guidedRule.setSlot(this);
 		}
-	}
-
-	/**
-	 * Adds a rule to the slot with a set probability. Used when loading
-	 * existing generators.
-	 * 
-	 * @param guidedRule
-	 *            The rule being loaded.
-	 * @param ruleProb
-	 *            The probability of the rule.
-	 */
-	public void addRule(GuidedRule guidedRule, double ruleProb) {
-		ruleGenerator_.add(guidedRule, ruleProb);
-		guidedRule.setSlot(this);
 	}
 
 	/**
@@ -140,7 +133,7 @@ public class Slot implements Serializable {
 		if (freeze) {
 			backupGenerator_ = ruleGenerator_;
 
-			ruleGenerator_ = ruleGenerator_.bindProbs(false);
+			// ruleGenerator_ = ruleGenerator_.bindProbs(false);
 		} else {
 			ruleGenerator_ = backupGenerator_;
 		}
@@ -153,32 +146,32 @@ public class Slot implements Serializable {
 	 * @param random
 	 *            The random number generator used for generating a gaussian
 	 *            value.
-	 * @param frozen
-	 *            If the generator is frozen, in which case selection is split
-	 *            uniformly without variance.
 	 * @return A boolean array of two elements: whether to use the slot and
 	 *         whether to keep the slot. Note that !Use -> !Keep
 	 */
-	public boolean[] shouldUseSlot(Random random, boolean frozen) {
+	public boolean[] shouldUseSlot(Random random) {
 		boolean[] useSlot = new boolean[2];
 		if (numSlotUses_ <= 0) {
 			// The slot has not been sampled yet and needs to set a selection
 			// probability.
-			if (frozen) {
-				// If frozen, just use the rounded value for selection
-				numSlotUses_ = (int) Math.round(selectionProb_);
-			} else {
-				// Selection prob is determined by a Poisson distribution
-				PoissonDistribution p = new PoissonDistributionImpl(
-						selectionProb_);
-				try {
-					double cumulativeProb = random.nextDouble();
-					numSlotUses_ = p
-							.inverseCumulativeProbability(cumulativeProb) + 1;
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+			double gauss = random.nextGaussian();
+			double selectionProb = selectionProb_ + selectionSD_ * gauss;
+			numSlotUses_ = 0;
+			while (random.nextDouble() < selectionProb) {
+				numSlotUses_++;
+				selectionProb--;
 			}
+
+			// PoissonDistribution p = new
+			// PoissonDistributionImpl(selectionProb_
+			// * selectionModifier);
+			// try {
+			// double cumulativeProb = random.nextDouble();
+			// numSlotUses_ = p.inverseCumulativeProbability(cumulativeProb) +
+			// 1;
+			// } catch (Exception e) {
+			// e.printStackTrace();
+			// }
 		}
 
 		// Use the slot if available, and remove it if no more uses are left.
@@ -202,8 +195,13 @@ public class Slot implements Serializable {
 	 * @param stepSize
 	 *            The amount the value should update by.
 	 */
-	public void updateSelectionValues(double mean, double stepSize) {
+	public void updateSelectionValues(double mean, double sd, double stepSize) {
 		selectionProb_ = mean * stepSize + (1 - stepSize) * selectionProb_;
+		selectionSD_ = sd * stepSize + (1 - stepSize) * selectionSD_;
+
+		// Capping variance at max.
+		if (selectionSD_ > MAX_SELECTION_VARIANCE)
+			selectionSD_ = MAX_SELECTION_VARIANCE;
 	}
 
 	/**
@@ -267,8 +265,20 @@ public class Slot implements Serializable {
 		selectionProb_ = prob;
 	}
 
+	public double getSelectionSD() {
+		return selectionSD_;
+	}
+
+	public void setSelectionSD(double sd) {
+		selectionSD_ = sd;
+	}
+
 	public Collection<StringFact> getSlotSplitFacts() {
 		return slotSplitFacts_;
+	}
+
+	public GuidedRule getSeedRule() {
+		return seedRule_;
 	}
 
 	public GuidedRule sample(boolean useMostLikely) {
@@ -306,11 +316,13 @@ public class Slot implements Serializable {
 	public Slot clone() {
 		Slot clone = new Slot(action_);
 		clone.selectionProb_ = selectionProb_;
+		clone.selectionSD_ = selectionSD_;
 		clone.fixed_ = fixed_;
 		clone.numSlotUses_ = numSlotUses_;
 		clone.ruleGenerator_ = ruleGenerator_.clone();
 		if (slotSplitFacts_ != null)
 			clone.slotSplitFacts_ = new ArrayList<StringFact>(slotSplitFacts_);
+		clone.seedRule_ = seedRule_;
 		if (backupGenerator_ != null)
 			clone.backupGenerator_ = backupGenerator_.clone();
 		return clone;
@@ -366,31 +378,13 @@ public class Slot implements Serializable {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
-		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_);
+		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_
+				+ "\u00b1" + selectionSD_);
 		return buffer.toString();
 	}
 
 	public boolean isEmpty() {
 		return ruleGenerator_.isEmpty();
-	}
-
-	/**
-	 * Converts this slot into a parsable string format.
-	 * 
-	 * @return This slot in string format.
-	 */
-	public String toParsableString() {
-		// TODO Deal with slot split facts
-		StringBuffer buffer = new StringBuffer();
-		if (fixed_)
-			buffer.append("FIXED" + ELEMENT_DELIMITER);
-		buffer.append(action_ + "{");
-		for (GuidedRule rule : ruleGenerator_) {
-			if (ruleGenerator_.getProb(rule) > 0)
-				buffer.append(ruleGenerator_.toString());
-		}
-		buffer.append("}");
-		return buffer.toString();
 	}
 
 	/**
@@ -401,7 +395,6 @@ public class Slot implements Serializable {
 	 * @return A new slot, which can be formatted into the same input string.
 	 */
 	public static Slot parseSlotString(String slotString) {
-		// TODO Deal with slot split facts
 		int index = 0;
 		// Checking if slot is fixed
 		boolean fixed = false;
