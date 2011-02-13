@@ -21,7 +21,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class ConditionBeliefs implements Serializable {
-	private static final long serialVersionUID = 1256381798685341459L;
+	private static final long serialVersionUID = 5023779765740732969L;
 
 	/** The condition this class represents as a base. */
 	private String condition_;
@@ -46,6 +46,9 @@ public class ConditionBeliefs implements Serializable {
 	 * version of this condition.
 	 */
 	private Collection<StringFact> disallowed_;
+
+	/** More general (and same) versions of this rule. */
+	private Collection<StringFact> generalities_;
 
 	/**
 	 * The argument index for the condition belief. Only used for negated
@@ -101,6 +104,7 @@ public class ConditionBeliefs implements Serializable {
 		// If this is our first state, all true facts are always true, and all
 		// others are always false.
 		if (firstState) {
+			generalities_ = createGeneralities();
 			alwaysTrue_.addAll(trueFacts);
 			addNeverSeenPreds();
 			if (addGeneralities)
@@ -127,6 +131,7 @@ public class ConditionBeliefs implements Serializable {
 			untrueFacts.addAll(occasionallyTrue_);
 			untrueFacts.addAll(neverTrue_);
 			untrueFacts.removeAll(trueFacts);
+			untrueFacts.removeAll(generalities_);
 		}
 
 		// Filter the disallowed facts
@@ -153,6 +158,109 @@ public class ConditionBeliefs implements Serializable {
 	}
 
 	/**
+	 * Creates the generalities of this fact and this fact itself.
+	 * 
+	 * @return A collection of all generalities of this rule.
+	 */
+	private Collection<StringFact> createGeneralities() {
+		Collection<StringFact> generalities = new TreeSet<StringFact>();
+
+		// Add general rules to always true (on ?X ?Y) => (on ?X ?), (on ? ?Y)
+		StringFact thisFact = StateSpec.getInstance().getStringFact(condition_);
+		int permutations = (int) Math.pow(2, thisFact.getArgTypes().length);
+		// Create all generalisations of this fact
+		for (int p = 1; p < permutations; p++) {
+			String[] genArguments = new String[thisFact.getArgTypes().length];
+			// Run through each index location, using bitwise ops
+			for (int i = 0; i < genArguments.length; i++) {
+				// If the argument is not 0, enter a variable.
+				if ((p & (int) Math.pow(2, i)) != 0)
+					genArguments[i] = RuleCreation
+							.getVariableTermString(i);
+				else
+					genArguments[i] = StateSpec.ANONYMOUS;
+			}
+
+			generalities.add(new StringFact(thisFact, genArguments));
+		}
+
+		return generalities;
+	}
+
+	/**
+	 * Not to be confused with noteTrueRelativeFacts, noteTrueFacts takes the
+	 * facts that are true and the facts that are false and performs no extra
+	 * reasoning for further facts.
+	 * 
+	 * The occasionally used facts contain previously used facts that have been
+	 * both true and false. Note that newly added true or false facts that are
+	 * not present in true, false or occasionally used will be added to their
+	 * appropriate location (true or false).
+	 * 
+	 * @param trueFacts
+	 *            The facts that are true.
+	 * @param untrueFacts
+	 *            The facts that are false.
+	 * @param occasionalFacts
+	 *            The facts that are sometimes true, sometimes false.
+	 */
+	public boolean noteFacts(Collection<StringFact> trueFacts,
+			Collection<StringFact> untrueFacts,
+			Collection<StringFact> occasionalFacts) {
+		if (firstState) {
+			alwaysTrue_.addAll(trueFacts);
+			neverTrue_.addAll(untrueFacts);
+			occasionallyTrue_.addAll(occasionalFacts);
+			firstState = false;
+			return true;
+		}
+
+		// Union the facts (and add any unseen facts)
+		boolean changed = false;
+//		changed |= alwaysTrue_.retainAll(trueFacts);
+//		changed |= neverTrue_.retainAll(untrueFacts);
+//		changed |= occasionallyTrue_.retainAll(occasionalFacts);
+		changed |= alwaysTrue_.removeAll(occasionalFacts);
+		changed |= neverTrue_.removeAll(occasionalFacts);
+		changed |= occasionallyTrue_.addAll(occasionalFacts);
+
+		for (StringFact trueFact : trueFacts) {
+			// If always doesn't contain the fact
+			if (!alwaysTrue_.contains(trueFact)) {
+				if (neverTrue_.contains(trueFact)) {
+					// ...and never does, remove it from neverTrue and add to
+					// occasional
+					neverTrue_.remove(trueFact);
+					occasionallyTrue_.add(trueFact);
+					changed = true;
+				} else if (!occasionallyTrue_.contains(trueFact)) {
+					// ...and neither never nor occasional do, add to always
+					alwaysTrue_.add(trueFact);
+					changed = true;
+				}
+			}
+		}
+
+		for (StringFact untrueFact : untrueFacts) {
+			// If always doesn't contain the fact
+			if (!neverTrue_.contains(untrueFact)) {
+				if (alwaysTrue_.contains(untrueFact)) {
+					// ...and never does, remove it from neverTrue and add to
+					// occasional
+					alwaysTrue_.remove(untrueFact);
+					occasionallyTrue_.add(untrueFact);
+					changed = true;
+				} else if (!occasionallyTrue_.contains(untrueFact)) {
+					// ...and neither never nor occasional do, add to always
+					neverTrue_.add(untrueFact);
+					changed = true;
+				}
+			}
+		}
+		return changed;
+	}
+
+	/**
 	 * Rearranges the rules about if there are specific rules in always or never
 	 * such that more general version of those rules are also in always or
 	 * never.
@@ -166,23 +274,10 @@ public class ConditionBeliefs implements Serializable {
 		neverTrue_.removeAll(generals);
 		alwaysTrue_.addAll(generals);
 
-		// Add general rules to always true
-		for (StringFact general : disallowed_) {
-			// Do not add fully anonymous/not anonymous at all rules.
-			boolean fullyAnon = true;
-			boolean fullyVar = true;
-			for (String arg : general.getArguments()) {
-				if (arg.equals("?"))
-					fullyVar = false;
-				else
-					fullyAnon = false;
-			}
-
-			if (!fullyAnon && !fullyVar) {
-				occasionallyTrue_.remove(general);
-				neverTrue_.remove(general);
-				alwaysTrue_.add(general);
-			}
+		for (StringFact general : generalities_) {
+			occasionallyTrue_.remove(general);
+			neverTrue_.remove(general);
+			alwaysTrue_.add(general);
 		}
 	}
 
@@ -243,11 +338,9 @@ public class ConditionBeliefs implements Serializable {
 				.getInstance().getStringFact(condition_));
 
 		// Run by the predicates
-		Set<String> predicates = null;
-		if (StateSpec.getInstance().isTypePredicate(condition_))
-			predicates = StateSpec.getInstance().getTypePredicates().keySet();
-		else
-			predicates = StateSpec.getInstance().getPredicates().keySet();
+		Set<String> predicates = new HashSet<String>();
+		predicates.addAll(StateSpec.getInstance().getTypePredicates().keySet());
+		predicates.addAll(StateSpec.getInstance().getPredicates().keySet());
 		for (String pred : predicates) {
 			// Run by the possible combinations within the predicates.
 			for (StringFact fact : createPossibleFacts(pred, possibleTerms)) {
@@ -256,8 +349,8 @@ public class ConditionBeliefs implements Serializable {
 					neverTrue_.add(fact);
 			}
 
-			// If the same pred, remove the disallowed values from always true
-			// as well.
+			// If the same pred, remove the disallowed values from always
+			// true as well.
 			if (pred.equals(condition_))
 				alwaysTrue_.removeAll(disallowed_);
 		}
@@ -300,7 +393,8 @@ public class ConditionBeliefs implements Serializable {
 
 	/**
 	 * Creates the mapping of variable action terms to argument types, based on
-	 * the location of the argument within the predicate.
+	 * the location of the argument within the predicate. Note that type
+	 * hierarchies are also included.
 	 * 
 	 * @param predicate
 	 *            The predicate to form action term map from.
@@ -311,9 +405,16 @@ public class ConditionBeliefs implements Serializable {
 
 		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
-			if (!StateSpec.isNumberType(argTypes[i]))
-				actionTerms.put(argTypes[i], RuleCreation
-						.getVariableTermString(i));
+			if (!StateSpec.isNumberType(argTypes[i])) {
+				String varName = RuleCreation.getVariableTermString(i);
+				actionTerms.putContains(argTypes[i], varName);
+				// Also put any parent type of the given type
+				Collection<String> parentTypes = new HashSet<String>();
+				StateSpec.getInstance()
+						.getTypeLineage(argTypes[i], parentTypes);
+				for (String parent : parentTypes)
+					actionTerms.putContains(parent, varName);
+			}
 		}
 
 		return actionTerms;
@@ -344,9 +445,7 @@ public class ConditionBeliefs implements Serializable {
 			// the condition itself.
 			boolean keepRule = false;
 			for (int i = 0; i < arguments.length; i++) {
-				if (!arguments[i].equals("?")
-						&& !(baseFact.getFactName().equals(condition_) && arguments[i]
-								.equals(RuleCreation.getVariableTermString(i)))) {
+				if (!arguments[i].equals("?")) {
 					keepRule = true;
 					break;
 				}
@@ -371,18 +470,11 @@ public class ConditionBeliefs implements Serializable {
 		}
 
 		// For each term
-		MultiMap<String, String> termsClone = new MultiMap<String, String>(
-				possibleTerms);
 		for (String term : terms) {
 			arguments[index] = term;
-			// If the term isn't anonymous, remove it from the possible terms
-			// (clone).
-			if (!term.equals("?")) {
-				termsClone.get(argTypes[index]).remove(term);
-			}
 
 			// Recurse further
-			formPossibleFact(arguments, index + 1, termsClone, baseFact,
+			formPossibleFact(arguments, index + 1, possibleTerms, baseFact,
 					possibleFacts);
 		}
 	}

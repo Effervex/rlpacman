@@ -57,28 +57,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 		bkMap.put("clearRule", new BackgroundKnowledge(
 				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
 
-		// OnFloor(X) <-> !On(X,?)
-		bkMap.put("onFloorRule1", new BackgroundKnowledge(
-				"(onFloor ?X) <=> (not (on ?X ?))", false));
-
-		// On(X,?) <-> !OnFloor(X)
-		bkMap.put("onFloorRule2", new BackgroundKnowledge(
-				"(on ?X ?) <=> (not (onFloor ?X))", false));
-
-		// Block(Z) & On(X,Y) -> !On(X,Z)
-		bkMap.put("onRule", new BackgroundKnowledge(
-				"(block ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
-
-		// Highest(X) -> Clear(X)
-		bkMap.put("highestRule", new BackgroundKnowledge(
-				"(highest ?X) => (clear ?X)", false));
-
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
-
-		bkMap.put("aboveRule1.5", new BackgroundKnowledge(
-				"(on ?X ?) => (above ?X ?)", false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
@@ -101,7 +82,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
-			return "(not (on ?X ?Y))";
+			return "(not (on ? ?))";
 		}
 
 		// Stack goal

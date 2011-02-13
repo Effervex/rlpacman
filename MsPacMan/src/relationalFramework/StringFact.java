@@ -12,7 +12,7 @@ import java.util.Map;
  * @author Sam Sarjant
  */
 public class StringFact implements Comparable<StringFact>, Serializable {
-	private static final long serialVersionUID = -7697442930084005787L;
+	private static final long serialVersionUID = 6060157961121072894L;
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -152,6 +152,29 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	}
 
 	/**
+	 * Only retains the arguments in the array and modifies all other arguments
+	 * to anonymous terms.
+	 * 
+	 * @param retainedArgs
+	 *            The arguments to retain.
+	 */
+	public void retainArguments(String[] retainedArgs) {
+		for (int i = 0; i < arguments_.length; i++) {
+			boolean retain = false;
+			// Check if it's a retainable arg
+			for (String retained : retainedArgs) {
+				if (arguments_[i].equals(retained)) {
+					retain = true;
+					break;
+				}
+			}
+
+			if (!retain)
+				arguments_[i] = "?";
+		}
+	}
+
+	/**
 	 * Creates a variable term replacement map using this StringFacts
 	 * non-numerical arguments as the terms being replaced.
 	 * 
@@ -226,12 +249,20 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 				return 1;
 		}
 
-		int result = factName_.compareTo(sf.factName_);
+		// Compare by number of arguments (complexity)
+		int result = Double.compare(arguments_.length, sf.arguments_.length);
 		if (result != 0)
 			return result;
+		
+		// Type predicates trump regular predicates
+		if (StateSpec.getInstance().isTypePredicate(factName_)) {
+			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
+				return -1;
+		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
+			return 1;
+			
 
-		// Compare by number of arguments (complexity)
-		result = Double.compare(arguments_.length, sf.arguments_.length);
+		result = factName_.compareTo(sf.factName_);
 		if (result != 0)
 			return result;
 

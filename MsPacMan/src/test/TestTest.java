@@ -30,7 +30,7 @@ public class TestTest {
 		for (int i = 0; i < 10000; i++) {
 			counts[p.inverseCumulativeProbability(random.nextDouble()) + 1]++;
 		}
-		double delta = 0.01;
+		double delta = 0.03;
 		assertEquals(0.367879, counts[0] / 10000d, delta);
 		assertEquals(0.367879, counts[1] / 10000d, delta);
 		assertEquals(0.183940, counts[2] / 10000d, delta);
@@ -56,7 +56,7 @@ public class TestTest {
 		for (int i = 0; i < 10000; i++) {
 			counts[p.inverseCumulativeProbability(random.nextDouble()) + 1]++;
 		}
-		delta = 0.01;
+		delta = 0.03;
 		assertEquals(0.423162, counts[0] / 10000d, delta);
 		assertEquals(0.363919, counts[1] / 10000d, delta);
 		assertEquals(0.156485, counts[2] / 10000d, delta);
@@ -125,5 +125,16 @@ public class TestTest {
 					/ maxVals[2] + '\t' + normal001[i] / maxVals[3] + '\n');
 
 		write.close();
+	}
+	
+	@Test
+	public void testBitOperators() {
+		assertTrue((2 & 1) == 0);
+		assertTrue((2 & 2) != 0);
+		assertTrue((3 & 1) != 0);
+		assertTrue((2 & 2) != 0);
+		assertTrue((4 & 4) != 0);
+		assertTrue((4 & 2) == 0);
+		assertTrue((4 & 1) == 0);
 	}
 }

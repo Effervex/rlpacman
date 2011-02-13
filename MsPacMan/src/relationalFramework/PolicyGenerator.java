@@ -422,6 +422,7 @@ public class PolicyGenerator implements Serializable {
 				Slot rlggSlot = rlgg.getSlot();
 				// Split the slots and add them.
 				Set<GuidedRule> splitSeeds = ruleCreation_.specialiseRule(rlgg);
+				currentRules_.addAll(splitSeeds);
 				for (GuidedRule seedRule : splitSeeds) {
 					// The seed rule becomes parent-less and a non-mutant
 					seedRule.removeMutation();
@@ -436,13 +437,15 @@ public class PolicyGenerator implements Serializable {
 
 					// Check if the slot already exists
 					Slot existingSlot = slotGenerator_.getElement(splitSlot);
-					if (existingSlot != null
-							&& existingSlot.getSeedRule().equals(seedRule)) {
-						splitSlot = existingSlot;
-						seedRule = existingSlot.getSeedRule();
+					if (existingSlot != null) {
+						if (existingSlot.getSeedRule().equals(seedRule)) {
+							splitSlot = existingSlot;
+							seedRule = existingSlot.getSeedRule();
+						} else {
+							slotGenerator_.remove(existingSlot);
+						}
 					}
 
-					currentRules_.add(seedRule);
 					// Mutate new rules for the slot
 					mutateRule(seedRule, splitSlot, -1);
 

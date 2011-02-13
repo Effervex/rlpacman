@@ -9,7 +9,6 @@ import java.util.SortedSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import relationalFramework.PolicyGenerator;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -22,7 +21,7 @@ import relationalFramework.Unification;
  */
 public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		Serializable {
-	private static final long serialVersionUID = 8232254519459077567L;
+	private static final long serialVersionUID = 8755871369618060470L;
 
 	/** The JESS compatible assertion string. */
 	private String assertionString_;
@@ -108,8 +107,9 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				.size());
 		for (StringFact preCond : preConds_) {
 			StringFact replacedFact = new StringFact(preCond);
-			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
-					true);
+			if (replacementTerms != null)
+				replacedFact.replaceArguments(
+						replacementTerms.inverseBidiMap(), true);
 			preConds.add(replacedFact);
 		}
 
@@ -173,14 +173,20 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		// Simplify to the left for equivalent background knowledge
 		if (equivalentRule_) {
 			replacementTerms.clear();
+
 			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
 					replacementTerms, new String[0], true);
+
+			// If there is a unification, attempt to remove the right side
 			if (unifiedEquiv != null) {
 				unifiedEquiv.replaceArguments(
 						replacementTerms.inverseBidiMap(), true);
 				if (ruleConds.remove(unifiedEquiv)) {
+					// Swap variable
 					Collection<StringFact> equivFacts = getPreConds(replacementTerms);
+
+					// Add all equivalent facts.
 					for (StringFact equivFact : equivFacts) {
 						if (!ruleConds.contains(equivFact)) {
 							ruleConds.add(equivFact);

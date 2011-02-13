@@ -1,5 +1,6 @@
 package mario;
 
+import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import ch.idsia.benchmark.mario.engine.LevelScene;
+import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
@@ -29,16 +31,9 @@ public class RLMarioStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
 		preconds.put("jumpOnto", "(canJumpOn ?X) (thing ?X) (distance ?X ?Y)");
-
-		// More specific actions TODO Remove these
-		preconds.put("jumpOntoEnemy",
-				"(canJumpOn ?X) (enemy ?X) (distance ?X ?Y)");
-		preconds.put("jumpOntoSolid",
-				"(canJumpOn ?X) (solid ?X) (distance ?X ?Y)");
-		preconds.put("jumpOntoCollectable",
-				"(canJumpOn ?X) (collectable ?X) (distance ?X ?Y)");
-		preconds.put("jumpOntoShell",
-				"(canJumpOn ?X) (shell ?X) (distance ?X ?Y)");
+		preconds
+				.put("jumpOver", "(canJumpOver ?X) (thing ?X) (distance ?X ?Y)");
+		preconds.put("move", "(thing ?X) (direction ?X ?Y) (distance ?X ?Z)");
 
 		return preconds;
 	}
@@ -52,31 +47,24 @@ public class RLMarioStateSpec extends StateSpec {
 	protected Collection<StringFact> initialiseActionTemplates() {
 		Collection<StringFact> actions = new ArrayList<StringFact>();
 
-		// Actions have a type and a distance
+		// Jump onto something
 		String[] structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = Number.Integer.toString();
 		actions.add(new StringFact("jumpOnto", structure));
 
+		// Jump over something
 		structure = new String[2];
-		structure[0] = "enemy";
+		structure[0] = "thing";
 		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOntoEnemy", structure));
+		actions.add(new StringFact("jumpOver", structure));
 
-		structure = new String[2];
-		structure[0] = "solid";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOntoSolid", structure));
-
-		structure = new String[2];
-		structure[0] = "collectable";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOntoCollectable", structure));
-
-		structure = new String[2];
-		structure[0] = "shell";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOntoShell", structure));
+		// Move towards something
+		structure = new String[3];
+		structure[0] = "thing";
+		structure[1] = "directionType";
+		structure[2] = Number.Integer.toString();
+		actions.add(new StringFact("move", structure));
 
 		return actions;
 	}
@@ -133,12 +121,12 @@ public class RLMarioStateSpec extends StateSpec {
 		// Coins (score)
 		structure = new String[1];
 		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("coins", structure));
+		predicates.add(new StringFact("numCoins", structure));
 
 		// Lives
 		structure = new String[1];
 		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("lives", structure));
+		predicates.add(new StringFact("numLives", structure));
 
 		// World
 		structure = new String[1];
@@ -167,6 +155,12 @@ public class RLMarioStateSpec extends StateSpec {
 		structure[0] = "thing";
 		predicates.add(new StringFact("canJumpOn", structure));
 
+		// Direction
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = "directionType";
+		predicates.add(new StringFact("direction", structure));
+
 		// Flying (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
@@ -188,6 +182,9 @@ public class RLMarioStateSpec extends StateSpec {
 	@Override
 	protected Map<String, String> initialiseTypePredicateTemplates() {
 		Map<String, String> types = new HashMap<String, String>();
+
+		// Direction
+		types.put("directionType", null);
 
 		// Everything is a 'thing'
 		types.put("thing", null);
@@ -233,27 +230,46 @@ public class RLMarioStateSpec extends StateSpec {
 	 * 
 	 * @param action
 	 *            The action to take.
+	 * @param startPos
+	 *            The starting position of Mario.
+	 * @param marioPos
+	 *            The current position of Mario.
 	 * @return A boolean array of keystroke actions to take at the time.
 	 */
-	public boolean[] applyAction(StringFact action) {
-		boolean[] actionArray = null;
+	public boolean[] applyAction(StringFact action, float[] startPos,
+			float[] marioPos) {
+		boolean[] actionArray = new boolean[Environment.numberOfKeys];
 		// If no actions available, just move right.
 		// This should never happen in the final version.
 		if (action == null) {
-			actionArray = new boolean[Environment.numberOfKeys];
-			actionArray[Environment.MARIO_KEY_RIGHT] = true;
-			actionArray[Environment.MARIO_KEY_SPEED] = true;
+			return actionArray;
+		}
+
+		// Move action
+		String actionName = action.getFactName();
+		if (actionName.equals("move")) {
+			if (action.getArguments()[1].equals("right"))
+				actionArray[Mario.KEY_RIGHT] = true;
+			else if (action.getArguments()[1].equals("left"))
+				actionArray[Mario.KEY_LEFT] = true;
+			actionArray[Mario.KEY_SPEED] = true;
 		} else {
-			// Extract the coords of he thing to take action upon and apply the
+			// Extract the coords of the thing to take action upon and apply the
 			// actions.
 			String[] argSplit = action.getArguments()[0].split("_");
 			float x = Float.parseFloat(argSplit[1]);
 			float y = Float.parseFloat(argSplit[2]);
-			// TODO Jump onto and jump over are different values.
-			actionArray = PhysicsApproximator.getInstance().jumpTo(x, y);
+
+			// Different behaviour for different actions
+			if (actionName.equals("jumpOnto")) {
+				actionArray = PhysicsApproximator.getInstance().jumpTo(
+						startPos[0], startPos[1], marioPos[0], marioPos[1], x,
+						y);
+			} else if (actionName.equals("jumpOver")) {
+				actionArray = PhysicsApproximator.getInstance().jumpOver(x, y);
+			}
 		}
 
-		PhysicsApproximator.getInstance().applyAction(actionArray);
 		return actionArray;
 	}
 
@@ -268,18 +284,46 @@ public class RLMarioStateSpec extends StateSpec {
 	 *            The Mario environment.
 	 * @return The global x and y positions.
 	 */
-	public static Point2D.Float determineGlobalPos(int x, int y,
+	public static Point2D.Float relativeToGlobal(int x, int y,
 			MarioEnvironment environment) {
 		// TODO Ensure this is working correctly - I haven't checked it. It's
 		// probably still int'ing.
 		float[] marioPos = environment.getMarioFloatPos();
-		float globalX = (int) ((marioPos[0] + LevelScene.cellSize
-				* (x - (environment.getReceptiveFieldWidth() / 2))) / LevelScene.cellSize);
-		globalX = (globalX + 0.5f) * LevelScene.cellSize;
-		float globalY = (int) ((marioPos[1] + LevelScene.cellSize
-				* (y - (environment.getReceptiveFieldHeight() / 2))) / LevelScene.cellSize);
-		globalY = (globalY + 0.5f) * LevelScene.cellSize;
+		int c = LevelScene.cellSize;
+
+		float globalX = ((int) (marioPos[0] / c) + x
+				- environment.getReceptiveFieldWidth() / 2 + 0.5f)
+				* c;
+		float globalY = ((int) (marioPos[1] / c) + y
+				- environment.getReceptiveFieldHeight() / 2 + 0.5f)
+				* c;
 
 		return new Point2D.Float(globalX, globalY);
+	}
+
+	/**
+	 * Determines the relative position of the global coordinates given.
+	 * 
+	 * @param x
+	 *            The global x position, between 0 and the level size.
+	 * @param y
+	 *            The global y position, between 0 and the level height.
+	 * @param environment
+	 *            The Mario environment.
+	 * @return The relative x and y positions, between 0 and the receptive field
+	 *         width.
+	 */
+
+	public static Point globalToRelative(float x, float y,
+			MarioEnvironment environment) {
+		float[] marioPos = environment.getMarioFloatPos();
+		int c = LevelScene.cellSize;
+
+		int localX = (int) (x / c + environment.getReceptiveFieldWidth() / 2 - marioPos[0]
+				/ c);
+		int localY = (int) (y / c + environment.getReceptiveFieldHeight() / 2 - marioPos[1]
+				/ c);
+
+		return new Point(localX, localY);
 	}
 }
