@@ -67,6 +67,9 @@ public abstract class StateSpec {
 	/** The type predicates, only used implicitly. */
 	private Map<String, StringFact> typePredicates_;
 
+	/** The type hierarchy. */
+	private Map<String, ParentChildren> typeHierarchy_;
+
 	/** The actions of the rules and their structure. */
 	private Map<String, StringFact> actions_;
 
@@ -173,17 +176,32 @@ public abstract class StateSpec {
 			// Type predicates and their hierarchy background rules.
 			typePredicates_ = new HashMap<String, StringFact>();
 			Map<String, String> typeAssertions = new HashMap<String, String>();
-			Map<String, String> typeHierarchy = initialiseTypePredicateTemplates();
-			for (String type : typeHierarchy.keySet()) {
+			Map<String, String> typeParents = initialiseTypePredicateTemplates();
+			typeHierarchy_ = new HashMap<String, ParentChildren>();
+			for (String type : typeParents.keySet()) {
 				typePredicates_.put(type, new StringFact(type,
 						new String[] { type }));
 				defineTemplate(type, rete_);
 
 				// Define background knowledge rule
-				if (typeHierarchy.get(type) != null) {
+				if (typeParents.get(type) != null) {
 					String assertion = "(" + type + " ?X) " + INFERS_ACTION
-							+ " (assert (" + typeHierarchy.get(type) + " ?X))";
+							+ " (assert (" + typeParents.get(type) + " ?X))";
 					typeAssertions.put(type + "ParentRule", assertion);
+
+					// Record the parent children relationship
+					ParentChildren thisPC = (typeHierarchy_.containsKey(type)) ? typeHierarchy_
+							.get(type)
+							: new ParentChildren();
+					String parentType = typeParents.get(type);
+					thisPC.setParent(parentType);
+					typeHierarchy_.put(type, thisPC);
+
+					ParentChildren parentPC = (typeHierarchy_
+							.containsKey(parentType)) ? typeHierarchy_
+							.get(parentType) : new ParentChildren();
+					parentPC.addChild(type);
+					typeHierarchy_.put(parentType, parentPC);
 				}
 			}
 			unnecessaries_ = formUnnecessaryString(typePredicates_.keySet());
@@ -216,7 +234,7 @@ public abstract class StateSpec {
 			for (String name : typeAssertions.keySet())
 				backgroundRules_.put(name, new BackgroundKnowledge(
 						typeAssertions.get(name), true));
-			
+
 			// State Spec rules
 			backgroundRules_.putAll(initialiseBackgroundKnowledge());
 			for (String ruleNames : backgroundRules_.keySet()) {
@@ -255,7 +273,7 @@ public abstract class StateSpec {
 
 			queryNames_ = new HashMap<GuidedRule, String>();
 			queryCount_ = 0;
-			
+
 			Unification.getInstance().resetRangeIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -475,6 +493,72 @@ public abstract class StateSpec {
 		return actionNum_;
 	}
 
+	/**
+	 * Gets the parent, child, and itself types of this given type, so unless
+	 * this type is alone, the returned collection will be greater than size 1.
+	 * 
+	 * @param type
+	 *            The type to get the lineage for, from parent to child (not
+	 *            necessarily in order).
+	 * @param lineage
+	 *            A to-be-filled collection of all types that are in the type
+	 *            lineage, be they parent, grandparent or child, grandchild,
+	 *            etc.
+	 */
+	public void getTypeLineage(String type, Collection<String> lineage) {
+		// Add itself
+		lineage.add(type);
+
+		ParentChildren typePC = typeHierarchy_.get(type);
+		if (typePC != null) {
+			// Add children
+			recurseChildrenTypes(typePC, lineage);
+
+			// Add parents
+			recurseParentTypes(typePC, lineage);
+		}
+	}
+
+	/**
+	 * Recurse through the parent types.
+	 * 
+	 * @param typePC
+	 *            The type Parent-Child relationship.
+	 * @param lineage
+	 *            The lineage to add to.
+	 */
+	private void recurseChildrenTypes(ParentChildren typePC,
+			Collection<String> lineage) {
+		if (typePC != null) {
+			Collection<String> children = typePC.getChildren();
+			if (children != null) {
+				for (String child : children) {
+					lineage.add(child);
+					recurseChildrenTypes(typeHierarchy_.get(child), lineage);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Recurse through the parent types.
+	 * 
+	 * @param typePC
+	 *            The type Parent-Child relationship.
+	 * @param lineage
+	 *            The lineage to add to.
+	 */
+	private void recurseParentTypes(ParentChildren typePC,
+			Collection<String> lineage) {
+		if (typePC != null) {
+			String parent = typePC.getParent();
+			if (parent != null) {
+				lineage.add(parent);
+				recurseParentTypes(typeHierarchy_.get(parent), lineage);
+			}
+		}
+	}
+
 	public Map<String, StringFact> getPredicates() {
 		return predicates_;
 	}
@@ -540,7 +624,7 @@ public abstract class StateSpec {
 			return TEST_DEFINITION;
 		return null;
 	}
-	
+
 	public Map<String, StringFact> getTypePredicates() {
 		return typePredicates_;
 	}
@@ -856,5 +940,33 @@ public abstract class StateSpec {
 		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
 		return new StringFact(StateSpec.getInstance().getStringFact(
 				condSplit[offset - 1]), arguments, negated);
+	}
+
+	/**
+	 * A basic class which holds parent-child data for a given type predicate.
+	 * 
+	 * @author Sam Sarjant
+	 */
+	private class ParentChildren {
+		private String parent_;
+		private Collection<String> children_;
+
+		public String getParent() {
+			return parent_;
+		}
+
+		public void setParent(String parent) {
+			parent_ = parent;
+		}
+
+		public Collection<String> getChildren() {
+			return children_;
+		}
+
+		public void addChild(String child) {
+			if (children_ == null)
+				children_ = new HashSet<String>();
+			children_.add(child);
+		}
 	}
 }

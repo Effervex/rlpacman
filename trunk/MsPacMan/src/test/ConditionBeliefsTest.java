@@ -5,8 +5,6 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -18,8 +16,6 @@ public class ConditionBeliefsTest {
 
 	@Before
 	public void setUp() throws Exception {
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 	}
 
@@ -42,7 +38,9 @@ public class ConditionBeliefsTest {
 		Collection<StringFact> untrueFacts = new ArrayList<StringFact>();
 		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
 				untrueFacts, true));
-		assertTrue(cb.getAlwaysTrue().isEmpty());
+		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(cb.getOccasionallyTrue().isEmpty());
 		assertFalse(cb.getNeverTrue().isEmpty());
 		assertTrue(cb.getNeverTrue().contains(
@@ -50,30 +48,40 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(on ? ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(above ?X ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(above ? ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(onFloor ?X)")));
-		assertFalse(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(clear ?X)")));
-		assertEquals(cb.getNeverTrue().size(), 6);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertEquals(cb.getNeverTrue().size(), 9);
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ? ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ?X ?)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ? ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?X ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(onFloor ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?X)")));
 		assertFalse(untrueFacts.contains(StateSpec.toStringFact("(clear ?X)")));
-		assertEquals(untrueFacts.size(), 6);
+		assertEquals(untrueFacts.size(), 9);
 
 		cb = new ConditionBeliefs("on");
 		untrueFacts.clear();
 		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
 				untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(on ?X ?Y)")));
 		assertTrue(cb.getAlwaysTrue().contains(
 				StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(cb.getAlwaysTrue().contains(
@@ -84,6 +92,12 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(on ?Y ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(on ? ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?Y ?Y)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?Y ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
@@ -99,6 +113,12 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(above ?X ?Y)")));
 		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?Y ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?Y ?Y)")));
+		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(onFloor ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(onFloor ?Y)")));
@@ -106,9 +126,16 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(clear ?Y)")));
-		assertEquals(cb.getNeverTrue().size(), 13);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?Y)")));
+		assertEquals(cb.getNeverTrue().size(), 21);
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?Y ?)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ? ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?Y ?Y)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?Y ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(highest ?Y)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ?X ?)")));
@@ -117,11 +144,19 @@ public class ConditionBeliefsTest {
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ? ?Y)")));
 		assertTrue(untrueFacts
 				.contains(StateSpec.toStringFact("(above ?X ?Y)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?Y ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?Y ?Y)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(onFloor ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(onFloor ?Y)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(clear ?Y)")));
-		assertEquals(untrueFacts.size(), 13);
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?Y)")));
+		assertEquals(untrueFacts.size(), 21);
 	}
 
 	@Test
@@ -132,22 +167,25 @@ public class ConditionBeliefsTest {
 		Collection<StringFact> untrueFacts = new ArrayList<StringFact>();
 		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
 				untrueFacts, true));
-		assertTrue(cb.getAlwaysTrue().isEmpty());
+		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(edible ?X)")));
 		assertTrue(cb.getOccasionallyTrue().isEmpty());
 		assertFalse(cb.getNeverTrue().isEmpty());
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(distanceGhost ? ?X ?)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(blinking ?X)")));
-		assertFalse(cb.getNeverTrue().contains(
-				StateSpec.toStringFact("(edible ?X)")));
-		assertEquals(cb.getNeverTrue().size(), 2);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(ghost ?X)")));
+		assertEquals(cb.getNeverTrue().size(), 3);
 		assertTrue(untrueFacts.contains(StateSpec
 				.toStringFact("(distanceGhost ? ?X ?)")));
 		assertTrue(untrueFacts
 				.contains(StateSpec.toStringFact("(blinking ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(ghost ?X)")));
 		assertFalse(untrueFacts.contains(StateSpec.toStringFact("(edible ?X)")));
-		assertEquals(untrueFacts.size(), 2);
+		assertEquals(untrueFacts.size(), 3);
 
 		cb = new ConditionBeliefs("distanceGhost");
 		untrueFacts.clear();
@@ -174,7 +212,11 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(edible ?Y)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(blinking ?Y)")));
-		assertEquals(cb.getNeverTrue().size(), 6);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(pacman ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(ghost ?Y)")));
+		assertEquals(cb.getNeverTrue().size(), 8);
 		assertTrue(untrueFacts.contains(StateSpec
 				.toStringFact("(distancePowerDot ?X ? ?)")));
 		assertTrue(untrueFacts.contains(StateSpec
@@ -186,7 +228,9 @@ public class ConditionBeliefsTest {
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(edible ?Y)")));
 		assertTrue(untrueFacts
 				.contains(StateSpec.toStringFact("(blinking ?Y)")));
-		assertEquals(untrueFacts.size(), 6);
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(ghost ?Y)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(pacman ?X)")));
+		assertEquals(untrueFacts.size(), 8);
 	}
 
 	@Test
@@ -201,12 +245,14 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.noteTrueRelativeFacts(trueFacts, untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(cb.getAlwaysTrue().contains(
 				StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(cb.getAlwaysTrue().contains(
 				StateSpec.toStringFact("(above ?X ?)")));
 		assertTrue(cb.getAlwaysTrue().contains(
 				StateSpec.toStringFact("(highest ?X)")));
-		assertEquals(cb.getAlwaysTrue().size(), 3);
+		assertEquals(cb.getAlwaysTrue().size(), 4);
 		assertTrue(cb.getOccasionallyTrue().isEmpty());
 		assertFalse(cb.getNeverTrue().isEmpty());
 		assertTrue(cb.getNeverTrue().contains(
@@ -214,12 +260,22 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(above ? ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(onFloor ?X)")));
-		assertEquals(cb.getNeverTrue().size(), 3);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertEquals(cb.getNeverTrue().size(), 6);
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ? ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ? ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(onFloor ?X)")));
-		assertEquals(untrueFacts.size(), 3);
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?X)")));
+		assertEquals(untrueFacts.size(), 6);
 
 		// Asserting the same again
 		untrueFacts.clear();
@@ -233,8 +289,10 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.noteTrueRelativeFacts(trueFacts, untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(cb.getAlwaysTrue().contains(
 				StateSpec.toStringFact("(highest ?X)")));
-		assertEquals(cb.getAlwaysTrue().size(), 1);
+		assertEquals(cb.getAlwaysTrue().size(), 2);
 		assertFalse(cb.getOccasionallyTrue().isEmpty());
 		assertTrue(cb.getOccasionallyTrue().contains(
 				StateSpec.toStringFact("(on ?X ?)")));
@@ -248,12 +306,22 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(on ? ?X)")));
 		assertTrue(cb.getNeverTrue().contains(
 				StateSpec.toStringFact("(above ? ?X)")));
-		assertEquals(cb.getNeverTrue().size(), 2);
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertEquals(cb.getNeverTrue().size(), 5);
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ? ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ? ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ?X ?)")));
-		assertEquals(untrueFacts.size(), 4);
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?X)")));
+		assertEquals(untrueFacts.size(), 7);
 
 		// Adding even more true facts, resulting in a fully indecisive
 		// condition
@@ -263,7 +331,9 @@ public class ConditionBeliefsTest {
 		trueFacts.add(StateSpec.toStringFact("above ? ?X)"));
 		untrueFacts.clear();
 		assertTrue(cb.noteTrueRelativeFacts(trueFacts, untrueFacts, true));
-		assertTrue(cb.getAlwaysTrue().isEmpty());
+		assertFalse(cb.getAlwaysTrue().isEmpty());
+		assertTrue(cb.getAlwaysTrue().contains(
+				StateSpec.toStringFact("(clear ?X)")));
 		assertFalse(cb.getOccasionallyTrue().isEmpty());
 		assertTrue(cb.getOccasionallyTrue().contains(
 				StateSpec.toStringFact("(on ?X ?)")));
@@ -277,11 +347,22 @@ public class ConditionBeliefsTest {
 				StateSpec.toStringFact("(on ? ?X)")));
 		assertTrue(cb.getOccasionallyTrue().contains(
 				StateSpec.toStringFact("(above ? ?X)")));
-		assertTrue(cb.getNeverTrue().isEmpty());
+		assertFalse(cb.getNeverTrue().isEmpty());
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(cb.getNeverTrue().contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertEquals(cb.getNeverTrue().size(), 3);
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(above ?X ?)")));
-		assertEquals(untrueFacts.size(), 3);
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(on ?X ?X)")));
+		assertTrue(untrueFacts
+				.contains(StateSpec.toStringFact("(above ?X ?X)")));
+		assertTrue(untrueFacts.contains(StateSpec.toStringFact("(block ?X)")));
+		assertEquals(untrueFacts.size(), 6);
 
 		// One more time
 		untrueFacts.clear();

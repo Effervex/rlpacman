@@ -36,7 +36,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = 2324961327171636118L;
+	private static final long serialVersionUID = 790371205436473937L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -69,8 +69,10 @@ public class AgentObservations implements Serializable {
 	/** The inactivity counter for the condition beliefs. */
 	private int conditionBeliefInactivity_ = 0;
 
+	// TODO Note facts which are always true or untrue and can be left out of
+	// learned knowledge
 	/** The observed invariants of the environment. */
-	private Collection<String> invariants_;
+	private ConditionBeliefs invariants_;
 
 	/** The rules about the environment learned by the agent. */
 	private SortedSet<BackgroundKnowledge> learnedEnvironmentRules_;
@@ -170,17 +172,9 @@ public class AgentObservations implements Serializable {
 				Collection<StringFact> termFacts = termMappedFacts_.get(term);
 				if (termFacts != null) {
 					for (StringFact termFact : termFacts) {
-						// Only note facts if type status matches (types note
-						// types, and non-types note non-types)
-						if (StateSpec.getInstance().isTypePredicate(
-								baseFact.getFactName()) == StateSpec
-								.getInstance().isTypePredicate(
-										termFact.getFactName())) {
-							StringFact relativeFact = new StringFact(termFact);
-							relativeFact
-									.replaceArguments(replacementMap, false);
-							relativeFacts.add(relativeFact);
-						}
+						StringFact relativeFact = new StringFact(termFact);
+						relativeFact.replaceArguments(replacementMap, false);
+						relativeFacts.add(relativeFact);
 					}
 				}
 			}
@@ -193,8 +187,17 @@ public class AgentObservations implements Serializable {
 				observationHash_ = null;
 			}
 
+			// Note the invariants
+//			if (invariants_ == null)
+//				invariants_ = new ConditionBeliefs("invariants");
+//			invariants_.noteFacts(cb.getAlwaysTrue(), cb.getNeverTrue(), cb
+//					.getOccasionallyTrue());
+
 			// Form the condition beliefs for the not relative facts, using the
-			// relative facts as always true values.
+			// relative facts as always true values (only for non-types
+			// predicates)
+			// if (!StateSpec.getInstance()
+			// .isTypePredicate(baseFact.getFactName()))
 			changed |= recordUntrueConditionAssociations(relativeFacts,
 					notRelativeFacts);
 		}
@@ -319,14 +322,17 @@ public class AgentObservations implements Serializable {
 			// Assert the true facts
 			for (StringFact alwaysTrue : cb.getAlwaysTrue()) {
 				// Check for equivalence relation
-				backgroundKnowledge
-						.add(createRelation(cbFact, alwaysTrue, true));
+				// Don't note single type relations unless this is a type
+				if (StateSpec.getInstance().isTypePredicate(cond)
+						|| !StateSpec.getInstance().isTypePredicate(
+								alwaysTrue.getFactName()))
+					createRelation(cbFact, alwaysTrue, true,
+							backgroundKnowledge);
 			}
 
 			// Assert the false facts
 			for (StringFact neverTrue : cb.getNeverTrue()) {
-				backgroundKnowledge
-						.add(createRelation(cbFact, neverTrue, false));
+				createRelation(cbFact, neverTrue, false, backgroundKnowledge);
 			}
 		}
 		return backgroundKnowledge;
@@ -343,22 +349,37 @@ public class AgentObservations implements Serializable {
 	 *            The possibly negated, usually right-side condition.
 	 * @param negationType
 	 *            The state of negation: true if not negated, false if negated.
-	 * @return Returns the newly created background knowledge rule.
+	 * @param relations
+	 *            The set of knowledge to add to.
 	 */
 	@SuppressWarnings("unchecked")
-	private BackgroundKnowledge createRelation(StringFact cond,
-			StringFact otherCond, boolean negationType) {
+	private void createRelation(StringFact cond, StringFact otherCond,
+			boolean negationType, SortedSet<BackgroundKnowledge> relations) {
+		// Don't make rules to itself.
+		if (cond.equals(otherCond))
+			return;
 		StringFact left = cond;
 		StringFact right = otherCond;
 		String relation = " => ";
 
+		// Create the basic inference relation
+		BackgroundKnowledge bckKnow = null;
+		if (negationType)
+			bckKnow = new BackgroundKnowledge(left + relation + right, false);
+		else
+			bckKnow = new BackgroundKnowledge(left + relation + "(not " + right
+					+ ")", false);
+		mappedEnvironmentRules_.putContains(left.getFactName(), bckKnow);
+		relations.add(bckKnow);
+
+		// Create an equivalence relation if possible.
 		// Get the relations to use for equivalency comparisons
-		Collection<StringFact> relations = getOtherConditionRelations(
+		Collection<StringFact> otherRelations = getOtherConditionRelations(
 				otherCond, negationType);
 
 		// Don't bother with self-condition relations
 		if (!otherCond.getFactName().equals(cond.getFactName())
-				&& relations != null && !relations.isEmpty()) {
+				&& otherRelations != null && !otherRelations.isEmpty()) {
 			// Replace arguments for this fact to match those seen in the
 			// otherCond (anonymise variables)
 			BidiMap replacementMap = new DualHashBidiMap();
@@ -372,7 +393,7 @@ public class AgentObservations implements Serializable {
 			StringFact modCond = new StringFact(cond);
 			modCond.replaceArguments(replacementMap, false);
 			// If the fact is present, then there is an equivalency!
-			if (relations.contains(modCond)) {
+			if (otherRelations.contains(modCond)) {
 				// Change the modArg back to its original arguments (though not
 				// changing anonymous values)
 				modCond
@@ -386,20 +407,20 @@ public class AgentObservations implements Serializable {
 					right = modCond;
 				}
 				relation = " <=> ";
+
+				if (negationType)
+					bckKnow = new BackgroundKnowledge(left + relation + right,
+							false);
+				else
+					bckKnow = new BackgroundKnowledge(left + relation + "(not "
+							+ right + ")", false);
+				mappedEnvironmentRules_
+						.putContains(left.getFactName(), bckKnow);
+				mappedEnvironmentRules_.putContains(right.getFactName(),
+						bckKnow);
+				relations.add(bckKnow);
 			}
 		}
-
-		// Return a standard inference rule.
-		BackgroundKnowledge bckKnow = null;
-		if (negationType)
-			bckKnow = new BackgroundKnowledge(left + relation + right, false);
-		else
-			bckKnow = new BackgroundKnowledge(left + relation + "(not " + right
-					+ ")", false);
-		mappedEnvironmentRules_.putContains(left.getFactName(), bckKnow);
-		if (relation.equals(" <=> "))
-			mappedEnvironmentRules_.putContains(right.getFactName(), bckKnow);
-		return bckKnow;
 	}
 
 	/**
@@ -438,9 +459,12 @@ public class AgentObservations implements Serializable {
 	 * 
 	 * @param action
 	 *            The action (with arguments).
+	 * @param onlyActionTerms
+	 *            If the method should anonymise non-action terms.
 	 * @return The relevant facts pertaining to the action.
 	 */
-	public Collection<StringFact> gatherActionFacts(StringFact action) {
+	public Collection<StringFact> gatherActionFacts(StringFact action,
+			boolean onlyActionTerms) {
 		// Note down action conditions if still unsettled.
 		Map<String, String> replacementMap = action
 				.createVariableTermReplacementMap();
@@ -450,20 +474,22 @@ public class AgentObservations implements Serializable {
 			if (!StateSpec.isNumber(argument)) {
 				List<StringFact> termFacts = termMappedFacts_.get(argument);
 				for (StringFact termFact : termFacts) {
-					if (!actionFacts.contains(termFact))
-						actionFacts.add(termFact);
+					StringFact notedFact = termFact;
+					if (onlyActionTerms) {
+						notedFact = new StringFact(termFact);
+						notedFact.retainArguments(action.getArguments());
+					}
+
+					if (!actionFacts.contains(notedFact))
+						actionFacts.add(notedFact);
 
 					// If the action conditions have not settled, note the
 					// action conditions.
 					if (getActionBasedObservation(action.getFactName()).actionConditionInactivity_ < INACTIVITY_THRESHOLD) {
-						// Ignore type predicates.
-						if (!StateSpec.getInstance().isTypePredicate(
-								termFact.getFactName())) {
-							// Note the action condition
-							StringFact actionCond = new StringFact(termFact);
-							actionCond.replaceArguments(replacementMap, false);
-							actionConds.add(actionCond);
-						}
+						// Note the action condition
+						StringFact actionCond = new StringFact(termFact);
+						actionCond.replaceArguments(replacementMap, false);
+						actionConds.add(actionCond);
 					}
 				}
 			}
@@ -756,7 +782,7 @@ public class AgentObservations implements Serializable {
 				buf.write(action + "\n");
 				buf
 						.write("True conditions: "
-								+ actionBasedObservations_.get(action).variantActionConditions_
+								+ actionBasedObservations_.get(action).specialisationConditions_
 								+ "\n");
 				if (actionBasedObservations_.get(action).conditionRanges_ != null)
 					buf
@@ -813,7 +839,6 @@ public class AgentObservations implements Serializable {
 				return (AgentObservations) ois.readObject();
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		return null;
 	}
@@ -887,13 +912,13 @@ public class AgentObservations implements Serializable {
 				return true;
 			}
 
-			int size = variantActionConditions_.size();
+			int hash = variantActionConditions_.hashCode();
 			variantActionConditions_.addAll(actionConds);
 			variantActionConditions_.addAll(invariantActionConditions_);
 			boolean changed = invariantActionConditions_.retainAll(actionConds);
 			variantActionConditions_.removeAll(invariantActionConditions_);
 
-			changed |= (size != variantActionConditions_.size());
+			changed |= (hash != variantActionConditions_.hashCode());
 
 			if (changed) {
 				specialisationConditions_ = recreateSpecialisations(
@@ -926,12 +951,20 @@ public class AgentObservations implements Serializable {
 			Collection<StringFact> specialisations = new HashSet<StringFact>();
 			for (StringFact condition : variantActionConditions) {
 				// Check the non-negated version
-				simplifyCondition(condition, specialisations);
+				condition = simplifyCondition(condition);
+				if (condition != null) {
+					specialisations.add(condition);
 
-				// Check the negated version
-				StringFact negCondition = new StringFact(condition);
-				negCondition.swapNegated();
-				simplifyCondition(negCondition, specialisations);
+					// Check the negated version (only for non-types)
+					if (!StateSpec.getInstance().isTypePredicate(
+							condition.getFactName())) {
+						StringFact negCondition = new StringFact(condition);
+						negCondition.swapNegated();
+						negCondition = simplifyCondition(negCondition);
+						if (negCondition != null)
+							specialisations.add(negCondition);
+					}
+				}
 			}
 			return specialisations;
 		}
@@ -941,11 +974,9 @@ public class AgentObservations implements Serializable {
 		 * 
 		 * @param condition
 		 *            The condition to simplify.
-		 * @param specialisations
-		 *            The specialisations set to add to.
+		 * @return The simplified condition (or the condition itself).
 		 */
-		private void simplifyCondition(StringFact condition,
-				Collection<StringFact> specialisations) {
+		private StringFact simplifyCondition(StringFact condition) {
 			SortedSet<StringFact> set = new TreeSet<StringFact>(
 					ConditionComparator.getInstance());
 			set.add(condition);
@@ -956,10 +987,11 @@ public class AgentObservations implements Serializable {
 				if (!invariantActionConditions_.contains(simplify)) {
 					if (simplify.isNegated()
 							|| variantActionConditions_.contains(simplify))
-						specialisations.add(simplify);
+						return simplify;
 				}
 			} else
-				specialisations.add(condition);
+				return condition;
+			return null;
 		}
 
 		public List<RangedCondition> getActionRange() {

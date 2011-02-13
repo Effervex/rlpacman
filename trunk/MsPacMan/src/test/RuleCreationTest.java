@@ -723,17 +723,16 @@ public class RuleCreationTest {
 		sut_.formPreGoalState(facts, ac);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
-		assertEquals(10, preGoal.size());
+		assertEquals(9, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear b)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block a)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block b)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(on a d)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(on b e)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(on a ?)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(on b ?)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(highest a)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a d)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a c)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(above b e)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a ?)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above b ?)")));
 
 		state.reset();
 		state.eval("(assert (block a))");
@@ -1420,5 +1419,21 @@ public class RuleCreationTest {
 
 		// TODO Illegal action condition restriction
 
+	}
+	
+	@Test
+	public void testSimplifyRuleMoveBW() {
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
+		sut_ = new RuleCreation();
+		
+		// Test the (block X) <=> (above X ?) rule
+		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+				ConditionComparator.getInstance());
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
+		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+				false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(block ?X)")));
+		assertEquals(results.size(), 1);
 	}
 }

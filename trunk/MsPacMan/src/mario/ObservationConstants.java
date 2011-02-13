@@ -4,7 +4,7 @@ import ch.idsia.benchmark.mario.engine.sprites.Sprite;
 
 public class ObservationConstants {
 	// Level constants
-	public static final int LVL_COIN = Sprite.KIND_COIN_ANIM;  //1
+	public static final int LVL_COIN = 2;  //1
 	public static final int LVL_BREAKABLE_BRICK = -20;
 	public static final int LVL_UNBREAKABLE_BRICK = -22; //a rock with animated question mark
 	public static final int LVL_BRICK = -24;           //a rock with animated question mark

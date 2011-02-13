@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -30,7 +29,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
-	private static final long serialVersionUID = -902117668118335074L;
+	private static final long serialVersionUID = -91335078270911356L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */
@@ -130,7 +129,7 @@ public class RuleCreation implements Serializable {
 			StringFact action = new StringFact(baseAction, args);
 
 			// TODO May be able to simply learn the RLGG here!
-			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action);
+			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action, false);
 
 			// Inversely substitute the terms for variables (in string form)
 			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action, null);
@@ -645,194 +644,6 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * Individual mutation of facts method. This method creates mutations that
-	 * operate on the very facts themselves, by swapping fact terms for other
-	 * terms. This method was automatically extracted, so it's a bit messy with
-	 * its arguments.
-	 * 
-	 * @param baseRule
-	 *            The base rule to mutate.
-	 * @param mutants
-	 *            The collection of mutants to add to.
-	 * @param preGoalState
-	 *            The pre-goal state being mutated towards.
-	 * @param replacementTerms
-	 *            The terms to replace in the pre-goal.
-	 * @param reverseReplacementTerms
-	 *            The terms to replace in the conditions (modifiable).
-	 * @param condFact
-	 *            The current rule condition being looked at.
-	 * @param preGoalFact
-	 *            The current fact's split form.
-	 * @param preGoalTerms
-	 *            The terms used in the pre-goal's action.
-	 * @param isRuleMutant
-	 *            If the rule is a mutant or not.
-	 * @param ruleTerms
-	 *            The terms used in the rule's action.
-	 * 
-	 * @return True if the cond and pre-goal fact match.
-	 */
-	private boolean factMutation(GuidedRule baseRule, Set<GuidedRule> mutants,
-			Collection<StringFact> preGoalState,
-			Map<String, String> replacementTerms,
-			Map<String, String> reverseReplacementTerms, StringFact condFact,
-			StringFact preGoalFact, String[] preGoalTerms, boolean isRuleMutant) {
-		// 4a. If the fact pred matches the rule pred, try replacing all
-		// occurrences of each cond term with the fact term in every cond
-		boolean hasPred = false;
-		if (preGoalFact.getFactName().equals(condFact.getFactName())) {
-			hasPred = true;
-
-			// Run through each term
-			boolean ceaseMutation = false;
-			String[] condArguments = condFact.getArguments();
-			for (int i = 0; i < condArguments.length; i++) {
-				// Refining ranged numerical variables
-				String preGoalArg = preGoalFact.getArguments()[i];
-				String condArg = condArguments[i];
-
-				// Finding the replacement term
-				String replacedTerm = (replacementTerms.containsKey(preGoalArg)) ? replacementTerms
-						.get(preGoalArg)
-						: preGoalArg;
-
-				// 5. Replacing variable terms
-				if (condArg.charAt(0) == '?') {
-					if (!condArg.contains("&:")) {
-						// The pregoal term is not anonymous
-						if (!ceaseMutation
-								&& !preGoalArg.equals(StateSpec.ANONYMOUS)) {
-							// 5a. If the cond term is ? and the preds match,
-							// use the fact term
-							boolean continueCreation = true;
-							// If the condition is anonymous, replace it with
-							// any term
-							if (condArg.equals(StateSpec.ANONYMOUS))
-								condArg = replacedTerm;
-							// Otherwise, a variable can be replaced with a
-							// non-action constant
-							else if (!StateSpec.arrayContains(preGoalTerms,
-									preGoalArg))
-								condArg = preGoalArg;
-							// Otherwise, we're looking at two non-mutatable
-							// actions.
-							else {
-								continueCreation = false;
-								// If the actions are different, cease mutation
-								if (!condArg.equals(replacedTerm))
-									ceaseMutation = true;
-							}
-
-							if (continueCreation) {
-								// Create the mutant
-								StringFact newCond = new StringFact(condFact);
-								newCond.getArguments()[i] = condArg;
-								if (!baseRule.getConditions(false).contains(
-										newCond)) {
-									SortedSet<StringFact> mutatedConditions = new TreeSet<StringFact>(
-											baseRule.getConditions(false));
-									mutatedConditions.remove(condFact);
-									mutatedConditions = simplifyRule(
-											mutatedConditions, newCond, false,
-											true);
-									if (mutatedConditions != null) {
-										GuidedRule mutant = new GuidedRule(
-												mutatedConditions, baseRule
-														.getAction(), baseRule);
-										mutant.setQueryParams(baseRule
-												.getQueryParameters());
-										// Here, needs to add inequals and types
-										// that may not be present.
-										mutant.expandConditions();
-										mutants.add(mutant);
-									}
-								}
-							}
-						}
-					}
-				} else if (!condArg.equals(replacedTerm)) {
-					// If the terms don't match up, then the entire fact won't,
-					// so skip it.
-					break;
-				}
-
-				// If we haven't looked at a replacement yet
-				if (reverseReplacementTerms.containsKey(condArg)) {
-					GuidedRule mutant = replaceActionTerm(baseRule, condArg,
-							reverseReplacementTerms.get(condArg), preGoalState,
-							preGoalTerms);
-					if (mutant != null) {
-						mutant.setQueryParams(baseRule.getQueryParameters());
-						mutants.add(mutant);
-					}
-
-					// Whatever the outcome, remove the reverse replacement
-					// as it has already been tested.
-					reverseReplacementTerms.remove(condArg);
-				}
-
-				// If the condSplit is a numerical range, create a number of
-				// sub-ranged mutations, using the range found in the pre-goal.
-				if (condArg.contains(StateSpec.BETWEEN_RANGE)) {
-					mutants.addAll(splitRanges(baseRule, preGoalFact, i,
-							isRuleMutant));
-				}
-			}
-		}
-		return hasPred;
-	}
-
-	/**
-	 * Replaces an action term with the action term used in the pre-goal.
-	 * 
-	 * @param baseRule
-	 *            The base rule that is being specialised.
-	 * @param replacedTerm
-	 *            The term to be replaced.
-	 * @param replacementTerm
-	 *            The term that will be replacing the above term.
-	 * @param preGoalState
-	 *            The current pre-goal state.
-	 * @param preGoalTerms
-	 *            The pre-goal action terms.
-	 * 
-	 * @return The mutant rule.
-	 */
-	private GuidedRule replaceActionTerm(GuidedRule baseRule,
-			String replacedTerm, String replacementTerm,
-			Collection<StringFact> preGoalState, String[] preGoalTerms) {
-		// Replace the variables with their replacements.
-		SortedSet<StringFact> ruleConditions = baseRule.getConditions(false);
-		StringFact ruleAction = baseRule.getAction();
-		SortedSet<StringFact> replacementConds = new TreeSet<StringFact>(
-				ConditionComparator.getInstance());
-		for (StringFact condition : ruleConditions) {
-			// Exclude inequals checks
-			if (!condition.getFactName().equals("test")) {
-				StringFact repl = new StringFact(condition);
-				repl.replaceArguments(replacedTerm, replacementTerm);
-				replacementConds.add(repl);
-			}
-		}
-		ruleAction = new StringFact(ruleAction);
-		ruleAction.replaceArguments(replacedTerm, replacementTerm);
-
-		// 4b. If the new cond is valid (through unification),
-		// keep it and note that the replacement has occurred
-		if (Unification.getInstance().unifyStates(replacementConds,
-				preGoalState, ruleAction.getArguments(), preGoalTerms) == 0) {
-			// Adding the mutated rule
-			GuidedRule mutant = new GuidedRule(replacementConds, ruleAction,
-					baseRule);
-			// Should only need to add inequals here.
-			mutant.expandConditions();
-			return mutant;
-		}
-		return null;
-	}
-
-	/**
 	 * Forms the pre-goal state by adding to it a pre-goal state the agent has
 	 * seen (or was given). This method forms the pre-goal state by finding the
 	 * bare minimal conditions seen in every pre-goal state.
@@ -862,7 +673,7 @@ public class RuleCreation implements Serializable {
 				if (actions != null) {
 					for (StringFact action : actions) {
 						Collection<StringFact> preGoalStringState = ao_
-								.gatherActionFacts(action);
+								.gatherActionFacts(action, true);
 
 						if (preGoal == null) {
 							preGoal = new PreGoalInformation(
