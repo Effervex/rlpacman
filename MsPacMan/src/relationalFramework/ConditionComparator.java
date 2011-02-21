@@ -10,8 +10,8 @@ import java.util.Comparator;
  * 
  * @author Sam Sarjant
  */
-public class ConditionComparator<T> implements Comparator<T>, Serializable {
-	private static final long serialVersionUID = -357269694510525864L;
+public class ConditionComparator implements Comparator<StringFact>, Serializable {
+	private static final long serialVersionUID = 2187893240541148300L;
 	private static Comparator<StringFact> instance_;
 	private final int BASE = 0;
 	private final int INEQ = 2;
@@ -22,13 +22,13 @@ public class ConditionComparator<T> implements Comparator<T>, Serializable {
 	}
 
 	@Override
-	public int compare(T arg0, T arg1) {
-		if (arg0 == null || !(arg0 instanceof StringFact)) {
-			if (arg1 == null || !(arg1 instanceof StringFact))
+	public int compare(StringFact arg0, StringFact arg1) {
+		if (arg0 == null) {
+			if (arg1 == null)
 				return 0;
 			else
 				return 1;
-		} else if (arg1 == null || !(arg1 instanceof StringFact)) {
+		} else if (arg1 == null) {
 			return -1;
 		}
 
@@ -57,7 +57,7 @@ public class ConditionComparator<T> implements Comparator<T>, Serializable {
 
 	public static Comparator<StringFact> getInstance() {
 		if (instance_ == null)
-			instance_ = new ConditionComparator<StringFact>();
+			instance_ = new ConditionComparator();
 		return instance_;
 	}
 }

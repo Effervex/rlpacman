@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +20,8 @@ import java.util.regex.Pattern;
  * 
  * @author Sam Sarjant
  */
-public class GuidedRule implements Serializable {
-	private static final long serialVersionUID = -5925170406690146061L;
+public class GuidedRule implements Serializable, Comparable<GuidedRule> {
+	private static final long serialVersionUID = 3633129238686345212L;
 
 	/**
 	 * The rule has to see 5 states without changing to be considered
@@ -611,7 +612,8 @@ public class GuidedRule implements Serializable {
 	/**
 	 * Removes a group of parents from a rule.
 	 * 
-	 * @param parents The group of parents to remove.
+	 * @param parents
+	 *            The group of parents to remove.
 	 */
 	public void removeParents(Collection<GuidedRule> parents) {
 		for (GuidedRule parent : parents)
@@ -715,6 +717,48 @@ public class GuidedRule implements Serializable {
 		return getStringConditions() + "=> " + ruleAction_;
 	}
 
+	/**
+	 * Outputs the rule in a simplified, but essentially equivalent (assuming
+	 * inequality and type definitions) format.
+	 * 
+	 * @return A nice, shortened version of the rule.
+	 */
+	public String toNiceString() {
+		StringBuffer niceString = new StringBuffer();
+		// Run through each condition, adding regular conditions and
+		// non-standard type predicates
+		Collection<StringFact> standardType = new HashSet<StringFact>();
+		for (StringFact stringFact : ruleConditions_) {
+			if (StateSpec.getInstance().isTypePredicate(
+					stringFact.getFactName())) {
+				// If a type predicate, only add it if it's non-standard
+				if (!standardType.contains(stringFact))
+					niceString.append(stringFact + " ");
+			} else if (!stringFact.getFactName().equals("test")) {
+				// If not a type or test, add the fact.
+				niceString.append(stringFact + " ");
+
+				// Scan the arguments and extract the standard type preds
+				for (int i = 0; i < stringFact.getArgTypes().length; i++) {
+					// If the type isn't a number and isn't anonymous, add it to
+					// the standards
+					if (!stringFact.getArguments()[i].equals("?")
+							&& !StateSpec
+									.isNumberType(stringFact.getArgTypes()[i])) {
+						StringFact type = new StringFact(StateSpec
+								.getInstance().getStringFact(
+										stringFact.getArgTypes()[i]),
+								new String[] { stringFact.getArguments()[i] });
+						standardType.add(type);
+					}
+				}
+			}
+		}
+		niceString.append("=> " + ruleAction_);
+
+		return niceString.toString();
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -757,5 +801,16 @@ public class GuidedRule implements Serializable {
 		} else if (!queryParams_.equals(other.queryParams_))
 			return false;
 		return true;
+	}
+
+	@Override
+	public int compareTo(GuidedRule o) {
+		if (o == null)
+			return -1;
+		int result = Double.compare(ruleHash_, o.ruleHash_);
+		if (result != 0)
+			return result;
+		
+		return toString().compareTo(o.toString());
 	}
 }

@@ -3,25 +3,72 @@ package relationalFramework;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 public class MultiMap<K, V> implements Serializable {
-	private static final long serialVersionUID = -5907393112846626155L;
+	private static final long serialVersionUID = -7151854312371461385L;
+	private static final int LIST_COLLECTION = 0;
+	private static final int SORTED_SET_COLLECTION = 1;
 	/** An inner map containing the values. C is implicitly of type V. */
-	private Map<K, List<V>> innerMap_;
+	private Map<K, Collection<V>> innerMap_;
+	/** A flag which notes which type of collection this multimap implements. */
+	private int collectionType_ = -1;
+	/** An optional comparator used for the sorted set. */
+	private Comparator<V> comparator_;
 
 	/**
 	 * The constructor.
 	 */
-	public MultiMap() {
-		innerMap_ = new HashMap<K, List<V>>();
+	private MultiMap() {
+		innerMap_ = new HashMap<K, Collection<V>>();
 	}
-	
+
+	/**
+	 * A factory method for creating a list type multimap.
+	 * 
+	 * @return A multimap implementing lists.
+	 */
+	public static <K, V> MultiMap<K, V> createListMultiMap() {
+		MultiMap<K, V> listMultiMap = new MultiMap<K, V>();
+		listMultiMap.collectionType_ = LIST_COLLECTION;
+		return listMultiMap;
+	}
+
+	/**
+	 * A factory method for creating a sorted set type multimap.
+	 * 
+	 * @return A multimap implementing sorted sets.
+	 */
+	public static <K, V> MultiMap<K, V> createSortedSetMultiMap() {
+		MultiMap<K, V> ssMultiMap = new MultiMap<K, V>();
+		ssMultiMap.collectionType_ = SORTED_SET_COLLECTION;
+		return ssMultiMap;
+	}
+
+	/**
+	 * A factory method for creating a sorted set type multimap.
+	 * 
+	 * @param valueComparator
+	 *            The comparator to use for the sorted set.
+	 * @return A multimap implementing sorted sets.
+	 */
+	public static <K, V> MultiMap<K, V> createSortedSetMultiMap(
+			Comparator<V> valueComparator) {
+		MultiMap<K, V> ssMultiMap = new MultiMap<K, V>();
+		ssMultiMap.collectionType_ = SORTED_SET_COLLECTION;
+		ssMultiMap.comparator_ = valueComparator;
+		return ssMultiMap;
+	}
+
 	public MultiMap(MultiMap<K, V> mm) {
 		this();
+		collectionType_ = mm.collectionType_;
 		putAll(mm);
 	}
 
@@ -32,14 +79,21 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The key to get the list from.
 	 * @return The newly created/pre-existing list.
 	 */
-	private List<V> initialiseGetList(K key) {
+	private Collection<V> initialiseGetCollection(K key) {
 		// Initialise the list
-		List<V> list = innerMap_.get(key);
-		if (list == null) {
-			list = new ArrayList<V>();
-			innerMap_.put(key, list);
+		Collection<V> collection = innerMap_.get(key);
+		if (collection == null) {
+			if (collectionType_ == LIST_COLLECTION)
+				collection = new ArrayList<V>();
+			else if (collectionType_ == SORTED_SET_COLLECTION) {
+				if (comparator_ != null)
+					collection = new TreeSet<V>(comparator_);
+				else
+					collection = new TreeSet<V>();
+			}
+			innerMap_.put(key, collection);
 		}
-		return list;
+		return collection;
 	}
 
 	/**
@@ -102,14 +156,40 @@ public class MultiMap<K, V> implements Serializable {
 	}
 
 	/**
+	 * Gets the collection of values under the multimap key.
+	 * 
+	 * @param key
+	 *            The key to retrieve the values from.
+	 * @return The collection under the key, or null.
+	 */
+	public Collection<V> get(Object key) {
+		return innerMap_.get(key);
+	}
+
+	/**
 	 * Gets the list of values under the multimap key.
 	 * 
 	 * @param key
 	 *            The key to retrieve values from.
 	 * @return The list under the key, or null.
 	 */
-	public List<V> get(Object key) {
-		return innerMap_.get(key);
+	public List<V> getList(Object key) {
+		if (collectionType_ == LIST_COLLECTION)
+			return (List<V>) innerMap_.get(key);
+		return null;
+	}
+
+	/**
+	 * Gets the sorted set of values under the multimap key.
+	 * 
+	 * @param key
+	 *            The key to retrieve values from.
+	 * @return The sorted set under the key, or null.
+	 */
+	public SortedSet<V> getSortedSet(Object key) {
+		if (collectionType_ == SORTED_SET_COLLECTION)
+			return (SortedSet<V>) innerMap_.get(key);
+		return null;
 	}
 
 	/**
@@ -123,7 +203,7 @@ public class MultiMap<K, V> implements Serializable {
 	 *         index is out of range.
 	 */
 	public V getIndex(Object key, int index) {
-		List<V> list = get(key);
+		List<V> list = getList(key);
 		if ((list != null) && (index < list.size())) {
 			return list.get(index);
 		}
@@ -147,7 +227,7 @@ public class MultiMap<K, V> implements Serializable {
 	 * @return True if the collection is empty.
 	 */
 	public boolean isValueEmpty(Object key) {
-		List<V> values = innerMap_.get(key);
+		Collection<V> values = innerMap_.get(key);
 		if (values == null)
 			return true;
 		return values.isEmpty();
@@ -184,8 +264,8 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The value to add to the collection.
 	 * @return The resultant collection, containing the value.
 	 */
-	public List<V> put(K key, V value) {
-		List<V> resultantCollection = initialiseGetList(key);
+	public Collection<V> put(K key, V value) {
+		Collection<V> resultantCollection = initialiseGetCollection(key);
 
 		// Adding the values
 		if (value != null)
@@ -203,8 +283,8 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The collection containing the values to add.
 	 * @return The resultant collection.
 	 */
-	public List<V> putCollection(K key, Collection<? extends V> collection) {
-		List<V> resultantCollection = initialiseGetList(key);
+	public Collection<V> putCollection(K key, Collection<? extends V> collection) {
+		Collection<V> resultantCollection = initialiseGetCollection(key);
 
 		// Adding the values
 		resultantCollection.addAll(collection);
@@ -256,13 +336,16 @@ public class MultiMap<K, V> implements Serializable {
 	 * @return True if the value was added.
 	 */
 	public boolean putContains(K key, V value) {
-		List<V> resultantCollection = initialiseGetList(key);
+		Collection<V> resultantCollection = initialiseGetCollection(key);
 
 		// Adding the values
-		if (!resultantCollection.contains(value)) {
-			resultantCollection.add(value);
-			return true;
-		}
+		if (collectionType_ == LIST_COLLECTION) {
+			if (!resultantCollection.contains(value)) {
+				resultantCollection.add(value);
+				return true;
+			}
+		} else if (collectionType_ == SORTED_SET_COLLECTION)
+			return resultantCollection.add(value);
 
 		return false;
 	}
@@ -277,15 +360,19 @@ public class MultiMap<K, V> implements Serializable {
 	 * @return True if the value was added.
 	 */
 	public boolean putContains(K key, Collection<? extends V> collection) {
-		List<V> resultantCollection = initialiseGetList(key);
+		Collection<V> resultantCollection = initialiseGetCollection(key);
 
 		// Adding the values
 		boolean result = false;
-		for (V value : collection) {
-			if (!resultantCollection.contains(value)) {
-				resultantCollection.add(value);
-				result = true;
+		if (collectionType_ == LIST_COLLECTION) {
+			for (V value : collection) {
+				if (!resultantCollection.contains(value)) {
+					resultantCollection.add(value);
+					result = true;
+				}
 			}
+		} else if (collectionType_ == SORTED_SET_COLLECTION) {
+			return resultantCollection.addAll(collection);
 		}
 
 		return result;
@@ -294,16 +381,25 @@ public class MultiMap<K, V> implements Serializable {
 	/**
 	 * Explicitly replaces a value if it is equal to the value being added.
 	 * 
-	 * @param key The key to place the value under.
-	 * @param value The object that is guaranteed to be added to the collection.
+	 * @param key
+	 *            The key to place the value under.
+	 * @param value
+	 *            The object that is guaranteed to be added to the collection.
 	 */
 	public void putReplace(K key, V value) {
-		List<V> resultantCollection = initialiseGetList(key);
-		
-		if (resultantCollection.contains(value))
-			resultantCollection.set(resultantCollection.indexOf(value), value);
-		else
+		Collection<V> resultantCollection = initialiseGetCollection(key);
+
+		// If list, replace
+		if (collectionType_ == LIST_COLLECTION) {
+			List<V> listCollection = (List<V>) resultantCollection;
+			if (resultantCollection.contains(value))
+				listCollection.set(listCollection.indexOf(value), value);
+			else
+				resultantCollection.add(value);
+		} else if (collectionType_ == SORTED_SET_COLLECTION) {
+			// If set, it'll replace anyway
 			resultantCollection.add(value);
+		}
 	}
 
 	/**
@@ -314,7 +410,7 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The key to remove.
 	 * @return The list contained under the key.
 	 */
-	public List<V> remove(Object key) {
+	public Collection<V> remove(Object key) {
 		return innerMap_.remove(key);
 	}
 
@@ -345,8 +441,8 @@ public class MultiMap<K, V> implements Serializable {
 	 */
 	public Collection<V> values() {
 		Collection<V> values = new ArrayList<V>();
-		for (List<V> valueLists : valuesLists()) {
-			values.addAll(valueLists);
+		for (Collection<V> valueCollections : valuesCollections()) {
+			values.addAll(valueCollections);
 		}
 		return values;
 	}
@@ -356,7 +452,7 @@ public class MultiMap<K, V> implements Serializable {
 	 * 
 	 * @return All the lists containing the values.
 	 */
-	public Collection<List<V>> valuesLists() {
+	public Collection<Collection<V>> valuesCollections() {
 		return innerMap_.values();
 	}
 
@@ -364,12 +460,14 @@ public class MultiMap<K, V> implements Serializable {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
+		result = prime * result + collectionType_;
+		result = prime * result
+				+ ((comparator_ == null) ? 0 : comparator_.hashCode());
 		result = prime * result
 				+ ((innerMap_ == null) ? 0 : innerMap_.hashCode());
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -378,7 +476,14 @@ public class MultiMap<K, V> implements Serializable {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		final MultiMap other = (MultiMap) obj;
+		MultiMap other = (MultiMap) obj;
+		if (collectionType_ != other.collectionType_)
+			return false;
+		if (comparator_ == null) {
+			if (other.comparator_ != null)
+				return false;
+		} else if (!comparator_.equals(other.comparator_))
+			return false;
 		if (innerMap_ == null) {
 			if (other.innerMap_ != null)
 				return false;
@@ -386,7 +491,7 @@ public class MultiMap<K, V> implements Serializable {
 			return false;
 		return true;
 	}
-	
+
 	@Override
 	public String toString() {
 		return innerMap_.toString();

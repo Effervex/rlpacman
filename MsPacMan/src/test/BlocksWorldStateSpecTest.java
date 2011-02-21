@@ -2,7 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
-import java.util.List;
+import java.util.SortedSet;
 
 import jess.Rete;
 
@@ -46,8 +46,10 @@ public class BlocksWorldStateSpecTest {
 		GuidedRule rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
 		// 2 assertions in the body: clear, and block
 		assertEquals(rule.getConditions(false).size(), 2);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
@@ -59,8 +61,10 @@ public class BlocksWorldStateSpecTest {
 		// 2 assertions in the body: clear, and block, with a constant
 		// variable
 		assertEquals(rule.getConditions(false).size(), 2);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block a)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
@@ -76,16 +80,19 @@ public class BlocksWorldStateSpecTest {
 		// 4 assertions in the body: 2 clears, and 2 blocks, without an
 		// inequality test
 		assertEquals(rule.getConditions(false).size(), 4);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear b)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block b)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear b)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block b)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
 		constants = rule.getConstantConditions();
-		strFact = StateSpec.getInstance().getPredicates().get(
-				"clear");
+		strFact = StateSpec.getInstance().getPredicates().get("clear");
 		assertTrue(constants.getFacts().contains(
 				new StringFact(strFact, new String[] { "a" })));
 		assertTrue(constants.getFacts().contains(
@@ -96,9 +103,12 @@ public class BlocksWorldStateSpecTest {
 		rule = new GuidedRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
 		// 3 assertions in the body: clear, highest, and a single block
 		assertEquals(rule.getConditions(false).size(), 3);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(highest ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(highest ?X)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
@@ -110,11 +120,16 @@ public class BlocksWorldStateSpecTest {
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
 		assertEquals(rule.getConditions(false).size(), 5);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(highest ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?Y ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(highest ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?Y ?X))")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
@@ -128,14 +143,22 @@ public class BlocksWorldStateSpecTest {
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
 		assertEquals(rule.getConditions(false).size(), 8);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(on ?X a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(above b ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block b)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?Y ?X a b))")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?X a b))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(on ?X a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(above b ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block b)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?Y ?X a b))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?X a b))")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
@@ -149,9 +172,12 @@ public class BlocksWorldStateSpecTest {
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
 		assertEquals(rule.getConditions(false).size(), 3);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(on ?X ?)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(on ?X ?)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
@@ -165,12 +191,18 @@ public class BlocksWorldStateSpecTest {
 		// inequals
 		// Note no inequals between ?1 and ?2
 		assertEquals(rule.getConditions(false).size(), 6);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(on ?X ?)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(on ?Y ?)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?Y ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(on ?X ?)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(on ?Y ?)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?Y ?X))")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
@@ -182,7 +214,8 @@ public class BlocksWorldStateSpecTest {
 		// Test type predicate
 		rule = new GuidedRule("(block ?X) => (moveFloor ?X)");
 		assertEquals(rule.getConditions(false).size(), 1);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
 		constants = rule.getConstantConditions();
 		assertNull(constants);
@@ -190,9 +223,12 @@ public class BlocksWorldStateSpecTest {
 		// Test inequal type predicates
 		rule = new GuidedRule("(block ?X) (block ?Y) => (move ?X ?Y)");
 		assertEquals(rule.getConditions(false).size(), 3);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?Y ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?Y ?X))")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(move ?X ?Y)"));
 		constants = rule.getConstantConditions();
 		assertNull(constants);
@@ -200,8 +236,10 @@ public class BlocksWorldStateSpecTest {
 		// Test existing type predicate
 		rule = new GuidedRule("(clear ?X) (block ?X) => (moveFloor ?X)");
 		assertEquals(rule.getConditions(false).size(), 2);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
 		constants = rule.getConstantConditions();
 		assertNull(constants);
@@ -210,11 +248,16 @@ public class BlocksWorldStateSpecTest {
 		rule = new GuidedRule(
 				"(clear ?X) (clear ?Y) (test (<> ?Y ?X)) (block ?X) (block ?Y) => (move ?X ?Y)");
 		assertEquals(rule.getConditions(false).size(), 5);
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?Y)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?Y ?X))")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?Y ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?Y)")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(move ?X ?Y)"));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
@@ -225,11 +268,16 @@ public class BlocksWorldStateSpecTest {
 
 		// Testing module syntax
 		rule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?_MOD_a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(above ?X ?_MOD_a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(test (<> ?_MOD_a ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?_MOD_a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(above ?X ?_MOD_a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(test (<> ?_MOD_a ?X))")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 5);
 		constants = rule.getConstantConditions();
@@ -238,23 +286,29 @@ public class BlocksWorldStateSpecTest {
 		// Testing module constants
 		rule = new GuidedRule(
 				"(clear ?_MOD_a) (on ?_MOD_a ?) => (moveFloor ?_MOD_a)");
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?_MOD_a)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(on ?_MOD_a ?)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?_MOD_a)")));
-		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?_MOD_a)"));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?_MOD_a)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(on ?_MOD_a ?)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?_MOD_a)")));
+		assertEquals(rule.getAction(), StateSpec
+				.toStringFact("(moveFloor ?_MOD_a)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getConstantConditions();
-		strFact = StateSpec.getInstance().getPredicates().get(
-				"clear");
+		strFact = StateSpec.getInstance().getPredicates().get("clear");
 		assertTrue(constants.getFacts().contains(
 				new StringFact(strFact, new String[] { "?_MOD_a" })));
 		assertEquals(constants.getFacts().size(), 1);
 
 		// Testing negation
 		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(not (highest ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(not (highest ?X))")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getConstantConditions();
@@ -262,9 +316,12 @@ public class BlocksWorldStateSpecTest {
 
 		// Testing negation (with extra terms)
 		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(StateSpec.toStringFact("(not (highest ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toStringFact("(not (highest ?X))")));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getConstantConditions();
@@ -277,39 +334,16 @@ public class BlocksWorldStateSpecTest {
 	}
 
 	@Test
-	public void testEncodeRule() {
-		String result = spec_.encodeRule(new GuidedRule(
-				"(block a) (clear a) => (moveFloor a)"));
-		assertTrue(result.equals("(clear a) => (moveFloor a)"));
-
-		result = spec_.encodeRule(new GuidedRule(
-				"(block a) (block b) (on a b) => (move a b)"));
-		assertTrue(result.equals("(on a b) => (move a b)"));
-
-		result = spec_.encodeRule(new GuidedRule(
-				"(block ?X) (clear ?X) => (moveFloor ?X)"));
-		assertTrue(result.equals("(clear ?X) => (moveFloor ?X)"));
-
-		result = spec_.encodeRule(new GuidedRule(
-				"(block ?X) (block ?Y) (test (<> ?X ?Y)) "
-						+ "(clear ?X) (clear ?Y) => (move ?X ?Y)"));
-		assertTrue(result.equals("(clear ?X) (clear ?Y) => (move ?X ?Y)"));
-
-		result = spec_.encodeRule(new GuidedRule("(block a) => (moveFloor a)"));
-		assertTrue(result.equals("(block a) => (moveFloor a)"));
-	}
-
-	@Test
 	public void testInsertValidActions() throws Exception {
 		Rete state = spec_.getRete();
 
 		// Empty case
-		MultiMap<String, String> validActions = spec_
+		MultiMap<String, String[]> validActions = spec_
 				.generateValidActions(state);
 		state.eval("(facts)");
 		assertNotNull(validActions);
-		assertNull(validActions.get("move"));
-		assertNull(validActions.get("moveFloor"));
+		assertNull(validActions.getList("move"));
+		assertNull(validActions.getList("moveFloor"));
 		state.reset();
 
 		// Simple move case
@@ -318,10 +352,11 @@ public class BlocksWorldStateSpecTest {
 		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
 		assertNotNull(validActions);
-		List<String> moveResult = validActions.get("move");
-		assertTrue(moveResult.contains("a b"));
-		assertTrue(moveResult.contains("b a"));
-		List<String> moveFloorResult = validActions.get("moveFloor");
+		SortedSet<String[]> moveResult = validActions.getSortedSet("move");
+		assertTrue(moveResult.contains(new String[] { "a", "b" }));
+		assertTrue(moveResult.contains(new String[] { "b", "a" }));
+		SortedSet<String[]> moveFloorResult = validActions
+				.getSortedSet("moveFloor");
 		assertNull(moveFloorResult);
 		state.reset();
 
@@ -331,10 +366,10 @@ public class BlocksWorldStateSpecTest {
 		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
 		assertNotNull(validActions);
-		moveResult = validActions.get("move");
+		moveResult = validActions.getSortedSet("move");
 		assertNull(moveResult);
-		moveFloorResult = validActions.get("moveFloor");
-		assertTrue(moveFloorResult.contains("v"));
+		moveFloorResult = validActions.getSortedSet("moveFloor");
+		assertTrue(moveFloorResult.contains(new String[] { "v" }));
 		state.reset();
 
 		// Complex both case
@@ -347,16 +382,16 @@ public class BlocksWorldStateSpecTest {
 		validActions = spec_.generateValidActions(state);
 		state.eval("(facts)");
 		assertNotNull(validActions);
-		moveResult = validActions.get("move");
-		assertTrue(moveResult.contains("d e"));
-		assertTrue(moveResult.contains("d c"));
-		assertTrue(moveResult.contains("e d"));
-		assertTrue(moveResult.contains("e c"));
-		assertTrue(moveResult.contains("c d"));
-		assertTrue(moveResult.contains("c e"));
-		moveFloorResult = validActions.get("moveFloor");
-		assertTrue(moveFloorResult.contains("d"));
-		assertTrue(moveFloorResult.contains("e"));
+		moveResult = validActions.getSortedSet("move");
+		assertTrue(moveResult.contains(new String[] { "d", "e" }));
+		assertTrue(moveResult.contains(new String[] { "d", "c" }));
+		assertTrue(moveResult.contains(new String[] { "e", "d" }));
+		assertTrue(moveResult.contains(new String[] { "e", "c" }));
+		assertTrue(moveResult.contains(new String[] { "c", "d" }));
+		assertTrue(moveResult.contains(new String[] { "c", "e" }));
+		moveFloorResult = validActions.getSortedSet("moveFloor");
+		assertTrue(moveFloorResult.contains(new String[] { "d" }));
+		assertTrue(moveFloorResult.contains(new String[] { "e" }));
 	}
 
 	@Test

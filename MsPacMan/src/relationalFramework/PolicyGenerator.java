@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,7 +35,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = -1511473311104846771L;
+	private static final long serialVersionUID = -439289279282263241L;
 
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;
@@ -153,9 +154,9 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public PolicyGenerator() {
 		actionSet_ = StateSpec.getInstance().getActions();
-		rlggRules_ = new MultiMap<String, GuidedRule>();
+		rlggRules_ = MultiMap.createListMultiMap();
 		ruleCreation_ = new RuleCreation();
-		mutatedRules_ = new MultiMap<Slot, GuidedRule>();
+		mutatedRules_ = MultiMap.createListMultiMap();
 		removedRules_ = new HashSet<GuidedRule>();
 		currentRules_ = new HashSet<GuidedRule>();
 		klDivergence_ = Double.MAX_VALUE;
@@ -233,7 +234,41 @@ public class PolicyGenerator implements Serializable {
 
 		// Append the general rules as well (if they aren't already in there) to
 		// ensure unnecessary covering isn't triggered.
-		for (GuidedRule coveredRule : rlggRules_.values()) {
+
+		// First get them in order
+		SortedSet<GuidedRule> orderedSlotRules = new TreeSet<GuidedRule>(
+				new Comparator<GuidedRule>() {
+					/**
+					 * Compares two rules and orders them by slot probability.
+					 * 
+					 * @param r1
+					 *            Rule 1.
+					 * @param r2
+					 *            Rule 2.
+					 * @return -1 if rule 1's slot probability is higher, 0 if
+					 *         equal, and 1 if lower.
+					 */
+					@Override
+					public int compare(GuidedRule r1, GuidedRule r2) {
+						// Null slot case
+						if (r1.getSlot() == null) {
+							if (r2.getSlot() != null)
+								return r1.compareTo(r2);
+							return 1;
+						} else if (r2.getSlot() == null)
+							return -1;
+
+						int result = Double.compare(slotGenerator_.getOrdering(r1
+								.getSlot()), slotGenerator_.getOrdering(r2
+								.getSlot()));
+						if (result != 0)
+							return result;
+						return r1.compareTo(r2);
+					}
+				});
+
+		orderedSlotRules.addAll(rlggRules_.values());
+		for (GuidedRule coveredRule : orderedSlotRules) {
 			if (!policy.contains(coveredRule))
 				policy.addRule(coveredRule, false, true);
 		}
@@ -261,8 +296,8 @@ public class PolicyGenerator implements Serializable {
 	 * @return The list of covered rules, one for each action type.
 	 */
 	public List<GuidedRule> triggerRLGGCovering(Rete state,
-			MultiMap<String, String> validActions,
-			MultiMap<String, String> activatedActions, boolean createNewRules) {
+			MultiMap<String, String[]> validActions,
+			MultiMap<String, String[]> activatedActions, boolean createNewRules) {
 		// If there are actions to cover, cover them.
 		if (!frozen_ && !slotOptimisation_
 				&& isCoveringNeeded(validActions, activatedActions)) {
@@ -315,8 +350,8 @@ public class PolicyGenerator implements Serializable {
 	 *            consider these when we're creating new rules.
 	 * @return True if covering is needed.
 	 */
-	private boolean isCoveringNeeded(MultiMap<String, String> validActions,
-			MultiMap<String, String> activatedActions) {
+	private boolean isCoveringNeeded(MultiMap<String, String[]> validActions,
+			MultiMap<String, String[]> activatedActions) {
 		for (String action : validActions.keySet()) {
 			// If the activated actions don't even contain the key, return
 			// true.
@@ -444,6 +479,24 @@ public class PolicyGenerator implements Serializable {
 						} else {
 							slotGenerator_.remove(existingSlot);
 						}
+
+						if (debugMode_) {
+							try {
+								System.out.println("\tEXISTING SLOT SEED: "
+										+ slotConditions + " => "
+										+ rlgg.getActionPredicate());
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					} else if (debugMode_) {
+						try {
+							System.out.println("\tNEW SLOT SEED: "
+									+ slotConditions + " => "
+									+ rlgg.getActionPredicate());
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
 					}
 
 					// Mutate new rules for the slot
@@ -500,7 +553,6 @@ public class PolicyGenerator implements Serializable {
 				}
 			}
 
-			// TODO Pac-Man old range rules not being removed.
 			Set<GuidedRule> mutants = ruleCreation_
 					.specialiseToPreGoal(baseRule);
 			if (ruleSlot.getSlotSplitFacts() != null)
@@ -513,7 +565,7 @@ public class PolicyGenerator implements Serializable {
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (removeOld) {
-				if (mutatedRules_.get(ruleSlot) != null) {
+				if (mutatedRules_.getList(ruleSlot) != null) {
 					// Run through the rules in the slot, removing any direct
 					// mutants of the base rule not in the current set of direct
 					// mutants.
@@ -546,7 +598,7 @@ public class PolicyGenerator implements Serializable {
 
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
-					mutatedRules_.get(ruleSlot).removeAll(removables);
+					mutatedRules_.getList(ruleSlot).removeAll(removables);
 				}
 			} else {
 				restart_ = false;
@@ -687,7 +739,7 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public void resetGenerator() {
 		slotGenerator_ = new OrderedDistribution<Slot>(random_);
-		currentSlots_ = new MultiMap<String, Slot>();
+		currentSlots_ = MultiMap.createListMultiMap();
 		for (String action : actionSet_.keySet()) {
 			Slot slot = new Slot(action);
 			slotGenerator_.add(slot);
@@ -790,7 +842,7 @@ public class PolicyGenerator implements Serializable {
 		}
 
 		// Only selecting the top elite samples
-		MultiMap<Slot, Double> slotNumeracy = new MultiMap<Slot, Double>();
+		MultiMap<Slot, Double> slotNumeracy = MultiMap.createListMultiMap();
 		for (PolicyValue pv : elites) {
 			Map<Slot, Integer> policySlotCounts = new HashMap<Slot, Integer>();
 			double weight = pv.getValue() * gradient + offset;
@@ -838,7 +890,7 @@ public class PolicyGenerator implements Serializable {
 			// Each slot should have elites number of counts
 			double[] slotCounts = new double[elites.size()];
 			int i = 0;
-			for (Double val : slotNumeracy.get(slot)) {
+			for (Double val : slotNumeracy.getList(slot)) {
 				slotCounts[i] = val;
 				i++;
 			}
@@ -1107,15 +1159,15 @@ public class PolicyGenerator implements Serializable {
 	/**
 	 * Adds LGG rules to this generator.
 	 * 
-	 * @param lggRules
+	 * @param rlggRules
 	 *            The lgg rules (found previously).
 	 */
-	public void addCoveredRules(MultiMap<String, GuidedRule> lggRules) {
-		rlggRules_ = new MultiMap<String, GuidedRule>();
-		for (String action : lggRules.keySet()) {
+	public void addCoveredRules(MultiMap<String, GuidedRule> rlggRules) {
+		rlggRules_ = MultiMap.createListMultiMap();
+		for (String action : rlggRules.keySet()) {
 			// Adding the lgg rules to the slots
 			Slot slot = findSlot(action);
-			for (GuidedRule rule : lggRules.get(action)) {
+			for (GuidedRule rule : rlggRules.getList(action)) {
 				rule = (GuidedRule) rule.clone();
 				rule.setSpawned(null);
 				slot.addNewRule(rule);
@@ -1192,8 +1244,7 @@ public class PolicyGenerator implements Serializable {
 							.getNonZeroOrderedElements()) {
 						if (!single)
 							slotOutput.append(" / ");
-						slotOutput.append(StateSpec.getInstance().encodeRule(
-								rule));
+						slotOutput.append(rule.toNiceString());
 						single = false;
 					}
 					slotOutput.append("\n");

@@ -139,6 +139,7 @@ public class PolicyActor implements AgentInterface {
 
 	// @Override
 	public Action agent_step(double arg0, Observation arg1) {
+		// TODO If the prevState matches the current state, resample the policy.
 		noteInternalFigures(arg0);
 
 		Action action = new Action(0, 0);
@@ -208,6 +209,8 @@ public class PolicyActor implements AgentInterface {
 		if ((internalGoal_ != null) && (internalGoalMet_))
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
+		// TODO Perhaps resample policy here if no rules are fired (not
+		// including the RLGG rules - may need to remove them).
 		actions = policy_.evaluatePolicy(state, ObjectObservations
 				.getInstance().validActions, actions, StateSpec.getInstance()
 				.getNumReturnedActions(), optimal_, false, noteTriggered);
@@ -313,7 +316,7 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		// Check each predicate in the state
-		MultiMap<String, ValueVector> goalFactMap = new MultiMap<String, ValueVector>();
+		MultiMap<String, ValueVector> goalFactMap = MultiMap.createListMultiMap();
 		boolean[] goalAchieved = new boolean[goalPredicate_.length];
 		for (Fact fact : stateFacts) {
 			String[] factSplit = StateSpec.splitFact(fact.toString());
@@ -376,7 +379,7 @@ public class PolicyActor implements AgentInterface {
 		// Setting up the lists
 		List<ValueVector>[] goalFacts = new ArrayList[goalPredicate_.length];
 		for (int i = 0; i < goalPredicate_.length; i++) {
-			goalFacts[i] = stateFacts.get(goalPredicate_[i]);
+			goalFacts[i] = stateFacts.getList(goalPredicate_[i]);
 		}
 
 		// Iterate through the lists, combining facts together

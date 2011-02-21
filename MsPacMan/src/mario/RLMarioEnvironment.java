@@ -46,7 +46,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_.setEnemies("off");
 		cmdLineOptions_.setLevelRandSeed(6);
 		cmdLineOptions_.setLevelDifficulty(0);
-		cmdLineOptions_.setFPS(10);
+		cmdLineOptions_.setFPS(30);
 		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -105,6 +105,10 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		while (!environment_.isMarioOnGround()) {
 			environment_.performAction(chooseLowAction(action, marioPos));
 			environment_.tick();
+			
+			// Check for endless fall bug
+			if (environment_.getTimeLeft() < 0)
+				break;
 		}
 
 		Observation obs = formObservations(rete_, 1);
@@ -148,7 +152,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			// Sort the facts by distance
 			Collections.sort(actions, new ActionComparator<StringFact>());
 			action = actions.get(0);
-			System.out.println(action + " : " + Arrays.toString(startPos));
+//			System.out.println(action + " : " + Arrays.toString(startPos));
 		}
 		boolean[] actionArray = ((RLMarioStateSpec) StateSpec.getInstance())
 				.applyAction(action, startPos, environment_.getMarioFloatPos());

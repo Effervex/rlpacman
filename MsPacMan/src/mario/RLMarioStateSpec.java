@@ -33,7 +33,7 @@ public class RLMarioStateSpec extends StateSpec {
 		preconds.put("jumpOnto", "(canJumpOn ?X) (thing ?X) (distance ?X ?Y)");
 		preconds
 				.put("jumpOver", "(canJumpOver ?X) (thing ?X) (distance ?X ?Y)");
-		preconds.put("move", "(thing ?X) (direction ?X ?Y) (distance ?X ?Z)");
+		preconds.put("move", "(flag ?X) (direction ?X ?Y) (distance ?X ?Z)");
 
 		return preconds;
 	}

@@ -1,11 +1,13 @@
 package relationalFramework;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 
 import jess.QueryResult;
 import jess.Rete;
@@ -265,11 +267,9 @@ public class Policy {
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
 				if (!isCoveredRule(rule))
-					buffer.append(StateSpec.getInstance().encodeRule(rule)
-							+ "\n");
+					buffer.append(rule.toNiceString() + "\n");
 			} else {
-				buffer.append("MODULAR: "
-						+ StateSpec.getInstance().encodeRule(rule) + "\n");
+				buffer.append("MODULAR: " + rule.toNiceString() + "\n");
 			}
 		}
 		return buffer.toString();
@@ -288,7 +288,7 @@ public class Policy {
 		for (GuidedRule rule : policyRules_) {
 			// Don't display module rules or unused rules
 			if (!rule.isLoadedModuleRule() && triggeredRules_.contains(rule)) {
-				buffer.append(StateSpec.getInstance().encodeRule(rule) + "\n");
+				buffer.append(rule.toNiceString() + "\n");
 			}
 		}
 		return buffer.toString();
@@ -316,12 +316,13 @@ public class Policy {
 	 *            deactivated after agent has found internal goal.
 	 */
 	public ActionChoice evaluatePolicy(Rete state,
-			MultiMap<String, String> validActions, ActionChoice actionSwitch,
+			MultiMap<String, String[]> validActions, ActionChoice actionSwitch,
 			int actionsReturned, boolean optimal, boolean alreadyCovered,
 			boolean noteTriggered) {
 		noteTriggered_ = noteTriggered;
 		actionSwitch.switchOffAll();
-		MultiMap<String, String> activatedActions = new MultiMap<String, String>();
+		MultiMap<String, String[]> activatedActions = MultiMap
+				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
 				: actionsReturned;
@@ -354,26 +355,24 @@ public class Policy {
 						StringFact action = new StringFact(gr.getAction());
 
 						// Find the arguments.
-						StringBuffer args = new StringBuffer();
-						boolean first = true;
 						String[] arguments = action.getArguments();
 						for (int i = 0; i < arguments.length; i++) {
+							// If the action is variable, use the replacement
 							if (arguments[i].charAt(0) == '?')
 								arguments[i] = results.getSymbol(arguments[i]
 										.substring(1));
-
-							if (!first)
-								args.append(" ");
-							args.append(arguments[i]);
-							first = false;
 						}
 
-						activatedActions.putContains(action.getFactName(), args
-								.toString());
+						// Check this is a valid action
+						if (isValidAction(arguments, validActions
+								.getSortedSet(action.getFactName()))) {
+							activatedActions.putContains(action.getFactName(),
+									arguments);
 
-						// Use the found action set as a result.
-						if (canAddRule(gr, actionsFound, actionsReturned))
-							actionsList.add(action);
+							// Use the found action set as a result.
+							if (canAddRule(gr, actionsFound, actionsReturned))
+								actionsList.add(action);
+						}
 					} while (results.next());
 
 					// Trim down the action list as it may contain too many
@@ -427,6 +426,24 @@ public class Policy {
 		}
 
 		return actionSwitch;
+	}
+
+	/**
+	 * Checks if this action is in the valid actions.
+	 * 
+	 * @param actionArgs
+	 *            The action args being checked.
+	 * @param validArgs
+	 *            The set of valid action args.
+	 * @return True if the action is valid, false otherwise.
+	 */
+	private boolean isValidAction(String[] actionArgs, SortedSet<String[]> validArgs) {
+		for (String[] validArg : validArgs) {
+			// Use the set's sorting value to quickly quit
+			if (Arrays.equals(actionArgs, validArg))
+				return true;
+		}
+		return false;
 	}
 
 	/**

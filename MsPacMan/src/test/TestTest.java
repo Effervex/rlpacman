@@ -7,10 +7,14 @@ import java.io.File;
 import java.io.FileWriter;
 import java.util.Arrays;
 import java.util.Random;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
+
+import relationalFramework.ArgumentComparator;
 
 public class TestTest {
 	@Test
@@ -126,7 +130,7 @@ public class TestTest {
 
 		write.close();
 	}
-	
+
 	@Test
 	public void testBitOperators() {
 		assertTrue((2 & 1) == 0);
@@ -136,5 +140,22 @@ public class TestTest {
 		assertTrue((4 & 4) != 0);
 		assertTrue((4 & 2) == 0);
 		assertTrue((4 & 1) == 0);
+	}
+
+	@Test
+	public void testSortedSetArrayContains() {
+		SortedSet<String[]> arraySet = new TreeSet<String[]>(ArgumentComparator
+				.getInstance());
+		assertTrue(arraySet.add(new String[] { "a", "b", "c"}));
+		assertTrue(arraySet.contains(new String[] {"a", "b", "c"}));
+		assertFalse(arraySet.contains(new String[] {"a", "b", "d"}));
+		assertFalse(arraySet.contains(new String[] {"a", "c", "b"}));
+		
+		assertTrue(arraySet.add(new String[] {"a", "b", "d"}));
+		assertTrue(arraySet.contains(new String[] {"a", "b", "c"}));
+		assertTrue(arraySet.contains(new String[] {"a", "b", "d"}));
+		assertFalse(arraySet.contains(new String[] {"a", "c", "b"}));
+		
+		assertFalse(arraySet.add(new String[] {"a", "b", "d"}));
 	}
 }
