@@ -259,7 +259,7 @@ public abstract class StateSpec {
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
-			actionPreconditions_ = new MultiMap<String, String>();
+			actionPreconditions_ = MultiMap.createListMultiMap();
 			for (String action : purePreConds.keySet()) {
 				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
 						+ " " + purePreConds.get(action) + ")";
@@ -434,23 +434,20 @@ public abstract class StateSpec {
 	 * @return A multimap with each valid action predicate as the key and the
 	 *         values as the arguments.
 	 */
-	public final MultiMap<String, String> generateValidActions(Rete state) {
-		MultiMap<String, String> validActions = new MultiMap<String, String>();
+	public final MultiMap<String, String[]> generateValidActions(Rete state) {
+		MultiMap<String, String[]> validActions = MultiMap.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		try {
 			for (String action : actions_.keySet()) {
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
-					StringBuffer factBuffer = new StringBuffer();
-					boolean first = true;
-					for (String term : actionPreconditions_.get(action)) {
-						if (!first)
-							factBuffer.append(" ");
-						factBuffer.append(result.getSymbol(term));
-						first = false;
+					List<String> actionTerms = actionPreconditions_.getList(action);
+					String[] arguments = new String[actionTerms.size()];
+					for (int i = 0; i < arguments.length; i++) {
+						arguments[i] = result.getSymbol(actionTerms.get(i));
 					}
-					validActions.put(action, factBuffer.toString());
+					validActions.put(action, arguments);
 				}
 			}
 		} catch (Exception e) {

@@ -71,16 +71,17 @@ public class RuleCreationTest {
 		state.eval("(assert (onFloor c))");
 		state.eval("(assert (onFloor a))");
 		state.eval("(assert (onFloor f))");
-		MultiMap<String, String> validActions = StateSpec.getInstance()
+		MultiMap<String, String[]> validActions = StateSpec.getInstance()
 				.generateValidActions(state);
 
+		MultiMap<String, GuidedRule> coveredRule = MultiMap.createListMultiMap();
 		List<GuidedRule> rules = sut_.rlggState(state, validActions,
-				new MultiMap<String, GuidedRule>());
+				coveredRule);
 		assertEquals(rules.size(), 2);
 		for (GuidedRule gr : rules) {
 			System.out.println(gr);
 			if (gr.getAction().getFactName().equals("moveFloor")) {
-				int condCount = StateSpec.getInstance().encodeRule(gr).split(
+				int condCount = gr.toNiceString().split(
 						StateSpec.INFERS_ACTION)[0].replaceAll(
 						"\\(.+?\\)( |$)", ".").length();
 				assertEquals(2, condCount);
@@ -150,7 +151,7 @@ public class RuleCreationTest {
 		state.eval("(assert (highest f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		MultiMap<String, GuidedRule> existingRules = new MultiMap<String, GuidedRule>();
+		MultiMap<String, GuidedRule> existingRules = MultiMap.createListMultiMap();
 		existingRules.put("move", new GuidedRule(
 				"(on ?X ?) (clear ?X) (on ?Y ?) (clear ?Y) (test (<> ?X ?Y)) "
 						+ "(block ?X) (block ?Y) => (move ?X ?Y)"));
@@ -222,8 +223,9 @@ public class RuleCreationTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
+		coveredRule.clear();
 		rules = sut_.rlggState(state, validActions,
-				new MultiMap<String, GuidedRule>());
+				coveredRule);
 		assertEquals(2, rules.size());
 		existingRules.clear();
 		for (GuidedRule gr : rules) {
@@ -458,8 +460,9 @@ public class RuleCreationTest {
 		state.run();
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
+		coveredRule.clear();
 		rules = sut_.rlggState(state, validActions,
-				new MultiMap<String, GuidedRule>());
+				coveredRule);
 		assertEquals(2, rules.size());
 		for (GuidedRule gr : rules) {
 			System.out.println(gr.toString());

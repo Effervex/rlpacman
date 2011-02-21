@@ -29,7 +29,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
-	private static final long serialVersionUID = -91335078270911356L;
+	private static final long serialVersionUID = -7006445793284513812L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */
@@ -67,8 +67,50 @@ public class RuleCreation implements Serializable {
 	 * @return A list of guided rules, one for each action type.
 	 */
 	public List<GuidedRule> rlggState(Rete state,
-			MultiMap<String, String> validActions,
-			MultiMap<String, GuidedRule> coveredRules) throws Exception {
+			MultiMap<String, String[]> validActions,
+			MultiMap<String, GuidedRule> coveredRules)
+			throws Exception {
+		// TODO Modify this (or the action condition) to deal with numerical
+		// values.
+		// The relevant facts which contain the key term
+		ao_.scanState(StateSpec.extractFacts(state));
+
+		// Run through each valid action.
+		for (String action : validActions.keySet()) {
+			// Get the list of previous rules, both LGG and non-LGG.
+			List<GuidedRule> previousRules = coveredRules.getList(action);
+			if (previousRules == null)
+				previousRules = new ArrayList<GuidedRule>();
+
+			// Gather the action facts for each valid action
+			StringFact baseAction = StateSpec.getInstance().getStringFact(
+					action);
+			for (String[] actionArgs : validActions.get(action)) {
+				StringFact actionFact = new StringFact(baseAction, actionArgs);
+				ao_.gatherActionFacts(actionFact, false);
+			}
+		}
+
+		// Get the RLGG from the invariant conditions from the action
+		// conditions.
+		return ao_.getRLGGActionRules();
+	}
+
+	/**
+	 * Covers a state using RLGG by creating a rule for every action type
+	 * present in the valid actions for the state.
+	 * 
+	 * @param state
+	 *            The state of the environment, containing the valid actions.
+	 * @param validActions
+	 *            The set of valid actions to choose from.
+	 * @param coveredRules
+	 *            A starting point for the rules, if any exist.
+	 * @return A list of guided rules, one for each action type.
+	 */
+	public List<GuidedRule> rlggState(Rete state,
+			MultiMap<String, String[]> validActions,
+			MultiMap<String, GuidedRule> coveredRules, int gds) throws Exception {
 		List<String> constants = StateSpec.getInstance().getConstants();
 
 		// The relevant facts which contain the key term
@@ -81,14 +123,14 @@ public class RuleCreation implements Serializable {
 		// Run through each valid action.
 		for (String action : validActions.keySet()) {
 			// Get the list of previous rules, both LGG and non-LGG.
-			List<GuidedRule> previousRules = coveredRules.get(action);
+			List<GuidedRule> previousRules = coveredRules.getList(action);
 			if (previousRules == null)
 				previousRules = new ArrayList<GuidedRule>();
 
 			// Cover the state, using the previous rules and/or newly created
 			// rules while noting valid conditions for later rule mutation\
 			List<GuidedRule> actionRules = unifyActionRules(validActions
-					.get(action), action, previousRules, constants);
+					.getList(action), action, previousRules, constants);
 			generalActions.addAll(actionRules);
 		}
 
@@ -111,25 +153,24 @@ public class RuleCreation implements Serializable {
 	 *            The constants to maintain in rules.
 	 * @return All rules representing a general action.
 	 */
-	private List<GuidedRule> unifyActionRules(List<String> argsList,
+	private List<GuidedRule> unifyActionRules(List<String[]> argsList,
 			String actionPred, List<GuidedRule> previousRules,
 			List<String> constants) {
 		// The terms in the action
 		StringFact baseAction = StateSpec.getInstance().getActions().get(
 				actionPred);
 
-		Iterator<String> argIter = argsList.iterator();
+		Iterator<String[]> argIter = argsList.iterator();
 		// Do until:
 		// 1) We have no actions left to look at
 		// 2) Every rule is not yet minimal
 		while (argIter.hasNext()) {
-			String arg = argIter.next();
-
-			String[] args = arg.split(" ");
+			String[] args = argIter.next();
 			StringFact action = new StringFact(baseAction, args);
 
 			// TODO May be able to simply learn the RLGG here!
-			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action, false);
+			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action,
+					false);
 
 			// Inversely substitute the terms for variables (in string form)
 			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action, null);

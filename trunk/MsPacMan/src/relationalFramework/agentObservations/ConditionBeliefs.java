@@ -401,7 +401,7 @@ public class ConditionBeliefs implements Serializable {
 	 * @return The mapping of argument type classes to argument variables.
 	 */
 	private MultiMap<String, String> createActionTerms(StringFact predicate) {
-		MultiMap<String, String> actionTerms = new MultiMap<String, String>();
+		MultiMap<String, String> actionTerms = MultiMap.createListMultiMap();
 
 		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
@@ -466,7 +466,7 @@ public class ConditionBeliefs implements Serializable {
 		List<String> terms = new ArrayList<String>();
 		terms.add("?");
 		if (possibleTerms.containsKey(argTypes[index])) {
-			terms.addAll(possibleTerms.get(argTypes[index]));
+			terms.addAll(possibleTerms.getList(argTypes[index]));
 		}
 
 		// For each term

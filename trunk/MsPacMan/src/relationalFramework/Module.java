@@ -247,7 +247,7 @@ public class Module {
 						+ "in order with variables replaced by parameters.");
 				for (GuidedRule gr : newModule.moduleRules_) {
 					gr.setParameters(null);
-					bf.write("\n" + StateSpec.getInstance().encodeRule(gr));
+					bf.write("\n" + gr.toNiceString());
 				}
 
 				bf.close();

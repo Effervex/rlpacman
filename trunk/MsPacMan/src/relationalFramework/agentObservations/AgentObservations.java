@@ -24,6 +24,7 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Fact;
 import relationalFramework.ConditionComparator;
+import relationalFramework.GuidedRule;
 import relationalFramework.RuleCreation;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
@@ -36,7 +37,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = 790371205436473937L;
+	private static final long serialVersionUID = -7521721290113897683L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -115,7 +116,7 @@ public class AgentObservations implements Serializable {
 		// Run through the facts, adding to term mapped facts and adding the raw
 		// facts for condition belief scanning.
 		Collection<StringFact> stateFacts = new ArrayList<StringFact>();
-		termMappedFacts_ = new MultiMap<String, StringFact>();
+		termMappedFacts_ = MultiMap.createSortedSetMultiMap();
 		for (Fact stateFact : state) {
 			// Ignore the type, inequal and actions pred
 			String[] split = StateSpec.splitFact(stateFact.toString());
@@ -188,10 +189,10 @@ public class AgentObservations implements Serializable {
 			}
 
 			// Note the invariants
-//			if (invariants_ == null)
-//				invariants_ = new ConditionBeliefs("invariants");
-//			invariants_.noteFacts(cb.getAlwaysTrue(), cb.getNeverTrue(), cb
-//					.getOccasionallyTrue());
+			// if (invariants_ == null)
+			// invariants_ = new ConditionBeliefs("invariants");
+			// invariants_.noteFacts(cb.getAlwaysTrue(), cb.getNeverTrue(), cb
+			// .getOccasionallyTrue());
 
 			// Form the condition beliefs for the not relative facts, using the
 			// relative facts as always true values (only for non-types
@@ -301,7 +302,7 @@ public class AgentObservations implements Serializable {
 		Collection<BackgroundKnowledge> stateSpecKnowledge = StateSpec
 				.getInstance().getBackgroundKnowledgeConditions();
 		backgroundKnowledge.addAll(stateSpecKnowledge);
-		mappedEnvironmentRules_ = new MultiMap<String, BackgroundKnowledge>();
+		mappedEnvironmentRules_ = MultiMap.createSortedSetMultiMap();
 		for (BackgroundKnowledge bckKnow : stateSpecKnowledge) {
 			Collection<String> relevantPreds = bckKnow.getRelevantPreds();
 			for (String pred : relevantPreds)
@@ -472,7 +473,7 @@ public class AgentObservations implements Serializable {
 		Set<StringFact> actionConds = new HashSet<StringFact>();
 		for (String argument : action.getArguments()) {
 			if (!StateSpec.isNumber(argument)) {
-				List<StringFact> termFacts = termMappedFacts_.get(argument);
+				Collection<StringFact> termFacts = termMappedFacts_.get(argument);
 				for (StringFact termFact : termFacts) {
 					StringFact notedFact = termFact;
 					if (onlyActionTerms) {
@@ -496,7 +497,7 @@ public class AgentObservations implements Serializable {
 		}
 		if (!actionConds.isEmpty()
 				&& getActionBasedObservation(action.getFactName())
-						.addActionConditions(actionConds))
+						.addActionConditions(actionConds, action))
 			observationHash_ = null;
 
 		return actionFacts;
@@ -560,6 +561,28 @@ public class AgentObservations implements Serializable {
 		}
 
 		return changedOverall;
+	}
+
+	/**
+	 * Gets the RLGG rules found through the action observations. This is found
+	 * by observing the invariants in the actions.
+	 * 
+	 * @return The RLGGs for every action.
+	 */
+	public List<GuidedRule> getRLGGActionRules() {
+		// TODO No need to recreate the rule every step.
+		List<GuidedRule> rlggRules = new ArrayList<GuidedRule>();
+		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
+			GuidedRule rlggRule = abo.getRLGGRule();
+			SortedSet<StringFact> ruleConds = rlggRule.getConditions(false);
+			simplifyRule(ruleConds, false, false);
+			if (ruleConds != null)
+				rlggRule.setConditions(ruleConds, false);
+			rlggRule.expandConditions();
+			rlggRule.incrementStatesCovered();
+			rlggRules.add(rlggRule);
+		}
+		return rlggRules;
 	}
 
 	/**
@@ -854,6 +877,12 @@ public class AgentObservations implements Serializable {
 		/** The pre-goal information. */
 		private transient PreGoalInformation pgi_;
 
+		/**
+		 * The action itself, usually expressed in variables, but possibly
+		 * constants if the action always takes a constant.
+		 */
+		private StringFact action_;
+
 		/** The conditions observed to always be true for the action. */
 		private Collection<StringFact> invariantActionConditions_;
 
@@ -896,11 +925,14 @@ public class AgentObservations implements Serializable {
 		 * Adds action conditions to the action based observations.
 		 * 
 		 * @param actionConds
-		 *            the action conditions being added.
+		 *            The action conditions being added.
+		 * @param action
+		 *            The action which added the conditions.
 		 * @return True if the set of action conditions changed because of the
 		 *         addition.
 		 */
-		public boolean addActionConditions(Collection<StringFact> actionConds) {
+		public boolean addActionConditions(Collection<StringFact> actionConds,
+				StringFact action) {
 			// If this is the first action condition, then all the actions are
 			// considered invariant.
 			if (invariantActionConditions_ == null) {
@@ -909,6 +941,7 @@ public class AgentObservations implements Serializable {
 				variantActionConditions_ = new HashSet<StringFact>();
 				specialisationConditions_ = new HashSet<StringFact>();
 				actionConditionInactivity_ = 0;
+				action_ = new StringFact(action);
 				return true;
 			}
 
@@ -919,6 +952,20 @@ public class AgentObservations implements Serializable {
 			variantActionConditions_.removeAll(invariantActionConditions_);
 
 			changed |= (hash != variantActionConditions_.hashCode());
+
+			// Generalise the action if necessary
+			for (int i = 0; i < action_.getArguments().length; i++) {
+				String argument = action_.getArguments()[i];
+
+				// If the action isn't variable, but doesn't match with the
+				// current action, generalise it.
+				if ((argument.charAt(0) != '?')
+						&& (!argument.equals(action.getArguments()[i]))) {
+					action_.getArguments()[i] = RuleCreation
+							.getVariableTermString(i);
+					changed = true;
+				}
+			}
 
 			if (changed) {
 				specialisationConditions_ = recreateSpecialisations(
@@ -992,6 +1039,32 @@ public class AgentObservations implements Serializable {
 			} else
 				return condition;
 			return null;
+		}
+
+		/**
+		 * Gets the RLGG rule from the observed invariant conditions.
+		 * 
+		 * @return The RLGG rule created using the invariants observed.
+		 */
+		public GuidedRule getRLGGRule() {
+			Collection<StringFact> ruleConds = new TreeSet<StringFact>(
+					ConditionComparator.getInstance());
+			// Form the replacements if the action is non-variable
+			String[] replacements = null;
+			for (String arg : action_.getArguments()) {
+				if (arg.charAt(0) != '?') {
+					replacements = action_.getArguments();
+					break;
+				}
+			}
+
+			for (StringFact invariant : invariantActionConditions_) {
+				StringFact modFact = new StringFact(invariant);
+				if (replacements != null)
+					modFact.replaceArguments(replacements);
+				ruleConds.add(modFact);
+			}
+			return new GuidedRule(ruleConds, action_, null);
 		}
 
 		public List<RangedCondition> getActionRange() {

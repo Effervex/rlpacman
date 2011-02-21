@@ -633,7 +633,7 @@ public class LearningController {
 		}
 
 		for (GuidedRule rule : sortedRules)
-			System.out.println(StateSpec.getInstance().encodeRule(rule) + ": "
+			System.out.println(rule.toNiceString() + ": "
 					+ rule.getInternalMean() + ((char) 177)
 					+ rule.getInternalSD());
 	}

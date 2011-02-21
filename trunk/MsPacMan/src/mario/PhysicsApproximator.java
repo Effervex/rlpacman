@@ -2,9 +2,6 @@ package mario;
 
 import java.awt.Point;
 
-import mario.robinbaumgarten.astar.LevelScene;
-import mario.robinbaumgarten.astar.level.Level;
-
 import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
