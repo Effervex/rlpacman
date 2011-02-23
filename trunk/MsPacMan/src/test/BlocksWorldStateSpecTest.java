@@ -342,8 +342,8 @@ public class BlocksWorldStateSpecTest {
 				.generateValidActions(state);
 		state.eval("(facts)");
 		assertNotNull(validActions);
-		assertNull(validActions.getList("move"));
-		assertNull(validActions.getList("moveFloor"));
+		assertNull(validActions.getSortedSet("move"));
+		assertNull(validActions.getSortedSet("moveFloor"));
 		state.reset();
 
 		// Simple move case

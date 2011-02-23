@@ -316,7 +316,8 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		// Check each predicate in the state
-		MultiMap<String, ValueVector> goalFactMap = MultiMap.createListMultiMap();
+		MultiMap<String, ValueVector> goalFactMap = MultiMap
+				.createListMultiMap();
 		boolean[] goalAchieved = new boolean[goalPredicate_.length];
 		for (Fact fact : stateFacts) {
 			String[] factSplit = StateSpec.splitFact(fact.toString());
@@ -378,8 +379,12 @@ public class PolicyActor implements AgentInterface {
 	private void formPossibleGoals(MultiMap<String, ValueVector> stateFacts) {
 		// Setting up the lists
 		List<ValueVector>[] goalFacts = new ArrayList[goalPredicate_.length];
-		for (int i = 0; i < goalPredicate_.length; i++) {
-			goalFacts[i] = stateFacts.getList(goalPredicate_[i]);
+		try {
+			for (int i = 0; i < goalPredicate_.length; i++) {
+				goalFacts[i] = stateFacts.getList(goalPredicate_[i]);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
 		// Iterate through the lists, combining facts together

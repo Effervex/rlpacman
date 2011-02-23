@@ -173,10 +173,12 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The key to retrieve values from.
 	 * @return The list under the key, or null.
 	 */
-	public List<V> getList(Object key) {
+	public List<V> getList(Object key) throws IllegalAccessException {
 		if (collectionType_ == LIST_COLLECTION)
 			return (List<V>) innerMap_.get(key);
-		return null;
+		throw new IllegalAccessError(
+				"MultiMap is not of collection type List. collectionType_: "
+						+ collectionType_);
 	}
 
 	/**
@@ -186,10 +188,12 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The key to retrieve values from.
 	 * @return The sorted set under the key, or null.
 	 */
-	public SortedSet<V> getSortedSet(Object key) {
+	public SortedSet<V> getSortedSet(Object key) throws IllegalAccessException {
 		if (collectionType_ == SORTED_SET_COLLECTION)
 			return (SortedSet<V>) innerMap_.get(key);
-		return null;
+		throw new IllegalAccessError(
+				"MultiMap is not of collection type SortedSet. collectionType_: "
+						+ collectionType_);
 	}
 
 	/**
@@ -202,12 +206,16 @@ public class MultiMap<K, V> implements Serializable {
 	 * @return The value at the index, or null if the value doesn't exist or the
 	 *         index is out of range.
 	 */
-	public V getIndex(Object key, int index) {
-		List<V> list = getList(key);
-		if ((list != null) && (index < list.size())) {
-			return list.get(index);
+	public V getIndex(Object key, int index) throws IllegalAccessException {
+		if (collectionType_ == LIST_COLLECTION) {
+			List<V> list = getList(key);
+			if ((list != null) && (index < list.size())) {
+				return list.get(index);
+			}
 		}
-		return null;
+		throw new IllegalAccessError(
+				"MultiMap is not of collection type List. collectionType_: "
+						+ collectionType_);
 	}
 
 	/**

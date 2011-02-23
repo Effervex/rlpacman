@@ -438,11 +438,12 @@ public class Policy {
 	 * @return True if the action is valid, false otherwise.
 	 */
 	private boolean isValidAction(String[] actionArgs, SortedSet<String[]> validArgs) {
-		for (String[] validArg : validArgs) {
-			// Use the set's sorting value to quickly quit
-			if (Arrays.equals(actionArgs, validArg))
-				return true;
-		}
+		// If there are no chances for this action at all, return false.
+		if (validArgs == null)
+			return false;
+		
+		if (validArgs.contains(actionArgs))
+			return true;
 		return false;
 	}
 
