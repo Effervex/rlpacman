@@ -565,7 +565,7 @@ public class PolicyGenerator implements Serializable {
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
 			if (removeOld) {
-				if (mutatedRules_.getList(ruleSlot) != null) {
+				if (mutatedRules_.get(ruleSlot) != null) {
 					// Run through the rules in the slot, removing any direct
 					// mutants of the base rule not in the current set of direct
 					// mutants.
@@ -598,7 +598,7 @@ public class PolicyGenerator implements Serializable {
 
 					if (ruleSlot.getGenerator().removeAll(removables))
 						ruleSlot.getGenerator().normaliseProbs();
-					mutatedRules_.getList(ruleSlot).removeAll(removables);
+					mutatedRules_.get(ruleSlot).removeAll(removables);
 				}
 			} else {
 				restart_ = false;
@@ -890,7 +890,7 @@ public class PolicyGenerator implements Serializable {
 			// Each slot should have elites number of counts
 			double[] slotCounts = new double[elites.size()];
 			int i = 0;
-			for (Double val : slotNumeracy.getList(slot)) {
+			for (Double val : slotNumeracy.get(slot)) {
 				slotCounts[i] = val;
 				i++;
 			}
@@ -1167,7 +1167,7 @@ public class PolicyGenerator implements Serializable {
 		for (String action : rlggRules.keySet()) {
 			// Adding the lgg rules to the slots
 			Slot slot = findSlot(action);
-			for (GuidedRule rule : rlggRules.getList(action)) {
+			for (GuidedRule rule : rlggRules.get(action)) {
 				rule = (GuidedRule) rule.clone();
 				rule.setSpawned(null);
 				slot.addNewRule(rule);
@@ -1285,5 +1285,12 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public Collection<StringFact> getPreGoal(String actionPred) {
 		return ruleCreation_.getPreGoalState(actionPred);
+	}
+
+	/**
+	 * Should only be a test method.
+	 */
+	public void clearAgentObservations() {
+		ruleCreation_.clearAgentObservations();
 	}
 }

@@ -714,6 +714,10 @@ public class AgentObservations implements Serializable {
 			actionBasedObservations_.get(action).setPGI(null);
 		}
 	}
+	
+	public void clearActionBasedObservations() {
+		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
+	}
 
 	public void resetInactivity() {
 		conditionBeliefInactivity_ = 0;
@@ -1050,6 +1054,7 @@ public class AgentObservations implements Serializable {
 			Collection<StringFact> ruleConds = new TreeSet<StringFact>(
 					ConditionComparator.getInstance());
 			// Form the replacements if the action is non-variable
+			// TODO Note numerical ranges
 			String[] replacements = null;
 			for (String arg : action_.getArguments()) {
 				if (arg.charAt(0) != '?') {

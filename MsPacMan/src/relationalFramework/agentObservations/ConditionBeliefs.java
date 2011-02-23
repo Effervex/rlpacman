@@ -466,7 +466,7 @@ public class ConditionBeliefs implements Serializable {
 		List<String> terms = new ArrayList<String>();
 		terms.add("?");
 		if (possibleTerms.containsKey(argTypes[index])) {
-			terms.addAll(possibleTerms.getList(argTypes[index]));
+			terms.addAll(possibleTerms.get(argTypes[index]));
 		}
 
 		// For each term

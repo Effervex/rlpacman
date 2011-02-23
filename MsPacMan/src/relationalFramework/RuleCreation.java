@@ -68,7 +68,7 @@ public class RuleCreation implements Serializable {
 	 */
 	public List<GuidedRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			MultiMap<String, GuidedRule> coveredRules)
+			MultiMap<String, GuidedRule> coveredRules, int ghjfda)
 			throws Exception {
 		// TODO Modify this (or the action condition) to deal with numerical
 		// values.
@@ -110,7 +110,7 @@ public class RuleCreation implements Serializable {
 	 */
 	public List<GuidedRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			MultiMap<String, GuidedRule> coveredRules, int gds) throws Exception {
+			MultiMap<String, GuidedRule> coveredRules) throws Exception {
 		List<String> constants = StateSpec.getInstance().getConstants();
 
 		// The relevant facts which contain the key term
@@ -130,7 +130,7 @@ public class RuleCreation implements Serializable {
 			// Cover the state, using the previous rules and/or newly created
 			// rules while noting valid conditions for later rule mutation\
 			List<GuidedRule> actionRules = unifyActionRules(validActions
-					.getList(action), action, previousRules, constants);
+					.get(action), action, previousRules, constants);
 			generalActions.addAll(actionRules);
 		}
 
@@ -153,7 +153,7 @@ public class RuleCreation implements Serializable {
 	 *            The constants to maintain in rules.
 	 * @return All rules representing a general action.
 	 */
-	private List<GuidedRule> unifyActionRules(List<String[]> argsList,
+	private List<GuidedRule> unifyActionRules(Collection<String[]> argsList,
 			String actionPred, List<GuidedRule> previousRules,
 			List<String> constants) {
 		// The terms in the action
@@ -959,5 +959,12 @@ public class RuleCreation implements Serializable {
 	 */
 	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
 		ao_.setBackgroundKnowledge(backKnow);
+	}
+
+	/**
+	 * Should only be a test method. 
+	 */
+	public void clearAgentObservations() {
+		ao_.clearActionBasedObservations();
 	}
 }
