@@ -68,10 +68,8 @@ public class RuleCreation implements Serializable {
 	 */
 	public List<GuidedRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			MultiMap<String, GuidedRule> coveredRules, int ghjfda)
+			MultiMap<String, GuidedRule> coveredRules, int fixthislater)
 			throws Exception {
-		// TODO Modify this (or the action condition) to deal with numerical
-		// values.
 		// The relevant facts which contain the key term
 		ao_.scanState(StateSpec.extractFacts(state));
 
@@ -843,7 +841,7 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * Checks if the pregoal for the given action is rececntly changed.
+	 * Checks if the pregoal for the given action is recently changed.
 	 * 
 	 * @param actionPred
 	 *            The action predicate.

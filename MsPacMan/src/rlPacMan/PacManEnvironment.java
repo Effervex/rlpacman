@@ -187,7 +187,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			PolicyActor handCodedAgent = new PolicyActor();
 			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
-			handCodedAgent.agent_message("Policy");
+			handCodedAgent.agent_message("SetPolicy");
 			Action act = handCodedAgent.agent_start(formObservations(rete_));
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);
@@ -223,7 +223,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			PolicyActor handCodedAgent = new PolicyActor();
 			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
-			handCodedAgent.agent_message("Policy");
+			handCodedAgent.agent_message("SetPolicy");
 			Action act = handCodedAgent.agent_start(formObservations(rete_));
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);

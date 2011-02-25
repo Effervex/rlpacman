@@ -21,6 +21,7 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.MarioAIOptions;
 
 import relationalFramework.ActionChoice;
+import relationalFramework.LearningController;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
@@ -44,9 +45,9 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_ = new MarioAIOptions();
 		cmdLineOptions_.setVisualization(!experimentMode_);
 		cmdLineOptions_.setEnemies("off");
-		cmdLineOptions_.setLevelRandSeed(6);
+//		cmdLineOptions_.setLevelRandSeed();
 		cmdLineOptions_.setLevelDifficulty(0);
-		cmdLineOptions_.setFPS(30);
+		// cmdLineOptions_.setFPS(30);
 		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -105,7 +106,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		while (!environment_.isMarioOnGround()) {
 			environment_.performAction(chooseLowAction(action, marioPos));
 			environment_.tick();
-			
+
 			// Check for endless fall bug
 			if (environment_.getTimeLeft() < 0)
 				break;
@@ -125,6 +126,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 * Resets the environment back to normal.
 	 */
 	public void resetEnvironment() {
+		cmdLineOptions_.setLevelRandSeed(PolicyGenerator.random_.nextInt());
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();
@@ -152,7 +154,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			// Sort the facts by distance
 			Collections.sort(actions, new ActionComparator<StringFact>());
 			action = actions.get(0);
-//			System.out.println(action + " : " + Arrays.toString(startPos));
+			// System.out.println(action + " : " + Arrays.toString(startPos));
 		}
 		boolean[] actionArray = ((RLMarioStateSpec) StateSpec.getInstance())
 				.applyAction(action, startPos, environment_.getMarioFloatPos());

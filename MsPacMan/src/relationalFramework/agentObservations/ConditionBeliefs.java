@@ -175,8 +175,7 @@ public class ConditionBeliefs implements Serializable {
 			for (int i = 0; i < genArguments.length; i++) {
 				// If the argument is not 0, enter a variable.
 				if ((p & (int) Math.pow(2, i)) != 0)
-					genArguments[i] = RuleCreation
-							.getVariableTermString(i);
+					genArguments[i] = RuleCreation.getVariableTermString(i);
 				else
 					genArguments[i] = StateSpec.ANONYMOUS;
 			}
@@ -217,9 +216,9 @@ public class ConditionBeliefs implements Serializable {
 
 		// Union the facts (and add any unseen facts)
 		boolean changed = false;
-//		changed |= alwaysTrue_.retainAll(trueFacts);
-//		changed |= neverTrue_.retainAll(untrueFacts);
-//		changed |= occasionallyTrue_.retainAll(occasionalFacts);
+		// changed |= alwaysTrue_.retainAll(trueFacts);
+		// changed |= neverTrue_.retainAll(untrueFacts);
+		// changed |= occasionallyTrue_.retainAll(occasionalFacts);
 		changed |= alwaysTrue_.removeAll(occasionalFacts);
 		changed |= neverTrue_.removeAll(occasionalFacts);
 		changed |= occasionallyTrue_.addAll(occasionalFacts);
@@ -377,8 +376,17 @@ public class ConditionBeliefs implements Serializable {
 
 		// Run through each base fact, shaping as it goes.
 		StringFact predFact = StateSpec.getInstance().getStringFact(pred);
-		formPossibleFact(new String[predFact.getArguments().length], 0,
-				possibleTerms, predFact, shapedFacts);
+		// Special case - if this condition is a type and the fact is a type add
+		// it simply.
+		if (StateSpec.getInstance().isTypePredicate(condition_)
+				&& StateSpec.getInstance().isTypePredicate(pred)) {
+			predFact = new StringFact(predFact, new String[] { possibleTerms
+					.values().iterator().next() });
+			shapedFacts.add(predFact);
+		} else {
+			formPossibleFact(new String[predFact.getArguments().length], 0,
+					possibleTerms, predFact, shapedFacts);
+		}
 
 		// Removing the base condition fact itself
 		if (pred.equals(condition_)) {

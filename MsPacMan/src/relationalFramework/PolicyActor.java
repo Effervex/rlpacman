@@ -34,6 +34,9 @@ public class PolicyActor implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
 
+	/** If a new policy should be generated at the start. */
+	private boolean generatePolicy_ = true;
+
 	/** The last chosen actions. */
 	private ActionChoice prevActions_;
 
@@ -83,13 +86,16 @@ public class PolicyActor implements AgentInterface {
 	// @Override
 	public String agent_message(String arg0) {
 		// Receive a policy
-		if (arg0.equals("Policy")) {
+		if (arg0.equals("GetPolicy")) {
+			ObjectObservations.getInstance().objectArray = new Object[] { policy_ };
+		} else if (arg0.equals("SetPolicy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
 				policy_.parameterArgs(possibleGoals_.get(
 						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
 						.getFacts());
 			}
+			generatePolicy_ = false;
 		} else if (arg0.equals("Optimal")) {
 			optimal_ = true;
 		} else if (arg0.equals("internalReward")) {
@@ -120,6 +126,17 @@ public class PolicyActor implements AgentInterface {
 
 	// @Override
 	public Action agent_start(Observation arg0) {
+		// Initialise the policy
+		if (generatePolicy_) {
+			policy_ = PolicyGenerator.getInstance().generatePolicy(true);
+			System.out.println(policy_);
+			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
+				policy_.parameterArgs(possibleGoals_.get(
+						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
+						.getFacts());
+			}
+		}
+
 		// Initialising the actions
 		prevActions_ = new ActionChoice();
 
@@ -179,6 +196,7 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		prevActions_ = null;
+		generatePolicy_ = true;
 	}
 
 	/**
