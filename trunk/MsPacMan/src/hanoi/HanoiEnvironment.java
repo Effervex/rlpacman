@@ -284,7 +284,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		PolicyActor optimalAgent = new PolicyActor();
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
-		optimalAgent.agent_message("Policy");
+		optimalAgent.agent_message("SetPolicy");
 		Action act = optimalAgent.agent_start(formObservation());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = env_step(act);

@@ -182,11 +182,15 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 *         terms into ordered variable terms.
 	 */
 	public Map<String, String> createVariableTermReplacementMap() {
+		// TODO Maybe don't replace the numbers and they can be put into ranges
+		// in their appropriate methods.
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i]))
 				replacementMap.put(arguments_[i], RuleCreation
 						.getVariableTermString(i));
+			// else
+			// replacementMap.put(arguments_[i], arguments_[i]);
 		}
 		return replacementMap;
 	}
@@ -253,14 +257,13 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		int result = Double.compare(arguments_.length, sf.arguments_.length);
 		if (result != 0)
 			return result;
-		
+
 		// Type predicates trump regular predicates
 		if (StateSpec.getInstance().isTypePredicate(factName_)) {
 			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
 				return -1;
 		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
 			return 1;
-			
 
 		result = factName_.compareTo(sf.factName_);
 		if (result != 0)

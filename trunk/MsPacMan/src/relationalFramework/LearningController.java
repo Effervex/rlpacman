@@ -341,13 +341,6 @@ public class LearningController {
 			// Fill the Policy Values list.
 			int maxSize = (t == 0) ? population * 2 : population;
 			do {
-				Policy pol = localPolicy.generatePolicy(true);
-
-				System.out.println(pol);
-				// Send the agent a generated policy
-				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-				RLGlue.RL_agent_message("Policy");
-
 				float score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 					numEpisodes++;
@@ -371,7 +364,10 @@ public class LearningController {
 				if (restart)
 					break;
 
-				PolicyValue thisPolicy = new PolicyValue(pol, score, t);
+				RLGlue.RL_agent_message("GetPolicy");
+				PolicyValue thisPolicy = new PolicyValue(
+						(Policy) ObjectObservations.getInstance().objectArray[0],
+						score, t);
 				pvs.add(thisPolicy);
 				// Storing the best policy
 				if ((bestPolicy == null)
@@ -556,7 +552,8 @@ public class LearningController {
 	 * @param staleValue
 	 *            The number of iterations to pass before a policy value becomes
 	 *            stale.
-	 * @param localPolicy The local policy generator.
+	 * @param localPolicy
+	 *            The local policy generator.
 	 * @return The cleaned list of policy values.
 	 */
 	private void postUpdateModification(List<PolicyValue> pvs, int iteration,
@@ -826,11 +823,6 @@ public class LearningController {
 	 * some rules to work with.
 	 */
 	private void preliminaryProcessing() {
-		Policy pol = PolicyGenerator.getInstance().generatePolicy(false);
-		System.out.println(pol);
-		// Send the agent a generated policy
-		ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-		RLGlue.RL_agent_message("Policy");
 		RLGlue.RL_episode(maxSteps_);
 		PolicyGenerator.getInstance().shouldRestart();
 	}
@@ -853,8 +845,6 @@ public class LearningController {
 	public float testAgent(int episode, int maxSteps, int run, int runs,
 			double expProg) {
 		float averageScore = 0;
-		// TODO Perhaps this isn't correct, as it changes the probabilities,
-		// resulting in unfair testing.
 		RLGlue.RL_env_message("freeze");
 		if (runningTests_) {
 			System.out.println();
@@ -869,13 +859,6 @@ public class LearningController {
 			for (int i = 0; i < TEST_ITERATIONS; i++) {
 				estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
 
-				Policy pol = PolicyGenerator.getInstance()
-						.generatePolicy(false);
-				System.out.println(pol);
-				// Send the agent a generated policy
-				ObjectObservations.getInstance().objectArray = new Policy[] { pol };
-				RLGlue.RL_agent_message("Policy");
-
 				double score = 0;
 				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 					RLGlue.RL_episode(maxSteps);
@@ -886,6 +869,9 @@ public class LearningController {
 						score += RLGlue.RL_return();
 				}
 				averageScore += score;
+
+				RLGlue.RL_agent_message("GetPolicy");
+				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
 				pol.parameterArgs(null);
 				System.out.println(score / AVERAGE_ITERATIONS + "\n");
 			}

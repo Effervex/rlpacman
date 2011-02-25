@@ -22,6 +22,8 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
+import com.sun.corba.se.impl.oa.poa.AOMEntry;
+
 import jess.Fact;
 import relationalFramework.ConditionComparator;
 import relationalFramework.GuidedRule;
@@ -37,7 +39,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = -7521721290113897683L;
+	private static final long serialVersionUID = -3124284798464655100L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -179,6 +181,11 @@ public class AgentObservations implements Serializable {
 					}
 				}
 			}
+
+			// TODO Can use these rules to note the condition ranges
+			// So when condX is true, condY is always in range 0-50
+			// Works for self conditions too, when cond X is true, condX is in
+			// range min-max
 
 			// Note the relative facts for the main pred and for every
 			// negated pred not present
@@ -473,7 +480,8 @@ public class AgentObservations implements Serializable {
 		Set<StringFact> actionConds = new HashSet<StringFact>();
 		for (String argument : action.getArguments()) {
 			if (!StateSpec.isNumber(argument)) {
-				Collection<StringFact> termFacts = termMappedFacts_.get(argument);
+				Collection<StringFact> termFacts = termMappedFacts_
+						.get(argument);
 				for (StringFact termFact : termFacts) {
 					StringFact notedFact = termFact;
 					if (onlyActionTerms) {
@@ -570,16 +578,9 @@ public class AgentObservations implements Serializable {
 	 * @return The RLGGs for every action.
 	 */
 	public List<GuidedRule> getRLGGActionRules() {
-		// TODO No need to recreate the rule every step.
 		List<GuidedRule> rlggRules = new ArrayList<GuidedRule>();
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			GuidedRule rlggRule = abo.getRLGGRule();
-			SortedSet<StringFact> ruleConds = rlggRule.getConditions(false);
-			simplifyRule(ruleConds, false, false);
-			if (ruleConds != null)
-				rlggRule.setConditions(ruleConds, false);
-			rlggRule.expandConditions();
-			rlggRule.incrementStatesCovered();
 			rlggRules.add(rlggRule);
 		}
 		return rlggRules;
@@ -714,7 +715,7 @@ public class AgentObservations implements Serializable {
 			actionBasedObservations_.get(action).setPGI(null);
 		}
 	}
-	
+
 	public void clearActionBasedObservations() {
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 	}
@@ -724,6 +725,7 @@ public class AgentObservations implements Serializable {
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			abo.actionConditionInactivity_ = 0;
 			abo.rangedConditionInactivity_ = 0;
+			abo.recreateRLGG_ = true;
 		}
 	}
 
@@ -909,6 +911,12 @@ public class AgentObservations implements Serializable {
 		/** The inactivity of the ranged conditions. */
 		private int rangedConditionInactivity_ = 0;
 
+		/** If the RLGG rule needs to be recreated. */
+		private boolean recreateRLGG_ = true;
+
+		/** The learned RLGG rule from the action observations. */
+		private GuidedRule rlggRule_;
+
 		public PreGoalInformation getPGI() {
 			return pgi_;
 		}
@@ -946,6 +954,8 @@ public class AgentObservations implements Serializable {
 				specialisationConditions_ = new HashSet<StringFact>();
 				actionConditionInactivity_ = 0;
 				action_ = new StringFact(action);
+				// TODO Note condition ranges here
+				recreateRLGG_ = true;
 				return true;
 			}
 
@@ -975,6 +985,7 @@ public class AgentObservations implements Serializable {
 				specialisationConditions_ = recreateSpecialisations(
 						variantActionConditions_, invariantActionConditions_);
 				actionConditionInactivity_ = 0;
+				recreateRLGG_ = true;
 				return true;
 			}
 
@@ -1051,25 +1062,36 @@ public class AgentObservations implements Serializable {
 		 * @return The RLGG rule created using the invariants observed.
 		 */
 		public GuidedRule getRLGGRule() {
-			Collection<StringFact> ruleConds = new TreeSet<StringFact>(
-					ConditionComparator.getInstance());
-			// Form the replacements if the action is non-variable
-			// TODO Note numerical ranges
-			String[] replacements = null;
-			for (String arg : action_.getArguments()) {
-				if (arg.charAt(0) != '?') {
-					replacements = action_.getArguments();
-					break;
+			// No need to recreate the rule if nothing has changed.
+			if (recreateRLGG_ || rlggRule_ == null) {
+				SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+						ConditionComparator.getInstance());
+				// Form the replacements if the action is non-variable
+				// TODO Note numerical ranges
+				String[] replacements = null;
+				for (String arg : action_.getArguments()) {
+					if (arg.charAt(0) != '?') {
+						replacements = action_.getArguments();
+						break;
+					}
 				}
+
+				for (StringFact invariant : invariantActionConditions_) {
+					StringFact modFact = new StringFact(invariant);
+					if (replacements != null)
+						modFact.replaceArguments(replacements);
+					ruleConds.add(modFact);
+				}
+
+				// Simplify the rule conditions
+				simplifyRule(ruleConds, false, false);
+				rlggRule_ = new GuidedRule(ruleConds, action_, null);
+				rlggRule_.expandConditions();
+				recreateRLGG_ = false;
 			}
 
-			for (StringFact invariant : invariantActionConditions_) {
-				StringFact modFact = new StringFact(invariant);
-				if (replacements != null)
-					modFact.replaceArguments(replacements);
-				ruleConds.add(modFact);
-			}
-			return new GuidedRule(ruleConds, action_, null);
+			rlggRule_.incrementStatesCovered();
+			return rlggRule_;
 		}
 
 		public List<RangedCondition> getActionRange() {
@@ -1096,6 +1118,7 @@ public class AgentObservations implements Serializable {
 
 			if (!rc.equalRange(oldCond)) {
 				rangedConditionInactivity_ = 0;
+				recreateRLGG_ = true;
 				return true;
 			}
 			rangedConditionInactivity_++;
