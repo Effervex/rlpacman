@@ -21,7 +21,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class ConditionBeliefs implements Serializable {
-	private static final long serialVersionUID = 5023779765740732969L;
+	private static final long serialVersionUID = 3058227596295767897L;
 
 	/** The condition this class represents as a base. */
 	private String condition_;
@@ -503,6 +503,27 @@ public class ConditionBeliefs implements Serializable {
 		return occasionallyTrue_;
 	}
 
+	/**
+	 * Gets the condition fact this condition represents.
+	 * 
+	 * @return A condition fact with the correct arguments and negation.
+	 */
+	public StringFact getConditionFact() {
+		StringFact cbFact = StateSpec.getInstance().getStringFact(condition_);
+		String[] arguments = new String[cbFact.getArguments().length];
+		for (int i = 0; i < arguments.length; i++) {
+			if ((argIndex_ == -1) || (argIndex_ & (1 << i)) != 0)
+				arguments[i] = RuleCreation.getVariableTermString(i);
+			else
+				arguments[i] = "?";
+		}
+
+		cbFact = new StringFact(cbFact, arguments);
+		if (argIndex_ != -1)
+			cbFact.swapNegated();
+		return cbFact;
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -560,20 +581,8 @@ public class ConditionBeliefs implements Serializable {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		if (argIndex_ != -1) {
-			buffer.append("!" + condition_ + "(");
-			for (int i = 0; (1 << i) <= argIndex_; i++) {
-				if (i != 0)
-					buffer.append(" ");
-				if ((argIndex_ & (1 << i)) != 0)
-					buffer.append(RuleCreation.getVariableTermString(i));
-				else
-					buffer.append("?");
-			}
-			buffer.append("):\n");
-		} else
-			buffer.append(condition_ + ":\n");
+		StringBuffer buffer = new StringBuffer(getConditionFact().toString()
+				+ ":\n");
 		buffer.append("\tAlways True: " + alwaysTrue_.toString() + "\n");
 		buffer.append("\tNever True: " + neverTrue_.toString() + "\n");
 		buffer.append("\tSometimes True: " + occasionallyTrue_.toString());

@@ -53,7 +53,6 @@ public class PacManStateSpecTest {
 		rule = new GuidedRule(
 				"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
 						+ " => (fromGhost ?Ghost)");
-		// 2 assertions in the body: clear, and block
 		assertEquals(rule.getConditions(false).size(), 4);
 		assertTrue(rule
 				.getConditions(false)

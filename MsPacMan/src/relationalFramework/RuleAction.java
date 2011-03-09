@@ -24,7 +24,8 @@ public class RuleAction {
 	 */
 	private boolean utilised_;
 
-	public RuleAction(GuidedRule rule, List<StringFact> actionsList, Policy policy) {
+	public RuleAction(GuidedRule rule, List<StringFact> actionsList,
+			Policy policy) {
 		rule_ = rule;
 		actions_ = actionsList;
 		policy_ = policy;
@@ -73,7 +74,8 @@ public class RuleAction {
 	}
 
 	/**
-	 * Gets the actions which have been triggered or utilised by the environment.
+	 * Gets the actions which have been triggered or utilised by the
+	 * environment.
 	 * 
 	 * @return The rule's actions if this was utilised otherwise null.
 	 */
@@ -81,5 +83,22 @@ public class RuleAction {
 		if (utilised_)
 			return actions_;
 		return null;
+	}
+
+	/**
+	 * Encodes this rule action in a readable string which gives an idea of what
+	 * it does.
+	 * 
+	 * @return A string representing the basic idea of the action
+	 */
+	public String getActionString() {
+		StringFact action = rule_.getAction();
+		StringBuffer buffer = new StringBuffer(action.getFactName());
+		Slot ruleSlot = rule_.getSlot();
+		if (ruleSlot == null || ruleSlot.getSlotSplitFacts() == null)
+			buffer.append("()");
+		else
+			buffer.append(ruleSlot.getSlotSplitFacts());
+		return buffer.toString();
 	}
 }

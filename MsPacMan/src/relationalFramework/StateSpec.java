@@ -86,7 +86,7 @@ public abstract class StateSpec {
 	private String goalState_;
 
 	/** The constants found within the goal. */
-	private List<String> constants_;
+	private Collection<String> constants_;
 
 	/** The parameter of the environment. */
 	protected String envParameter_;
@@ -101,7 +101,7 @@ public abstract class StateSpec {
 	private String unnecessaries_;
 
 	/** The mapping for rules to queries in the Rete object. */
-	private Map<GuidedRule, String> queryNames_;
+	private Map<Object, String> queryNames_;
 
 	/** The count value for the query names. */
 	private int queryCount_;
@@ -126,6 +126,30 @@ public abstract class StateSpec {
 		}
 
 		return terms;
+	}
+
+	/**
+	 * Extracts the constants from the goal (also includes modular variables).
+	 * 
+	 * @param goalState
+	 *            The goal state to parse.
+	 */
+	private Collection<String> extractConstants(String goalState) {
+		Collection<String> constants = new HashSet<String>();
+
+		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
+		Matcher m = p.matcher(goalState);
+
+		while (m.find()) {
+			String[] factSplit = splitFact(m.group());
+			for (int i = 1; i < factSplit.length; i++) {
+				if (factSplit[i].charAt(0) != '?' && !isNumber(factSplit[i])) {
+					constants.add(factSplit[i]);
+				}
+			}
+		}
+
+		return constants;
 	}
 
 	/**
@@ -249,8 +273,8 @@ public abstract class StateSpec {
 					+ "return TRUE))");
 
 			// Initialise the goal state rules
-			constants_ = new ArrayList<String>();
-			goalState_ = initialiseGoalState(constants_);
+			goalState_ = initialiseGoalState();
+			constants_ = extractConstants(goalState_);
 			rete_.eval("(deftemplate goal (slot goalMet))");
 			rete_.eval("(defrule goalState " + goalState_
 					+ " => (assert (goal (goalMet TRUE))))");
@@ -271,7 +295,7 @@ public abstract class StateSpec {
 			// Initialise the optimal policy
 			handCodedPolicy_ = initialiseOptimalPolicy();
 
-			queryNames_ = new HashMap<GuidedRule, String>();
+			queryNames_ = new HashMap<Object, String>();
 			queryCount_ = 0;
 
 			Unification.getInstance().resetRangeIndex();
@@ -312,11 +336,9 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the goal state.
 	 * 
-	 * @param constants
-	 *            The constants that are used in the goal. To be filled.
 	 * @return The minimal state that is true when the goal is satisfied.
 	 */
-	protected abstract String initialiseGoalState(List<String> constants);
+	protected abstract String initialiseGoalState();
 
 	/**
 	 * Initialises the optimal policy for the goal.
@@ -346,13 +368,11 @@ public abstract class StateSpec {
 	protected abstract Map<String, String> initialiseTypePredicateTemplates();
 
 	/**
-	 * Adds type predicates to the rule from a fact if they are not already
-	 * there.
+	 * Creates the necessary type conditions for a rule.
 	 * 
 	 * @param fact
 	 *            The fact.
-	 * @param termIndex
-	 *            The index where the first term is found.
+	 * @return The type cocditions.
 	 */
 	public Collection<StringFact> createTypeConds(StringFact fact) {
 		Collection<StringFact> typeConds = new HashSet<StringFact>();
@@ -435,14 +455,16 @@ public abstract class StateSpec {
 	 *         values as the arguments.
 	 */
 	public final MultiMap<String, String[]> generateValidActions(Rete state) {
-		MultiMap<String, String[]> validActions = MultiMap.createSortedSetMultiMap(ArgumentComparator.getInstance());
+		MultiMap<String, String[]> validActions = MultiMap
+				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		try {
 			for (String action : actions_.keySet()) {
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
-					List<String> actionTerms = actionPreconditions_.getList(action);
+					List<String> actionTerms = actionPreconditions_
+							.getList(action);
 					String[] arguments = new String[actionTerms.size()];
 					for (int i = 0; i < arguments.length; i++) {
 						arguments[i] = result.getSymbol(actionTerms.get(i));
@@ -465,7 +487,7 @@ public abstract class StateSpec {
 		return backgroundRules_.values();
 	}
 
-	public List<String> getConstants() {
+	public Collection<String> getConstants() {
 		return constants_;
 	}
 
@@ -594,6 +616,30 @@ public abstract class StateSpec {
 							+ gr.getStringConditions() + ")");
 				}
 				queryNames_.put(gr, result);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets or creates a rule query for a fact (an anonymous fact which only
+	 * matches the existence of the fact).
+	 * 
+	 * @param fact
+	 *            The anonymous fact.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(StringFact fact) {
+		String result = queryNames_.get(fact);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				// If the rule has parameters, declare them as variables.
+				rete_.eval("(defquery " + result + " " + fact + ")");
+				queryNames_.put(fact, result);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

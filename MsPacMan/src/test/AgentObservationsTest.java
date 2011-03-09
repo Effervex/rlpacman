@@ -590,6 +590,7 @@ public class AgentObservationsTest {
 		neverTrue.clear();
 		neverTrue.add("(on ?X ?X)");
 		neverTrue.add("(above ?X ?X)");
+		neverTrue.add("(floor ?X)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
 		// Floor
@@ -602,6 +603,7 @@ public class AgentObservationsTest {
 		alwaysTrue.add("(thing ?X)");
 		occasionallyTrue.clear();
 		neverTrue.clear();
+		neverTrue.add("(block ?X)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
 		// Thing
@@ -916,7 +918,7 @@ public class AgentObservationsTest {
 		sut_.scanState(facts);
 
 		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move c e)"), false);
+				.toStringFact("(move c e)"), null, false);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -936,7 +938,7 @@ public class AgentObservationsTest {
 
 		// A different move action
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move d c)"), false);
+				.toStringFact("(move d c)"), null, false);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear d)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block d)")));
@@ -971,7 +973,7 @@ public class AgentObservationsTest {
 
 		// And another
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), false);
+				.toStringFact("(move e c)"), null, false);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));

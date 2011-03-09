@@ -3,7 +3,6 @@ package hanoi;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
@@ -77,7 +76,7 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState(List<String> constants) {
+	protected String initialiseGoalState() {
 		return "(tower t2) (forall (tile ?X) (or (towerBase ?X) (on ?X ? t2)))";
 	}
 

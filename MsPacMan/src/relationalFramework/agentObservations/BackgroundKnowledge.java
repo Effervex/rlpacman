@@ -110,7 +110,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			if (replacementTerms != null)
 				replacedFact.replaceArguments(
 						replacementTerms.inverseBidiMap(), true);
-			preConds.add(replacedFact);
+			if (!replacedFact.isFullyAnonymous())
+				preConds.add(replacedFact);
 		}
 
 		return preConds;
@@ -176,7 +177,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
-					replacementTerms, new String[0], true);
+					replacementTerms, new String[0], true, false);
 
 			// If there is a unification, attempt to remove the right side
 			if (unifiedEquiv != null) {

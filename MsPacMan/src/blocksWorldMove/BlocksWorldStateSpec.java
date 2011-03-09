@@ -3,7 +3,6 @@ package blocksWorldMove;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
@@ -69,14 +68,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState(List<String> constants) {
+	protected String initialiseGoalState() {
 		if (envParameter_ == null)
 			envParameter_ = "onab";
 
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
-			constants.add("a");
-			constants.add("b");
 			return "(on a b)";
 		}
 
@@ -92,12 +89,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
-			constants.add("a");
 			return "(clear a)";
 		}
 
 		if (envParameter_.equals("highestA")) {
-			constants.add("a");
 			return "(highest a)";
 		}
 

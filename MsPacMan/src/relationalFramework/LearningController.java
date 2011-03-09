@@ -311,6 +311,10 @@ public class LearningController {
 		int sinceLastTest = 0;
 		int numEpisodes = 0;
 		while ((t < finiteNum) && (!localPolicy.isConverged())) {
+			// Clear any 'waiting' flags
+			PolicyGenerator.getInstance().shouldRestart();
+			RLGlue.RL_agent_message("GetPolicy");
+			
 			if (PolicyGenerator.getInstance().useModules_
 					&& (loadedGeneratorFile_ == null)) {
 				// Check if the agent needs to drop into learning a module
@@ -824,7 +828,6 @@ public class LearningController {
 	 */
 	private void preliminaryProcessing() {
 		RLGlue.RL_episode(maxSteps_);
-		PolicyGenerator.getInstance().shouldRestart();
 	}
 
 	/**

@@ -1,0 +1,6 @@
+blocksWorldMove.BlocksWorld
+10
+50
+blocksMoveElites.txt
+blocksMoveTest.txt
+10,"goal unstack"

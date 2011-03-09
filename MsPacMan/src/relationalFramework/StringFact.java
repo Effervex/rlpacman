@@ -12,7 +12,7 @@ import java.util.Map;
  * @author Sam Sarjant
  */
 public class StringFact implements Comparable<StringFact>, Serializable {
-	private static final long serialVersionUID = 6060157961121072894L;
+	private static final long serialVersionUID = 7493617342280103699L;
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -123,6 +123,9 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 * Replaces all variable indexed terms (?X,?Y,?Z...) with the given indexed
 	 * terms, be they variable or otherwise.
 	 * 
+	 * So if the fact is blah(?X ?Z ?Y) and the replacements given are [a, b, c]
+	 * then the result is blah(a, c, b)
+	 * 
 	 * @param replacements
 	 *            The terms to replace any variable terms with.
 	 */
@@ -178,19 +181,24 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 * Creates a variable term replacement map using this StringFacts
 	 * non-numerical arguments as the terms being replaced.
 	 * 
+	 * @param formNumericalReplacement
+	 *            If the numerical values should have variable replacements or
+	 *            not. If not, they remain as is.
 	 * @return A replacement map which converts this string fact's non-numerical
 	 *         terms into ordered variable terms.
 	 */
-	public Map<String, String> createVariableTermReplacementMap() {
+	public Map<String, String> createVariableTermReplacementMap(
+			boolean formNumericalReplacement) {
 		// TODO Maybe don't replace the numbers and they can be put into ranges
 		// in their appropriate methods.
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
-			if (!StateSpec.isNumberType(factTypes_[i]))
+			if (!StateSpec.isNumberType(factTypes_[i])
+					|| formNumericalReplacement)
 				replacementMap.put(arguments_[i], RuleCreation
 						.getVariableTermString(i));
-			// else
-			// replacementMap.put(arguments_[i], arguments_[i]);
+			else
+				replacementMap.put(arguments_[i], arguments_[i]);
 		}
 		return replacementMap;
 	}
@@ -228,6 +236,18 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 
 	public void swapNegated() {
 		negated_ = !negated_;
+	}
+
+	/**
+	 * Checks if this fact is fully anonymous.
+	 * 
+	 * @return True if all arguments for the fact are anonymous arguments.
+	 */
+	public boolean isFullyAnonymous() {
+		for (String argument : arguments_)
+			if (!argument.equals(StateSpec.ANONYMOUS))
+				return false;
+		return true;
 	}
 
 	@Override

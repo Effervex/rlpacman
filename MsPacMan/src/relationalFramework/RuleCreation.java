@@ -3,9 +3,7 @@ package relationalFramework;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,7 +16,6 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.PreGoalInformation;
-import relationalFramework.agentObservations.RangedCondition;
 
 import jess.Fact;
 import jess.Rete;
@@ -29,15 +26,13 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
-	private static final long serialVersionUID = -7006445793284513812L;
+	private static final long serialVersionUID = 7289003836420867684L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */
 	private static final char MODULO_LETTERS = 26;
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
-	/** The number of discretised ranges the rules are split into. */
-	public static final int NUM_DISCRETE_RANGES = 4;
 
 	/** The observations the agent has made about the environment. */
 	private AgentObservations ao_;
@@ -68,8 +63,7 @@ public class RuleCreation implements Serializable {
 	 */
 	public List<GuidedRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			MultiMap<String, GuidedRule> coveredRules, int fixthislater)
-			throws Exception {
+			MultiMap<String, GuidedRule> coveredRules) throws Exception {
 		// The relevant facts which contain the key term
 		ao_.scanState(StateSpec.extractFacts(state));
 
@@ -85,139 +79,13 @@ public class RuleCreation implements Serializable {
 					action);
 			for (String[] actionArgs : validActions.get(action)) {
 				StringFact actionFact = new StringFact(baseAction, actionArgs);
-				ao_.gatherActionFacts(actionFact, false);
+				ao_.gatherActionFacts(actionFact, null, false);
 			}
 		}
 
 		// Get the RLGG from the invariant conditions from the action
 		// conditions.
 		return ao_.getRLGGActionRules();
-	}
-
-	/**
-	 * Covers a state using RLGG by creating a rule for every action type
-	 * present in the valid actions for the state.
-	 * 
-	 * @param state
-	 *            The state of the environment, containing the valid actions.
-	 * @param validActions
-	 *            The set of valid actions to choose from.
-	 * @param coveredRules
-	 *            A starting point for the rules, if any exist.
-	 * @return A list of guided rules, one for each action type.
-	 */
-	public List<GuidedRule> rlggState(Rete state,
-			MultiMap<String, String[]> validActions,
-			MultiMap<String, GuidedRule> coveredRules) throws Exception {
-		List<String> constants = StateSpec.getInstance().getConstants();
-
-		// The relevant facts which contain the key term
-		ao_.scanState(StateSpec.extractFacts(state));
-
-		// Maintain a mapping for each action, to be used in unification between
-		// actions
-		List<GuidedRule> generalActions = new ArrayList<GuidedRule>();
-
-		// Run through each valid action.
-		for (String action : validActions.keySet()) {
-			// Get the list of previous rules, both LGG and non-LGG.
-			List<GuidedRule> previousRules = coveredRules.getList(action);
-			if (previousRules == null)
-				previousRules = new ArrayList<GuidedRule>();
-
-			// Cover the state, using the previous rules and/or newly created
-			// rules while noting valid conditions for later rule mutation\
-			List<GuidedRule> actionRules = unifyActionRules(validActions
-					.get(action), action, previousRules, constants);
-			generalActions.addAll(actionRules);
-		}
-
-		return generalActions;
-	}
-
-	/**
-	 * Unifies action rules together into one general all-covering rule. Also
-	 * notes down conditions which are true/not always true for use in later
-	 * rule specialisation.
-	 * 
-	 * @param argsList
-	 *            A heuristically sorted list of actions for a single predicate.
-	 * @param actionPred
-	 *            The action predicate spawning this rule.
-	 * @param previousRules
-	 *            A pre-existing list of previously created rules, both LGG and
-	 *            non-LGG.
-	 * @param constants
-	 *            The constants to maintain in rules.
-	 * @return All rules representing a general action.
-	 */
-	private List<GuidedRule> unifyActionRules(Collection<String[]> argsList,
-			String actionPred, List<GuidedRule> previousRules,
-			List<String> constants) {
-		// The terms in the action
-		StringFact baseAction = StateSpec.getInstance().getActions().get(
-				actionPred);
-
-		Iterator<String[]> argIter = argsList.iterator();
-		// Do until:
-		// 1) We have no actions left to look at
-		// 2) Every rule is not yet minimal
-		while (argIter.hasNext()) {
-			String[] args = argIter.next();
-			StringFact action = new StringFact(baseAction, args);
-
-			// TODO May be able to simply learn the RLGG here!
-			Collection<StringFact> actionFacts = ao_.gatherActionFacts(action,
-					false);
-
-			// Inversely substitute the terms for variables (in string form)
-			GuidedRule inverseSubbed = new GuidedRule(actionFacts, action, null);
-
-			// Unify with the previous rules, unless it causes the rule to
-			// become invalid
-			if (previousRules.isEmpty()) {
-				previousRules.add(inverseSubbed);
-			} else {
-				// Unify with each rule in the previous rule/s
-				boolean createNewRule = true;
-				for (int i = 0; i < previousRules.size(); i++) {
-					GuidedRule prev = previousRules.get(i);
-
-					// Unify the prev rule and the inverse subbed rule
-					SortedSet<StringFact> ruleConditions = prev
-							.getConditions(true);
-					String[] ruleTerms = prev.getActionTerms();
-					int changed = Unification.getInstance().unifyStates(
-							ruleConditions, inverseSubbed.getConditions(false),
-							ruleTerms, inverseSubbed.getActionTerms());
-
-					if (changed == 1) {
-						prev.setActionTerms(ruleTerms);
-						prev.setConditions(ruleConditions, true);
-					}
-
-					// The rule isn't minimal (but it changed)
-					createNewRule = false;
-
-				}
-
-				// If all rules became invalid, we need a new rule
-				if (createNewRule) {
-					previousRules.add(inverseSubbed);
-				}
-			}
-		}
-
-		// Return the old, possibly modified rules and any new ones.
-		for (GuidedRule prev : previousRules) {
-			SortedSet<StringFact> ruleConds = simplifyRule(prev
-					.getConditions(false), null, false, true);
-			if (ruleConds != null)
-				prev.setConditions(ruleConds, false);
-			prev.expandConditions();
-			prev.incrementStatesCovered();
-		}
-		return previousRules;
 	}
 
 	/**
@@ -249,7 +117,7 @@ public class RuleCreation implements Serializable {
 			if (checkConditionUnification) {
 				StringFact unification = Unification.getInstance().unifyFact(
 						condition, ruleConds, new DualHashBidiMap(),
-						new DualHashBidiMap(), new String[0], false);
+						new DualHashBidiMap(), new String[0], false, false);
 				if (unification != null)
 					return null;
 			}
@@ -257,7 +125,7 @@ public class RuleCreation implements Serializable {
 			condition.swapNegated();
 			StringFact negUnification = Unification.getInstance().unifyFact(
 					condition, ruleConds, new DualHashBidiMap(),
-					new DualHashBidiMap(), new String[0], false);
+					new DualHashBidiMap(), new String[0], false, false);
 			condition.swapNegated();
 			if (negUnification != null)
 				return null;
@@ -283,6 +151,12 @@ public class RuleCreation implements Serializable {
 	 */
 	@SuppressWarnings("unchecked")
 	public Set<GuidedRule> specialiseToPreGoal(GuidedRule rule) {
+		// TODO Specialise using the known goal constants. Maybe by using the
+		// goal itself as a pre-goal and swapping action variables around:
+		// E.g. (distance goal 0) & Agent has rule ... (distance ?X ?Y) ... =>
+		// (move ?X ?Y ?Z)
+		// So, swap all ?X with goal and maybe (numerical may be different) all
+		// ?Y with 0.
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 		String actionPred = rule.getActionPredicate();
 		PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
@@ -432,7 +306,7 @@ public class RuleCreation implements Serializable {
 	 * @param preGoalFact
 	 *            The split term in the pre-goal matching a ranged condition in
 	 *            the rule. Can be null.
-	 * @param numericalIndex
+	 * @param preGoalIndex
 	 *            The index in the pre-goal split of the numerical value. Not
 	 *            used if preGoalSplit is null.
 	 * @param isRuleMutant
@@ -440,58 +314,27 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @return A collection of any sub-ranged mutants created from the rule.
 	 */
-	private Collection<GuidedRule> splitRanges(GuidedRule baseRule,
-			StringFact preGoalFact, int numericalIndex, boolean isRuleMutant) {
-		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
+	private Set<GuidedRule> splitRanges(GuidedRule baseRule,
+			StringFact preGoalFact, int preGoalIndex, boolean isRuleMutant) {
+		Set<GuidedRule> subranges = new HashSet<GuidedRule>();
 
 		// Run through each condition
-		int c = 0;
 		for (StringFact condition : baseRule.getConditions(false)) {
 			for (int i = 0; i < condition.getArguments().length; i++) {
 				String arg = condition.getArguments()[i];
 				int suchThatIndex = arg.indexOf("&:");
 
+				// We have a range
 				if (suchThatIndex != -1) {
-					// We have a range
 					String[] betweenRangeSplit = StateSpec.splitFact(arg
 							.substring(suchThatIndex + 2));
 					// Find the values
 					double min = Double.parseDouble(betweenRangeSplit[2]);
 					double max = Double.parseDouble(betweenRangeSplit[3]);
-					double rangeSplit = (max - min) / NUM_DISCRETE_RANGES;
-					RangedCondition rc = new RangedCondition(condition
-							.getFactName(), min, max);
 
-					// If dealing with a covered rule, record rule details
-					boolean mutate = false;
-					if (!isRuleMutant) {
-						mutate = true;
-						ao_.setActionRange(baseRule.getAction().getFactName(),
-								rc);
-					} else {
-						// Test to see if the range matches the action range.
-						List<RangedCondition> existingRange = ao_
-								.getActionRange(baseRule.getAction()
-										.getFactName());
-						if (existingRange != null) {
-							int index = existingRange.indexOf(rc);
-							if (index != -1) {
-								// There is an action range
-								RangedCondition coveredRange = existingRange
-										.get(index);
-								if (rc.equalRange(coveredRange)) {
-									mutate = true;
-								}
-							}
-						}
-					}
-
-					// Check if the pre-goal matches the value
-					if (mutate) {
-						determineRanges(baseRule, preGoalFact, numericalIndex,
-								subranges, c, condition, i,
-								betweenRangeSplit[1], min, max, rangeSplit);
-					}
+					createRangeSpecialisations(baseRule, preGoalFact,
+							preGoalIndex, subranges, condition, i,
+							betweenRangeSplit[1], min, max);
 				}
 			}
 		}
@@ -514,7 +357,7 @@ public class RuleCreation implements Serializable {
 	 *            The condition index.
 	 * @param condition
 	 *            The original condition being mutated.
-	 * @param i
+	 * @param condArgIndex
 	 *            The index of the mutation.
 	 * @param rangeVariable
 	 *            the range variable.
@@ -525,159 +368,109 @@ public class RuleCreation implements Serializable {
 	 * @param rangeSplit
 	 *            The size of the subranges.
 	 */
-	private void determineRanges(GuidedRule baseRule, StringFact preGoalFact,
-			int preGoalIndex, Collection<GuidedRule> subranges, int c,
-			StringFact condition, int i, String rangeVariable, double min,
-			double max, double rangeSplit) {
-		// Add the default ranged split
-		ArrayList<Double> values = new ArrayList<Double>();
-		values.add(min);
-		values.add(max);
-
-		// If the ranges go through 0, add that as a stopping point.
-		if (min * max < 0)
-			values.add(0d);
-
-		Collections.sort(values);
-		subranges.addAll(createRangedMutations(baseRule, c, condition, i,
-				rangeVariable, values.toArray(new Double[values.size()]),
-				rangeSplit, false));
-
-		// If we have a pre-goal and the current split is the same condition.
-		if ((preGoalFact != null)
-				&& (condition.getFactName().equals(preGoalFact.getFactName()))) {
-			values.clear();
-
-			// Split the pre-goal range into chunks of max size rangeSplit
-			String preGoalTerm = preGoalFact.getArguments()[preGoalIndex];
-			if (preGoalTerm.contains(StateSpec.BETWEEN_RANGE)) {
-				// Mutate to a pre-goal range
-				int preGoalSuchThatIndex = preGoalTerm.indexOf("&:");
-				String[] preGoalRangeSplit = StateSpec.splitFact(preGoalTerm
-						.substring(preGoalSuchThatIndex + 2));
-				double startPoint = Double.parseDouble(preGoalRangeSplit[2]);
-				double endPoint = Double.parseDouble(preGoalRangeSplit[3]);
-
-				if (startPoint * endPoint < 0)
-					values.add(0d);
-
-				// Determine the ranges
-				values.add(startPoint);
-				values.add(endPoint);
-
-				// Modify the range split if necessary
-				if (((endPoint - startPoint) / NUM_DISCRETE_RANGES) > rangeSplit)
-					rangeSplit = (endPoint - startPoint) / NUM_DISCRETE_RANGES;
-
-				Collections.sort(values);
-				subranges.addAll(createRangedMutations(baseRule, c, condition,
-						i, rangeVariable, values.toArray(new Double[values
-								.size()]), rangeSplit, true));
-			} else {
-				double point = Double.parseDouble(preGoalTerm);
-				if (point < min)
-					point = min;
-				if (point > max)
-					point = max;
-
-				// Create the point mutant itself
-				GuidedRule pointMutant = replaceConditionTerm(baseRule,
-						condition, i, point + "");
-				pointMutant.getAction().replaceArguments(rangeVariable,
-						point + "");
-				subranges.add(pointMutant);
-
-			}
+	private void createRangeSpecialisations(GuidedRule baseRule,
+			StringFact preGoalFact, int preGoalIndex,
+			Set<GuidedRule> subranges, StringFact condition, int condArgIndex,
+			String rangeVariable, double min, double max) {
+		if (min != max) {
+			// Create 3 ranges, the min and max split in two and a range
+			// overlapping each centred about the middle.
+			double halfVal = min + (max - min) / 2;
+			double quarterAmount = (max - min) / 4;
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, rangeVariable, min, halfVal));
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, rangeVariable, halfVal, max));
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, rangeVariable, halfVal - quarterAmount,
+					halfVal + quarterAmount));
 		}
-	}
 
-	/**
-	 * Create a number of ranged mutations between two points.
-	 * 
-	 * @param baseRule
-	 *            The base rule to mutate.
-	 * @param condIndex
-	 *            The index of the condition within the rule.
-	 * @param condition
-	 *            The condition being mutated.
-	 * @param condSplitIndex
-	 *            The index within the split condition being modified.
-	 * @param rangeVariable
-	 *            The variable used to represent the range.
-	 * @param values
-	 *            The values to create ranges in between.
-	 * @param normalRange
-	 *            The normal range to split by.
-	 * @param createMaxRange
-	 *            If a maximum all encompassing range should be created as well.
-	 * @return A collection of mutated rules, each representing a portion of the
-	 *         range given. The number of rules equals the number of ranges.
-	 */
-	private Collection<GuidedRule> createRangedMutations(GuidedRule baseRule,
-			int condIndex, StringFact condition, int condSplitIndex,
-			String rangeVariable, Double[] values, double normalRange,
-			boolean createMaxRange) {
-		Collection<GuidedRule> subranges = new ArrayList<GuidedRule>();
+		if (!baseRule.isMutant()) {
+			// If the ranges go through 0 and this rule isn't a
+			// mutant, split at 0
+			if (min * max < 0) {
+				subranges.add(createRangedSpecialisation(baseRule, condition,
+						condArgIndex, rangeVariable, min, 0));
+				subranges.add(createRangedSpecialisation(baseRule, condition,
+						condArgIndex, rangeVariable, 0, max));
+			}
 
-		// Run through each range
-		int numRanges = 0;
-		for (int i = 0; i < values.length - 1; i++) {
-			double min = values[i];
-			double max = values[i + 1];
-			numRanges = (int) Math.ceil((max - min) / normalRange);
+			// If the pre-goal has a range of different size, create
+			// that too.
+			if (preGoalFact != null
+					&& condition.getFactName()
+							.equals(preGoalFact.getFactName())) {
+				// Check that the size differs
+				String preGoalTerm = preGoalFact.getArguments()[preGoalIndex];
+				if (preGoalTerm.contains(StateSpec.BETWEEN_RANGE)) {
+					// Mutate to a pre-goal range
+					int preGoalSuchThatIndex = preGoalTerm.indexOf("&:");
+					String[] preGoalRangeSplit = StateSpec
+							.splitFact(preGoalTerm
+									.substring(preGoalSuchThatIndex + 2));
+					double startPoint = Double
+							.parseDouble(preGoalRangeSplit[2]);
+					double endPoint = Double.parseDouble(preGoalRangeSplit[3]);
 
-			if (numRanges > 0) {
-				double rangeSplit = (max - min) / numRanges;
-
-				// Create NUM_DISCRETE_RANGES mutants per range
-				for (int j = 0; j < numRanges; j++) {
-					String range = rangeVariable + "&:("
-							+ StateSpec.BETWEEN_RANGE + " " + rangeVariable
-							+ " " + (min + rangeSplit * j) + " "
-							+ (min + rangeSplit * (j + 1)) + ")";
-					subranges.add(replaceConditionTerm(baseRule, condition,
-							condSplitIndex, range));
+					// Make sure the sizes differ otherwise it's just creating
+					// the same range
+					if (startPoint != min || endPoint != max)
+						subranges.add(createRangedSpecialisation(baseRule,
+								condition, condArgIndex, rangeVariable,
+								startPoint, endPoint));
+				} else {
+					double point = Double.parseDouble(preGoalTerm);
+					subranges.add(createRangedSpecialisation(baseRule,
+							condition, condArgIndex, rangeVariable, point,
+							point));
 				}
 			}
 		}
-
-		// If we're creating a range from min to max value and it hasn't already
-		// been created (only 1 range)
-		if (createMaxRange && (numRanges > 1)) {
-			String range = rangeVariable + "&:(" + StateSpec.BETWEEN_RANGE
-					+ " " + rangeVariable + " " + values[0] + " "
-					+ values[values.length - 1] + ")";
-			subranges.add(replaceConditionTerm(baseRule, condition,
-					condSplitIndex, range));
-		}
-
-		return subranges;
 	}
 
 	/**
-	 * Simple procedural method that replaces a particular term in a rule
-	 * condition with another, creating a new rule.
+	 * Creates a ranged specialisation of an existing range within a rule.
 	 * 
 	 * @param baseRule
-	 *            The base rule to mutate.
+	 *            The base rule to specialise.
 	 * @param condition
-	 *            The condition being modified.
-	 * @param condSplitIndex
-	 *            The argument of the condition being replaced.
-	 * @param replacementTerm
-	 *            The term replacing the old term.
-	 * @return The replaced condition term rule.
+	 *            The condition within the rule to specialise.
+	 * @param condArgIndex
+	 *            The argument index in the condition to specialise.
+	 * @param rangeVariable
+	 *            The range variable at that index.
+	 * @param lowerBound
+	 *            The lower bound of the range.
+	 * @param upperBound
+	 *            The upper bound of the range.
+	 * @return A specialised GuidedRule in the same form as baseRule, but with a
+	 *         smaller range.
 	 */
-	private GuidedRule replaceConditionTerm(GuidedRule baseRule,
-			StringFact condition, int condSplitIndex, String replacementTerm) {
+	private GuidedRule createRangedSpecialisation(GuidedRule baseRule,
+			StringFact condition, int condArgIndex, String rangeVariable,
+			double lowerBound, double upperBound) {
+		// Create the replacement term.
+		String replacementTerm;
+		// If a range, make a range, otherwise make a point.
+		if (lowerBound != upperBound)
+			replacementTerm = rangeVariable + "&:(" + StateSpec.BETWEEN_RANGE
+					+ " " + rangeVariable + " " + lowerBound + " " + upperBound
+					+ ")";
+		else
+			replacementTerm = lowerBound + "";
+
 		StringFact mutantFact = new StringFact(condition);
-		mutantFact.getArguments()[condSplitIndex] = replacementTerm;
+		mutantFact.getArguments()[condArgIndex] = replacementTerm;
 		SortedSet<StringFact> cloneConds = baseRule.getConditions(false);
 		cloneConds.remove(condition);
 		cloneConds.add(mutantFact);
 
 		GuidedRule mutant = new GuidedRule(cloneConds, baseRule.getAction(),
 				baseRule);
+		// If just a point, change the action.
+		if (lowerBound == upperBound)
+			mutant.getAction().replaceArguments(rangeVariable, lowerBound + "");
 		mutant.setQueryParams(baseRule.getQueryParameters());
 		return mutant;
 	}
@@ -689,17 +482,20 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param preGoalState
 	 *            The pre-goal state seen by the agent.
+	 * @param constants
+	 *            Extra constants to note down int he pre-goal.
 	 * @param actions
 	 *            The final action/s taken by the agent.
 	 * @return A collection of actions which have settled pre-goals.
 	 */
 	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actionChoice) {
+			ActionChoice actionChoice, Collection<String> constants) {
 		// Scan the state first to create the term-mapped facts
-		// Check unifying pre-goal constants (specifically highest)
 		ao_.scanState(preGoalState);
 
 		Set<String> formedActions = new HashSet<String>();
+		if (constants == null)
+			constants = StateSpec.getInstance().getConstants();
 
 		for (RuleAction ruleAction : actionChoice.getActions()) {
 			String actionPred = ruleAction.getRule().getActionPredicate();
@@ -712,7 +508,7 @@ public class RuleCreation implements Serializable {
 				if (actions != null) {
 					for (StringFact action : actions) {
 						Collection<StringFact> preGoalStringState = ao_
-								.gatherActionFacts(action, true);
+								.gatherActionFacts(action, constants, true);
 
 						if (preGoal == null) {
 							preGoal = new PreGoalInformation(
@@ -855,17 +651,6 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * If the AgentObservations are settled.
-	 * 
-	 * @return True if the observations are settled.
-	 */
-	public boolean isSettled() {
-		return ao_.isConditionBeliefsSettled()
-				&& ao_.isActionConditionSettled()
-				&& ao_.isRangedConditionSettled();
-	}
-
-	/**
 	 * Resets the inactivity counters of the AgentObservations object.
 	 */
 	public void resetInactivity() {
@@ -924,7 +709,12 @@ public class RuleCreation implements Serializable {
 	 *         variable refers to or -1 if invalid.
 	 */
 	public static int getVariableTermIndex(String variable) {
-		if (variable.length() < 2)
+		// Don't swap constants or anonymous
+		if (variable.charAt(0) != '?' || variable.length() < 2)
+			return -1;
+
+		// Don't swap number variables
+		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
 			return -1;
 
 		int termIndex = (variable.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
@@ -960,7 +750,7 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * Should only be a test method. 
+	 * Should only be a test method.
 	 */
 	public void clearAgentObservations() {
 		ao_.clearActionBasedObservations();

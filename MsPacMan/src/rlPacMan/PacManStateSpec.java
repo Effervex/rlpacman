@@ -3,7 +3,6 @@ package rlPacMan;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GuidedRule;
@@ -111,7 +110,7 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState(List<String> constants) {
+	protected String initialiseGoalState() {
 		if (envParameter_ == null)
 			envParameter_ = "10000";
 

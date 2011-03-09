@@ -5,10 +5,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import jess.Fact;
+import jess.QueryResult;
 import jess.RU;
 import jess.Rete;
 import jess.Value;
@@ -34,14 +36,14 @@ public class PolicyActor implements AgentInterface {
 	/** The current agent policy. */
 	private Policy policy_;
 
-	/** If a new policy should be generated at the start. */
-	private boolean generatePolicy_ = true;
-
 	/** The last chosen actions. */
 	private ActionChoice prevActions_;
 
 	/** The previous state seen by the agent. */
 	private Collection<Fact> prevState_;
+
+	/** The collection of unseen predicates. */
+	private Collection<StringFact> unseenPreds_;
 
 	/**
 	 * If this agent is the optimal agent (defined by the environment, not how
@@ -81,6 +83,10 @@ public class PolicyActor implements AgentInterface {
 		possibleGoals_ = new ArrayList<GoalState>();
 		totalReward_ = 0;
 		totalSteps_ = 0;
+		unseenPreds_ = new HashSet<StringFact>();
+		unseenPreds_.addAll(StateSpec.getInstance().getPredicates().values());
+		unseenPreds_.addAll(StateSpec.getInstance().getTypePredicates()
+				.values());
 	}
 
 	// @Override
@@ -88,6 +94,7 @@ public class PolicyActor implements AgentInterface {
 		// Receive a policy
 		if (arg0.equals("GetPolicy")) {
 			ObjectObservations.getInstance().objectArray = new Object[] { policy_ };
+			policy_ = null;
 		} else if (arg0.equals("SetPolicy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
@@ -95,7 +102,6 @@ public class PolicyActor implements AgentInterface {
 						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
 						.getFacts());
 			}
-			generatePolicy_ = false;
 		} else if (arg0.equals("Optimal")) {
 			optimal_ = true;
 		} else if (arg0.equals("internalReward")) {
@@ -109,7 +115,7 @@ public class PolicyActor implements AgentInterface {
 			// Only form pre-goal if the generator isn't a module.
 			if (!PolicyGenerator.getInstance().isModuleGenerator())
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_);
+						prevActions_, null);
 		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
 			String[] oldGoal = null;
@@ -127,7 +133,7 @@ public class PolicyActor implements AgentInterface {
 	// @Override
 	public Action agent_start(Observation arg0) {
 		// Initialise the policy
-		if (generatePolicy_) {
+		if (policy_ == null) {
 			policy_ = PolicyGenerator.getInstance().generatePolicy(true);
 			System.out.println(policy_);
 			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
@@ -191,12 +197,11 @@ public class PolicyActor implements AgentInterface {
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)) {
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_);
+						prevActions_, null);
 			}
 		}
 
 		prevActions_ = null;
-		generatePolicy_ = true;
 	}
 
 	/**
@@ -229,15 +234,63 @@ public class PolicyActor implements AgentInterface {
 		// Evaluate the policy for true rules and activates
 		// TODO Perhaps resample policy here if no rules are fired (not
 		// including the RLGG rules - may need to remove them).
-		actions = policy_.evaluatePolicy(state, ObjectObservations
-				.getInstance().validActions, actions, StateSpec.getInstance()
-				.getNumReturnedActions(), optimal_, false, noteTriggered);
+		MultiMap<String, String[]> validActions = ObjectObservations
+				.getInstance().validActions;
+		actions = policy_.evaluatePolicy(state, validActions, actions,
+				StateSpec.getInstance().getNumReturnedActions(), optimal_,
+				false, noteTriggered);
+
+		// This allows action covering to catch variant action conditions.
+		// This problem is caused by hierarchical RLGG rules, which cover
+		// actions regarding new object type already
+		if (!optimal_)
+			checkForUnseenPreds(state, validActions);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;
 
 		// Return the actions.
 		return actions;
+	}
+
+	/**
+	 * Runs through the set of unseen predicates to check if the state contains
+	 * them. This method is used to capture variant action conditions.
+	 * 
+	 * @param state
+	 *            The state to scan.
+	 * @param validActions
+	 *            The state valid actions.
+	 */
+	private void checkForUnseenPreds(Rete state,
+			MultiMap<String, String[]> validActions) {
+		try {
+			// Run through the unseen preds, triggering covering if necessary.
+			boolean triggerCovering = false;
+			Collection<StringFact> removables = new HashSet<StringFact>();
+			for (StringFact unseenPred : unseenPreds_) {
+				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
+				QueryResult results = state.runQueryStar(query,
+						new ValueVector());
+				if (results.next()) {
+					// The unseen pred exists - trigger covering
+					triggerCovering = true;
+					removables.add(unseenPred);
+				}
+			}
+
+			// If any unseen preds are seen, trigger covering.
+			if (triggerCovering) {
+				MultiMap<String, String[]> emptyActions = MultiMap
+						.createSortedSetMultiMap(ArgumentComparator
+								.getInstance());
+				PolicyGenerator.getInstance().triggerRLGGCovering(state,
+						validActions, emptyActions, false);
+				unseenPreds_.removeAll(removables);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -524,7 +577,7 @@ public class PolicyActor implements AgentInterface {
 
 			// Forming the pre-goal with placeholder constants
 			PolicyGenerator.getInstance().formPreGoalState(prevStateClone,
-					prevActions_);
+					prevActions_, placeholderConstants);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

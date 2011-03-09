@@ -3,4 +3,4 @@ blocksWorld.BlocksWorld
 50
 blocksElites.txt
 blocksTest.txt
-10,"goal unstack"
+10,"goal onab"

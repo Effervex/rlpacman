@@ -35,7 +35,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = -439289279282263241L;
+	private static final long serialVersionUID = -8780621530231271334L;
 
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;
@@ -258,9 +258,9 @@ public class PolicyGenerator implements Serializable {
 						} else if (r2.getSlot() == null)
 							return -1;
 
-						int result = Double.compare(slotGenerator_.getOrdering(r1
-								.getSlot()), slotGenerator_.getOrdering(r2
-								.getSlot()));
+						int result = Double.compare(slotGenerator_
+								.getOrdering(r1.getSlot()), slotGenerator_
+								.getOrdering(r2.getSlot()));
 						if (result != 0)
 							return result;
 						return r1.compareTo(r2);
@@ -366,9 +366,6 @@ public class PolicyGenerator implements Serializable {
 				ruleCreation_.resetInactivity();
 				return true;
 			}
-
-			if (!ruleCreation_.isSettled())
-				return true;
 		}
 		return false;
 	}
@@ -644,13 +641,15 @@ public class PolicyGenerator implements Serializable {
 	 *            The pre-goal state seen by the agent.
 	 * @param actions
 	 *            The final action(s) taken by the agent.
+	 * @param constants
+	 *            Extra constants to note down in the pre-goal.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actions) {
+			ActionChoice actions, Collection<String> constants) {
 		if (!frozen_ && !slotOptimisation_) {
 			// Form the pre-goal using the final action/s as a parameter.
 			Collection<String> settledGoals = ruleCreation_.formPreGoalState(
-					preGoalState, actions);
+					preGoalState, actions, constants);
 			String actionPred = actions.getActionPreds();
 			if (debugMode_) {
 				try {

@@ -22,8 +22,6 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import com.sun.corba.se.impl.oa.poa.AOMEntry;
-
 import jess.Fact;
 import relationalFramework.ConditionComparator;
 import relationalFramework.GuidedRule;
@@ -31,6 +29,7 @@ import relationalFramework.RuleCreation;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.Unification;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -39,7 +38,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = -3124284798464655100L;
+	private static final long serialVersionUID = -7206709504108716575L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -51,7 +50,7 @@ public class AgentObservations implements Serializable {
 
 	/** The amount of inactivity before an observation is considered converged. */
 	// TODO Set this as a better measure
-	public static final int INACTIVITY_THRESHOLD = 500;
+	public static final int INACTIVITY_THRESHOLD = 5;
 
 	/** The agent observations directory. */
 	public static final File AGENT_OBSERVATIONS_DIR = new File(
@@ -151,9 +150,6 @@ public class AgentObservations implements Serializable {
 	 *            The facts of the state in StringFact form.
 	 */
 	private void recordConditionAssociations(Collection<StringFact> stateFacts) {
-		if (conditionBeliefInactivity_ >= INACTIVITY_THRESHOLD)
-			return;
-
 		boolean changed = false;
 		for (StringFact baseFact : stateFacts) {
 			// Getting the ConditionBeliefs object
@@ -166,7 +162,7 @@ public class AgentObservations implements Serializable {
 
 			// Create a replacement map here (excluding numerical values)
 			Map<String, String> replacementMap = baseFact
-					.createVariableTermReplacementMap();
+					.createVariableTermReplacementMap(true);
 
 			// Replace facts for all relevant facts and store as condition
 			// beliefs.
@@ -320,30 +316,73 @@ public class AgentObservations implements Serializable {
 		// Form equivalence (<=>) relations wherever possible
 		for (String cond : conditionBeliefs_.keySet()) {
 			ConditionBeliefs cb = conditionBeliefs_.get(cond);
-			StringFact cbFact = StateSpec.getInstance().getStringFact(
-					cb.getCondition());
-			String[] arguments = new String[cbFact.getArguments().length];
-			for (int i = 0; i < arguments.length; i++)
-				arguments[i] = RuleCreation.getVariableTermString(i);
-			cbFact = new StringFact(cbFact, arguments);
+			StringFact cbFact = cb.getConditionFact();
 
 			// Assert the true facts
 			for (StringFact alwaysTrue : cb.getAlwaysTrue()) {
-				// Check for equivalence relation
-				// Don't note single type relations unless this is a type
-				if (StateSpec.getInstance().isTypePredicate(cond)
-						|| !StateSpec.getInstance().isTypePredicate(
-								alwaysTrue.getFactName()))
+				// Only create the relation if it is useful (not an obvious type
+				// relation)
+				if (shouldCreateRelation(cbFact, alwaysTrue))
 					createRelation(cbFact, alwaysTrue, true,
-							backgroundKnowledge);
+							backgroundKnowledge, true);
 			}
 
 			// Assert the false facts
 			for (StringFact neverTrue : cb.getNeverTrue()) {
-				createRelation(cbFact, neverTrue, false, backgroundKnowledge);
+				// Don't note obvious type rules.
+				createRelation(cbFact, neverTrue, false, backgroundKnowledge,
+						true);
+			}
+		}
+
+		// Create the negated condition beliefs (only for the !A => B relations)
+		for (String cond : negatedConditionBeliefs_.keySet()) {
+			for (ConditionBeliefs negCB : negatedConditionBeliefs_.get(cond)
+					.values()) {
+				StringFact negCBFact = negCB.getConditionFact();
+				// Only assert the !A => B assertions. The rest aren't accurate.
+				for (StringFact alwaysTrue : negCB.getAlwaysTrue()) {
+					if (shouldCreateRelation(negCBFact, alwaysTrue))
+						createRelation(negCBFact, alwaysTrue, true,
+								backgroundKnowledge, false);
+				}
 			}
 		}
 		return backgroundKnowledge;
+	}
+
+	/**
+	 * If a relation should be created. Ignore relations that are simply
+	 * themselves (A -> A) and ignore obvious type relations.
+	 * 
+	 * @param cbFact
+	 *            The condition beliefs fact.
+	 * @param relatedFact
+	 *            The related fact.
+	 * @return True if the relation should be created, false otherwise.
+	 */
+	private boolean shouldCreateRelation(StringFact cbFact,
+			StringFact relatedFact) {
+		// Don't make rules to itself.
+		if (cbFact.equals(relatedFact))
+			return false;
+
+		// If the fact is a type predicate, go for it.
+		if (StateSpec.getInstance().isTypePredicate(cbFact.getFactName()))
+			return true;
+		else {
+			// If the rule is a normal predicate, don't make obvious type rules.
+			if (StateSpec.getInstance().isTypePredicate(
+					relatedFact.getFactName())) {
+				int index = RuleCreation.getVariableTermIndex(relatedFact
+						.getArguments()[0]);
+				if (cbFact.getArgTypes()[index].equals(relatedFact
+						.getFactName()))
+					return false;
+			}
+
+			return true;
+		}
 	}
 
 	/**
@@ -359,13 +398,13 @@ public class AgentObservations implements Serializable {
 	 *            The state of negation: true if not negated, false if negated.
 	 * @param relations
 	 *            The set of knowledge to add to.
+	 * @param checkEquivalence
+	 *            If the method should check for an equivalence.
 	 */
 	@SuppressWarnings("unchecked")
 	private void createRelation(StringFact cond, StringFact otherCond,
-			boolean negationType, SortedSet<BackgroundKnowledge> relations) {
-		// Don't make rules to itself.
-		if (cond.equals(otherCond))
-			return;
+			boolean negationType, SortedSet<BackgroundKnowledge> relations,
+			boolean checkEquivalence) {
 		StringFact left = cond;
 		StringFact right = otherCond;
 		String relation = " => ";
@@ -379,6 +418,10 @@ public class AgentObservations implements Serializable {
 					+ ")", false);
 		mappedEnvironmentRules_.putContains(left.getFactName(), bckKnow);
 		relations.add(bckKnow);
+
+		// If not checking equivalences, just return.
+		if (!checkEquivalence)
+			return;
 
 		// Create an equivalence relation if possible.
 		// Get the relations to use for equivalency comparisons
@@ -467,15 +510,26 @@ public class AgentObservations implements Serializable {
 	 * 
 	 * @param action
 	 *            The action (with arguments).
+	 * @param constants
+	 *            The constants to maintain.
 	 * @param onlyActionTerms
 	 *            If the method should anonymise non-action terms.
 	 * @return The relevant facts pertaining to the action.
 	 */
 	public Collection<StringFact> gatherActionFacts(StringFact action,
-			boolean onlyActionTerms) {
+			Collection<String> constants, boolean onlyActionTerms) {
 		// Note down action conditions if still unsettled.
 		Map<String, String> replacementMap = action
-				.createVariableTermReplacementMap();
+				.createVariableTermReplacementMap(false);
+		// Add constants as replacements
+		if (constants != null) {
+			for (String constant : constants) {
+				// TODO Do I just replace straight away?
+				if (!replacementMap.containsKey(constant))
+					replacementMap.put(constant, constant);
+			}
+		}
+
 		Collection<StringFact> actionFacts = new HashSet<StringFact>();
 		Set<StringFact> actionConds = new HashSet<StringFact>();
 		for (String argument : action.getArguments()) {
@@ -492,14 +546,10 @@ public class AgentObservations implements Serializable {
 					if (!actionFacts.contains(notedFact))
 						actionFacts.add(notedFact);
 
-					// If the action conditions have not settled, note the
-					// action conditions.
-					if (getActionBasedObservation(action.getFactName()).actionConditionInactivity_ < INACTIVITY_THRESHOLD) {
-						// Note the action condition
-						StringFact actionCond = new StringFact(termFact);
-						actionCond.replaceArguments(replacementMap, false);
-						actionConds.add(actionCond);
-					}
+					// Note the action condition
+					StringFact actionCond = new StringFact(termFact);
+					actionCond.replaceArguments(replacementMap, false);
+					actionConds.add(actionCond);
 				}
 			}
 		}
@@ -661,17 +711,6 @@ public class AgentObservations implements Serializable {
 		observationHash_ = null;
 	}
 
-	public List<RangedCondition> getActionRange(String actionPred) {
-		if (!actionBasedObservations_.containsKey(actionPred))
-			return null;
-		return actionBasedObservations_.get(actionPred).getActionRange();
-	}
-
-	public void setActionRange(String actionPred, RangedCondition rc) {
-		if (getActionBasedObservation(actionPred).setActionRange(rc))
-			observationHash_ = null;
-	}
-
 	/**
 	 * Backs up the pre-goals into a single mapping and removes them from the
 	 * observations so a different learning algorithm can use the agent
@@ -724,30 +763,8 @@ public class AgentObservations implements Serializable {
 		conditionBeliefInactivity_ = 0;
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			abo.actionConditionInactivity_ = 0;
-			abo.rangedConditionInactivity_ = 0;
 			abo.recreateRLGG_ = true;
 		}
-	}
-
-	public boolean isConditionBeliefsSettled() {
-		return (conditionBeliefInactivity_ >= INACTIVITY_THRESHOLD);
-	}
-
-	public boolean isActionConditionSettled() {
-		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
-			if (abo.actionConditionInactivity_ < INACTIVITY_THRESHOLD)
-				return false;
-		}
-		return true;
-	}
-
-	public boolean isRangedConditionSettled() {
-		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
-			if ((abo.conditionRanges_ != null)
-					&& (abo.rangedConditionInactivity_ < INACTIVITY_THRESHOLD))
-				return false;
-		}
-		return true;
 	}
 
 	/**
@@ -813,11 +830,6 @@ public class AgentObservations implements Serializable {
 						.write("True conditions: "
 								+ actionBasedObservations_.get(action).specialisationConditions_
 								+ "\n");
-				if (actionBasedObservations_.get(action).conditionRanges_ != null)
-					buf
-							.write("Ranged values: "
-									+ actionBasedObservations_.get(action).conditionRanges_
-									+ "\n");
 				buf.write("\n");
 			}
 
@@ -865,7 +877,17 @@ public class AgentObservations implements Serializable {
 			if (serialisedFile.exists()) {
 				FileInputStream fis = new FileInputStream(serialisedFile);
 				ObjectInputStream ois = new ObjectInputStream(fis);
-				return (AgentObservations) ois.readObject();
+				AgentObservations ao = (AgentObservations) ois.readObject();
+				if (ao != null) {
+					// Need to recreate the RLGG rule so it gets placed in the
+					// appropriate slot.
+					if (ao.actionBasedObservations_ != null) {
+						for (ActionBasedObservations abo : ao.actionBasedObservations_
+								.values())
+							abo.rlggRule_ = null;
+					}
+					return ao;
+				}
 			}
 		} catch (Exception e) {
 		}
@@ -878,7 +900,7 @@ public class AgentObservations implements Serializable {
 	 * @author Sam Sarjant
 	 */
 	private class ActionBasedObservations implements Serializable {
-		private static final long serialVersionUID = 1167175828246036292L;
+		private static final long serialVersionUID = 7037058544484843208L;
 
 		/** The pre-goal information. */
 		private transient PreGoalInformation pgi_;
@@ -904,12 +926,6 @@ public class AgentObservations implements Serializable {
 
 		/** The inactivity of the action conditions. */
 		private int actionConditionInactivity_ = 0;
-
-		/** The maximum ranges of the conditions seen by this action. */
-		private List<RangedCondition> conditionRanges_;
-
-		/** The inactivity of the ranged conditions. */
-		private int rangedConditionInactivity_ = 0;
 
 		/** If the RLGG rule needs to be recreated. */
 		private boolean recreateRLGG_ = true;
@@ -954,18 +970,14 @@ public class AgentObservations implements Serializable {
 				specialisationConditions_ = new HashSet<StringFact>();
 				actionConditionInactivity_ = 0;
 				action_ = new StringFact(action);
-				// TODO Note condition ranges here
 				recreateRLGG_ = true;
 				return true;
 			}
 
-			int hash = variantActionConditions_.hashCode();
-			variantActionConditions_.addAll(actionConds);
-			variantActionConditions_.addAll(invariantActionConditions_);
-			boolean changed = invariantActionConditions_.retainAll(actionConds);
-			variantActionConditions_.removeAll(invariantActionConditions_);
-
-			changed |= (hash != variantActionConditions_.hashCode());
+			// Sort the invariant and variant conditions, making a special case
+			// for numerical conditions.
+			String[] actionArgs = action_.getArguments();
+			boolean changed = intersectActionConditions(actionConds, actionArgs);
 
 			// Generalise the action if necessary
 			for (int i = 0; i < action_.getArguments().length; i++) {
@@ -994,6 +1006,39 @@ public class AgentObservations implements Serializable {
 		}
 
 		/**
+		 * Intersects the action conditions sets, handling numerical values as a
+		 * special case.
+		 * 
+		 * @param actionConds
+		 *            The action conditions being added.
+		 * @return True if the action conditions changed, false otherwise.
+		 */
+		private boolean intersectActionConditions(
+				Collection<StringFact> actionConds, String[] actionArgs) {
+			boolean changed = false;
+			Collection<StringFact> newInvariantConditions = new HashSet<StringFact>();
+
+			// Run through each invariant fact
+			for (StringFact invFact : invariantActionConditions_) {
+				StringFact mergedFact = Unification.getInstance().unifyFact(
+						invFact, actionConds, new DualHashBidiMap(),
+						new DualHashBidiMap(), actionArgs, false, true);
+				if (mergedFact != null) {
+					changed |= !invFact.equals(mergedFact);
+					newInvariantConditions.add(mergedFact);
+				} else {
+					variantActionConditions_.add(invFact);
+				}
+			}
+			invariantActionConditions_ = newInvariantConditions;
+
+			// Add any remaining action conds to the variants
+			changed |= variantActionConditions_.addAll(actionConds);
+
+			return changed;
+		}
+
+		/**
 		 * Recreates the set of specialisation conditions, which are basically
 		 * the variant conditions, both negated and normal, and simplified to
 		 * exclude the invariant and illegal conditions.
@@ -1010,7 +1055,8 @@ public class AgentObservations implements Serializable {
 		private Collection<StringFact> recreateSpecialisations(
 				Collection<StringFact> variantActionConditions,
 				Collection<StringFact> invariantActionConditions) {
-			Collection<StringFact> specialisations = new HashSet<StringFact>();
+			SortedSet<StringFact> specialisations = new TreeSet<StringFact>(
+					ConditionComparator.getInstance());
 			for (StringFact condition : variantActionConditions) {
 				// Check the non-negated version
 				condition = simplifyCondition(condition);
@@ -1028,6 +1074,7 @@ public class AgentObservations implements Serializable {
 					}
 				}
 			}
+
 			return specialisations;
 		}
 
@@ -1067,7 +1114,6 @@ public class AgentObservations implements Serializable {
 				SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
 						ConditionComparator.getInstance());
 				// Form the replacements if the action is non-variable
-				// TODO Note numerical ranges
 				String[] replacements = null;
 				for (String arg : action_.getArguments()) {
 					if (arg.charAt(0) != '?') {
@@ -1085,44 +1131,18 @@ public class AgentObservations implements Serializable {
 
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false);
-				rlggRule_ = new GuidedRule(ruleConds, action_, null);
+				if (rlggRule_ == null)
+					rlggRule_ = new GuidedRule(ruleConds, action_, null);
+				else {
+					rlggRule_.setConditions(ruleConds, false);
+					rlggRule_.setActionTerms(action_.getArguments());
+				}
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
 			}
 
 			rlggRule_.incrementStatesCovered();
 			return rlggRule_;
-		}
-
-		public List<RangedCondition> getActionRange() {
-			return conditionRanges_;
-		}
-
-		/**
-		 * Sets the action range to the specified value.
-		 * 
-		 * @param rc
-		 *            The ranged condition to set.
-		 * @return True if the condition range changed, false otherwise.
-		 */
-		public boolean setActionRange(RangedCondition rc) {
-			RangedCondition oldCond = null;
-			if (conditionRanges_ == null)
-				conditionRanges_ = new ArrayList<RangedCondition>();
-			else {
-				int index = conditionRanges_.indexOf(rc);
-				if (index != -1)
-					oldCond = conditionRanges_.remove(index);
-			}
-			conditionRanges_.add(rc);
-
-			if (!rc.equalRange(oldCond)) {
-				rangedConditionInactivity_ = 0;
-				recreateRLGG_ = true;
-				return true;
-			}
-			rangedConditionInactivity_++;
-			return false;
 		}
 
 		private AgentObservations getOuterType() {
@@ -1138,10 +1158,6 @@ public class AgentObservations implements Serializable {
 					* result
 					+ ((variantActionConditions_ == null) ? 0
 							: variantActionConditions_.hashCode());
-			result = prime
-					* result
-					+ ((conditionRanges_ == null) ? 0 : conditionRanges_
-							.hashCode());
 			result = prime * result + ((pgi_ == null) ? 0 : pgi_.hashCode());
 			return result;
 		}
@@ -1162,11 +1178,6 @@ public class AgentObservations implements Serializable {
 					return false;
 			} else if (!variantActionConditions_
 					.equals(other.variantActionConditions_))
-				return false;
-			if (conditionRanges_ == null) {
-				if (other.conditionRanges_ != null)
-					return false;
-			} else if (!conditionRanges_.equals(other.conditionRanges_))
 				return false;
 			if (pgi_ == null) {
 				if (other.pgi_ != null)
