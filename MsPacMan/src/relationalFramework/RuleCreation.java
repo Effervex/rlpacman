@@ -26,7 +26,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
-	private static final long serialVersionUID = 7289003836420867684L;
+	private static final long serialVersionUID = -3432603898586013236L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 	/** The final character for variables. */

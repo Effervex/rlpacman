@@ -35,7 +35,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = -8780621530231271334L;
+	private static final long serialVersionUID = -3840268992962159336L;
 
 	/** The probability distributions defining the policy generator. */
 	private OrderedDistribution<Slot> slotGenerator_;

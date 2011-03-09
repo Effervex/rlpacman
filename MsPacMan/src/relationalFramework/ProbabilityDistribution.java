@@ -19,7 +19,7 @@ import java.util.Set;
  * 
  */
 public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = -5600686052439795893L;
+	private static final long serialVersionUID = 3187745593570014645L;
 	/** The instances in the distribution with associated weights. */
 	private Map<T, Double> itemProbs_;
 	/** The random number generator. */
