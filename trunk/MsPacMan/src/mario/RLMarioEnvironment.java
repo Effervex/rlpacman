@@ -1,10 +1,13 @@
 package mario;
 
 import java.awt.geom.Point2D;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import jess.JessException;
 import jess.Rete;
@@ -14,6 +17,8 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import competition.cig.robinbaumgarten.astar.sprites.Mario;
+
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
 import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.environments.Environment;
@@ -21,7 +26,6 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.MarioAIOptions;
 
 import relationalFramework.ActionChoice;
-import relationalFramework.LearningController;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
@@ -33,6 +37,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	private MarioEnvironment environment_;
 	private boolean experimentMode_ = false;
 	private MarioAIOptions cmdLineOptions_;
+	private StringFact prevAction_;
 
 	@Override
 	public void env_cleanup() {
@@ -45,9 +50,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_ = new MarioAIOptions();
 		cmdLineOptions_.setVisualization(!experimentMode_);
 		cmdLineOptions_.setEnemies("off");
-//		cmdLineOptions_.setLevelRandSeed();
 		cmdLineOptions_.setLevelDifficulty(0);
-		// cmdLineOptions_.setFPS(30);
+//		 cmdLineOptions_.setFPS(100);
 		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -80,6 +84,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			// Idle...
 			environment_.tick();
 		}
+		prevAction_ = null;
 
 		// Only make decisions when Mario is on the ground
 		while (!environment_.isMarioOnGround())
@@ -91,10 +96,10 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Applying the action (up down left right or nothing)
-		RuleAction action = ((ActionChoice) ObjectObservations.getInstance().objectArray[0])
-				.getFirstActionList();
+		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
 		float[] marioPos = Arrays.copyOf(environment_.getMarioFloatPos(), 2);
-		environment_.performAction(chooseLowAction(action, marioPos));
+		environment_.performAction(chooseLowAction(actions.getActions(),
+				marioPos));
 		environment_.tick();
 
 		while (GlobalOptions.isGameplayStopped) {
@@ -103,14 +108,19 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		}
 
 		// Only make decisions when Mario is on the ground
-		while (!environment_.isMarioOnGround()) {
-			environment_.performAction(chooseLowAction(action, marioPos));
+		while (!environment_.isMarioOnGround()
+				&& environment_.getMarioStatus() != Mario.STATUS_WIN) {
+			environment_.performAction(chooseLowAction(actions.getActions(),
+					marioPos));
 			environment_.tick();
 
 			// Check for endless fall bug
-			if (environment_.getTimeLeft() < 0)
+			if (environment_.getMarioFloatPos()[1] > environment_
+					.getLevelHeight()
+					* LevelScene.cellSize)
 				break;
 		}
+		prevAction_ = null;
 
 		Observation obs = formObservations(rete_, 1);
 		float reward = 0;
@@ -127,6 +137,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 */
 	public void resetEnvironment() {
 		cmdLineOptions_.setLevelRandSeed(PolicyGenerator.random_.nextInt());
+		// cmdLineOptions_.setLevelRandSeed(-1808813221);
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();
@@ -137,30 +148,84 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	/**
 	 * Chooses a direction based off the chosen high action to follow.
 	 * 
-	 * @param ruleAction
-	 *            The action the agent will take. May be multiple versions of
+	 * @param ruleActions
+	 *            The actions the agent will take. May be multiple versions of
 	 *            the same action with different arguments, based on what
 	 *            matched the action conditions.
 	 * @param startPos
 	 *            The starting position of Mario in the case of jumping.
 	 * @return The low action to use.
 	 */
-	private boolean[] chooseLowAction(RuleAction ruleAction, float[] startPos) {
-		StringFact action = null;
-		if (ruleAction != null) {
-			// Find the action with the lowest distance; that will be the chosen
-			// action
-			List<StringFact> actions = ruleAction.getTriggerActions();
-			// Sort the facts by distance
-			Collections.sort(actions, new ActionComparator<StringFact>());
-			action = actions.get(0);
-			// System.out.println(action + " : " + Arrays.toString(startPos));
+	private boolean[] chooseLowAction(ArrayList<RuleAction> ruleActions,
+			float[] startPos) {
+		Map<Integer, SortedMap<Double, StringFact>> representativeRule = new HashMap<Integer, SortedMap<Double, StringFact>>();
+		Map<Integer, Double> weightedActions = new HashMap<Integer, Double>();
+		byte[][] basicLevelObservation = environment_
+				.getLevelSceneObservationZ(2);
+		float[] marioFloatPos = environment_.getMarioFloatPos();
+		
+		// If there is a previous action take that (for when Mario is in the air
+		// and other non-decision making situations)
+		if (prevAction_ != null)
+			return ((RLMarioStateSpec) StateSpec
+					.getInstance()).applyAction(prevAction_, startPos,
+							marioFloatPos, basicLevelObservation);
+
+		// Run through the actions, storing identical action mappings under the
+		// same weight. Storage is through bit shifted operations.
+		int i = 0;
+		int bestBitwise = -1;
+		double bestWeight = -1;
+		for (RuleAction ruleAction : ruleActions) {
+			List<StringFact> actionStrings = ruleAction.getTriggerActions();
+			double policyWeight = (1.0 * ruleActions.size() - i)
+					/ ruleActions.size();
+			policyWeight *= policyWeight;
+
+			// Find the individual distance weighting and direction of each
+			// action in the ArrayList
+			for (StringFact action : actionStrings) {
+				boolean[] actionArray = ((RLMarioStateSpec) StateSpec
+						.getInstance()).applyAction(action, startPos,
+						marioFloatPos, basicLevelObservation);
+				int bitwise = booleanArrayToInt(actionArray);
+				double distance = Double.parseDouble(action.getArguments()[1]);
+
+				// Store the values, adding to existing values if necessary
+				Double oldWeight = weightedActions.get(bitwise);
+				SortedMap<Double, StringFact> bestActions = representativeRule
+						.get(bitwise);
+				if (oldWeight == null) {
+					oldWeight = 0d;
+					bestActions = new TreeMap<Double, StringFact>();
+					representativeRule.put(bitwise, bestActions);
+				}
+				// Add the weighted inverse distance
+				double actionWeight = (policyWeight / distance);
+				double newWeight = oldWeight + actionWeight;
+				weightedActions.put(bitwise, newWeight);
+				bestActions.put(actionWeight, action);
+
+				// Update best weights
+				if (newWeight > bestWeight) {
+					bestWeight = newWeight;
+					bestBitwise = bitwise;
+				}
+			}
 		}
-		boolean[] actionArray = ((RLMarioStateSpec) StateSpec.getInstance())
-				.applyAction(action, startPos, environment_.getMarioFloatPos());
+
 		// If Mario is on the ground and cannot jump, allow him time to breathe
+		boolean[] actionArray = intToBooleanArray(bestBitwise);
 		if (environment_.isMarioOnGround() && !environment_.isMarioAbleToJump())
 			actionArray[Environment.MARIO_KEY_JUMP] = false;
+
+		// Output the 'firing' action.
+		SortedMap<Double, StringFact> bestRules = representativeRule
+				.get(bestBitwise);
+		StringFact bestAction = bestRules.get(bestRules.lastKey());
+//		System.out.println("Action: " + bestAction);
+		prevAction_ = bestAction;
+
 		return actionArray;
 	}
 
@@ -207,7 +272,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			byte[][] levelObs = environment_
 					.getLevelSceneObservationZ(levelZoom);
 			float[] enemyPos = environment_.getEnemiesFloatPos();
-			float[] marioPos = environment_.getMarioFloatPos();
 
 			// Assert the level objects
 			for (byte y = 0; y < levelObs.length; y++) {
@@ -231,7 +295,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			// Ever present goal
 			rete.assertString("(flag goal))");
 			rete.assertString("(distance goal "
-					+ environment_.getEvaluationInfo().levelLength + ")");
+					+ environment_.getReceptiveFieldWidth() / 2
+					* LevelScene.cellSize + ")");
 			rete.assertString("(direction goal right)");
 			rete.assertString("(heightDiff goal 0)");
 
@@ -504,6 +569,10 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 		// Can jump on/over assertions
 		assertJumpOnOver(rete, thing, x, y, jumpInto);
+
+		// Width assertion
+		// TODO Change for pits
+		rete.assertString("(width " + thing + " 1)");
 	}
 
 	/**
@@ -521,24 +590,45 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 */
 	private void assertJumpOnOver(Rete rete, String thing, float x, float y,
 			boolean jumpInto) throws Exception {
-		if (PhysicsApproximator.getInstance().canJumpTo(x, y, environment_,
-				jumpInto)) {
+		boolean[] jumpOnOver = ((RLMarioStateSpec) StateSpec.getInstance())
+				.canJumpOnOver(x, y, environment_, jumpInto);
+		if (jumpOnOver[0])
 			rete.assertString("(canJumpOn " + thing + ")");
-			// System.out.print("(canJumpOn " + thing + ") ");
-		}
+		if (jumpOnOver[1])
+			rete.assertString("(canJumpOver " + thing + ")");
 	}
 
-	private class ActionComparator<T> implements Comparator<StringFact> {
-
-		@Override
-		public int compare(StringFact o1, StringFact o2) {
-			Double o1Val = Double.parseDouble(o1.getArguments()[o1
-					.getArgTypes().length - 1]);
-			Double o2Val = Double.parseDouble(o2.getArguments()[o2
-					.getArgTypes().length - 1]);
-
-			return o1Val.compareTo(o2Val);
+	/**
+	 * Converts a boolean array into an integer, where each boolean flag
+	 * represents a bit.
+	 * 
+	 * @param array
+	 *            The boolean array to be converted.
+	 * @return The resulting integer.
+	 */
+	public static int booleanArrayToInt(boolean[] array) {
+		int result = 0;
+		for (int i = 0; i < Environment.numberOfKeys; i++) {
+			if (array[i])
+				result |= (int) Math.pow(2, i);
 		}
+		return result;
+	}
 
+	/**
+	 * Converts an integer into a boolean array. where '1' bits are true and '0'
+	 * bits are false.
+	 * 
+	 * @param integer
+	 *            The integer to be converted.
+	 * @return The resulting boolean array.
+	 */
+	public static boolean[] intToBooleanArray(int integer) {
+		boolean[] result = new boolean[Environment.numberOfKeys];
+		for (int i = 0; i < result.length; i++) {
+			if ((integer & (int) Math.pow(2, i)) != 0)
+				result[i] = true;
+		}
+		return result;
 	}
 }

@@ -129,7 +129,7 @@ public class Unification {
 		for (StringFact oldStateFact : oldState) {
 			StringFact modFact = unifyFact(oldStateFact, newState,
 					oldReplacementMap, newReplacementMap, oldTerms,
-					flexibleReplacement);
+					flexibleReplacement, false);
 
 			// If the fact is null, then there was no unification.
 			if (modFact == null)
@@ -232,6 +232,9 @@ public class Unification {
 	 * @param flexibleReplacement
 	 *            If the replacement maps can be filled dynamically to match
 	 *            terms.
+	 * @param removeUnifiedFact
+	 *            If the unityFact this fact unifies with should be removed from
+	 *            the unityFacts.
 	 * @return The unified version of the fact (possibly more general than the
 	 *         input fact) or null if no unification.
 	 */
@@ -239,8 +242,9 @@ public class Unification {
 	public StringFact unifyFact(StringFact fact,
 			Collection<StringFact> unityFacts, BidiMap factReplacementMap,
 			BidiMap unityReplacementMap, String[] factTerms,
-			boolean flexibleReplacement) {
+			boolean flexibleReplacement, boolean removeUnifiedFact) {
 		StringFact result = null;
+		StringFact unityResult = null;
 		BidiMap resultReplacements = null;
 
 		// Maintain a check on what is the best unification (should better ones
@@ -314,6 +318,7 @@ public class Unification {
 						StringFact unifact = new StringFact(fact, unification,
 								fact.isNegated());
 						result = unifact;
+						unityResult = unityFact;
 
 						// If we're using flexible replacements, store any
 						// temporary replacements created
@@ -336,6 +341,10 @@ public class Unification {
 				unityReplacementMap.putAll(resultReplacements);
 		}
 
+		// If removing the unityFact, do so here
+		if (removeUnifiedFact)
+			unityFacts.remove(unityResult);
+		
 		return result;
 	}
 

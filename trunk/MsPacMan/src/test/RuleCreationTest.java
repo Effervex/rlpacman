@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -17,12 +18,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.ActionChoice;
+import relationalFramework.ArgumentComparator;
 import relationalFramework.ConditionComparator;
+import relationalFramework.MultiMap;
+import relationalFramework.OrderedDistribution;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
-import relationalFramework.MultiMap;
 import relationalFramework.Policy;
 import relationalFramework.RuleAction;
+import relationalFramework.Slot;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -72,7 +77,7 @@ public class RuleCreationTest {
 				"(clear a) => (moveFloor a)"), actions, policy);
 		ra.getTriggerActions();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac);
+		sut_.formPreGoalState(facts, ac, null);
 		Collection<StringFact> preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
@@ -90,7 +95,7 @@ public class RuleCreationTest {
 				actions, policy);
 		ra.getTriggerActions();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac);
+		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?X)")));
@@ -121,7 +126,7 @@ public class RuleCreationTest {
 				policy);
 		ra.getTriggerActions();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac);
+		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
 		assertEquals(9, preGoal.size());
@@ -156,7 +161,7 @@ public class RuleCreationTest {
 				policy);
 		ra.getTriggerActions();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac);
+		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(6, preGoal.size());
@@ -176,7 +181,7 @@ public class RuleCreationTest {
 				policy);
 		ra.getTriggerActions();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac);
+		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(4, preGoal.size());
@@ -184,6 +189,9 @@ public class RuleCreationTest {
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?Y)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?X)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?Y)")));
+		
+		// Modular pre-goal
+		
 	}
 
 	/**
@@ -817,9 +825,6 @@ public class RuleCreationTest {
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(above ? ?X)")));
 		assertEquals(results.size(), 1);
-
-		// TODO Illegal action condition restriction
-
 	}
 
 	@Test

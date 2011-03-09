@@ -1,0 +1,6 @@
+rlPacManGeneral.PacMan
+10
+100
+pacManElites.txt
+pacManTest.txt
+"goal levelMax"

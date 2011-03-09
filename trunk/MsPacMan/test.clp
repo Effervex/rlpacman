@@ -1,35 +1,26 @@
 (deftemplate validActions (multislot move) (multislot moveFloor))
 
 ;; Initial facts
-(assert (pacman player))
-(assert (dot a4))
-(assert (distance player a4 -4))
-(assert (dot a1))
-(assert (distance player a1 2.5))
-(assert (dot a2))
-(assert (distance player a2 3))
+(assert (block a))
+(assert (block b))
+(assert (block c))
+(assert (block d))
+(assert (floor fl))
+(assert (on a fl))
+(assert (on b a))
+(assert (on c fl))
+(assert (on d b))
 
 ;; define the terminal fact
 (deftemplate goalState (slot goalMet))
 
-(deffunction betweenRange (?val ?low ?high)
-    (if (and (>= ?val ?low) (<= ?val ?high)) then 
-        return TRUE))
+(defrule unstack
+    "Unstacked state"
+    (floor ?Y) (forall (block ?X) (on ?X ?Y)) => (assert (goalMet TRUE)))
 
-;; rule definition
-(defrule closestDot1
-    (pacman ?X) (dot ?Y) (distance ?X ?Y ?YDist)
-    (not (and (dot ?Z &:(<> ?Z ?Y)) (distance ?X ?Z ?ZDist &:(< ?ZDist ?YDist))))
-    =>
-    (assert (closest ?X ?Y)))
-(defrule closestDot2
-    (pacman ?X) (dot ?Y) (not (dot ?Z &:(<> ?Z ?Y)))
-    =>
-    (assert (closest ?X ?Y)))
-(defrule testtest
-    (pacman ?X) (dot ?Y) (distance ?X ?Y ?YDist) (test (betweenRange ?YDist 2 3))
-    =>
-    (assert (closeEnough ?X ?Y)))
+(defrule exists
+    "Does X exist?"
+    (onFloor ?) => (assert (floorexists TRUE)))
 
 (run)
 

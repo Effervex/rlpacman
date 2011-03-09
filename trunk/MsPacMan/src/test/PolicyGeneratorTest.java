@@ -170,7 +170,7 @@ public class PolicyGeneratorTest {
 		ruleAction.getTriggerActions();
 		actions.switchOn(ruleAction);
 		assertNull(sut_.getPreGoal("move"));
-		sut_.formPreGoalState(preGoalFacts, actions);
+		sut_.formPreGoalState(preGoalFacts, actions, null);
 		Collection<StringFact> preGoalState = new HashSet<StringFact>(sut_
 				.getPreGoal("move"));
 		assertTrue(sut_.hasPreGoal());
@@ -264,7 +264,7 @@ public class PolicyGeneratorTest {
 		actions.switchOn(ruleAction);
 		assertEquals(preGoalState, sut_.getPreGoal("move"));
 		assertTrue(sut_.getPreGoal("move").contains(blockA));
-		sut_.formPreGoalState(preGoalFacts, actions);
+		sut_.formPreGoalState(preGoalFacts, actions, null);
 		assertFalse(sut_.getPreGoal("move").contains(blockA));
 		assertFalse(preGoalState.equals(sut_.getPreGoal("move")));
 		assertTrue(sut_.hasPreGoal());
@@ -352,11 +352,11 @@ public class PolicyGeneratorTest {
 		rlggRules = sut_.triggerRLGGCovering(state, validActions,
 				activatedActions, true);
 		GuidedRule rlggRule = new GuidedRule(
-				"(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
+				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(rlggRules.toString(), rlggRules.contains(rlggRule));
 		rlggRule = new GuidedRule(
-				"(distanceGhost player ?X ?__Num1&:(betweenRange ?__Num1 4.0 25.0))"
+				"(distanceGhost ? ?X ?__Num1&:(betweenRange ?__Num1 4.0 25.0))"
 						+ " => (fromGhost ?X ?__Num1)");
 		assertTrue(rlggRules.toString(), rlggRules.contains(rlggRule));
 		assertEquals(rlggRules.size(), 2);
