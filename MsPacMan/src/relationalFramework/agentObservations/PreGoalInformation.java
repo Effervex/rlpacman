@@ -15,7 +15,7 @@ import relationalFramework.StringFact;
  * @author Samuel J. Sarjant
  */
 public class PreGoalInformation implements Serializable {
-	private static final long serialVersionUID = -1535455560516107541L;
+	private static final long serialVersionUID = 83704495471286796L;
 	private Collection<StringFact> state_;
 	private String[] actionTerms_;
 	private MultiMap<String, String> termTypes_;

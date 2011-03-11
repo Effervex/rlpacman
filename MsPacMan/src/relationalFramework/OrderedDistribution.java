@@ -18,7 +18,7 @@ import java.util.Set;
  * @author Sam Sarjant
  */
 public class OrderedDistribution<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = 4540536469021010978L;
+	private static final long serialVersionUID = 5024008061049583631L;
 
 	/** The elements contained within the distribution. */
 	private Map<T, Double> elements_;
