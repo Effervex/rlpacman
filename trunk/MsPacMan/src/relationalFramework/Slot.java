@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
  * @author Samuel J. Sarjant
  */
 public class Slot implements Serializable {
-	private static final long serialVersionUID = 1013881731353664622L;
+	private static final long serialVersionUID = -6840374248845210786L;
 
 	private static final String ELEMENT_DELIMITER = ":";
 
