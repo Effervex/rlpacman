@@ -130,6 +130,10 @@ public class RuleCreation implements Serializable {
 			if (negUnification != null)
 				return null;
 
+			// Need to check type conditions
+			if (!checkConditionTypes(ruleConds, condition))
+				return null;
+
 			simplified.add(condition);
 		}
 
@@ -139,6 +143,41 @@ public class RuleCreation implements Serializable {
 		if (simplified.equals(ruleConds))
 			return null;
 		return simplified;
+	}
+
+	/**
+	 * Checks if the type conditions of the added condition conflict with the
+	 * existing types.
+	 * 
+	 * @param ruleConds
+	 *            The existing rule conditions.
+	 * @param condition
+	 *            The condition to be added.
+	 * @return False if the condition conflicts, true otherwise.
+	 */
+	private boolean checkConditionTypes(SortedSet<StringFact> ruleConds,
+			StringFact condition) {
+		// Run through the rule conditions.
+		for (StringFact ruleCond : ruleConds) {
+			// Only check type preds
+			if (StateSpec.getInstance().isTypePredicate(ruleCond.getFactName())) {
+				// Check if the type argument conflicts with the conditions
+				// arguments
+				String[] condArgs = condition.getArguments();
+				for (int i = 0; i < condArgs.length; i++) {
+					// Matching argument. Check if types conflict
+					if (condArgs[i].equals(ruleCond.getArguments()[0])) {
+						Collection<String> lineage = new HashSet<String>();
+						StateSpec.getInstance().getTypeLineage(
+								condition.getArgTypes()[i], lineage);
+						if (!lineage.contains(ruleCond.getFactName()))
+							return false;
+					}
+				}
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -181,22 +220,42 @@ public class RuleCreation implements Serializable {
 							&& ruleTerms[i].charAt(0) == '?') {
 						SortedSet<StringFact> specConditions = new TreeSet<StringFact>(
 								ruleConditions.comparator());
+						boolean isTypeValid = true;
 						for (StringFact condition : ruleConditions) {
+							// If this condition is a type predicate, ensure it
+							// fits with the pre-goal term types
+							if (StateSpec.getInstance().isTypePredicate(
+									condition.getFactName())) {
+								Collection<String> lineage = new HashSet<String>();
+								StateSpec.getInstance().getTypeLineage(
+										condition.getFactName(), lineage);
+								if (!lineage.containsAll(preGoal
+										.getTermTypes(preGoalTerms[i]))) {
+									isTypeValid = false;
+									break;
+								}
+							}
+
 							StringFact replacement = new StringFact(condition);
 							replacement.replaceArguments(ruleTerms[i],
 									preGoalTerms[i]);
 							specConditions.add(replacement);
 						}
-						StringFact replAction = new StringFact(rule.getAction());
-						replAction.replaceArguments(ruleTerms[i],
-								preGoalTerms[i]);
 
-						// Create the mutant
-						GuidedRule mutant = new GuidedRule(specConditions,
-								replAction, rule);
-						mutant.setQueryParams(rule.getQueryParameters());
-						mutant.expandConditions();
-						mutants.add(mutant);
+						// Only create if the term swapping is type valid.
+						if (isTypeValid) {
+							StringFact replAction = new StringFact(rule
+									.getAction());
+							replAction.replaceArguments(ruleTerms[i],
+									preGoalTerms[i]);
+
+							// Create the mutant
+							GuidedRule mutant = new GuidedRule(specConditions,
+									replAction, rule);
+							mutant.setQueryParams(rule.getQueryParameters());
+							mutant.expandConditions();
+							mutants.add(mutant);
+						}
 					}
 				}
 			}
@@ -222,7 +281,8 @@ public class RuleCreation implements Serializable {
 								.getAction(), rule);
 						mutant.setQueryParams(rule.getQueryParameters());
 						mutant.expandConditions();
-						mutants.add(mutant);
+						if (!mutant.equals(rule))
+							mutants.add(mutant);
 					}
 				}
 			}
@@ -717,6 +777,10 @@ public class RuleCreation implements Serializable {
 		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
 			return -1;
 
+		// Don't swap modular variables
+		if (variable.contains(Module.MOD_VARIABLE_PREFIX))
+			return -1;
+
 		int termIndex = (variable.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
 				% MODULO_LETTERS;
 		return termIndex;
@@ -754,5 +818,16 @@ public class RuleCreation implements Serializable {
 	 */
 	public void clearAgentObservations() {
 		ao_.clearActionBasedObservations();
+	}
+
+	/**
+	 * Checks if agent observations have been loaded.
+	 * 
+	 * @return True if observations were loaded (and they're not empty).
+	 */
+	public boolean hasAgentObservations() {
+		if (ao_.getConditionBeliefs().isEmpty())
+			return false;
+		return true;
 	}
 }

@@ -142,13 +142,20 @@ public class LearningController {
 					loadedGeneratorFile_ = new File(args[i]);
 				} else if (args[i].equals("-t"))
 					runningTests_ = false;
-				else if (args[i].equals("-m"))
+				else if (args[i].equals("-m")) {
 					Module.saveAtEnd_ = true;
-				else if (args[i].equals("-s")) {
+
+				} else if (args[i].equals("-s")) {
 					i++;
 					loadedGeneratorFile_ = new File(args[i].substring(0,
 							args[i].lastIndexOf(".")));
 					serializedFile_ = new File(args[i]);
+				} else if (args[i].equals("-slotProb")) {
+					i++;
+					if (args[i].equals("dynamic"))
+						Slot.INITIAL_SLOT_PROB = -1;
+					else
+						Slot.INITIAL_SLOT_PROB = Double.parseDouble(args[i]);
 				}
 			}
 
@@ -314,7 +321,7 @@ public class LearningController {
 			// Clear any 'waiting' flags
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
-			
+
 			if (PolicyGenerator.getInstance().useModules_
 					&& (loadedGeneratorFile_ == null)) {
 				// Check if the agent needs to drop into learning a module
@@ -518,7 +525,8 @@ public class LearningController {
 			saveElitePolicies(pvs);
 			// Output the episode averages
 			savePerformance(episodePerformances, run, finalTest);
-			localPolicy.saveAgentObservations(run);
+			if (!Module.saveAtEnd_)
+				localPolicy.saveAgentObservations(run);
 
 		} catch (Exception e) {
 			e.printStackTrace();

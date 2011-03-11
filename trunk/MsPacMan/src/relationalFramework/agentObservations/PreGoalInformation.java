@@ -3,7 +3,10 @@ package relationalFramework.agentObservations;
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 
+import relationalFramework.MultiMap;
+import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 
 /**
@@ -15,11 +18,55 @@ public class PreGoalInformation implements Serializable {
 	private static final long serialVersionUID = -1535455560516107541L;
 	private Collection<StringFact> state_;
 	private String[] actionTerms_;
+	private MultiMap<String, String> termTypes_;
 	private int inactivity_ = 0;
 
 	public PreGoalInformation(Collection<StringFact> state, String[] actionTerms) {
 		state_ = state;
 		actionTerms_ = actionTerms;
+		determineTermTypes();
+	}
+
+	/**
+	 * Determines what type any constant terms are.
+	 */
+	private void determineTermTypes() {
+		// Check if there are constant terms at all
+		Collection<String> constantTerms = new HashSet<String>();
+		for (String term : actionTerms_) {
+			if (term.charAt(0) != '?' && !StateSpec.isNumber(term)) {
+				constantTerms.add(term);
+			}
+		}
+		// If no constants, stop there.
+		if (constantTerms.isEmpty())
+			return;
+
+		termTypes_ = MultiMap.createSortedSetMultiMap();
+		// Run through the state
+		for (StringFact stateFact : state_) {
+			// Only look at type preds
+			if (StateSpec.getInstance()
+					.isTypePredicate(stateFact.getFactName())) {
+				if (constantTerms.contains(stateFact.getArguments()[0])) {
+					termTypes_.put(stateFact.getArguments()[0], stateFact
+							.getFactName());
+				}
+			}
+		}
+	}
+
+	/**
+	 * Gets the types for a given action term.
+	 * 
+	 * @param term
+	 *            The action term of the pre-goal.
+	 * @return The types this term is under (only a lineage).
+	 */
+	public Collection<String> getTermTypes(String term) {
+		if (termTypes_ != null)
+			return termTypes_.get(term);
+		return null;
 	}
 
 	public int incrementInactivity() {
@@ -29,6 +76,7 @@ public class PreGoalInformation implements Serializable {
 
 	public void resetInactivity() {
 		inactivity_ = 0;
+		determineTermTypes();
 	}
 
 	public boolean isSettled() {
@@ -56,7 +104,9 @@ public class PreGoalInformation implements Serializable {
 		return state_.toString() + " : " + Arrays.toString(actionTerms_);
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see java.lang.Object#hashCode()
 	 */
 	@Override
@@ -71,7 +121,9 @@ public class PreGoalInformation implements Serializable {
 		return result;
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see java.lang.Object#equals(java.lang.Object)
 	 */
 	@Override

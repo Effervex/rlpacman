@@ -18,6 +18,8 @@ public class Slot implements Serializable {
 
 	private static final String ELEMENT_DELIMITER = ":";
 
+	public static double INITIAL_SLOT_PROB = 1;
+
 	/** The maximum amount of variance the selection probability can have. */
 	public static final double MAX_SELECTION_VARIANCE = 0.5;
 
@@ -60,7 +62,10 @@ public class Slot implements Serializable {
 		action_ = action;
 		ruleGenerator_ = new ProbabilityDistribution<GuidedRule>(
 				PolicyGenerator.random_);
-		selectionProb_ = 1.0;
+		if (INITIAL_SLOT_PROB == -1)
+			selectionProb_ = 1;
+		else
+			selectionProb_ = INITIAL_SLOT_PROB;
 		selectionSD_ = 0.5;
 		numSlotUses_ = 0;
 	}
