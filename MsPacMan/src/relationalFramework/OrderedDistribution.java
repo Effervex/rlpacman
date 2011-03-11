@@ -391,4 +391,13 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		}
 		return buffer.toString();
 	}
+
+	/**
+	 * TODO Temp testing method. Make it better if it's successful.
+	 */
+	public void normaliseSlotProbs() {
+		for (T slot : elements_.keySet()) {
+			((Slot) slot).setSelectionProb(1.0 / size());
+		}
+	}
 }

@@ -468,6 +468,12 @@ public class PolicyGenerator implements Serializable {
 					splitSlot.addNewRule(seedRule);
 
 					// Check if the slot already exists
+					// TODO Might be better to initialise slots with 1/slot
+					// number probability and make them work to get more. Test
+					// with experiments.
+					// Could be problematic with Ms. Pac-Man and other
+					// multi-action environments.
+
 					Slot existingSlot = slotGenerator_.getElement(splitSlot);
 					if (existingSlot != null) {
 						if (existingSlot.getSeedRule().equals(seedRule)) {
@@ -513,6 +519,8 @@ public class PolicyGenerator implements Serializable {
 		if (changed) {
 			slotGenerator_.retainAll(currentSlots_.values());
 			slotGenerator_.addContainsAll(currentSlots_.values());
+			if (Slot.INITIAL_SLOT_PROB == -1)
+				slotGenerator_.normaliseSlotProbs();
 		}
 	}
 

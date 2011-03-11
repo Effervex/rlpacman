@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -18,16 +17,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.ActionChoice;
-import relationalFramework.ArgumentComparator;
 import relationalFramework.ConditionComparator;
-import relationalFramework.MultiMap;
-import relationalFramework.OrderedDistribution;
-import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.Policy;
 import relationalFramework.RuleAction;
-import relationalFramework.Slot;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -39,6 +33,8 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = new RuleCreation();
+		assertTrue("No loaded agent observations. Cannot run test.", sut_
+				.hasAgentObservations());
 	}
 
 	@Test
@@ -189,9 +185,9 @@ public class RuleCreationTest {
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?Y)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?X)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?Y)")));
-		
+
 		// Modular pre-goal
-		
+
 	}
 
 	/**

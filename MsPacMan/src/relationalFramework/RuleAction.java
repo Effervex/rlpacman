@@ -98,7 +98,7 @@ public class RuleAction {
 		if (ruleSlot == null || ruleSlot.getSlotSplitFacts() == null)
 			buffer.append("()");
 		else
-			buffer.append(ruleSlot.getSlotSplitFacts());
+			buffer.append(ruleSlot.getSlotSplitFacts().iterator().next());
 		return buffer.toString();
 	}
 }
