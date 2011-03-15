@@ -51,7 +51,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_.setVisualization(!experimentMode_);
 		cmdLineOptions_.setEnemies("off");
 		cmdLineOptions_.setLevelDifficulty(0);
-//		 cmdLineOptions_.setFPS(100);
+		// cmdLineOptions_.setFPS(100);
 		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -163,13 +163,20 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		byte[][] basicLevelObservation = environment_
 				.getLevelSceneObservationZ(2);
 		float[] marioFloatPos = environment_.getMarioFloatPos();
-		
+
 		// If there is a previous action take that (for when Mario is in the air
 		// and other non-decision making situations)
 		if (prevAction_ != null)
-			return ((RLMarioStateSpec) StateSpec
-					.getInstance()).applyAction(prevAction_, startPos,
-							marioFloatPos, basicLevelObservation);
+			return ((RLMarioStateSpec) StateSpec.getInstance()).applyAction(
+					prevAction_, startPos, marioFloatPos,
+					basicLevelObservation, null);
+
+		// TODO This vote thing more or less works, but it may ignore shooting,
+		// which is really only governed by one action. The problem with Mario
+		// is that the agent takes multiple actions at once. This could be
+		// remedied by using votes for left/right jump/not jump shoot/don't
+		// shoot, but this could 1) produce erratic behaviour, 2) weight towards
+		// clusters of objects.
 
 		// Run through the actions, storing identical action mappings under the
 		// same weight. Storage is through bit shifted operations.
@@ -187,7 +194,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			for (StringFact action : actionStrings) {
 				boolean[] actionArray = ((RLMarioStateSpec) StateSpec
 						.getInstance()).applyAction(action, startPos,
-						marioFloatPos, basicLevelObservation);
+						marioFloatPos, basicLevelObservation, null);
 				int bitwise = booleanArrayToInt(actionArray);
 				double distance = Double.parseDouble(action.getArguments()[1]);
 
@@ -223,7 +230,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		SortedMap<Double, StringFact> bestRules = representativeRule
 				.get(bestBitwise);
 		StringFact bestAction = bestRules.get(bestRules.lastKey());
-//		System.out.println("Action: " + bestAction);
+		// System.out.println("Action: " + bestAction);
 		prevAction_ = bestAction;
 
 		return actionArray;

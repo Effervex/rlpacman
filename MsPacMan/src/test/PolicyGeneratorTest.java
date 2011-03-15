@@ -20,6 +20,7 @@ import relationalFramework.MultiMap;
 import relationalFramework.OrderedDistribution;
 import relationalFramework.Policy;
 import relationalFramework.PolicyGenerator;
+import relationalFramework.ProbabilityDistribution;
 import relationalFramework.RuleAction;
 import relationalFramework.Slot;
 import relationalFramework.StateSpec;
@@ -131,7 +132,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		OrderedDistribution<Slot> slotGenerator = sut_.getGenerator();
+		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 12);
 	}
 
@@ -211,7 +212,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		OrderedDistribution<Slot> slotGenerator = sut_.getGenerator();
+		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 12);
 		// Each move slot should have more than one rule
 		StringFact blockA = StateSpec.toStringFact("(block a)");
@@ -362,7 +363,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		OrderedDistribution<Slot> slotGenerator = sut_.getGenerator();
+		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 17);
 	}
 

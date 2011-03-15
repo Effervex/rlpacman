@@ -200,6 +200,23 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
+	 * Adds all arguments not already in the distribution.
+	 * 
+	 * @param arg0
+	 *            The collection of elements being added.
+	 * @param prob
+	 *            The probability to set the slots.
+	 */
+	public boolean addContainsAll(Collection<? extends T> arg0, double prob) {
+		boolean val = false;
+		for (T t : arg0) {
+			if (!contains(t))
+				val |= add(t, prob);
+		}
+		return val;
+	}
+
+	/**
 	 * Checks if the probabilities sum to one.
 	 * 
 	 * @return True if the probabilities all sum to one.
@@ -346,6 +363,63 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			// Normalise the probabilities
 			normaliseProbs();
 		}
+
+		return absoluteChange;
+	}
+
+	/**
+	 * Updates the probability distribution using given step sizes.
+	 * 
+	 * @param observedDistribution
+	 *            The observed distribution to step towards.
+	 * @param stepSizes
+	 *            The step sizes for each individual element.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
+	 */
+	public double updateDistribution(
+			ProbabilityDistribution<T> observedDistribution,
+			Map<T, Double> stepSizes) {
+		double absoluteChange = 0;
+		for (T element : itemProbs_.keySet()) {
+			// Update every element within the distribution
+			Double ratio = observedDistribution.getProb(element);
+			if (ratio == null)
+				ratio = 0d;
+			absoluteChange += Math.abs(updateElement(element, 1, ratio,
+					stepSizes.get(element)));
+		}
+
+		// Normalise the probabilities
+		normaliseProbs();
+
+		return absoluteChange;
+	}
+
+	/**
+	 * Updates the probability distribution using a constant step size.
+	 * 
+	 * @param observedDistribution
+	 *            The observed distribution to step towards.
+	 * @param stepSize
+	 *            The constant step size.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
+	 */
+	public double updateDistribution(
+			ProbabilityDistribution<T> observedDistribution, double stepSize) {
+		double absoluteChange = 0;
+		for (T element : itemProbs_.keySet()) {
+			// Update every element within the distribution
+			Double ratio = observedDistribution.getProb(element);
+			if (ratio == null)
+				ratio = 0d;
+			absoluteChange += Math.abs(updateElement(element, 1, ratio,
+					stepSize));
+		}
+
+		// Normalise the probabilities
+		normaliseProbs();
 
 		return absoluteChange;
 	}
@@ -516,6 +590,22 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		for (T element : ordered) {
 			if (!first)
 				buffer.append(", ");
+			buffer.append("(" + element + ":" + itemProbs_.get(element) + ")");
+			first = false;
+		}
+		buffer.append("}");
+		return buffer.toString();
+	}
+	
+	public String toString(boolean seperateElements) {
+		if (!seperateElements)
+			return toString();
+		ArrayList<T> ordered = getOrderedElements();
+		StringBuffer buffer = new StringBuffer("{");
+		boolean first = true;
+		for (T element : ordered) {
+			if (!first)
+				buffer.append(",\n");
 			buffer.append("(" + element + ":" + itemProbs_.get(element) + ")");
 			first = false;
 		}

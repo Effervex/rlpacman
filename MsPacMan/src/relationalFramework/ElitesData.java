@@ -86,12 +86,13 @@ public class ElitesData {
 	 * 
 	 * @return A mapping of slots and their average relative positions.
 	 */
-	public Map<Slot, Double> getSlotPositions() {
-		Map<Slot, Double> slotPositions = new HashMap<Slot, Double>();
+	public ProbabilityDistribution<Slot> getObservedSlotDistribution() {
+		ProbabilityDistribution<Slot> observedDistribution = new ProbabilityDistribution<Slot>();
 		for (Slot slot : slotData_.keySet()) {
-			slotPositions.put(slot, slotData_.get(slot).getAverageOrdering());
+			observedDistribution.add(slot, slotData_.get(slot).getAverageOrdering());
 		}
-		return slotPositions;
+		observedDistribution.normaliseProbs();
+		return observedDistribution;
 	}
 
 	/**

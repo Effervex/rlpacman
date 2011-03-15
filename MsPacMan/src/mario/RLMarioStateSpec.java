@@ -58,6 +58,12 @@ public class RLMarioStateSpec extends StateSpec {
 		preconds.put("jumpOver", "(canJumpOver ?X) (thing ?X) "
 				+ "(distance ?X ?Y&:(betweenRange ?Y 16 160)) (width ?X ?Z)");
 
+		// Shoot at an enemy (either fireball or holding shell)
+		preconds.put("shoot", "(distance ?X ?Y) "
+				+ "(heightDiff ?X ?Z&:(betweenRange ?Z -16 16) (enemy ?X)");
+		
+		// Pickup
+
 		return preconds;
 	}
 
@@ -95,6 +101,12 @@ public class RLMarioStateSpec extends StateSpec {
 		structure[0] = "brick";
 		structure[1] = Number.Double.toString();
 		actions.add(new StringFact("search", structure));
+		
+		// Shoot an enemy
+		structure = new String[2];
+		structure[0] = "enemy";
+		structure[1] = Number.Double.toString();
+		actions.add(new StringFact("shoot", structure));
 
 		return actions;
 	}
@@ -341,10 +353,11 @@ public class RLMarioStateSpec extends StateSpec {
 	 *            The current position of Mario.
 	 * @param basicLevelObs
 	 *            The basic observation for the level.
+	 * @param marioDirection TODO Maybe put in previous boolean array here.
 	 * @return A boolean array of keystroke actions to take at the time.
 	 */
 	public boolean[] applyAction(StringFact action, float[] startPos,
-			float[] marioPos, byte[][] basicLevelObs) {
+			float[] marioPos, byte[][] basicLevelObs, int marioDirection) {
 		basicLevelObs_ = basicLevelObs;
 		boolean[] actionArray = new boolean[Environment.numberOfKeys];
 		if (action == null) {
@@ -394,6 +407,8 @@ public class RLMarioStateSpec extends StateSpec {
 			int width = Integer.parseInt(action.getArguments()[2]);
 			actionArray = preJumpOver(startPos[0], startPos[1], marioPos[0],
 					marioPos[1], x, y, width);
+		} else if (action.getFactName().equals("shoot")) {
+			actionArray = shoot(marioDirection);
 		}
 
 		return actionArray;
@@ -628,6 +643,17 @@ public class RLMarioStateSpec extends StateSpec {
 					+ (negModifier_ * jumpPoint), endY);
 		} else
 			return move(startX, startY, currentX, currentY, endX, endY);
+	}
+
+	/**
+	 * Shoot an enemy, by turning in that direction and shooting.
+	 * 
+	 * @param marioDirection The direction Mario is facing.
+	 * @return
+	 */
+	private boolean[] shoot(int marioDirection) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 	/**
