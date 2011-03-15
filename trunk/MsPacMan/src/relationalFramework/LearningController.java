@@ -456,10 +456,12 @@ public class LearningController {
 		// Update the weights for all distributions using only the elite
 		// samples
 		int numElite = (int) Math.ceil(population * SELECTION_RATIO);
-		double alphaUpdate = STEP_SIZE / testingStep;
 		if (ENTROBEAM) {
 			numElite = population;
 		}
+		// Increasing alpha, from alpha / N to alpha / p.N
+		double updateModifier = Math.max(testingStep - population - iteration, population);
+		double alphaUpdate = STEP_SIZE / updateModifier;
 
 		// Clean up the policy values
 		preUpdateModification(elites, numElite);
@@ -799,7 +801,7 @@ public class LearningController {
 	}
 
 	/**
-	 * Determines the population of rules to use for optimisation.
+	 * Determines the population (N) of rules to use for optimisation.
 	 * 
 	 * @param policyGenerator
 	 *            The policy generator to determine the populations from.
@@ -820,14 +822,36 @@ public class LearningController {
 		}
 
 		double sumSlot = 0;
+		double maxSlotMean = 0;
 		for (Slot slot : policyGenerator.getGenerator()) {
 			double weight = slot.getSelectionProbability();
 			if (weight > 1)
 				weight = 1;
+			if (weight > maxSlotMean)
+				maxSlotMean = weight;
 			sumSlot += (slot.size() * weight);
 		}
+		sumSlot /= maxSlotMean;
 		return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
 				.getGenerator().size()));
+//
+//		if (policyGenerator.isSlotOptimiser()) {
+//			return (int) (policyGenerator.getGenerator().size() / SELECTION_RATIO);
+//		}
+//
+//		double maxWeightedRuleCount = 0;
+//		double maxSlotMean = 0;
+//		for (Slot slot : policyGenerator.getGenerator()) {
+//			double weight = slot.getSelectionProbability();
+//			if (weight > 1)
+//				weight = 1;
+//			if (weight > maxSlotMean)
+//				maxSlotMean = weight;
+//			double weightedRuleCount = slot.size() * weight;
+//			if (weightedRuleCount > maxWeightedRuleCount)
+//				maxWeightedRuleCount = weightedRuleCount;
+//		}
+//		return (int) Math.ceil(maxWeightedRuleCount / (maxSlotMean * SELECTION_RATIO));
 	}
 
 	/**

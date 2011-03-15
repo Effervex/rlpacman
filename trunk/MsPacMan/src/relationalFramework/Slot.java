@@ -166,17 +166,6 @@ public class Slot implements Serializable {
 				numSlotUses_++;
 				selectionProb--;
 			}
-
-			// PoissonDistribution p = new
-			// PoissonDistributionImpl(selectionProb_
-			// * selectionModifier);
-			// try {
-			// double cumulativeProb = random.nextDouble();
-			// numSlotUses_ = p.inverseCumulativeProbability(cumulativeProb) +
-			// 1;
-			// } catch (Exception e) {
-			// e.printStackTrace();
-			// }
 		}
 
 		// Use the slot if available, and remove it if no more uses are left.
