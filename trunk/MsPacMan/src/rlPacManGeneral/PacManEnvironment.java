@@ -4,7 +4,6 @@ import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import jess.JessException;
 import jess.Rete;
@@ -16,6 +15,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
 import relationalFramework.LearningController;
+import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -334,11 +334,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 		int i = 0;
 		double[] globalDirectionVote = new double[PacManLowAction.values().length];
 		double globalBest = 0;
+		MultiMap<Byte, RuleAction> actionDirections = MultiMap
+				.createListMultiMap();
 		for (RuleAction ruleAction : actions) {
 			double[] directionVote = new double[PacManLowAction.values().length];
 			double worst = 0;
 			double bestWeight = 0;
-			List<StringFact> actionStrings = ruleAction.getTriggerActions();
+			Collection<StringFact> actionStrings = ruleAction.getActions();
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
@@ -352,6 +354,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 					double weighting = weightedDir.getWeight();
 					bestWeight = Math.max(bestWeight, Math.abs(weighting));
 					byte dir = (byte) Math.abs(weightedDir.getDirection());
+					actionDirections.putContains(dir, ruleAction);
 					if (weightedDir.getDirection() > 0) {
 						directionVote[dir] += weighting;
 					} else if (weightedDir.getDirection() < 0) {
@@ -407,24 +410,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// If only one direction left, use that
 		if (directions.size() == 1) {
 			lastDirection_ = directions.get(0);
-			return directions.get(0);
-		}
-
-		// If possible, continue with the last direction.
-		if (directions.contains(lastDirection_)) {
-			return lastDirection_;
-		}
-
-		// Otherwise take a direction perpendicular to the last direction.
-		for (PacManLowAction dir : directions) {
-			if (dir != lastDirection_.opposite()) {
-				lastDirection_ = dir;
-				return dir;
+		} else if (!directions.contains(lastDirection_)) {
+			// If possible, continue with the last direction.
+			// Otherwise take a direction perpendicular to the last direction.
+			for (PacManLowAction dir : directions) {
+				if (dir != lastDirection_.opposite()) {
+					lastDirection_ = dir;
+				}
 			}
 		}
 
-		// Or just take the opposite direction. (Shouldn't get this far...)
-		lastDirection_ = lastDirection_.opposite();
+		// Trigger the rules leading to this direction
+		if (actionDirections.containsKey((byte) lastDirection_.ordinal())) {
+			for (RuleAction ra : actionDirections.get((byte) lastDirection_.ordinal()))
+				ra.triggerRule();
+		}
 		return lastDirection_;
 	}
 

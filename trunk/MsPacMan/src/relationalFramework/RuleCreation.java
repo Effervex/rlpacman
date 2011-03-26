@@ -562,7 +562,8 @@ public class RuleCreation implements Serializable {
 			// If the state isn't yet settled, try unification
 			PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
 			if ((preGoal == null) || (!preGoal.isSettled())) {
-				List<StringFact> actions = ruleAction.getUtilisedActions();
+				Collection<StringFact> actions = ruleAction
+						.getUtilisedActions();
 
 				// Create a pre-goal from every action in the actions list.
 				if (actions != null) {
@@ -679,6 +680,27 @@ public class RuleCreation implements Serializable {
 	public void setAllowedActionConditions(String action,
 			Collection<StringFact> conditions) {
 		ao_.setActionConditions(action, conditions);
+	}
+
+	/**
+	 * Gets the agent's unseen predicates.
+	 * 
+	 * @return The agent's yet to be observed, but defined predicates.
+	 */
+	public Collection<StringFact> getUnseenPreds() {
+		return ao_.getUnseenPredicates();
+	}
+
+	/**
+	 * Removes a collection of predicates from the unseen predicates.
+	 * 
+	 * @param removables
+	 *            The predicates to be removed.
+	 * @return True if the unseen predicates collection changed as a result of
+	 *         this method.
+	 */
+	public boolean removeUnseenPreds(Collection<StringFact> removables) {
+		return ao_.removeUnseenPredicates(removables);
 	}
 
 	/**

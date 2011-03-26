@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jess.Fact;
 import jess.Rete;
@@ -68,8 +69,8 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				activatedActions, true);
+		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
+				validActions, activatedActions, true);
 
 		// [e]
 		// [b][d]
@@ -97,8 +98,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, activatedActions, true);
+		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+				activatedActions, true);
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -125,7 +126,8 @@ public class PolicyGeneratorTest {
 
 		rlggRules = sut_.triggerRLGGCovering(state, validActions,
 				activatedActions, true);
-		GuidedRule rlggRule = new GuidedRule("(above ?X ?) (clear ?X) => (moveFloor ?X)");
+		GuidedRule rlggRule = new GuidedRule(
+				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
 		assertTrue(rlggRules.contains(rlggRule));
 		rlggRule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		assertTrue(rlggRules.contains(rlggRule));
@@ -165,10 +167,10 @@ public class PolicyGeneratorTest {
 				"(clear ?X) (highest ?Y) => (move ?X ?Y)");
 		Policy policy = new Policy();
 		policy.addRule(stackRule, false, false);
-		List<StringFact> actionsList = new ArrayList<StringFact>();
+		Set<StringFact> actionsList = new HashSet<StringFact>();
 		actionsList.add(StateSpec.toStringFact("(move f a)"));
 		RuleAction ruleAction = new RuleAction(stackRule, actionsList, policy);
-		ruleAction.getTriggerActions();
+		ruleAction.getActions();
 		actions.switchOn(ruleAction);
 		assertNull(sut_.getPreGoal("move"));
 		sut_.formPreGoalState(preGoalFacts, actions, null);
@@ -258,10 +260,10 @@ public class PolicyGeneratorTest {
 		actions = new ActionChoice();
 		policy = new Policy();
 		policy.addRule(stackRule, false, false);
-		actionsList = new ArrayList<StringFact>();
+		actionsList = new HashSet<StringFact>();
 		actionsList.add(StateSpec.toStringFact("(move b f)"));
 		ruleAction = new RuleAction(stackRule, actionsList, policy);
-		ruleAction.getTriggerActions();
+		ruleAction.getActions();
 		actions.switchOn(ruleAction);
 		assertEquals(preGoalState, sut_.getPreGoal("move"));
 		assertTrue(sut_.getPreGoal("move").contains(blockA));

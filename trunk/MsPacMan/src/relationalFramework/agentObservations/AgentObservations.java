@@ -87,6 +87,9 @@ public class AgentObservations implements Serializable {
 
 	/** A transient group of facts indexed by terms used within. */
 	private transient MultiMap<String, StringFact> termMappedFacts_;
+	
+	/** The collection of unseen predicates. */
+	private Collection<StringFact> unseenPreds_;
 
 	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
@@ -100,6 +103,11 @@ public class AgentObservations implements Serializable {
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 		observationHash_ = null;
 		learnedEnvironmentRules_ = formBackgroundKnowledge();
+
+		unseenPreds_ = new HashSet<StringFact>();
+		unseenPreds_.addAll(StateSpec.getInstance().getPredicates().values());
+		unseenPreds_.addAll(StateSpec.getInstance().getTypePredicates()
+				.values());
 
 		AGENT_OBSERVATIONS_DIR.mkdir();
 	}
@@ -696,6 +704,14 @@ public class AgentObservations implements Serializable {
 				return true;
 		}
 		return false;
+	}
+
+	public Collection<StringFact> getUnseenPredicates() {
+		return unseenPreds_;
+	}
+
+	public boolean removeUnseenPredicates(Collection<StringFact> removables) {
+		return unseenPreds_.removeAll(removables);
 	}
 
 	public Collection<StringFact> getSpecialisationConditions(String actionPred) {

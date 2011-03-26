@@ -3,6 +3,7 @@ package relationalFramework;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.TreeSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -47,6 +48,9 @@ public abstract class StateSpec {
 
 	/** The between a range of values function name. */
 	public static final String BETWEEN_RANGE = "betweenRange";
+
+	/** The outside a range of values function name. */
+	public static final String OUTSIDE_RANGE = "outsideRange";
 
 	/** The replacement value for unnecessary facts. */
 	private static final String ACTION_TERM_REPL = "__TYPE__";
@@ -107,24 +111,17 @@ public abstract class StateSpec {
 	private int queryCount_;
 
 	/**
-	 * Extract the terms from a set of facts.
+	 * Forms the list of variable action terms the action expects to be in the
+	 * precondition rule.
 	 * 
-	 * @param facts
-	 *            The facts to extract the terms from.
-	 * @return The terms in a list.
+	 * @param action
+	 *            The StringFact definition for the action.
+	 * @return A list of variable terms, from ?X onwards.
 	 */
-	private List<String> extractTerms(String facts) {
-		List<String> terms = new ArrayList<String>();
-		// ?X ?x ?_4 ?g4 ?#...
-		Pattern p = Pattern.compile("\\?[A-Za-z$*=+/<>_?#.][\\w$*=+/<>_?#.]*");
-		Matcher m = p.matcher(facts);
-		while (m.find()) {
-			// Removing the '?'
-			String term = m.group().substring(1);
-			if (!terms.contains(term))
-				terms.add(term);
-		}
-
+	private List<String> formActionTerms(StringFact action) {
+		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
+		for (int i = 0; i < action.getArgTypes().length; i++)
+			terms.add(RuleCreation.getVariableTermString(i).substring(1));
 		return terms;
 	}
 
@@ -267,9 +264,12 @@ public abstract class StateSpec {
 							+ backgroundRules_.get(ruleNames) + ")");
 			}
 
-			// Initialise the betweenRange function
+			// Initialise the betweenRange and outsideRange functions
 			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
 					+ "(if (and (>= ?val ?low) (<= ?val ?high)) then "
+					+ "return TRUE))");
+			rete_.eval("(deffunction " + OUTSIDE_RANGE + " (?val ?low ?high) "
+					+ "(if (or (< ?val ?low) (> ?val ?high)) then "
 					+ "return TRUE))");
 
 			// Initialise the goal state rules
@@ -289,7 +289,7 @@ public abstract class StateSpec {
 						+ " " + purePreConds.get(action) + ")";
 				rete_.eval(query);
 				actionPreconditions_.putCollection(action,
-						extractTerms(purePreConds.get(action)));
+						formActionTerms(actions_.get(action)));
 			}
 
 			// Initialise the optimal policy
@@ -458,8 +458,8 @@ public abstract class StateSpec {
 		MultiMap<String, String[]> validActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		try {
-			for (String action : actions_.keySet()) {
+		for (String action : actions_.keySet()) {
+			try {
 				QueryResult result = state.runQueryStar(action
 						+ ACTION_PRECOND_SUFFIX, new ValueVector());
 				while (result.next()) {
@@ -471,9 +471,9 @@ public abstract class StateSpec {
 					}
 					validActions.put(action, arguments);
 				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 
 		return validActions;
@@ -820,7 +820,7 @@ public abstract class StateSpec {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Collection<Fact> extractFacts(Rete state) {
-		Collection<Fact> facts = new ArrayList<Fact>();
+		Collection<Fact> facts = new HashSet<Fact>();
 		for (Iterator<Fact> factIter = state.listFacts(); factIter.hasNext();) {
 			facts.add(factIter.next());
 		}

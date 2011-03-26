@@ -101,7 +101,7 @@ public class PolicyGenerator implements Serializable {
 	public boolean weightedElites_ = false;
 
 	/** If modules are being used. */
-	public boolean useModules_ = true;
+	public boolean useModules_ = false;
 
 	/** If the slots can be dynamically added/removed. */
 	public boolean dynamicSlotNumber_ = true;
@@ -131,7 +131,8 @@ public class PolicyGenerator implements Serializable {
 	 * If the summed total update value is only at this percentage of the
 	 * update, the distribution is converged.
 	 */
-	private static final double CONVERGED_EPSILON = 0.1;
+	private static final double CONVERGED_EPSILON = 0.01;
+
 	/**
 	 * The threshold coefficient relative to distribution size at which rules
 	 * have extra influence.
@@ -148,6 +149,12 @@ public class PolicyGenerator implements Serializable {
 	 * converged.
 	 */
 	private static final int NUM_COVERGED_UPDATES = 10;
+
+	/**
+	 * The resampling bound. If an agent completes that many * the average
+	 * episode length without changing action or state, resample policy.
+	 */
+	public static final double RESAMPLE_POLICY_BOUND = 0.1;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -869,7 +876,7 @@ public class PolicyGenerator implements Serializable {
 					// Slot ordering
 					ed
 							.addSlotOrdering(ruleSlot,
-									1.0 - (1.0 * firedRuleIndex / eliteSolution
+									(1.0 * firedRuleIndex / eliteSolution
 											.size()));
 					firedRuleIndex++;
 
@@ -963,10 +970,12 @@ public class PolicyGenerator implements Serializable {
 
 			// Sample a rule from the slot and mutate it if it has seen
 			// sufficient states.
-			GuidedRule rule = distribution.sample(false);
-			if (distribution.isEmpty() || rule == null)
-				System.out.println("Problem... " + slot);
-			mutateRule(rule, slot, mutationUses);
+			if (distribution.size() > 0) {
+				GuidedRule rule = distribution.sample(false);
+				if (distribution.isEmpty() || rule == null)
+					System.out.println("Problem... " + slot);
+				mutateRule(rule, slot, mutationUses);
+			}
 		}
 
 		// Mutate the rules further

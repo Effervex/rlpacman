@@ -33,8 +33,12 @@ public class PolicyActor implements AgentInterface {
 	 */
 	private static final double INTERNAL_STEPWISE_REWARD = -1;
 
+	// ////////////// BASIC MEMBERS ////////////////////
 	/** The current agent policy. */
 	private Policy policy_;
+
+	/** The reward received using this policy. */
+	private int policySteps_;
 
 	/** The last chosen actions. */
 	private ActionChoice prevActions_;
@@ -42,15 +46,10 @@ public class PolicyActor implements AgentInterface {
 	/** The previous state seen by the agent. */
 	private Collection<Fact> prevState_;
 
-	/** The collection of unseen predicates. */
-	private Collection<StringFact> unseenPreds_;
+	/** If this agent is the hand-coded agent. */
+	private boolean handCoded_;
 
-	/**
-	 * If this agent is the optimal agent (defined by the environment, not how
-	 * the agent sees itself).
-	 */
-	private boolean optimal_;
-
+	// ////////////// MODULAR MEMBERS //////////////////
 	/** An agent's internal goal to attempt to achieve. */
 	private String[] goalPredicate_;
 
@@ -66,11 +65,28 @@ public class PolicyActor implements AgentInterface {
 	/** A collection of possible goals for the agent to pursue. */
 	private List<GoalState> possibleGoals_;
 
+	// /////////////// INTERNAL COUNTERS ////////////////////
 	/** The total reward accrued by the agent. */
 	private double totalReward_;
 
 	/** The total number of steps the agent has taken. */
 	private int totalSteps_;
+
+	/** The total number of episodes recorded. */
+	private int totalEpisodes_;
+
+	// /////////////// RESAMPLING MEMBERS /////////////////////
+	/** This episode's state-action pairs. */
+	private Collection<StateAction> episodeStateActions_;
+
+	/** The probability of the agent resampling a new policy. */
+	private double resampleProb_;
+
+	/** The best policy seen so far. */
+	private Policy bestPolicy_;
+
+	/** The best total reward the best policy received. */
+	private int mostSteps_;
 
 	// @Override
 	public void agent_cleanup() {
@@ -79,22 +95,27 @@ public class PolicyActor implements AgentInterface {
 	// @Override
 	public void agent_init(String arg0) {
 		prevState_ = null;
-		optimal_ = false;
+		handCoded_ = false;
 		possibleGoals_ = new ArrayList<GoalState>();
 		totalReward_ = 0;
 		totalSteps_ = 0;
-		unseenPreds_ = new HashSet<StringFact>();
-		unseenPreds_.addAll(StateSpec.getInstance().getPredicates().values());
-		unseenPreds_.addAll(StateSpec.getInstance().getTypePredicates()
-				.values());
+		totalEpisodes_ = -1;
 	}
 
 	// @Override
 	public String agent_message(String arg0) {
 		// Receive a policy
 		if (arg0.equals("GetPolicy")) {
-			ObjectObservations.getInstance().objectArray = new Object[] { policy_ };
+			if (bestPolicy_ == null)
+				bestPolicy_ = policy_;
+			else {
+				if (policySteps_ > mostSteps_)
+					bestPolicy_ = policy_;
+			}
+			ObjectObservations.getInstance().objectArray = new Object[] { bestPolicy_ };
 			policy_ = null;
+			bestPolicy_ = null;
+			mostSteps_ = Integer.MIN_VALUE;
 		} else if (arg0.equals("SetPolicy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
@@ -103,7 +124,7 @@ public class PolicyActor implements AgentInterface {
 						.getFacts());
 			}
 		} else if (arg0.equals("Optimal")) {
-			optimal_ = true;
+			handCoded_ = true;
 		} else if (arg0.equals("internalReward")) {
 			// Return the reward if the internal goal was met, else return a
 			// large negative value.
@@ -134,14 +155,11 @@ public class PolicyActor implements AgentInterface {
 	public Action agent_start(Observation arg0) {
 		// Initialise the policy
 		if (policy_ == null) {
-			policy_ = PolicyGenerator.getInstance().generatePolicy(true);
-			System.out.println(policy_);
-			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
-				policy_.parameterArgs(possibleGoals_.get(
-						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
-						.getFacts());
-			}
+			generatePolicy(false);
 		}
+
+		prevState_ = null;
+		totalEpisodes_++;
 
 		// Initialising the actions
 		prevActions_ = new ActionChoice();
@@ -154,7 +172,7 @@ public class PolicyActor implements AgentInterface {
 		setInternalGoal(stateFacts);
 
 		prevActions_ = chooseAction(
-				ObjectObservations.getInstance().predicateKB, stateFacts);
+				ObjectObservations.getInstance().predicateKB, stateFacts, null);
 		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
 
 		return action;
@@ -162,8 +180,8 @@ public class PolicyActor implements AgentInterface {
 
 	// @Override
 	public Action agent_step(double arg0, Observation arg1) {
-		// TODO If the prevState matches the current state, resample the policy.
-		noteInternalFigures(arg0);
+		if (!handCoded_)
+			noteInternalFigures(arg0);
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
@@ -171,12 +189,21 @@ public class PolicyActor implements AgentInterface {
 				.getInstance().predicateKB);
 
 		// Check the internal goal here
-		if (!optimal_ && (goalPredicate_ != null)) {
+		if (!handCoded_ && (goalPredicate_ != null)) {
 			processInternalGoal(stateFacts, prevState_);
 		}
 
+		// Randomly resample the policy if the agent has been performing the
+		// same actions.
+		if (resampleProb_ > 0
+				&& PolicyGenerator.random_.nextDouble() < resampleProb_) {
+			generatePolicy(true);
+			resampleProb_ = 0;
+		}
+
+		policySteps_++;
 		prevActions_ = chooseAction(
-				ObjectObservations.getInstance().predicateKB, stateFacts);
+				ObjectObservations.getInstance().predicateKB, stateFacts, arg0);
 		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
 
 		return action;
@@ -184,11 +211,12 @@ public class PolicyActor implements AgentInterface {
 
 	// @Override
 	public void agent_end(double arg0) {
-		noteInternalFigures(arg0);
+		if (!handCoded_)
+			noteInternalFigures(arg0);
 
 		// Save the pre-goal state and goal action
 		if (goalPredicate_ != null) {
-			if (!optimal_) {
+			if (!handCoded_) {
 				Collection<Fact> stateFacts = StateSpec
 						.extractFacts(ObjectObservations.getInstance().predicateKB);
 				processInternalGoal(stateFacts, prevState_);
@@ -201,7 +229,43 @@ public class PolicyActor implements AgentInterface {
 			}
 		}
 
+		policySteps_++;
 		prevActions_ = null;
+	}
+
+	/**
+	 * Generates a new policy to use.
+	 * 
+	 * @param isResampled
+	 *            If this policy was a result of resampling.
+	 */
+	private void generatePolicy(boolean isResampled) {
+		// Note the previous policy and its reward, if applicable
+		if (policySteps_ > mostSteps_ && policy_ != null) {
+			bestPolicy_ = policy_;
+			mostSteps_ = policySteps_;
+		}
+
+		policy_ = PolicyGenerator.getInstance().generatePolicy(true);
+		if (PolicyGenerator.debugMode_) {
+			if (isResampled)
+				System.out.println("RESAMPLED POLICY: " + policy_);
+			else
+				System.out.println(policy_);
+		}
+		if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
+			policy_.parameterArgs(possibleGoals_.get(
+					PolicyGenerator.random_.nextInt(possibleGoals_.size()))
+					.getFacts());
+		}
+
+		// Reset the state observations
+		resampleProb_ = 0;
+		int initialCapacity = 100;
+		if (totalEpisodes_ > 0)
+			initialCapacity = 2 * totalSteps_ / totalEpisodes_;
+		episodeStateActions_ = new HashSet<StateAction>(initialCapacity);
+		policySteps_ = 0;
 	}
 
 	/**
@@ -212,7 +276,7 @@ public class PolicyActor implements AgentInterface {
 	 */
 	private void noteInternalFigures(double reward) {
 		// Noting internal figures
-		if (totalSteps_ < Short.MAX_VALUE) {
+		if (totalSteps_ < Integer.MAX_VALUE) {
 			totalReward_ += reward;
 			totalSteps_++;
 		}
@@ -223,31 +287,50 @@ public class PolicyActor implements AgentInterface {
 	 * 
 	 * @param state
 	 *            The state of the system as given by predicates.
+	 * @param reward
+	 *            The reward received this step.
 	 * @return A relational action.
 	 */
-	private ActionChoice chooseAction(Rete state, Collection<Fact> stateFacts) {
+	private ActionChoice chooseAction(Rete state, Collection<Fact> stateFacts,
+			Double reward) {
 		ActionChoice actions = new ActionChoice();
 
 		boolean noteTriggered = true;
 		if ((internalGoal_ != null) && (internalGoalMet_))
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
-		// TODO Perhaps resample policy here if no rules are fired (not
-		// including the RLGG rules - may need to remove them).
 		MultiMap<String, String[]> validActions = ObjectObservations
 				.getInstance().validActions;
+
 		actions = policy_.evaluatePolicy(state, validActions, actions,
-				StateSpec.getInstance().getNumReturnedActions(), optimal_,
+				StateSpec.getInstance().getNumReturnedActions(), handCoded_,
 				false, noteTriggered);
 
 		// This allows action covering to catch variant action conditions.
 		// This problem is caused by hierarchical RLGG rules, which cover
 		// actions regarding new object type already
-		if (!optimal_)
+		if (!handCoded_)
 			checkForUnseenPreds(state, validActions);
 
 		// Save the previous state (if not an optimal agent).
 		prevState_ = stateFacts;
+		StateAction stateAction = new StateAction(stateFacts, actions);
+
+		if (!handCoded_ && totalEpisodes_ > 0) {
+			// Put the state action pair in the collection
+			double resampleShiftAmount = 1 / (PolicyGenerator.RESAMPLE_POLICY_BOUND
+					* totalSteps_ / totalEpisodes_);
+			// If we've seen this state and less than average reward is being
+			// received
+			if (episodeStateActions_.contains(stateAction) && reward != null
+					&& reward < (totalReward_ / totalSteps_)) {
+				resampleProb_ += resampleShiftAmount;
+			} else {
+				episodeStateActions_.add(stateAction);
+				resampleProb_ = Math
+						.max(0, resampleProb_ - resampleShiftAmount);
+			}
+		}
 
 		// Return the actions.
 		return actions;
@@ -268,7 +351,8 @@ public class PolicyActor implements AgentInterface {
 			// Run through the unseen preds, triggering covering if necessary.
 			boolean triggerCovering = false;
 			Collection<StringFact> removables = new HashSet<StringFact>();
-			for (StringFact unseenPred : unseenPreds_) {
+			for (StringFact unseenPred : PolicyGenerator.getInstance().ruleCreation_
+					.getUnseenPreds()) {
 				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
 				QueryResult results = state.runQueryStar(query,
 						new ValueVector());
@@ -286,7 +370,8 @@ public class PolicyActor implements AgentInterface {
 								.getInstance());
 				PolicyGenerator.getInstance().triggerRLGGCovering(state,
 						validActions, emptyActions, false);
-				unseenPreds_.removeAll(removables);
+				PolicyGenerator.getInstance().ruleCreation_
+						.removeUnseenPreds(removables);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

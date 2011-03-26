@@ -45,8 +45,6 @@ public class LearningController {
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The ratio of samples to use as 'elite' samples. */
-	private static final double POPULATION_CONSTANT = 50;
-	/** The ratio of samples to use as 'elite' samples. */
 	private static final double SELECTION_RATIO = 0.05;
 	/** The rate at which the weights change. */
 	private static final double STEP_SIZE = 0.6;
@@ -55,7 +53,7 @@ public class LearningController {
 	/** The marker for the end of a successfully completed performance file. */
 	public static final String END_PERFORMANCE = "<--END-->";
 	/** The gap between performance checks per episode. */
-	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 100;
+	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 10;
 	/**
 	 * The number of meta-iterations a rule goes without updates before being
 	 * pruned.
@@ -369,16 +367,15 @@ public class LearningController {
 					}
 				}
 
-				score /= AVERAGE_ITERATIONS;
-				System.out.println(score);
-
 				if (restart)
 					break;
 
 				RLGlue.RL_agent_message("GetPolicy");
-				PolicyValue thisPolicy = new PolicyValue(
-						(Policy) ObjectObservations.getInstance().objectArray[0],
-						score, t);
+				Policy policy = (Policy) ObjectObservations.getInstance().objectArray[0];
+				score /= AVERAGE_ITERATIONS;
+				System.out.println(policy);
+				System.out.println(numEpisodes + ": " + score);
+				PolicyValue thisPolicy = new PolicyValue(policy, score, t);
 				pvs.add(thisPolicy);
 				// Storing the best policy
 				if ((bestPolicy == null)
@@ -460,14 +457,13 @@ public class LearningController {
 			numElite = population;
 		}
 		// Increasing alpha, from alpha / N to alpha / p.N
-		double updateModifier = Math.max(testingStep - population - iteration, population);
+		double updateModifier = Math.max(testingStep - population - iteration,
+				population);
 		double alphaUpdate = STEP_SIZE / updateModifier;
 
 		// Clean up the policy values
 		preUpdateModification(elites, numElite);
 
-		// TODO Examine this update code. It may be erroneous as it
-		// never seems to be happy with a single solution
 		localPolicy.updateDistributions(elites, numElite, alphaUpdate);
 
 		postUpdateModification(elites, iteration, testingStep, localPolicy);
@@ -520,7 +516,7 @@ public class LearningController {
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
 		episodePerformances.put(numEpisodes, testAgent(t, maxSteps_, run,
-				(repetitionsEnd_ - repetitionsStart_), expProg));
+				(repetitionsEnd_ - repetitionsStart_), expProg, numEpisodes));
 
 		// Save the results at each episode
 		try {
@@ -809,49 +805,53 @@ public class LearningController {
 	 *         combinations of rules.
 	 */
 	private int determinePopulation(PolicyGenerator policyGenerator) {
-		// TODO Experiment with squared slot values, as they make sense in terms
-		// of fair testing. E.g. Slot of 3 rules with 0.33 prob results in 3
-		// samples per rule to get possible rule slot. But perhaps even include
-		// the elites value, so squared and / elites selection ratio. This could
-		// get a bit big, so perhaps use a log curve * pop const.
 
 		// If the generator is just a slot optimiser, use 50 * slot number
+		// if (policyGenerator.isSlotOptimiser()) {
+		// return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
+		// .size());
+		// }
+		//
+		// double sumSlot = 0;
+		// double maxSlotMean = 0;
+		// for (Slot slot : policyGenerator.getGenerator()) {
+		// double weight = slot.getSelectionProbability();
+		// if (weight > 1)
+		// weight = 1;
+		// if (weight > maxSlotMean)
+		// maxSlotMean = weight;
+		// sumSlot += (slot.size() * weight);
+		// }
+		// sumSlot /= maxSlotMean;
+		// return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
+		// .getGenerator().size()));
+		//
 		if (policyGenerator.isSlotOptimiser()) {
-			return (int) (POPULATION_CONSTANT * policyGenerator.getGenerator()
-					.size());
+			return (int) (policyGenerator.getGenerator().size() / SELECTION_RATIO);
 		}
 
-		double sumSlot = 0;
+		double maxWeightedRuleCount = 0;
 		double maxSlotMean = 0;
+		double sumWeightedRuleCount = 0;
+		double sumSlotMean = 0;
 		for (Slot slot : policyGenerator.getGenerator()) {
 			double weight = slot.getSelectionProbability();
 			if (weight > 1)
 				weight = 1;
 			if (weight > maxSlotMean)
 				maxSlotMean = weight;
-			sumSlot += (slot.size() * weight);
+			sumSlotMean += weight;
+			double weightedRuleCount = slot.size() * weight;
+			sumWeightedRuleCount += weightedRuleCount;
+			if (weightedRuleCount > maxWeightedRuleCount)
+				maxWeightedRuleCount = weightedRuleCount;
 		}
-		sumSlot /= maxSlotMean;
-		return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
-				.getGenerator().size()));
-//
-//		if (policyGenerator.isSlotOptimiser()) {
-//			return (int) (policyGenerator.getGenerator().size() / SELECTION_RATIO);
-//		}
-//
-//		double maxWeightedRuleCount = 0;
-//		double maxSlotMean = 0;
-//		for (Slot slot : policyGenerator.getGenerator()) {
-//			double weight = slot.getSelectionProbability();
-//			if (weight > 1)
-//				weight = 1;
-//			if (weight > maxSlotMean)
-//				maxSlotMean = weight;
-//			double weightedRuleCount = slot.size() * weight;
-//			if (weightedRuleCount > maxWeightedRuleCount)
-//				maxWeightedRuleCount = weightedRuleCount;
-//		}
-//		return (int) Math.ceil(maxWeightedRuleCount / (maxSlotMean * SELECTION_RATIO));
+
+		// Always have a minimum of |D_S| elite samples.
+		// double numElites =
+		// maxWeightedRuleCount / maxSlotMean;
+		double numElites = sumWeightedRuleCount / sumSlotMean;
+		return (int) Math.ceil(numElites / SELECTION_RATIO);
 	}
 
 	/**
@@ -875,10 +875,11 @@ public class LearningController {
 	 *            The current run number.
 	 * @param runs
 	 *            The total number of runs to complete.
+	 * @param numEpisodes The number of episodes that have passed.
 	 * @return The average performance of the agent.
 	 */
 	public float testAgent(int episode, int maxSteps, int run, int runs,
-			double expProg) {
+			double expProg, int numEpisodes) {
 		float averageScore = 0;
 		RLGlue.RL_env_message("freeze");
 		if (runningTests_) {
@@ -908,7 +909,8 @@ public class LearningController {
 				RLGlue.RL_agent_message("GetPolicy");
 				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
 				pol.parameterArgs(null);
-				System.out.println(score / AVERAGE_ITERATIONS + "\n");
+				System.out.println(pol);
+				System.out.println(numEpisodes + ": " + score / AVERAGE_ITERATIONS + "\n");
 			}
 			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 		}
@@ -1177,8 +1179,8 @@ public class LearningController {
 				return;
 			}
 
-			List<Float> runPerformanceList = new ArrayList<Float>();
-			performances.add(runPerformanceList);
+			List<Float> thisRunPerformances = new ArrayList<Float>();
+			performances.add(thisRunPerformances);
 
 			// Run through the performances and place them in the matrix
 			SortedMap<Integer, Float> runPerformances = PerformanceReader
@@ -1186,14 +1188,15 @@ public class LearningController {
 			if (byEpisode) {
 				Iterator<Integer> iter = runPerformances.keySet().iterator();
 				Integer current = iter.next();
-				Integer previous = 0;
-				int currentEpisode = 0;
+				Integer previous = null;
+				int currentKeyframeEpisode = 0;
 				// Run through the performances, using linear interpolation to
 				// get estimates of the performance at a given interval.
+				float interpolated = 0;
 				do {
 					// If the current segment is further along than the current
 					// value, advance to the next value.
-					while (currentEpisode > current) {
+					while (currentKeyframeEpisode > current) {
 						previous = current;
 						if (iter.hasNext())
 							current = iter.next();
@@ -1201,30 +1204,41 @@ public class LearningController {
 							break;
 					}
 
-					float interpolated = 0;
-					if (previous == current) {
-						interpolated = runPerformances.get(current);
+					// If the keyframe isn't up to the first episode, just use
+					// the current value
+					if (previous == null) {
+						// Add to the previous value.
+						thisRunPerformances.add(runPerformances.get(current));
 					} else {
-						float prevVal = (previous == 0) ? 0 : runPerformances
-								.get(previous);
-						float currentVal = runPerformances.get(current);
-						interpolated = (currentVal - prevVal)
-								* (1f * (currentEpisode - previous) / (current - previous))
-								+ prevVal;
+						// Interpolate from the previous value to the current
+						// one.
+						interpolated = 0;
+						if (previous == current) {
+							interpolated = runPerformances.get(current);
+						} else {
+							float prevVal = (previous == 0) ? 0
+									: runPerformances.get(previous);
+							float currentVal = runPerformances.get(current);
+							interpolated = (currentVal - prevVal)
+									* (1f * (currentKeyframeEpisode - previous) / (current - previous))
+									+ prevVal;
+						}
+
+						// Add to the performances
+						thisRunPerformances.add(interpolated);
 					}
 
-					// Add to the performances
-					runPerformanceList.add(interpolated);
-
 					// To the next increment
-					currentEpisode += PERFORMANCE_EPISODE_GAP_SIZE;
-				} while (currentEpisode <= runPerformances.lastKey());
-				System.out.println(runPerformanceList.get(runPerformanceList
+					currentKeyframeEpisode += PERFORMANCE_EPISODE_GAP_SIZE;
+				} while (currentKeyframeEpisode <= runPerformances.lastKey());
+				thisRunPerformances.add(runPerformances.get(current));
+				System.out.println(thisRunPerformances.get(thisRunPerformances
 						.size() - 1));
 			} else {
 				// Take the values directly from the run performances
-				for (Integer key : runPerformances.keySet())
-					runPerformanceList.add(runPerformances.get(key));
+				for (Integer key : runPerformances.keySet()) {
+					thisRunPerformances.add(runPerformances.get(key));
+				}
 			}
 
 			// Find min or max runs

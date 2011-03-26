@@ -19,7 +19,7 @@ public class HanoiStateSpec extends StateSpec {
 
 		// Put the pure precondition in, the rest is taken care of...
 		actionPreconditions.put("move",
-				"(clear ?X ?Ta) (clear ?Y ?Tb&:(neq ?Tb ?Ta)) "
+				"(clear ?X ?Y) (clear ?Z ?A&:(neq ?A ?Y)) "
 						+ "(smaller ?X ?Y)");
 
 		return actionPreconditions;
