@@ -5,16 +5,22 @@ import static org.junit.Assert.*;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
+import jess.Fact;
+import jess.Rete;
 
 import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
 
 import relationalFramework.ArgumentComparator;
+import relationalFramework.StateSpec;
 
 public class TestTest {
 	@Test
@@ -146,16 +152,67 @@ public class TestTest {
 	public void testSortedSetArrayContains() {
 		SortedSet<String[]> arraySet = new TreeSet<String[]>(ArgumentComparator
 				.getInstance());
-		assertTrue(arraySet.add(new String[] { "a", "b", "c"}));
-		assertTrue(arraySet.contains(new String[] {"a", "b", "c"}));
-		assertFalse(arraySet.contains(new String[] {"a", "b", "d"}));
-		assertFalse(arraySet.contains(new String[] {"a", "c", "b"}));
+		assertTrue(arraySet.add(new String[] { "a", "b", "c" }));
+		assertTrue(arraySet.contains(new String[] { "a", "b", "c" }));
+		assertFalse(arraySet.contains(new String[] { "a", "b", "d" }));
+		assertFalse(arraySet.contains(new String[] { "a", "c", "b" }));
+
+		assertTrue(arraySet.add(new String[] { "a", "b", "d" }));
+		assertTrue(arraySet.contains(new String[] { "a", "b", "c" }));
+		assertTrue(arraySet.contains(new String[] { "a", "b", "d" }));
+		assertFalse(arraySet.contains(new String[] { "a", "c", "b" }));
+
+		assertFalse(arraySet.add(new String[] { "a", "b", "d" }));
+	}
+
+	@Test
+	public void testEqualStateActions() throws Exception {
+		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		Rete state = StateSpec.getInstance().getRete();
+		state.reset();
+		state.eval("(assert (block a))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block c))");
+		state.eval("(assert (block d))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (on a d))");
+		state.eval("(assert (on d c))");
+		state.eval("(assert (on b e))");
+		state.eval("(assert (onFloor e))");
+		state.eval("(assert (onFloor c))");
+		state.eval("(assert (highest a))");
+		state.run();
+		StateSpec.getInstance().generateValidActions(state);
+		Collection<Fact> facts = StateSpec.extractFacts(state);
+
+		assertEquals(facts, StateSpec.extractFacts(state));
 		
-		assertTrue(arraySet.add(new String[] {"a", "b", "d"}));
-		assertTrue(arraySet.contains(new String[] {"a", "b", "c"}));
-		assertTrue(arraySet.contains(new String[] {"a", "b", "d"}));
-		assertFalse(arraySet.contains(new String[] {"a", "c", "b"}));
+		state.reset();
+		state.eval("(assert (block a))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block c))");
+		state.eval("(assert (block d))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (on a d))");
+		state.eval("(assert (on d c))");
+		state.eval("(assert (on b e))");
+		state.eval("(assert (onFloor e))");
+		state.eval("(assert (onFloor c))");
+		state.eval("(assert (highest a))");
+		state.run();
+		StateSpec.getInstance().generateValidActions(state);
+		Collection<Fact> sameFacts = StateSpec.extractFacts(state);
+		assertEquals(facts, sameFacts);
 		
-		assertFalse(arraySet.add(new String[] {"a", "b", "d"}));
+		ArrayList<String> abc = new ArrayList<String>();
+		abc.add("a");
+		abc.add("b");
+		abc.add("c");
+		
+		ArrayList<String> sameABC = new ArrayList<String>();
+		sameABC.add("a");
+		sameABC.add("b");
+		sameABC.add("c");
+		assertEquals(abc, sameABC);
 	}
 }

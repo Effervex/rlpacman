@@ -1,5 +1,7 @@
 package hanoi;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
 
@@ -125,7 +127,9 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		List<StringFact> actions = ruleAction.getTriggerActions();
+		List<StringFact> actions = new ArrayList<StringFact>(ruleAction
+				.getActions());
+		ruleAction.triggerRule();
 		StringFact action = actions.get(PolicyGenerator.random_.nextInt(actions
 				.size()));
 

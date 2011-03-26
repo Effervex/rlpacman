@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -66,12 +67,12 @@ public class RuleCreationTest {
 		state.eval("(assert (block a))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 		ActionChoice ac = new ActionChoice();
-		List<StringFact> actions = new ArrayList<StringFact>();
+		Set<StringFact> actions = new HashSet<StringFact>();
 		actions.add(StateSpec.toStringFact("(moveFloor a)"));
 		Policy policy = new Policy();
 		RuleAction ra = new RuleAction(new GuidedRule(
 				"(clear a) => (moveFloor a)"), actions, policy);
-		ra.getTriggerActions();
+		ra.getActions();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null);
 		Collection<StringFact> preGoal = sut_.getPreGoalState("moveFloor");
@@ -89,7 +90,7 @@ public class RuleCreationTest {
 		actions.add(StateSpec.toStringFact("(moveFloor b)"));
 		ra = new RuleAction(new GuidedRule("(clear b) => (moveFloor b)"),
 				actions, policy);
-		ra.getTriggerActions();
+		ra.getActions();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("moveFloor");
@@ -120,7 +121,7 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
 				policy);
-		ra.getTriggerActions();
+		ra.getActions();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");
@@ -155,7 +156,7 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
 				policy);
-		ra.getTriggerActions();
+		ra.getActions();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");
@@ -175,7 +176,7 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move b a)"), actions,
 				policy);
-		ra.getTriggerActions();
+		ra.getActions();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null);
 		preGoal = sut_.getPreGoalState("move");

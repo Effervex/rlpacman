@@ -188,6 +188,7 @@ public class DistanceGridCache {
 		Set<Junction> isJunct = null;
 		boolean changed = false;
 		do {
+			// TODO Change junction definition to include corners
 			changed = false;
 			switch (direction) {
 			case Thing.UP:
@@ -265,8 +266,8 @@ public class DistanceGridCache {
 	}
 
 	/**
-	 * Checks if the coordinates are a junction. If they are, returns a bitwise
-	 * representation of the directions to go.
+	 * Checks if the coordinates are a junction/corner. If they are, returns a
+	 * bitwise representation of the directions to go.
 	 * 
 	 * @param loc
 	 *            The location of the possible junction.
@@ -274,6 +275,8 @@ public class DistanceGridCache {
 	 *            The current distance of the junction.
 	 * @param model
 	 *            The game model.
+	 * @param origDir
+	 *            The original direction the junction was encountered from.
 	 * @return A list of the possible directions the junction goes or null if no
 	 *         junction.
 	 */

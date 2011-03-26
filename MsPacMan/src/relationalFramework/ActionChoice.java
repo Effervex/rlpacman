@@ -105,4 +105,30 @@ public class ActionChoice {
 			return null;
 		return activeActions_.get(0);
 	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((activeActions_ == null) ? 0 : activeActions_.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ActionChoice other = (ActionChoice) obj;
+		if (activeActions_ == null) {
+			if (other.activeActions_ != null)
+				return false;
+		} else if (!activeActions_.equals(other.activeActions_))
+			return false;
+		return true;
+	}
 }

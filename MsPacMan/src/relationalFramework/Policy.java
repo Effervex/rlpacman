@@ -346,7 +346,7 @@ public class Policy {
 
 				// If there is at least one result
 				if (results.next()) {
-					List<StringFact> actionsList = new ArrayList<StringFact>();
+					Set<StringFact> actionsCollection = new HashSet<StringFact>();
 
 					// For each possible replacement
 					do {
@@ -370,26 +370,17 @@ public class Policy {
 
 							// Use the found action set as a result.
 							if (canAddRule(gr, actionsFound, actionsReturned))
-								actionsList.add(action);
+								actionsCollection.add(action);
 						}
 					} while (results.next());
 
-					// Trim down the action list as it may contain too many
-					// actions
 					if (actionsFound < actionsReturnedModified) {
-						if ((actionsFound + actionsList.size()) > actionsReturnedModified) {
-							Collections.shuffle(actionsList,
-									PolicyGenerator.random_);
-							actionsList = actionsList.subList(0,
-									actionsReturnedModified - actionsFound);
-						}
-
 						// Turn on the actions
 						if (canAddRule(gr, actionsFound, actionsReturned))
 							actionSwitch.switchOn(new RuleAction(gr,
-									actionsList, this));
+									actionsCollection, this));
 					}
-					actionsFound += actionsList.size();
+					actionsFound += actionsCollection.size();
 				}
 				results.close();
 			} catch (Exception e) {

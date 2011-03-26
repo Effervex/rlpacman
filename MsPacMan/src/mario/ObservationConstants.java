@@ -1,7 +1,5 @@
 package mario;
 
-import ch.idsia.benchmark.mario.engine.sprites.Sprite;
-
 public class ObservationConstants {
 	// Level constants
 	public static final int LVL_COIN = 2; // 1

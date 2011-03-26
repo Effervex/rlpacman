@@ -63,9 +63,6 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 * @return The element.
 	 */
 	public T sample(double order, boolean useMostLikely) {
-		// TODO Change this to something simpler. Why not just use a Probability
-		// Distribution?
-		
 		// Build a distribution, with modified weights based on element ordering
 		// and the value asked for.
 		ProbabilityDistribution<T> distribution = new ProbabilityDistribution<T>(

@@ -189,8 +189,6 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 */
 	public Map<String, String> createVariableTermReplacementMap(
 			boolean formNumericalReplacement) {
-		// TODO Maybe don't replace the numbers and they can be put into ranges
-		// in their appropriate methods.
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i])
