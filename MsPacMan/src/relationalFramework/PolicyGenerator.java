@@ -38,7 +38,7 @@ public class PolicyGenerator implements Serializable {
 	private static final long serialVersionUID = -3840268992962159336L;
 
 	/** The probability distributions defining the policy generator. */
-	private ProbabilityDistribution<Slot> slotGenerator_;
+	private OrderedDistribution<Slot> slotGenerator_;
 
 	/** The current slots used. */
 	private MultiMap<String, Slot> currentSlots_;
@@ -191,7 +191,7 @@ public class PolicyGenerator implements Serializable {
 		ProbabilityDistribution<Slot> removalDist = new ProbabilityDistribution<Slot>(
 				random_);
 		for (Slot slot : slotGenerator_) {
-			removalDist.add(slot.clone(), slotGenerator_.getProb(slot));
+			removalDist.add(slot.clone(), slotGenerator_.getOrdering(slot));
 		}
 
 		int i = 0;
@@ -264,9 +264,9 @@ public class PolicyGenerator implements Serializable {
 						} else if (r2.getSlot() == null)
 							return -1;
 
-						int result = -Double.compare(slotGenerator_.getProb(r1
-								.getSlot()), slotGenerator_.getProb(r2
-								.getSlot()));
+						int result = Double.compare(slotGenerator_
+								.getOrdering(r1.getSlot()), slotGenerator_
+								.getOrdering(r2.getSlot()));
 						if (result != 0)
 							return result;
 						return r1.compareTo(r2);
@@ -524,9 +524,7 @@ public class PolicyGenerator implements Serializable {
 		// If the slots have changed, add the new ones (removing the old).
 		if (changed) {
 			slotGenerator_.retainAll(currentSlots_.values());
-			if (slotGenerator_.addContainsAll(currentSlots_.values(),
-					1.0 / slotGenerator_.size()))
-				slotGenerator_.normaliseProbs();
+			slotGenerator_.addContainsAll(currentSlots_.values());
 			if (Slot.INITIAL_SLOT_PROB == -1) {
 				for (Slot slot : slotGenerator_)
 					slot.setSelectionProb(1.0 / slotGenerator_.size());
@@ -755,14 +753,13 @@ public class PolicyGenerator implements Serializable {
 	 * Resets the generator to where it started.
 	 */
 	public void resetGenerator() {
-		slotGenerator_ = new ProbabilityDistribution<Slot>(random_);
+		slotGenerator_ = new OrderedDistribution<Slot>(random_);
 		currentSlots_ = MultiMap.createListMultiMap();
 		for (String action : actionSet_.keySet()) {
 			Slot slot = new Slot(action);
 			slotGenerator_.add(slot);
 			currentSlots_.put(action, slot);
 		}
-		slotGenerator_.normaliseProbs();
 
 		rlggRules_.clear();
 		mutatedRules_.clear();
@@ -821,7 +818,7 @@ public class PolicyGenerator implements Serializable {
 		}
 		// Update the slot distribution
 		klDivergence_ += slotGenerator_.updateDistribution(ed
-				.getObservedSlotDistribution(), stepSize);
+				.getSlotPositions(), stepSize);
 
 		convergedValue_ = stepSize * CONVERGED_EPSILON;
 	}
@@ -874,10 +871,8 @@ public class PolicyGenerator implements Serializable {
 					ed.addSlotCount(ruleSlot, weight);
 
 					// Slot ordering
-					ed
-							.addSlotOrdering(ruleSlot,
-									(1.0 * firedRuleIndex / eliteSolution
-											.size()));
+					ed.addSlotOrdering(ruleSlot,
+							(1.0 * firedRuleIndex / eliteSolution.size()));
 					firedRuleIndex++;
 
 					// Rule counts
@@ -1152,7 +1147,7 @@ public class PolicyGenerator implements Serializable {
 		return Module.formName(moduleGoal_);
 	}
 
-	public ProbabilityDistribution<Slot> getGenerator() {
+	public OrderedDistribution<Slot> getGenerator() {
 		return slotGenerator_;
 	}
 
@@ -1194,7 +1189,7 @@ public class PolicyGenerator implements Serializable {
 
 	@Override
 	public String toString() {
-		return slotGenerator_.toString(true);
+		return slotGenerator_.toString();
 	}
 
 	/**
@@ -1208,7 +1203,7 @@ public class PolicyGenerator implements Serializable {
 	public void saveGenerators(BufferedWriter buf, String performanceFile)
 			throws Exception {
 		// For each of the rule generators
-		buf.write(slotGenerator_.toString(true) + "\n");
+		buf.write(slotGenerator_.toString() + "\n");
 		buf.write("Total Update Size: " + klDivergence_ + "\n");
 		buf.write("Converged Value: " + convergedValue_);
 		// Serialise and save policy generator.
