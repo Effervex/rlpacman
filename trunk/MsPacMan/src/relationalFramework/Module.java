@@ -64,7 +64,7 @@ public class Module {
 	 *            The state of the distribution for the agent.
 	 */
 	private Module(ArrayList<StringFact> facts,
-			ProbabilityDistribution<Slot> slotDistribution) {
+			OrderedDistribution<Slot> slotDistribution) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = formName(facts);
@@ -194,7 +194,7 @@ public class Module {
 	 *            The policy generator which solves the goal.
 	 */
 	public static void saveModule(ArrayList<StringFact> facts,
-			ProbabilityDistribution<Slot> slotDistribution) {
+			OrderedDistribution<Slot> slotDistribution) {
 		String modName = formName(facts);
 		Module newModule = null;
 		if (!loadedModules_.containsKey(modName)) {
