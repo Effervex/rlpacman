@@ -473,10 +473,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 			// Load distance grid measures
 			distanceGrid_ = distanceGridCache_.getGrid(model_.m_stage,
-					model_.m_player.m_locX, model_.m_player.m_locY);
+					model_.m_player.m_locX, model_.m_player.m_locY, Thing.STILL);
 			closeJunctions_ = distanceGridCache_.getCloseJunctions(
 					model_.m_stage, model_.m_player.m_locX,
 					model_.m_player.m_locY);
+//			DistanceGridCache.printDistanceGrid(distanceGrid_);
 
 			// Ghost Centre. Note that the centre can shift based on how the
 			// ghosts are positioned, as the warp points make the map
@@ -521,7 +522,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 						if (!ghost.isEdible()) {
 							DistanceDir[][] ghostGrid = distanceGridCache_
 									.getGrid(model_.m_stage, ghost.m_locX,
-											ghost.m_locY);
+											ghost.m_locY, Thing.STILL);
 							// If the ghost is in the ghost area or otherwise
 							// not accessible by PacMan, ignore it.
 							if (ghostGrid != null) {
