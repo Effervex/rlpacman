@@ -114,28 +114,21 @@ public class PacManStateSpec extends StateSpec {
 					+ "(distance ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
 					+ "(edible ?Ghost) (powerDot ?PowerDot) "
 					+ "=> (moveFrom ?PowerDot ?Dist0)");
-			rules
-					.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-							+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
+			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+					+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
 			rules.add("(distance ?PDot ?Dist0&:(betweenRange ?Dist0 2 99)) "
-					+ "(powerDot ?PDot) "
-					+ "=> (moveTo ?PDot ?Dist0)");
+					+ "(powerDot ?PDot) " + "=> (moveTo ?PDot ?Dist0)");
 		} else if (envParameter_ != null && envParameter_.equals("noPowerDots")) {
 			// Good policy for no power dot play
-			rules
-					.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-							+ "(ghost ?Ghost) => (moveFrom ?Ghost ?Dist0)");
-			rules
-					.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-							+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
+			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+					+ "(ghost ?Ghost) => (moveFrom ?Ghost ?Dist0)");
+			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+					+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
 			rules.add("(distanceDot ?Player ?Dot ?Dist0) "
 					+ "(dot ?Dot) => (moveTo ?Dot ?Dist0)");
 		} else {
 			// Good policy for regular play
 			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (moveFrom ?Ghost ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
 					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
 					+ "=> (moveFrom ?Ghost ?Dist0)");
 			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
@@ -151,14 +144,13 @@ public class PacManStateSpec extends StateSpec {
 					+ "(distance ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
 					+ "(edible ?Ghost) (powerDot ?PowerDot) "
 					+ "=> (moveFrom ?PowerDot ?Dist0)");
-			rules
-					.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-							+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
+			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
+					+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
 			rules.add("(distance ?Dot ?Dist0) "
 					+ "(dot ?Dot) => (moveTo ?Dot ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (moveFrom ?Ghost ?Dist0)");
+			rules
+			.add("(junctionSafety ?X ?__Num3&:(betweenRange ?__Num3 -16.0 28.0)) "
+					+ "=> (toJunction ?X ?__Num3)");
 		}
 
 		for (String rule : rules)
