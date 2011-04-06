@@ -101,7 +101,7 @@ public class PolicyGenerator implements Serializable {
 	public boolean weightedElites_ = false;
 
 	/** If modules are being used. */
-	public boolean useModules_ = false;
+	public boolean useModules_ = true;
 
 	/** If the slots can be dynamically added/removed. */
 	public boolean dynamicSlotNumber_ = true;
@@ -155,6 +155,12 @@ public class PolicyGenerator implements Serializable {
 	 * episode length without changing action or state, resample policy.
 	 */
 	public static final double RESAMPLE_POLICY_BOUND = 0.1;
+
+	/**
+	 * The number of numerical splits when specialising (disregarding special
+	 * negative case.
+	 */
+	public static final int NUM_NUMERICAL_SPLITS = 3;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -393,6 +399,13 @@ public class PolicyGenerator implements Serializable {
 		if (rule.hasSpawned(preGoalHash))
 			return false;
 
+		// (Only check for postUpdate muattions - not split slot mutations)
+		// If the rule's slot isn't already full
+		int maximumSlotCapacity = ruleCreation_.getNumSpecialisations(rule
+				.getAction()) / 2;
+		if ((mutationUses > -1) && rule.getSlot().size() > maximumSlotCapacity)
+			return false;
+
 		// If the rule is below average probability
 		if (mutationUses > 0
 				&& rule.getSlot().getGenerator().getProb(rule) < (1.0 / rule
@@ -474,12 +487,6 @@ public class PolicyGenerator implements Serializable {
 					splitSlot.addNewRule(seedRule);
 
 					// Check if the slot already exists
-					// TODO Might be better to initialise slots with 1/slot
-					// number probability and make them work to get more. Test
-					// with experiments.
-					// Could be problematic with Ms. Pac-Man and other
-					// multi-action environments.
-
 					Slot existingSlot = slotGenerator_.getElement(splitSlot);
 					if (existingSlot != null) {
 						if (existingSlot.getSeedRule().equals(seedRule)) {
