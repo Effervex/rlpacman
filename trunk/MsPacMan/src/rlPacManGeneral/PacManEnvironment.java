@@ -4,6 +4,7 @@ import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 
 import jess.JessException;
 import jess.Rete;
@@ -15,7 +16,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
 import relationalFramework.LearningController;
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -319,32 +319,20 @@ public class PacManEnvironment implements EnvironmentInterface {
 			directions.add(PacManLowAction.LEFT);
 		if (Thing.isValidMove(Thing.RIGHT, x, y, model_))
 			directions.add(PacManLowAction.RIGHT);
-		double inverseDirs = 1d / directions.size();
 
 		// Compile the state
-		int safestJunction = -Integer.MAX_VALUE;
-		for (Junction junc : closeJunctions_)
-			safestJunction = Math.max(safestJunction, junc.getSafety());
-		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_,
-				safestJunction, model_.m_player };
+		Object[] stateObjs = { model_.m_ghosts, model_.m_fruit, distanceGrid_ };
 		PacManState state = new PacManState(stateObjs);
 
 		// Run through each action, until a clear singular direction is arrived
 		// upon.
-		int i = 0;
-
-		double globalBest = 0;
-		MultiMap<Byte, RuleAction> actionDirections = MultiMap
-				.createListMultiMap();
+		Collection<RuleAction> firedRules = new HashSet<RuleAction>();
 		for (RuleAction ruleAction : actions) {
-			double[] globalDirectionVote = new double[PacManLowAction.values().length];
-			double[] directionVote = new double[PacManLowAction.values().length];
-			double worst = 0;
-			double bestWeight = 0;
+			ArrayList<PacManLowAction> actionDirections = new ArrayList<PacManLowAction>();
+			double bestWeight = Integer.MIN_VALUE;
 			Collection<StringFact> actionStrings = ruleAction.getActions();
 
-			// Find the individual distance weighting and direction of each
-			// action in the ArrayList.
+			// Only use the closest object(s) to make decisions
 			for (StringFact action : actionStrings) {
 				// For each rule, a list of actions are returned
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
@@ -353,68 +341,44 @@ public class PacManEnvironment implements EnvironmentInterface {
 				if (weightedDir != null) {
 					// Use a linearly decreasing weight and the object proximity
 					double weighting = weightedDir.getWeight();
-					bestWeight = Math.max(bestWeight, Math.abs(weighting));
-					byte dir = (byte) Math.abs(weightedDir.getDirection());
-					actionDirections.putContains(dir, ruleAction);
-					if (weightedDir.getDirection() > 0) {
-						directionVote[dir] += weighting;
-					} else if (weightedDir.getDirection() < 0) {
-						directionVote[dir] -= weighting;
+					// If weighting is higher, clear the previous decisions and
+					// use this one.
+					if (weighting > bestWeight) {
+						actionDirections.clear();
+						bestWeight = weighting;
 					}
-
-					// Recording best and worst
-					worst = Math.min(worst, directionVote[dir]);
+					byte dir = weightedDir.getDirection();
+					// If this weighting is the same as the best weight, note
+					// the direction.
+					if (weighting == bestWeight) {
+						if (dir < 0) {
+							actionDirections.addAll(directions);
+							actionDirections
+									.remove(PacManLowAction.values()[-dir]);
+						} else
+							actionDirections.add(PacManLowAction.values()[dir]);
+					}
 				}
 			}
 
-			// Normalise the values
-			// double sum = 0;
-			double max = 0;
-			for (int j = 1; j < directionVote.length; j++) {
-				// Making all values positive
-				directionVote[j] -= worst;
-				// sum += directionVote[j];
-				max = Math.max(max, directionVote[j]);
-			}
-
-			// Using position within the action list as a weighting influence
-			// double inverseNumberWeight = (1.0 * (actions.size() - i))
-			// / actions.size();
-			// inverseNumberWeight *= inverseNumberWeight;
-
-			// Add to the global direction vote
-			for (int j = 1; j < directionVote.length; j++) {
-				// Add to the global weight, using the position within the
-				// policy and the highest weight as factors.
-				directionVote[j] /= max;
-				globalDirectionVote[j] += directionVote[j] * bestWeight;
-				if (globalDirectionVote[j] > globalBest)
-					globalBest = globalDirectionVote[j];
-			}
-
-			// Normalise the globalDirectionVote and remove any directions not
-			// significantly weighted.
+			// Refine the directions selected by this rule
 			ArrayList<PacManLowAction> backupDirections = new ArrayList<PacManLowAction>(
 					directions);
-			for (int d = 0; d < globalDirectionVote.length; d++) {
-				globalDirectionVote[d] /= globalBest;
-				// If the vote is less than 1 - # valid directions, then remove
-				// it.
-				if (globalDirectionVote[d] <= 1d - inverseDirs)
-					directions.remove(PacManLowAction.values()[d]);
-			}
+			directions.retainAll(actionDirections);
+			// If no legal directions selected
 			if (directions.isEmpty())
 				directions = backupDirections;
-
-			// If only one direction left, use that
+			// If the possible directions has shrunk, this rule has been
+			// utilised
+			if (directions.size() < backupDirections.size())
+				firedRules.add(ruleAction);
+			// If there is only one direction left, use that
 			if (directions.size() == 1) {
 				lastDirection_ = directions.get(0);
 				break;
 			}
-
-			i++;
 		}
-		
+
 		if (!directions.contains(lastDirection_)) {
 			// If possible, continue with the last direction.
 			// Otherwise take a direction perpendicular to the last
@@ -425,14 +389,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 				}
 			}
 		}
-		
+
 		// Trigger the rules leading to this direction
-		if (actionDirections.containsKey((byte) lastDirection_.ordinal())) {
-			for (RuleAction ra : actionDirections.get((byte) lastDirection_
-					.ordinal()))
-				ra.triggerRule();
-		}
-		
+		for (RuleAction ra : firedRules)
+			ra.triggerRule();
+
 		return lastDirection_;
 	}
 
@@ -486,7 +447,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			closeJunctions_ = distanceGridCache_.getCloseJunctions(
 					model_.m_stage, model_.m_player.m_locX,
 					model_.m_player.m_locY);
-			// DistanceGridCache.printDistanceGrid(distanceGrid_);
+//			 DistanceGridCache.printDistanceGrid(distanceGrid_);
 
 			// Ghost Centre. Note that the centre can shift based on how the
 			// ghosts are positioned, as the warp points make the map

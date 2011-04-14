@@ -80,6 +80,11 @@ public class LearningController {
 	private boolean runningTests_ = true;
 	/** If the performance is saved by episode or by CE iteration. */
 	private boolean performanceByEpisode_ = true;
+	/**
+	 * An optional comment to append to the beginning of performance and elite
+	 * files.
+	 */
+	private String comment_;
 
 	/**
 	 * A constructor for initialising the cross-entropy generators and
@@ -116,8 +121,15 @@ public class LearningController {
 			if (extraArgs != null) {
 				Pattern p = Pattern.compile("((\".+?\")|\\w+)");
 				Matcher m = p.matcher(extraArgs);
-				while (m.find())
-					extraArgsList.add(m.group().replaceAll("\"", ""));
+				while (m.find()) {
+					String extraArg = m.group().replaceAll("\"", "");
+					// Performance file comment
+					if (extraArg.charAt(0) == '%') {
+						comment_ = extraArg;
+						System.out.println(comment_);
+					} else
+						extraArgsList.add(extraArg);
+				}
 			}
 
 			bf.close();
@@ -456,9 +468,10 @@ public class LearningController {
 		if (ENTROBEAM) {
 			numElite = population;
 		}
-		// Increasing alpha, from alpha / N to alpha / p.N
+		// Increasing alpha, from (~)alpha / N to alpha / p.N
 		double updateModifier = Math.max(testingStep - population - iteration,
 				population);
+		// double updateModifier = testingStep;
 		double alphaUpdate = STEP_SIZE / updateModifier;
 
 		// Clean up the policy values
@@ -830,6 +843,7 @@ public class LearningController {
 			return (int) (policyGenerator.getGenerator().size() / SELECTION_RATIO);
 		}
 
+		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
 		double maxWeightedRuleCount = 0;
 		double maxSlotMean = 0;
 		double sumWeightedRuleCount = 0;
@@ -850,8 +864,19 @@ public class LearningController {
 		// Always have a minimum of |D_S| elite samples.
 		// double numElites =
 		// maxWeightedRuleCount / maxSlotMean;
-		double numElites = sumWeightedRuleCount / sumSlotMean;
+
+		// Elites is equal to the average number of rules in high mean slots.
+		double numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
+				sumSlotMean);
 		return (int) Math.ceil(numElites / SELECTION_RATIO);
+
+		// N_E = Max(# specialisations)
+		// int maxSpecialisations = 0;
+		// for (String action : StateSpec.getInstance().getActions().keySet()) {
+		// maxSpecialisations = Math.max(PolicyGenerator.getInstance()
+		// .getNumSpecialisations(action), maxSpecialisations);
+		// }
+		// return (int) (maxSpecialisations / SELECTION_RATIO);
 	}
 
 	/**
@@ -875,7 +900,8 @@ public class LearningController {
 	 *            The current run number.
 	 * @param runs
 	 *            The total number of runs to complete.
-	 * @param numEpisodes The number of episodes that have passed.
+	 * @param numEpisodes
+	 *            The number of episodes that have passed.
 	 * @return The average performance of the agent.
 	 */
 	public float testAgent(int episode, int maxSteps, int run, int runs,
@@ -910,7 +936,8 @@ public class LearningController {
 				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
 				pol.parameterArgs(null);
 				System.out.println(pol);
-				System.out.println(numEpisodes + ": " + score / AVERAGE_ITERATIONS + "\n");
+				System.out.println(numEpisodes + ": " + score
+						/ AVERAGE_ITERATIONS + "\n");
 			}
 			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
 		}
@@ -1029,6 +1056,9 @@ public class LearningController {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
+		if (comment_ != null)
+			buf.write(comment_ + "\n");
+
 		for (PolicyValue pv : elites) {
 			buf.write(pv.getPolicy().toOnlyUsedString() + "\n");
 			buf.write(pv.getValue() + "\n\n");
@@ -1069,6 +1099,9 @@ public class LearningController {
 		tempPerf.createNewFile();
 		FileWriter wr = new FileWriter(tempPerf, true);
 		BufferedWriter buf = new BufferedWriter(wr);
+
+		if (comment_ != null)
+			buf.write(comment_ + "\n");
 
 		System.out.println("Average episode elite scores:");
 		PolicyGenerator.getInstance().saveHumanGenerators(buf);

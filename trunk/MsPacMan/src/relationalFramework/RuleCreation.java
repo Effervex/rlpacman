@@ -646,6 +646,29 @@ public class RuleCreation implements Serializable {
 			return new AgentObservations();
 	}
 
+	/**
+	 * Gets the number of specialisations an action can have.
+	 * 
+	 * @param actionPredicate
+	 *            The action predicate to check.
+	 * @return The total possible number of specialisations the action can make.
+	 */
+	public int getNumSpecialisations(String action) {
+		Collection<StringFact> specConditions = ao_
+				.getSpecialisationConditions(action);
+		int num = 0;
+		if (specConditions != null)
+			num = specConditions.size();
+		// Also, if the action has numerical arguments, add them to the count
+		// too
+		for (String type : StateSpec.getInstance().getStringFact(action)
+				.getArgTypes()) {
+			if (StateSpec.isNumberType(type))
+				num += PolicyGenerator.NUM_NUMERICAL_SPLITS;
+		}
+		return num;
+	}
+
 	public void loadBackupPreGoal() {
 		if (backupPreGoals_ == null)
 			return;

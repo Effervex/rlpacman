@@ -101,7 +101,7 @@ public class PolicyGenerator implements Serializable {
 	public boolean weightedElites_ = false;
 
 	/** If modules are being used. */
-	public boolean useModules_ = true;
+	public boolean useModules_ = false;
 
 	/** If the slots can be dynamically added/removed. */
 	public boolean dynamicSlotNumber_ = true;
@@ -399,10 +399,10 @@ public class PolicyGenerator implements Serializable {
 		if (rule.hasSpawned(preGoalHash))
 			return false;
 
-		// (Only check for postUpdate muattions - not split slot mutations)
+		// (Only check for postUpdate mutations - not split slot mutations)
 		// If the rule's slot isn't already full
 		int maximumSlotCapacity = ruleCreation_.getNumSpecialisations(rule
-				.getAction()) / 2;
+				.getActionPredicate());
 		if ((mutationUses > -1) && rule.getSlot().size() > maximumSlotCapacity)
 			return false;
 
@@ -1309,5 +1309,9 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public void clearAgentObservations() {
 		ruleCreation_.clearAgentObservations();
+	}
+
+	public int getNumSpecialisations(String action) {
+		return ruleCreation_.getNumSpecialisations(action);
 	}
 }

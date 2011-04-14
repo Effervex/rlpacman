@@ -134,7 +134,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
+		Collection<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 12);
 	}
 
@@ -214,7 +214,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
+		Collection<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 12);
 		// Each move slot should have more than one rule
 		StringFact blockA = StateSpec.toStringFact("(block a)");
@@ -365,7 +365,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		ProbabilityDistribution<Slot> slotGenerator = sut_.getGenerator();
+		Collection<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 17);
 	}
 

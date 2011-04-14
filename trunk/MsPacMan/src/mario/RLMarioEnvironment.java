@@ -4,11 +4,7 @@ import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 import jess.Fact;
 import jess.JessException;
@@ -26,7 +22,6 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.MarioAIOptions;
 
 import relationalFramework.ActionChoice;
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
@@ -36,8 +31,9 @@ import relationalFramework.StringFact;
 public class RLMarioEnvironment implements EnvironmentInterface {
 	private Rete rete_;
 	private MarioEnvironment environment_;
-	private Collection<Fact> staticObjectFacts_;
+	private Collection<String> staticObjectFacts_;
 	private boolean isMarioInAir_;
+	private float[] marioGroundPos_ = { 32, 32 };
 	/** Needed to check if the shells are passive. */
 	private Collection<String> shellPositions_ = new HashSet<String>();
 	private boolean experimentMode_ = false;
@@ -64,9 +60,9 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		environment_ = MarioEnvironment.getInstance();
 		cmdLineOptions_ = new MarioAIOptions();
 		cmdLineOptions_.setVisualization(!experimentMode_);
-		staticObjectFacts_ = new HashSet<Fact>();
+		staticObjectFacts_ = new HashSet<String>();
 		// cmdLineOptions_.setEnemies("off");
-		// cmdLineOptions_.setFPS(1);
+		// cmdLineOptions_.setFPS(10);
 		// cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -92,7 +88,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Observation env_start() {
-		levelDifficulty_ = 0;
+		levelDifficulty_ = 1;
 		resetEnvironment();
 		environment_.tick();
 
@@ -101,7 +97,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			environment_.tick();
 		}
 
-		return formObservations(rete_, 1);
+		return formObservations(rete_);
 	}
 
 	@Override
@@ -110,7 +106,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
 		float[] marioPos = Arrays.copyOf(environment_.getMarioFloatPos(), 2);
 		environment_.performAction(chooseLowAction(actions.getActions(),
-				marioPos));
+				marioGroundPos_));
 		environment_.tick();
 
 		while (GlobalOptions.isGameplayStopped) {
@@ -123,10 +119,11 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			isMarioInAir_ = true;
 		else {
 			isMarioInAir_ = false;
+			marioGroundPos_ = marioPos;
 			staticObjectFacts_.clear();
 		}
 
-		Observation obs = formObservations(rete_, 1);
+		Observation obs = formObservations(rete_);
 		double thisStepReward = environment_.getIntermediateReward();
 		double reward = thisStepReward - prevReward_;
 		prevReward_ = thisStepReward;
@@ -140,8 +137,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			levelDifficulty_++;
 			reward = environment_.getEvaluationInfo().computeWeightedFitness()
 					- sumReward_;
-			resetEnvironment();
-			terminal = 0;
+			// resetEnvironment();
+			terminal = 1;
 		}
 
 		Reward_observation_terminal rot = new Reward_observation_terminal(
@@ -164,7 +161,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 		rete_ = StateSpec.getInstance().getRete();
 		staticObjectFacts_.clear();
-		
+
 		isMarioInAir_ = false;
 		prevBoolAction_ = new boolean[Environment.numberOfKeys];
 		marioDirection_ = Environment.MARIO_KEY_RIGHT;
@@ -185,83 +182,59 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 */
 	private boolean[] chooseLowAction(ArrayList<RuleAction> ruleActions,
 			float[] startPos) {
-		Map<Integer, SortedMap<Double, StringFact>> representativeRule = new HashMap<Integer, SortedMap<Double, StringFact>>();
-		Map<Integer, Double> weightedActions = new HashMap<Integer, Double>();
 		byte[][] basicLevelObservation = environment_
 				.getLevelSceneObservationZ(2);
 		float[] marioFloatPos = environment_.getMarioFloatPos();
 		boolean bigMario = environment_.getMarioMode() != 0;
 
-		// TODO This vote thing more or less works, but it may ignore shooting,
-		// which is really only governed by one action. The problem with Mario
-		// is that the agent takes multiple actions at once. This could be
-		// remedied by using votes for left/right jump/not jump shoot/don't
-		// shoot, but this could 1) produce erratic behaviour, 2) weight towards
-		// clusters of objects.
-
-		// TODO Implement voting and strict action selection (take action
-		// immediately, if rule is weighted high enough)
-
-		// Run through the actions, storing identical action mappings under the
-		// same weight. Storage is through bit shifted operations.
-		int i = 0;
-		int bestBitwise = -1;
-		double bestWeight = -1;
-		MultiMap<Integer, RuleAction> actionDirections = MultiMap
-				.createListMultiMap();
+		// An array which determines which actions are pressed {dir, jump?,
+		// run?} A non-zero value means the action has been selected (-1
+		// left/false, +1 right/true)
+		boolean[] selectedAction = null;
 		for (RuleAction ruleAction : ruleActions) {
 			Collection<StringFact> actionStrings = ruleAction.getActions();
-			double policyWeight = (1.0 * ruleActions.size() - i)
-					/ ruleActions.size();
-			policyWeight *= policyWeight;
+			double bestWeight = Integer.MIN_VALUE;
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList
+			StringFact bestAction = null;
 			for (StringFact action : actionStrings) {
 				boolean[] actionArray = ((RLMarioStateSpec) StateSpec
-						.getInstance()).applyAction(action, startPos,
+						.getInstance()).applyAction(action, marioGroundPos_,
 						marioFloatPos, basicLevelObservation, prevBoolAction_,
 						marioDirection_, bigMario);
 				double distance = Math.abs(Double.parseDouble(action
 						.getArguments()[1]));
-				int bitwise = booleanArrayToInt(actionArray);
-				actionDirections.putContains(bitwise, ruleAction);
-
-				// Store the values, adding to existing values if necessary
-				Double oldWeight = weightedActions.get(bitwise);
-				SortedMap<Double, StringFact> bestActions = representativeRule
-						.get(bitwise);
-				if (oldWeight == null) {
-					oldWeight = 0d;
-					bestActions = new TreeMap<Double, StringFact>();
-					representativeRule.put(bitwise, bestActions);
-				}
-				// Add the weighted inverse distance
-				double actionWeight = (policyWeight / distance);
-				double newWeight = oldWeight + actionWeight;
-				weightedActions.put(bitwise, newWeight);
-				bestActions.put(actionWeight, action);
-
-				// Update best weights
-				if (newWeight > bestWeight) {
-					bestWeight = newWeight;
-					bestBitwise = bitwise;
+				double actionWeight = (1 / distance);
+				// If a closer object has been found, act on that.
+				if (actionWeight > bestWeight) {
+					bestWeight = actionWeight;
+					selectedAction = actionArray;
+					bestAction = action;
+				} else if (actionWeight == bestWeight
+						&& !Arrays.equals(selectedAction, actionArray)) {
+					// If two objects are of the same distance, and they're not
+					// the same boolean[] action, skip this action and move onto
+					// the next to decide.
+					selectedAction = null;
+					break;
 				}
 			}
 
-			i++;
+			if (selectedAction != null) {
+				ruleAction.triggerRule();
+				// System.out.println(bestAction);
+				break;
+			}
 		}
 
+		// If the selected action isn't null, reset the previous bool action.
+		if (selectedAction != null)
+			prevBoolAction_ = selectedAction;
+
 		// If Mario is on the ground and cannot jump, allow him time to breathe
-		prevBoolAction_ = intToBooleanArray(bestBitwise);
 		if (environment_.isMarioOnGround() && !environment_.isMarioAbleToJump())
 			prevBoolAction_[Environment.MARIO_KEY_JUMP] = false;
-
-		// Output the 'firing' action.
-		 SortedMap<Double, StringFact> bestRules = representativeRule
-		 .get(bestBitwise);
-		 StringFact bestAction = bestRules.get(bestRules.lastKey());
-		 System.out.println("Action: " + bestAction);
 
 		if (prevBoolAction_[Environment.MARIO_KEY_RIGHT]
 				&& !prevBoolAction_[Environment.MARIO_KEY_LEFT])
@@ -269,12 +242,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		else if (prevBoolAction_[Environment.MARIO_KEY_LEFT]
 				&& !prevBoolAction_[Environment.MARIO_KEY_RIGHT])
 			marioDirection_ = Environment.MARIO_KEY_LEFT;
-
-		// Trigger the winning rules in the policy
-		if (actionDirections.containsKey(bestBitwise)) {
-			for (RuleAction ra : actionDirections.get(bestBitwise))
-				ra.triggerRule();
-		}
 
 		return prevBoolAction_;
 	}
@@ -307,11 +274,9 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 * 
 	 * @param rete
 	 *            The rete object to add observations to.
-	 * @param levelZoom
-	 *            The zoom level for the level observations.
 	 * @return An observation of the current state
 	 */
-	private Observation formObservations(Rete rete, int levelZoom) {
+	private Observation formObservations(Rete rete) {
 		try {
 			rete.reset();
 
@@ -331,8 +296,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			}
 
 			// Run through the level observations
-			byte[][] levelObs = environment_
-					.getLevelSceneObservationZ(levelZoom);
+			byte[][] levelObs = environment_.getLevelSceneObservationZ(1);
 			byte[][] enemyObs = environment_.getEnemiesObservationZ(0);
 			float[] enemyPos = environment_.getEnemiesFloatPos();
 
@@ -348,8 +312,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 			// Reassert static objects
 			if (isMarioInAir_)
-				for (Fact fact : staticObjectFacts_)
-					rete.assertFact(fact);
+				for (String fact : staticObjectFacts_)
+					rete.assertString(fact);
 
 			// Assert the enemies
 			Collection<String> currentShells = new HashSet<String>();
@@ -359,7 +323,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 				float x = enemyPos[e++];
 				float y = enemyPos[e];
 				// Check it's not stuck in geometry
-				if (!stuckInGeometry(x, y, levelObs)) {
+				if (!stuckInGeometry(x, y, levelObs, enemyType)) {
 					// Enemy objects, like fireFlower, mushroom, all enemies and
 					// projectiles
 					String isShell = assertEnemyObjects(rete, enemyType, x, y,
@@ -399,7 +363,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	}
 
 	/**
-	 * Checks if an enemy coordinate is stuck in geometry.
+	 * Checks if an enemy coordinate is stuck in geometry. Special case for
+	 * Koopa's which are tall
 	 * 
 	 * @param x
 	 *            The enemy's x coord.
@@ -407,9 +372,12 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 *            The enemy's y coord.
 	 * @param levelObs
 	 *            The level observations. The enemy may be outside these bounds.
+	 * @param enemyType
+	 *            The type of enemy being asserted.
 	 * @return True if the enemy is stuck in geometry, false otherwise.
 	 */
-	private boolean stuckInGeometry(float x, float y, byte[][] levelObs) {
+	private boolean stuckInGeometry(float x, float y, byte[][] levelObs,
+			float enemyType) {
 		for (int i = -1; i <= 1; i++) {
 			int relGridX = Math.round((x + i * LevelScene.cellSize / 2)
 					/ LevelScene.cellSize)
@@ -417,11 +385,24 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			int relGridY = Math.round((y - LevelScene.cellSize / 2)
 					/ LevelScene.cellSize)
 					+ marioCentreY_;
+			int relGridY1 = Math.max(0, relGridY - 1);
 			if (relGridY < 0 || relGridY >= levelObs.length || relGridX < 0
 					|| relGridX >= levelObs[0].length)
 				return false;
-			if (isBlank(levelObs[relGridY][relGridX]))
-				return false;
+			// Special case for Koopas (tall)
+			switch ((int) enemyType) {
+			case ObservationConstants.ENMY_GREEN_KOOPA:
+			case ObservationConstants.ENMY_GREEN_KOOPA_WINGED:
+			case ObservationConstants.ENMY_RED_KOOPA:
+			case ObservationConstants.ENMY_RED_KOOPA_WINGED:
+				if (isBlank(levelObs[relGridY][relGridX])
+						|| isBlank(levelObs[relGridY1][relGridX]))
+					return false;
+				break;
+			default:
+				if (isBlank(levelObs[relGridY][relGridX]))
+					return false;
+			}
 		}
 		return true;
 	}
@@ -452,13 +433,21 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		// Brick
 		case (ObservationConstants.LVL_BRICK):
 		case (ObservationConstants.LVL_BREAKABLE_BRICK):
-		case (ObservationConstants.LVL_UNBREAKABLE_BRICK):
 			// If searchable, assert brick. Otherwise it's just terrain
 			if (canMarioFit(x, y, levelObs, true)) {
 				assertThing(rete, "brick", "brk", x, y, false, levelObs, 1);
 
 				if (PolicyGenerator.debugMode_)
 					System.out.print("b ");
+				break;
+			}
+		case (ObservationConstants.LVL_UNBREAKABLE_BRICK):
+			// If searchable, assert brick. Otherwise it's just terrain
+			if (canMarioFit(x, y, levelObs, true)) {
+				assertThing(rete, "box", "box", x, y, false, levelObs, 1);
+
+				if (PolicyGenerator.debugMode_)
+					System.out.print("B ");
 				break;
 			}
 			// Terrain
@@ -713,7 +702,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	private void assertThing(Rete rete, String condition, String thingPrefix,
 			int relX, int relY, boolean jumpInto, byte[][] levelObs, int width)
 			throws Exception {
-		if (isMarioInAir_)
+		if (isMarioInAir_ && !condition.equals("mushroom"))
 			return;
 
 		// Can use Mario's current location to fix level object names
@@ -756,14 +745,14 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			boolean jumpInto, byte[][] levelObs, int width, boolean isStatic)
 			throws JessException, Exception {
 		String thing = thingPrefix + "_" + x + "_" + y;
-		Fact fact = rete.assertString("(" + condition + " " + thing + ")");
+		String fact = "(" + condition + " " + thing + ")";
+		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
 			staticObjectFacts_.add(fact);
 
 		// Distance & direction assertions.
 		float[] marioPos = environment_.getMarioFloatPos();
-		int dist = (int) Math.round(Point2D.distance(marioPos[0], marioPos[1],
-				x, y));
+		int dist = (int) (x - marioPos[0]);
 
 		// Special checks for shells
 		if (thingPrefix.equals("shell")) {
@@ -779,24 +768,27 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 				jumpInto = false;
 		}
 
-		if (x < marioPos[0])
-			dist *= -1;
-		fact = rete.assertString("(distance " + thing + " " + dist + ")");
+		fact = "(distance " + thing + " " + dist + ")";
+		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
 			staticObjectFacts_.add(fact);
 
 		// Height diff
 		int heightDiff = (int) Math.round(marioPos[1] - y);
-		fact = rete.assertString("(heightDiff " + thing + " " + heightDiff
-				+ ")");
+		fact = "(heightDiff " + thing + " " + heightDiff + ")";
+		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
 			staticObjectFacts_.add(fact);
 
 		// Can jump on/over assertions
-		assertJumpOnOver(rete, thing, x, y, gridX, gridY, levelObs, jumpInto);
+		Collection<String> facts = assertJumpOnOver(rete, thing, x, y, gridX,
+				gridY, levelObs, jumpInto);
+		if (isStatic && !isMarioInAir_)
+			staticObjectFacts_.addAll(facts);
 
 		// Width assertion
-		fact = rete.assertString("(width " + thing + " " + width + ")");
+		fact = "(width " + thing + " " + width + ")";
+		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
 			staticObjectFacts_.add(fact);
 		return thing;
@@ -823,19 +815,27 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 * @param jumpInto
 	 *            If the thing can be jumped into.
 	 */
-	private void assertJumpOnOver(Rete rete, String thing, float x, float y,
-			int gridX, int gridY, byte[][] levelObs, boolean jumpInto)
-			throws Exception {
+	private Collection<String> assertJumpOnOver(Rete rete, String thing,
+			float x, float y, int gridX, int gridY, byte[][] levelObs,
+			boolean jumpInto) throws Exception {
 		// Check Mario isn't blocked by geometry
 		boolean[] jumpOnOver = ((RLMarioStateSpec) StateSpec.getInstance())
 				.canJumpOnOver(x, y, environment_, jumpInto, isMarioInAir_);
+		Collection<String> facts = new ArrayList<String>(2);
 		if ((jumpOnOver[0] || jumpOnOver[1])
 				&& !jumpBlocked(gridX, gridY, levelObs, jumpInto)) {
-			if (jumpOnOver[0])
-				rete.assertString("(canJumpOn " + thing + ")");
-			if (jumpOnOver[1])
-				rete.assertString("(canJumpOver " + thing + ")");
+			if (jumpOnOver[0]) {
+				String fact = "(canJumpOn " + thing + ")";
+				rete.assertString(fact);
+				facts.add(fact);
+			}
+			if (jumpOnOver[1]) {
+				String fact = "(canJumpOver " + thing + ")";
+				rete.assertString(fact);
+				facts.add(fact);
+			}
 		}
+		return facts;
 	}
 
 	/**

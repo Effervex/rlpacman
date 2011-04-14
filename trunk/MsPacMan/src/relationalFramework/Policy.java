@@ -23,7 +23,7 @@ public class Policy {
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<GuidedRule> policyRules_;
 	/** The LGG rules added to the end of the policy. */
-	private Set<GuidedRule> lggRules_;
+	private Set<GuidedRule> rlggRules_;
 	/** The triggered rules in the policy */
 	private Set<GuidedRule> triggeredRules_;
 	/** The number of rules added to this policy (excluding modular) */
@@ -40,7 +40,7 @@ public class Policy {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
-		lggRules_ = new HashSet<GuidedRule>();
+		rlggRules_ = new HashSet<GuidedRule>();
 		policySize_ = 0;
 	}
 
@@ -53,7 +53,7 @@ public class Policy {
 	public Policy(Policy policy) {
 		this();
 		policyRules_.addAll(policy.policyRules_);
-		lggRules_.addAll(policy.lggRules_);
+		rlggRules_.addAll(policy.rlggRules_);
 		policySize_ = policy.policySize_;
 	}
 
@@ -77,7 +77,7 @@ public class Policy {
 			policyRules_.add(rule);
 			policySize_++;
 			if (isLGGRule)
-				lggRules_.add(rule);
+				rlggRules_.add(rule);
 		}
 	}
 
@@ -144,16 +144,16 @@ public class Policy {
 	}
 
 	/**
-	 * Checks if a rule is an LGG rule added automatically to the end of
-	 * policies. Not necessarily if the rule is an LGG rule, as those can be
+	 * Checks if a rule is an RLGG rule added automatically to the end of
+	 * policies. Not necessarily if the rule is an RLGG rule, as those can be
 	 * added manually too.
 	 * 
 	 * @param rule
 	 *            The rule being checked.
-	 * @return True if the rule was an automatically added LGG rule.
+	 * @return True if the rule was an automatically added RLGG rule.
 	 */
-	public boolean isCoveredRule(GuidedRule rule) {
-		return lggRules_.contains(rule);
+	public boolean isRLGGRule(GuidedRule rule) {
+		return rlggRules_.contains(rule);
 	}
 
 	/**
@@ -216,7 +216,7 @@ public class Policy {
 		final int prime = 31;
 		int result = 1;
 		result = prime * result
-				+ ((lggRules_ == null) ? 0 : lggRules_.hashCode());
+				+ ((rlggRules_ == null) ? 0 : rlggRules_.hashCode());
 		result = prime * result + (noteTriggered_ ? 1231 : 1237);
 		result = prime * result
 				+ ((policyRules_ == null) ? 0 : policyRules_.hashCode());
@@ -235,10 +235,10 @@ public class Policy {
 		if (getClass() != obj.getClass())
 			return false;
 		Policy other = (Policy) obj;
-		if (lggRules_ == null) {
-			if (other.lggRules_ != null)
+		if (rlggRules_ == null) {
+			if (other.rlggRules_ != null)
 				return false;
-		} else if (!lggRules_.equals(other.lggRules_))
+		} else if (!rlggRules_.equals(other.rlggRules_))
 			return false;
 		if (noteTriggered_ != other.noteTriggered_)
 			return false;
@@ -265,7 +265,7 @@ public class Policy {
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
-				if (!isCoveredRule(rule))
+				if (!isRLGGRule(rule))
 					buffer.append(rule.toNiceString() + "\n");
 			} else {
 				buffer.append("MODULAR: " + rule.toNiceString() + "\n");
@@ -327,6 +327,9 @@ public class Policy {
 				: actionsReturned;
 		// Check every slot, from top-to-bottom until enough have activated (as
 		// per actionsReturned)
+		// TODO Evaluate RLGG rules first, so policy evaluation can stop early
+		// if an action has been found (not applicable in environments where all
+		// actions are required.)
 		int actionsFound = 0;
 		Iterator<GuidedRule> iter = policyRules_.iterator();
 		while (iter.hasNext()) {
@@ -346,7 +349,7 @@ public class Policy {
 
 				// If there is at least one result
 				if (results.next()) {
-					Set<StringFact> actionsCollection = new HashSet<StringFact>();
+					List<StringFact> actionsCollection = new ArrayList<StringFact>();
 
 					// For each possible replacement
 					do {
@@ -375,6 +378,13 @@ public class Policy {
 					} while (results.next());
 
 					if (actionsFound < actionsReturnedModified) {
+						if ((actionsFound + actionsCollection.size()) > actionsReturnedModified) {
+							Collections.shuffle(actionsCollection,
+									PolicyGenerator.random_);
+							actionsCollection = actionsCollection.subList(0,
+									actionsReturnedModified - actionsFound);
+						}
+
 						// Turn on the actions
 						if (canAddRule(gr, actionsFound, actionsReturned))
 							actionSwitch.switchOn(new RuleAction(gr,
@@ -427,11 +437,12 @@ public class Policy {
 	 *            The set of valid action args.
 	 * @return True if the action is valid, false otherwise.
 	 */
-	private boolean isValidAction(String[] actionArgs, SortedSet<String[]> validArgs) {
+	private boolean isValidAction(String[] actionArgs,
+			SortedSet<String[]> validArgs) {
 		// If there are no chances for this action at all, return false.
 		if (validArgs == null)
 			return false;
-		
+
 		if (validArgs.contains(actionArgs))
 			return true;
 		return false;
@@ -462,7 +473,7 @@ public class Policy {
 
 		// If adding a covered rule to an infinite action list, don't add it if
 		// other actions have been.
-		if (isCoveredRule(gr) && (actionsReturned <= -1) && (actionsFound > 0)) {
+		if (isRLGGRule(gr) && (actionsReturned <= -1) && (actionsFound > 0)) {
 			return false;
 		}
 

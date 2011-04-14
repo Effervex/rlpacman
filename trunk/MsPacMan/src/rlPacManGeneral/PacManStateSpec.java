@@ -149,8 +149,8 @@ public class PacManStateSpec extends StateSpec {
 			rules.add("(distance ?Dot ?Dist0) "
 					+ "(dot ?Dot) => (moveTo ?Dot ?Dist0)");
 			rules
-			.add("(junctionSafety ?X ?__Num3&:(betweenRange ?__Num3 -16.0 28.0)) "
-					+ "=> (toJunction ?X ?__Num3)");
+					.add("(junctionSafety ?X ?__Num3&:(betweenRange ?__Num3 -16.0 28.0)) "
+							+ "=> (toJunction ?X ?__Num3)");
 		}
 
 		for (String rule : rules)
@@ -266,27 +266,10 @@ public class PacManStateSpec extends StateSpec {
 		else if (action.getFactName().equals("moveFrom"))
 			return new WeightedDirection((byte) (-path), weight);
 		else if (action.getFactName().equals("toJunction")) {
-			// Modify the distances such that a higher safety has a lower
-			// positive value
-			double normalisedSafety = state.getSafestJunction();
-			// If the best is 0, make it 1
-			if (normalisedSafety == 0)
-				normalisedSafety = 1;
-			// If the best is negative, make it positive
-			if (normalisedSafety < 0)
-				normalisedSafety *= -1;
-
 			// Junction value
 			int juncVal = Integer.parseInt(arguments[1]);
-			// If the junction has safety 0, there is neither weight towards,
-			// nor from it.
-			if (juncVal == 0)
-				return new WeightedDirection(distanceGrid.getDirection(), 0);
 
-			normalisedSafety /= juncVal;
-
-			weight = determineWeight(normalisedSafety);
-			return new WeightedDirection(distanceGrid.getDirection(), weight);
+			return new WeightedDirection(distanceGrid.getDirection(), juncVal);
 		}
 
 		return null;
