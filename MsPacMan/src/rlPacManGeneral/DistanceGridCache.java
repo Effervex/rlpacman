@@ -59,7 +59,14 @@ public class DistanceGridCache {
 				// valid position.
 				while ((iter == null) || (iter.hasNext())) {
 					// Initialise a new distance grid.
-					DistanceDir[][] distanceGrid = new DistanceDir[model.m_gameSizeX][model.m_gameSizeY];
+					Map<Byte, DistanceDir[][]> distanceGrids = new HashMap<Byte, DistanceDir[][]>();
+					//for (byte b = 0; b < PacManLowAction.values().length; b++) {
+					for (byte b = 0; b < 1; b++) {
+						distanceGrids
+								.put(
+										b,
+										new DistanceDir[model.m_gameSizeX][model.m_gameSizeY]);
+					}
 					SortedSet<Junction> closeJunctions = null;
 
 					Point origin = null;
@@ -67,7 +74,7 @@ public class DistanceGridCache {
 						origin = new Point(startX, startY);
 						// Initial searching to fill the validPositions
 						closeJunctions = searchMaze(startX, startY,
-								distanceGrid, validPositions, model);
+								distanceGrids, validPositions, model);
 						// Remove the initial position, so it isn't scanned
 						// twice and set the iterator.
 						validPositions.remove(origin);
@@ -76,11 +83,11 @@ public class DistanceGridCache {
 						origin = iter.next();
 						// Search from a valid position
 						closeJunctions = searchMaze(origin.x, origin.y,
-								distanceGrid, null, model);
+								distanceGrids, null, model);
 					}
 
 					// Insert the grid
-					grids[origin.x][origin.y] = new DistanceGrid(distanceGrid,
+					grids[origin.x][origin.y] = new DistanceGrid(distanceGrids,
 							closeJunctions);
 				}
 
@@ -100,8 +107,8 @@ public class DistanceGridCache {
 	 *            The origin X position.
 	 * @param originY
 	 *            The origin Y position.
-	 * @param distanceGrid
-	 *            The distance grid to fill.
+	 * @param distanceGrids
+	 *            The distance grids to fill.
 	 * @param validLocations
 	 *            A collection to fill with valid locations, or null if not
 	 *            filling it.
@@ -110,43 +117,78 @@ public class DistanceGridCache {
 	 * @return The closest immediate junctions to the origin point.
 	 */
 	public SortedSet<Junction> searchMaze(int originX, int originY,
-			DistanceDir[][] distanceGrid, Collection<Point> validLocations,
-			GameModel model) {
+			Map<Byte, DistanceDir[][]> distanceGrids,
+			Collection<Point> validLocations, GameModel model) {
 		SortedSet<Junction> closeJunctions = new TreeSet<Junction>();
 
 		Point playerLoc = new Point(originX, originY);
 
-		// Update the distance grid
-		Set<Point> knownJunctions = new HashSet<Point>();
-		// Check for junctions here.
-		Set<Junction> thisLoc = isJunction(playerLoc, 0, model, Thing.STILL);
-		if (thisLoc != null) {
-			Point p = thisLoc.iterator().next().getLocation();
-			knownJunctions.add(p);
-		}
+		// Check every direction
+		//for (byte dir = 0; dir < PacManLowAction.values().length; dir++) {
+		for (byte dir = 0; dir < 1; dir++) {
+			DistanceDir[][] distanceGrid = distanceGrids.get(dir);
 
-		SortedSet<Junction> junctionStack = new TreeSet<Junction>();
-		// Add the initial junction points to the stack
-		junctionStack.add(new Junction(playerLoc, Thing.UP, 0, Thing.UP));
-		junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0, Thing.DOWN));
-		junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0, Thing.LEFT));
-		junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0, Thing.RIGHT));
-		distanceGrid[playerLoc.x][playerLoc.y] = new DistanceDir(0, Thing.STILL);
-
-		// Keep following junctions until all have been found
-		while (!junctionStack.isEmpty()) {
-			Junction point = junctionStack.first();
-			junctionStack.remove(point);
-
-			Set<Junction> nextJunction = searchToJunction(point,
-					knownJunctions, model, distanceGrid, validLocations);
-			junctionStack.addAll(nextJunction);
-
-			// Checking for the immediate junctions
-			if ((!nextJunction.isEmpty())
-					&& (point.getLocation().equals(playerLoc))) {
-				closeJunctions.add(nextJunction.iterator().next());
+			// Update the distance grid
+			Set<Point> knownJunctions = new HashSet<Point>();
+			// Check for junctions here.
+			Set<Junction> thisLoc = isJunction(playerLoc, 0, model, Thing.STILL);
+			if (thisLoc != null) {
+				Point p = thisLoc.iterator().next().getLocation();
+				knownJunctions.add(p);
 			}
+
+			SortedSet<Junction> junctionStack = new TreeSet<Junction>();
+			// Add the initial junction points to the stack
+			if (dir != Thing.DOWN && dir != Thing.UP) {
+				junctionStack
+						.add(new Junction(playerLoc, Thing.UP, 0, Thing.UP));
+				junctionStack.add(new Junction(playerLoc, Thing.DOWN, 0,
+						Thing.DOWN));
+			}
+			if (dir != Thing.RIGHT && dir != Thing.LEFT) {
+				junctionStack.add(new Junction(playerLoc, Thing.LEFT, 0,
+						Thing.LEFT));
+				junctionStack.add(new Junction(playerLoc, Thing.RIGHT, 0,
+						Thing.RIGHT));
+			}
+			// Special case for directions - backup junctions (may not be used
+			// at all)
+			Set<Junction> backupJunctions = null;
+			if (dir != Thing.STILL) {
+				backupJunctions = new HashSet<Junction>(junctionStack);
+				junctionStack.clear();
+				junctionStack.add(new Junction(playerLoc, dir, 0, dir));
+			}
+
+			distanceGrid[playerLoc.x][playerLoc.y] = new DistanceDir(0,
+					Thing.STILL);
+
+			// Keep following junctions until all have been found
+			while (!junctionStack.isEmpty()) {
+				Junction point = junctionStack.first();
+				junctionStack.remove(point);
+
+				Set<Junction> nextJunction = searchToJunction(point,
+						knownJunctions, model, distanceGrid, validLocations);
+				junctionStack.addAll(nextJunction);
+
+				// Checking for the immediate junctions
+				if (point.getLocation().equals(playerLoc)) {
+					// If the direction is still, record the close junctions
+					if (dir == Thing.STILL && !nextJunction.isEmpty()) {
+						closeJunctions.add(nextJunction.iterator().next());
+					}
+
+					// If we have backup directions and the initial junction was
+					// invalid, load the backups.
+					if (backupJunctions != null && junctionStack.isEmpty()) {
+						junctionStack.addAll(backupJunctions);
+						backupJunctions = null;
+					}
+				}
+			}
+
+//			printDistanceGrid(distanceGrid);
 		}
 
 		return closeJunctions;
@@ -188,7 +230,6 @@ public class DistanceGridCache {
 		Set<Junction> isJunct = null;
 		boolean changed = false;
 		do {
-			// TODO Change junction definition to include corners
 			changed = false;
 			switch (direction) {
 			case Thing.UP:
@@ -312,14 +353,17 @@ public class DistanceGridCache {
 	 *            The x origin point.
 	 * @param originY
 	 *            The y origin point
+	 * @param direction
+	 *            The direction of the thing at the origin, if relevant.
 	 * @return The distance grid for the given parameters.
 	 */
-	public DistanceDir[][] getGrid(int level, int originX, int originY) {
+	public DistanceDir[][] getGrid(int level, int originX, int originY,
+			byte direction) {
 		level = (level - 1) % GameModel.MAX_LEVELS + 1;
 		DistanceGrid grid = grids_.get(level - 1)[originX][originY];
 		if (grid == null)
 			return null;
-		return grid.getDistanceGrid();
+		return grid.getDistanceGrid(direction);
 	}
 
 	/**
@@ -342,16 +386,34 @@ public class DistanceGridCache {
 	/**
 	 * A debug feature that allows visual inspection of the distance grid.
 	 */
-	public static void printDistanceGrid(int[][] distanceGrid) {
+	public static void printDistanceGrid(DistanceDir[][] distanceGrid) {
 		StringBuffer buffer = new StringBuffer();
 		for (int y = 0; y < distanceGrid[0].length; y++) {
 			for (int x = 0; x < distanceGrid.length; x++) {
-				if (distanceGrid[x][y] == Integer.MAX_VALUE)
+				if (distanceGrid[x][y] == null)
 					buffer.append("  ");
-				else if (distanceGrid[x][y] < 10)
-					buffer.append(" " + distanceGrid[x][y]);
-				else
-					buffer.append(distanceGrid[x][y]);
+				else {
+					String val = distanceGrid[x][y].getDistance() + "";
+//					switch (distanceGrid[x][y].getDirection()) {
+//					case Thing.UP:
+//						val = "U";
+//						break;
+//					case Thing.DOWN:
+//						val = "D";
+//						break;
+//					case Thing.LEFT:
+//						val = "L";
+//						break;
+//					case Thing.RIGHT:
+//						val = "R";
+//						break;
+//					}
+//					buffer.append(" " + val);
+					 if (distanceGrid[x][y].getDistance() < 10)
+					 buffer.append(" " + val);
+					 else
+					 buffer.append(val);
+				}
 				buffer.append(" ");
 			}
 			buffer.append("\n");
@@ -366,8 +428,8 @@ public class DistanceGridCache {
 	 * @author Sam Sarjant
 	 */
 	private class DistanceGrid {
-		/** The actual distance grid for this position. */
-		private DistanceDir[][] distanceGrid_;
+		/** The actual distance grids for this position, mapped by direction. */
+		private Map<Byte, DistanceDir[][]> distanceGrids_;
 
 		/** The closest junctions to the origin. */
 		private Collection<Junction> closeJunctions_;
@@ -376,18 +438,18 @@ public class DistanceGridCache {
 		 * A constructor for a distance grid.
 		 * 
 		 * @param distanceGrid
-		 *            The distance grid for the location.
+		 *            The distance grids for the location, mapped by direction.
 		 * @param closeJunctions
 		 *            The closest junctions to the origin location.
 		 */
-		public DistanceGrid(DistanceDir[][] distanceGrid,
+		public DistanceGrid(Map<Byte, DistanceDir[][]> distanceGrids,
 				Collection<Junction> closeJunctions) {
-			distanceGrid_ = distanceGrid;
+			distanceGrids_ = distanceGrids;
 			closeJunctions_ = closeJunctions;
 		}
 
-		public DistanceDir[][] getDistanceGrid() {
-			return distanceGrid_;
+		public DistanceDir[][] getDistanceGrid(byte direction) {
+			return distanceGrids_.get(direction);
 		}
 
 		public Collection<Junction> getCloseJunctions() {

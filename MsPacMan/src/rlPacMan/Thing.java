@@ -36,12 +36,12 @@ public abstract class Thing extends PacPoint {
 	Rectangle m_boundingBox; // Bounding box of Thing in pixels
 	boolean m_bPaused = false;
 	boolean m_bVisible = false;
-	
+
 	int pixelX_;
 	int pixelY_;
 	int pixelSize_;
 	int pixelShrink_;
-	
+
 	Random random_ = new Random(0);
 
 	public Thing(GameModel gameModel, int startX, int startY, boolean bMiddleX) {
@@ -108,17 +108,22 @@ public abstract class Thing extends PacPoint {
 	public void setPaused(boolean bPaused) {
 		m_bPaused = bPaused;
 	}
-	
+
 	/**
 	 * Checks if a movement is valid.
 	 * 
-	 * @param direction The direction to move in.
-	 * @param locX The x location.
-	 * @param locY The y location.
-	 * @param model The game model.
+	 * @param direction
+	 *            The direction to move in.
+	 * @param locX
+	 *            The x location.
+	 * @param locY
+	 *            The y location.
+	 * @param model
+	 *            The game model.
 	 * @return True if the movement is allowed, false otherwise.
 	 */
-	public static boolean isValidMove(int direction, int locX, int locY, GameModel model) {
+	public static boolean isValidMove(byte direction, int locX, int locY,
+			GameModel model) {
 		// If the request direction is blocked by a wall, then just return the
 		// current location
 		if ((direction == UP && (model.m_gameState[locX][locY] & GameModel.GS_NORTH) != 0)
@@ -133,7 +138,7 @@ public abstract class Thing extends PacPoint {
 	// This method will take the specified location and direction and determine
 	// for the given location if the thing moved in that direction, what the
 	// next possible turning location would be.
-	public static boolean getDestination(int direction, int locX, int locY,
+	public static boolean getDestination(byte direction, int locX, int locY,
 			Point point, GameModel model) {
 		if (!isValidMove(direction, locX, locY, model))
 			return false;

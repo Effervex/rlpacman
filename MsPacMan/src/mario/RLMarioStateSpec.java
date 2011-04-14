@@ -44,11 +44,11 @@ public class RLMarioStateSpec extends StateSpec {
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
 		preconds.put("move", "(canJumpOn ?X) (thing ?X) "
-				+ "(distance ?X ?Y&:(outsideRange ?Y -8 8))");
+				+ "(distance ?X ?Y&:(outsideRange ?Y -16 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
 		preconds.put("search",
-				"(brick ?X)  (distance ?X ?Y&:(betweenRange ?Y -32 32)) "
+				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
 						+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
@@ -66,7 +66,7 @@ public class RLMarioStateSpec extends StateSpec {
 
 		// Shoot a fireball at an enemy
 		preconds.put("shootFireball", "(marioPower ?Z&:(= ?Z fire)) "
-				+ "(distance ?X ?Y) "
+				+ "(distance ?X ?Y&:(outsideRange ?Y -8 8)) "
 				+ "(heightDiff ?X ?H&:(betweenRange ?H -16 16)) (enemy ?X)");
 
 		// Shoot a held shell at an enemy
@@ -311,21 +311,45 @@ public class RLMarioStateSpec extends StateSpec {
 			} else if (isMarioInAir)
 				canJumpOnOver[0] = true;
 		} else {
-
 			// If not in the same axis, 'reduce' the height of the thing being
 			// jumped into if jumping into something
-			float jumpIntoBonus = (jumpInto) ? extra : 0;
-			if (diffs[1] - jumpIntoBonus <= MAX_JUMP_HEIGHT)
+			if (jumpInto)
+				diffs[1] -= extra;
+
+			if (canJump(diffs, 0))
 				canJumpOnOver[0] = true;
 
 			// Can only jump over things about a cell and a half lower than MAX
 			// JUMP HEIGHT
-			if (diffs[1] <= MAX_JUMP_HEIGHT - cellSize * 1.5)
+			if (canJump(diffs, cellSize * 1.5f))
 				canJumpOnOver[1] = true;
 		}
 
 		// return false;
 		return canJumpOnOver;
+	}
+
+	/**
+	 * A basic method which checks if a thing can be jumped onto/over
+	 * 
+	 * @param diffs
+	 *            The x,y diffs between the point and Mario. A positive y
+	 *            indicates the object is higher than Mario.
+	 * @param extraDist
+	 *            If there is extra distance to cover (for jumping over
+	 *            something).
+	 * @return True if Mario can jump onto/over the thing.
+	 */
+	private boolean canJump(float[] diffs, float extraDist) {
+		// Vertical limit
+		float vertLimit = (extraDist != 0) ? cellSize * 1.5f : 0;
+		if (diffs[1] <= MAX_JUMP_HEIGHT - vertLimit) {
+			// Horizontal limit
+			float canJumpDist = diffs[0] + diffs[1] + extraDist;
+			if (canJumpDist < MAX_JUMP_DIST_RUNNING)
+				return true;
+		}
+		return false;
 	}
 
 	/**
@@ -375,7 +399,7 @@ public class RLMarioStateSpec extends StateSpec {
 		currentEndDiffs_[1] = marioPos[1] - y;
 
 		// Direction specific variables
-		if (x > startPos[0]) {
+		if (x > marioPos[0]) {
 			direction_ = Environment.MARIO_KEY_RIGHT;
 			oppDirection_ = Environment.MARIO_KEY_LEFT;
 			directedCellSize_ = cellSize;
@@ -537,8 +561,7 @@ public class RLMarioStateSpec extends StateSpec {
 	private boolean[] preJumpOnto(float startX, float startY, float currentX,
 			float currentY, float endX, float endY, boolean bigMario) {
 		// If Mario is beyond jumping distance, move closer.
-		float canJumpDist = currentEndDiffs_[0] + currentEndDiffs_[1];
-		if (canJumpDist < MAX_JUMP_DIST_RUNNING) {
+		if (canJump(currentEndDiffs_, 0)) {
 			return jumpOnto(startX, startY, currentX, currentY, endX, endY);
 		} else
 			return move(startX, startY, currentX, currentY, endX, endY,
@@ -584,15 +607,15 @@ public class RLMarioStateSpec extends StateSpec {
 		// through the jump.
 
 		// Modify the values for jumping if the y location is lower
-//		float lowerX = (endY > startY) ? endX - (endY - startY) : endX;
-//		float lowerY = (endY > startY) ? startY : endY;
-//		float releaseJumpPoint = (float) Point.distance(startX, startY, lowerX,
-//				lowerY) / 4;
-//		releaseJumpPoint = Math.max(releaseJumpPoint, 1);
-//		if (startCurrentDiffX_ <= releaseJumpPoint || currentEndDiffs_[1] > 0)
+		float releaseJumpPoint = startEndDiffs_[0] / 3;
+		releaseJumpPoint = Math.max(releaseJumpPoint, 1);
+		// Special case, if the object is immediately beside Mario
+		if (startEndDiffs_[0] <= cellSize && startEndDiffs_[1] > 0)
+			releaseJumpPoint = Integer.MAX_VALUE;
+		if (currentEndDiffs_[0] > releaseJumpPoint || currentEndDiffs_[1] > 0)
 			actionArray[Mario.KEY_JUMP] = true;
-//		else
-//			actionArray[Mario.KEY_JUMP] = false;
+		else
+			actionArray[Mario.KEY_JUMP] = false;
 
 		// Running or not
 		if (startEndDiffs_[0] >= MAX_JUMP_DIST)
@@ -657,9 +680,7 @@ public class RLMarioStateSpec extends StateSpec {
 			float currentY, float endX, float endY, int width, boolean bigMario) {
 		// If Mario is beyond jumping distance, move closer.
 		float jumpPoint = (width + 1.5f) * cellSize;
-		float canJumpDist = currentEndDiffs_[0] + currentEndDiffs_[1]
-				+ jumpPoint;
-		if (canJumpDist < MAX_JUMP_DIST_RUNNING) {
+		if (canJump(currentEndDiffs_, jumpPoint)) {
 			if (negModifier_ > 0)
 				endX = endX + jumpPoint;
 			else

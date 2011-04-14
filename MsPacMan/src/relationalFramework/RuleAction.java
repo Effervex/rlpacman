@@ -2,7 +2,6 @@ package relationalFramework;
 
 import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * A class which describes the actions returned by a specific GuidedRule.
@@ -14,7 +13,7 @@ public class RuleAction {
 	private GuidedRule rule_;
 
 	/** The actions spawned by the rule. */
-	private Set<StringFact> actions_;
+	private Collection<StringFact> actions_;
 
 	/** The policy that created this rule action. */
 	private Policy policy_;
@@ -25,7 +24,7 @@ public class RuleAction {
 	 */
 	private boolean utilised_;
 
-	public RuleAction(GuidedRule rule, Set<StringFact> actionsList,
+	public RuleAction(GuidedRule rule, Collection<StringFact> actionsList,
 			Policy policy) {
 		rule_ = rule;
 		actions_ = actionsList;
@@ -63,7 +62,7 @@ public class RuleAction {
 	 * 
 	 * @return The actions for this rule action.
 	 */
-	public Set<StringFact> getActions() {
+	public Collection<StringFact> getActions() {
 		return actions_;
 	}
 
