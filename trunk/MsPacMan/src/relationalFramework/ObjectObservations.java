@@ -27,6 +27,12 @@ public class ObjectObservations {
 	public MultiMap<String, String[]> validActions;
 
 	/**
+	 * If the environment should end the episode early, from an agent's
+	 * prompting.
+	 */
+	public boolean earlyExit;
+
+	/**
 	 * The private, empty constructor
 	 */
 	private ObjectObservations() {

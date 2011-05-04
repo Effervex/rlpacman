@@ -118,7 +118,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
-			rules[0] = "(clear ?X) (above ?X a) => (move ?X ?Y)";
+			rules[0] = "(clear ?X) (above ?X a) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("highestA")) {
 			rules = new String[2];
 			rules[0] = "(clear ?X) (above ?X a) (floor ?Y) => (move ?X ?Y)";

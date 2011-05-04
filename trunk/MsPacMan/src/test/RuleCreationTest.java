@@ -4,8 +4,10 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -19,6 +21,7 @@ import org.junit.Test;
 
 import relationalFramework.ActionChoice;
 import relationalFramework.ConditionComparator;
+import relationalFramework.Module;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.Policy;
@@ -72,9 +75,9 @@ public class RuleCreationTest {
 		Policy policy = new Policy();
 		RuleAction ra = new RuleAction(new GuidedRule(
 				"(clear a) => (moveFloor a)"), actions, policy);
-		ra.getActions();
+		ra.triggerRule();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac, null);
+		sut_.formPreGoalState(facts, ac, null, null);
 		Collection<StringFact> preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
@@ -90,9 +93,9 @@ public class RuleCreationTest {
 		actions.add(StateSpec.toStringFact("(moveFloor b)"));
 		ra = new RuleAction(new GuidedRule("(clear b) => (moveFloor b)"),
 				actions, policy);
-		ra.getActions();
+		ra.triggerRule();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac, null);
+		sut_.formPreGoalState(facts, ac, null, null);
 		preGoal = sut_.getPreGoalState("moveFloor");
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?X)")));
@@ -121,21 +124,22 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
 				policy);
-		ra.getActions();
+		ra.triggerRule();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac, null);
+		sut_.formPreGoalState(facts, ac, null, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains the defined preds, above and clear preds
-		assertEquals(9, preGoal.size());
+		assertEquals(10, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear b)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block a)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block b)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(on a ?)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(on b ?)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(on a d)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(on b e)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(highest a)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a ?)")));
-		assertTrue(preGoal.contains(StateSpec.toStringFact("(above b ?)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a d)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above a c)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above b e)")));
 
 		state.reset();
 		state.eval("(assert (block a))");
@@ -156,9 +160,9 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move a b)"), actions,
 				policy);
-		ra.getActions();
+		ra.triggerRule();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac, null);
+		sut_.formPreGoalState(facts, ac, null, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(6, preGoal.size());
@@ -176,9 +180,9 @@ public class RuleCreationTest {
 		ra = new RuleAction(
 				new GuidedRule("(clear a) (clear b) => (move b a)"), actions,
 				policy);
-		ra.getActions();
+		ra.triggerRule();
 		ac.switchOn(ra);
-		sut_.formPreGoalState(facts, ac, null);
+		sut_.formPreGoalState(facts, ac, null, null);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(4, preGoal.size());
@@ -188,7 +192,34 @@ public class RuleCreationTest {
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?Y)")));
 
 		// Modular pre-goal
-
+		ac = new ActionChoice();
+		actions.clear();
+		actions.add(StateSpec.toStringFact("(move b a)"));
+		ra = new RuleAction(
+				new GuidedRule("(clear a) (clear b) => (move b a)"), actions,
+				policy);
+		ra.triggerRule();
+		ac.switchOn(ra);
+		Map<String, String> replacement = new HashMap<String, String>();
+		replacement.put("b", Module.createModuleParameter(0));
+		sut_.clearPreGoalState();
+		sut_.formPreGoalState(facts, ac, null, replacement);
+		preGoal = sut_.getPreGoalState("move");
+		// Contains less than the defined preds, above and clear preds
+		assertEquals(preGoal.toString(), 8, preGoal.size());
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(onFloor a)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(highest "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(block a)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(block "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(on "
+				+ Module.createModuleParameter(0) + " f)")));
+		assertTrue(preGoal.contains(StateSpec.toStringFact("(above "
+				+ Module.createModuleParameter(0) + " f)")));
 	}
 
 	/**
@@ -730,6 +761,41 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec.toStringFact("(above ?X a)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(above ?Y ?)")));
 		assertEquals(results.size(), 2);
+	}
+
+	@Test
+	public void testSimplifyRuleBWMove() {
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
+		sut_ = new RuleCreation();
+		assertTrue("No loaded agent observations. Cannot run test.", sut_
+				.hasAgentObservations());
+		
+		// Strange issue:
+		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+				ConditionComparator.getInstance());
+		ruleConds.add(StateSpec.toStringFact("(highest ?Y)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?Y ?)"));
+		ruleConds.add(StateSpec.toStringFact("(block ?Y)"));
+		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+				false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(highest ?Y)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(block ?Y)")));
+		assertEquals(results.size(), 2);
+		
+		ruleConds = new TreeSet<StringFact>(
+				ConditionComparator.getInstance());
+		ruleConds.add(StateSpec.toStringFact("(highest ?Y)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?Y floor)"));
+		ruleConds.add(StateSpec.toStringFact("(above ?Y ?)"));
+		ruleConds.add(StateSpec.toStringFact("(block ?Y)"));
+		results = sut_.simplifyRule(ruleConds, null,
+				false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(highest ?Y)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(above ?Y floor)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(block ?Y)")));
+		assertEquals(results.size(), 3);
 	}
 
 	@Test

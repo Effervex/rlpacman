@@ -49,9 +49,6 @@ public class Slot implements Serializable {
 	/** The variance on the chances of the slot being selected. */
 	private double selectionSD_;
 
-	/** The number of times the slot should be used. */
-	private int numSlotUses_;
-
 	/**
 	 * The constructor for a new Slot.
 	 * 
@@ -67,7 +64,6 @@ public class Slot implements Serializable {
 		else
 			selectionProb_ = INITIAL_SLOT_PROB;
 		selectionSD_ = 0.5;
-		numSlotUses_ = 0;
 	}
 
 	/**
@@ -149,33 +145,20 @@ public class Slot implements Serializable {
 	 * distribution. Note that if it is not used, it must be removed.
 	 * 
 	 * @param random
-	 *            The random number generator used for generating a gaussian
+	 *            The random number generator used for generating a Gaussian
 	 *            value.
-	 * @return A boolean array of two elements: whether to use the slot and
-	 *         whether to keep the slot. Note that !Use -> !Keep
+	 * @return True if the slot should be used, false otherwise.
 	 */
-	public boolean[] shouldUseSlot(Random random) {
-		boolean[] useSlot = new boolean[2];
-		if (numSlotUses_ <= 0) {
-			// The slot has not been sampled yet and needs to set a selection
-			// probability.
-			double gauss = random.nextGaussian();
-			double selectionProb = selectionProb_ + selectionSD_ * gauss;
-			numSlotUses_ = 0;
-			while (random.nextDouble() < selectionProb) {
-				numSlotUses_++;
-				selectionProb--;
-			}
+	public int numSlotUses(Random random) {
+		// Generate the probability of slot use
+		double gauss = random.nextGaussian();
+		double selectionProb = selectionProb_ + selectionSD_ * gauss;
+		int numUses = 0;
+		while (random.nextDouble() < selectionProb) {
+			numUses++;
+			selectionProb--;
 		}
-
-		// Use the slot if available, and remove it if no more uses are left.
-		if (numSlotUses_ > 0)
-			useSlot[0] = true;
-		numSlotUses_--;
-		if (numSlotUses_ > 0)
-			useSlot[1] = true;
-
-		return useSlot;
+		return numUses;
 	}
 
 	/**
@@ -296,8 +279,21 @@ public class Slot implements Serializable {
 		// TODO Fix the slot in place by creating a single rule for it
 	}
 
+	// TODO Be careful when changing this (to the KLsize). Make sure the
+	// affected calls remain valid.
 	public int size() {
 		return ruleGenerator_.size();
+	}
+
+	/**
+	 * Gets the slot's maximum capacity, based on the number of possible rule
+	 * specialisations.
+	 * 
+	 * @return The maximum capacity. Note that the size CAN be ovr this, but no
+	 *         mutations will be allowed.
+	 */
+	public int getMaximumCapacity() {
+		return PolicyGenerator.getInstance().getNumSpecialisations(action_) + 1;
 	}
 
 	/**
@@ -312,7 +308,6 @@ public class Slot implements Serializable {
 		clone.selectionProb_ = selectionProb_;
 		clone.selectionSD_ = selectionSD_;
 		clone.fixed_ = fixed_;
-		clone.numSlotUses_ = numSlotUses_;
 		clone.ruleGenerator_ = ruleGenerator_.clone();
 		if (slotSplitFacts_ != null)
 			clone.slotSplitFacts_ = new ArrayList<StringFact>(slotSplitFacts_);

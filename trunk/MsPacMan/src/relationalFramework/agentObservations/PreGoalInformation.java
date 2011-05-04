@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 
+import relationalFramework.Module;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -34,7 +35,9 @@ public class PreGoalInformation implements Serializable {
 		// Check if there are constant terms at all
 		Collection<String> constantTerms = new HashSet<String>();
 		for (String term : actionTerms_) {
-			if (term.charAt(0) != '?' && !StateSpec.isNumber(term)) {
+			if ((term.charAt(0) != '?' || term
+					.contains(Module.MOD_VARIABLE_PREFIX))
+					&& !StateSpec.isNumber(term)) {
 				constantTerms.add(term);
 			}
 		}
@@ -77,12 +80,6 @@ public class PreGoalInformation implements Serializable {
 	public void resetInactivity() {
 		inactivity_ = 0;
 		determineTermTypes();
-	}
-
-	public boolean isSettled() {
-		if (inactivity_ < AgentObservations.INACTIVITY_THRESHOLD)
-			return false;
-		return true;
 	}
 
 	public boolean isRecentlyChanged() {

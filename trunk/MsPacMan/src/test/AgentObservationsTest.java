@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ import org.junit.Test;
 
 import blocksWorld.BlocksWorldStateSpec;
 
+import relationalFramework.Module;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
@@ -259,7 +261,7 @@ public class AgentObservationsTest {
 		for (BackgroundKnowledge stateSpecBK : BlocksWorldStateSpec
 				.getInstance().getBackgroundKnowledgeConditions())
 			sut_.getLearnedBackgroundKnowledge().remove(stateSpecBK);
-//		assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
+		// assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
 
 		// Cover another different (flat) state
 		// [a][b][c][d][e][f]
@@ -444,7 +446,7 @@ public class AgentObservationsTest {
 		for (BackgroundKnowledge stateSpecBK : BlocksWorldStateSpec
 				.getInstance().getBackgroundKnowledgeConditions())
 			sut_.getLearnedBackgroundKnowledge().remove(stateSpecBK);
-//		assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
+		// assertEquals(sut_.getLearnedBackgroundKnowledge().size(), 0);
 	}
 
 	@Test
@@ -918,7 +920,7 @@ public class AgentObservationsTest {
 		sut_.scanState(facts);
 
 		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move c e)"), null, false);
+				.toStringFact("(move c e)"), null, false, null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -938,7 +940,7 @@ public class AgentObservationsTest {
 
 		// A different move action
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move d c)"), null, false);
+				.toStringFact("(move d c)"), null, false, null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear d)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block d)")));
@@ -973,7 +975,7 @@ public class AgentObservationsTest {
 
 		// And another
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), null, false);
+				.toStringFact("(move e c)"), null, false, null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -988,6 +990,50 @@ public class AgentObservationsTest {
 		assertTrue(relevantFacts
 				.contains(StateSpec.toStringFact("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 9);
+		// Testing the action conditions
+		specialisationConditions = sut_.getSpecialisationConditions("move");
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(highest ?X)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(highest ?Y)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?X))")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?Y))")));
+		assertFalse(specialisationConditions.contains(StateSpec
+				.toStringFact("(on ?X ?)")));
+		assertFalse(specialisationConditions.contains(StateSpec
+				.toStringFact("(on ?Y ?)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(above ?X ?)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(above ?Y ?)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(onFloor ?X)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(onFloor ?Y)")));
+		assertEquals(specialisationConditions.size(), 8);
+
+		// Replacements
+		Map<String, String> replacements = new HashMap<String, String>();
+		replacements.put("e", Module.createModuleParameter(0));
+		relevantFacts = sut_.gatherActionFacts(StateSpec
+				.toStringFact("(move e c)"), null, true, replacements);
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(highest "
+				+ Module.createModuleParameter(0) + ")")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(on "
+				+ Module.createModuleParameter(0) + " ?)")));
+		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(above "
+				+ Module.createModuleParameter(0) + " ?)")));
+		assertTrue(relevantFacts
+				.contains(StateSpec.toStringFact("(onFloor c)")));
+		assertEquals(relevantFacts.size(), 8);
 		// Testing the action conditions
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec

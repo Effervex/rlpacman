@@ -190,19 +190,12 @@ public class Policy {
 	 * @param goalState
 	 *            The arguments to apply to the parameters.
 	 */
-	public void parameterArgs(List<ValueVector> goalState) {
+	public void parameterArgs(String[] goalArgs) {
 		List<String> params = null;
-		if (goalState != null) {
+		if (goalArgs != null) {
 			params = new ArrayList<String>();
-			try {
-				for (ValueVector vv : goalState) {
-					for (int i = 0; i < vv.size(); i++) {
-						params.add(vv.get(i).stringValue(null));
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			for (String arg : goalArgs)
+				params.add(arg);
 		}
 
 		// Set the parameters for the policy rules.

@@ -11,15 +11,16 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.Stack;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
@@ -101,10 +102,7 @@ public class PolicyGenerator implements Serializable {
 	public boolean weightedElites_ = false;
 
 	/** If modules are being used. */
-	public boolean useModules_ = false;
-
-	/** If the slots can be dynamically added/removed. */
-	public boolean dynamicSlotNumber_ = true;
+	public boolean useModules_ = true;
 
 	/**
 	 * The maximum amount of change between the slots before it is considered
@@ -163,6 +161,15 @@ public class PolicyGenerator implements Serializable {
 	public static final int NUM_NUMERICAL_SPLITS = 3;
 
 	/**
+	 * The increment for an ordering value to increase when resolving ordering
+	 * value clashes.
+	 */
+	private static final double ORDER_CLASH_INCREMENT = 0.001;
+
+	/** Just a value to add to the ordering to keep RLGG rules seperate. */
+	private static final double RLGG_ORDERING_VALUE = 10;
+
+	/**
 	 * The constructor for creating a new Policy Generator.
 	 */
 	public PolicyGenerator() {
@@ -192,37 +199,31 @@ public class PolicyGenerator implements Serializable {
 
 		Policy policy = new Policy();
 
-		// Clone the ordered distribution and normalise it so the largest slot
-		// usage value is at least 1.
-		ProbabilityDistribution<Slot> removalDist = new ProbabilityDistribution<Slot>(
-				random_);
+		SortedMap<Double, GuidedRule> policyOrdering = new TreeMap<Double, GuidedRule>();
+
+		// Run through every slot, adding them where possible. Add slots to a
+		// sorted map, which determines the ordering.
+		boolean noRules = true;
 		for (Slot slot : slotGenerator_) {
-			removalDist.add(slot.clone(), slotGenerator_.getOrdering(slot));
-		}
+			double slotOrdering = slotGenerator_.getOrdering(slot);
+			int maxCapacity = slot.getMaximumCapacity();
+			double slotFillLevel = (maxCapacity > 1) ? (1.0 * slot.size() - 1)
+					/ (maxCapacity - 1) : 1;
+			double slotOrderSD = slotGenerator_.getOrderingSD(slot,
+					slotFillLevel);
 
-		int i = 0;
-		boolean emptyPolicy = true;
-		while (!removalDist.isEmpty()) {
-			Slot slot = null;
-			if (!dynamicSlotNumber_ || slotOptimisation_) {
-				// Sample with removal, getting the most likely if frozen.
-				slot = removalDist.sampleWithRemoval(false);
-			} else {
-				slot = removalDist.sample(false);
-				boolean[] useSlot = slot.shouldUseSlot(random_);
-				// If we are removing the slot, remove it
-				if (!useSlot[1])
-					removalDist.remove(slot);
-				// If we aren't using the slot, set it to null.
-				if (!useSlot[0])
-					slot = null;
-			}
+			// Insert the slot as many times as required.
+			if (!slot.isEmpty()) {
+				noRules = false;
+				int slotUses = slot.numSlotUses(random_);
+				for (int i = 0; i < slotUses; i++) {
+					double slotOrderVal = slotOrdering + random_.nextGaussian()
+							* slotOrderSD;
+					// Ensure the slot is placed in a unique order - no clashes.
+					while (policyOrdering.containsKey(slotOrderVal))
+						slotOrderVal += ORDER_CLASH_INCREMENT;
 
-			if (slot != null) {
-				emptyPolicy = false;
-				if (!slot.isEmpty()) {
-					// If influencing towards untested rules, skew the slot
-					// distribution towards lesser used rules.
+					// Sample a rule and add it
 					GuidedRule gr = null;
 					if (influenceUntestedRules) {
 						gr = slot.getInfluencedDistribution(
@@ -231,59 +232,39 @@ public class PolicyGenerator implements Serializable {
 						gr.incrementRuleUses();
 					} else
 						gr = slot.sample(false);
-					if (gr != null) {
-						policy.addRule(gr, true, false);
-						slot.getGenerator().remove(gr);
-						slot.getGenerator().normaliseProbs();
-					}
+					policyOrdering.put(slotOrderVal, gr);
 				}
 			}
 		}
 
+		// If there are no rules, return an empty policy.
+		if (noRules)
+			return policy;
+
 		// If the policy is empty while there are available slots, try again
-		if (emptyPolicy)
+		if (policyOrdering.isEmpty())
 			return generatePolicy(influenceUntestedRules);
 
-		// Append the general rules as well (if they aren't already in there) to
-		// ensure unnecessary covering isn't triggered.
-
-		// First get them in order
-		SortedSet<GuidedRule> orderedSlotRules = new TreeSet<GuidedRule>(
-				new Comparator<GuidedRule>() {
-					/**
-					 * Compares two rules and orders them by slot probability.
-					 * 
-					 * @param r1
-					 *            Rule 1.
-					 * @param r2
-					 *            Rule 2.
-					 * @return -1 if rule 1's slot probability is higher, 0 if
-					 *         equal, and 1 if lower.
-					 */
-					@Override
-					public int compare(GuidedRule r1, GuidedRule r2) {
-						// Null slot case
-						if (r1.getSlot() == null) {
-							if (r2.getSlot() != null)
-								return r1.compareTo(r2);
-							return 1;
-						} else if (r2.getSlot() == null)
-							return -1;
-
-						int result = Double.compare(slotGenerator_
-								.getOrdering(r1.getSlot()), slotGenerator_
-								.getOrdering(r2.getSlot()));
-						if (result != 0)
-							return result;
-						return r1.compareTo(r2);
-					}
-				});
-
-		orderedSlotRules.addAll(rlggRules_.values());
-		for (GuidedRule coveredRule : orderedSlotRules) {
-			if (!policy.contains(coveredRule))
-				policy.addRule(coveredRule, false, true);
+		// Add the RLGG rules
+		for (GuidedRule rlggRule : rlggRules_.values()) {
+			if (!policyOrdering.containsValue(rlggRule)) {
+				double ordering = RLGG_ORDERING_VALUE
+						+ slotGenerator_.getOrdering(rlggRule.getSlot());
+				while (policyOrdering.containsKey(ordering))
+					ordering += ORDER_CLASH_INCREMENT;
+				policyOrdering.put(ordering, rlggRule);
+			}
 		}
+
+		// Add the rules, noting the RLGG rules.
+		for (Double orders : policyOrdering.keySet()) {
+			GuidedRule rule = policyOrdering.get(orders);
+			if (orders >= RLGG_ORDERING_VALUE)
+				policy.addRule(rule, false, true);
+			else
+				policy.addRule(rule, true, false);
+		}
+
 		return policy;
 	}
 
@@ -401,8 +382,7 @@ public class PolicyGenerator implements Serializable {
 
 		// (Only check for postUpdate mutations - not split slot mutations)
 		// If the rule's slot isn't already full
-		int maximumSlotCapacity = ruleCreation_.getNumSpecialisations(rule
-				.getActionPredicate());
+		int maximumSlotCapacity = rule.getSlot().getMaximumCapacity();
 		if ((mutationUses > -1) && rule.getSlot().size() > maximumSlotCapacity)
 			return false;
 
@@ -666,21 +646,25 @@ public class PolicyGenerator implements Serializable {
 	 *            The final action(s) taken by the agent.
 	 * @param constants
 	 *            Extra constants to note down in the pre-goal.
+	 * @param replacements
+	 *            An optional replacement map for transforming the state and
+	 *            actions.
 	 */
 	public void formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actions, Collection<String> constants) {
+			ActionChoice actions, Collection<String> constants,
+			Map<String, String> replacements) {
 		if (!frozen_ && !slotOptimisation_) {
 			// Form the pre-goal using the final action/s as a parameter.
-			Collection<String> settledGoals = ruleCreation_.formPreGoalState(
-					preGoalState, actions, constants);
+			boolean changedPreGoal = ruleCreation_.formPreGoalState(
+					preGoalState, actions, constants, replacements);
 			String actionPred = actions.getActionPreds();
 			if (debugMode_) {
 				try {
-					if (settledGoals.contains(actionPred))
-						System.out.println("\tSETTLED PRE-GOAL STATE " + "("
+					if (changedPreGoal)
+						System.out.println("\tFORMING PRE-GOAL STATE " + "("
 								+ actionPred + "):");
 					else
-						System.out.println("\tFORMING PRE-GOAL STATE " + "("
+						System.out.println("\tEXISTING PRE-GOAL STATE " + "("
 								+ actionPred + "):");
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -802,10 +786,10 @@ public class PolicyGenerator implements Serializable {
 	 * @param stepSize
 	 *            The step size update parameter.
 	 */
-	public void updateDistributions(List<PolicyValue> sortedPolicies,
+	public void updateDistributions(Collection<PolicyValue> sortedPolicies,
 			int numElite, double stepSize) {
 		// Keep count of the rules seen (and slots used)
-		ElitesData ed = countRules(sortedPolicies.subList(0, numElite));
+		ElitesData ed = countRules(sortedPolicies);
 
 		klDivergence_ = 0;
 
@@ -844,18 +828,18 @@ public class PolicyGenerator implements Serializable {
 	 *            The relative positions of slots within the elite policies.
 	 * @return The average value of the elite samples.
 	 */
-	private ElitesData countRules(List<PolicyValue> elites) {
+	private ElitesData countRules(Collection<PolicyValue> elites) {
 		ElitesData ed = new ElitesData();
 
 		double gradient = 0;
 		double offset = 1;
-		if (weightedElites_) {
-			double diffValues = (elites.get(0).getValue() - elites.get(
-					elites.size() - 1).getValue());
-			if (diffValues != 0)
-				gradient = (1 - MIN_UPDATE) / diffValues;
-			offset = 1 - gradient * elites.get(0).getValue();
-		}
+//		if (weightedElites_) {
+//			double diffValues = (elites.get(0).getValue() - elites.get(
+//					elites.size() - 1).getValue());
+//			if (diffValues != 0)
+//				gradient = (1 - MIN_UPDATE) / diffValues;
+//			offset = 1 - gradient * elites.get(0).getValue();
+//		}
 
 		// Only selecting the top elite samples
 		MultiMap<Slot, Double> slotNumeracy = MultiMap.createListMultiMap();
@@ -1004,12 +988,10 @@ public class PolicyGenerator implements Serializable {
 		// terms.
 		for (Slot slot : slotGenerator_) {
 			for (GuidedRule gr : slot.getGenerator()) {
-				// Check the rule's pre-goal is settled
-				if (ruleCreation_.isPreGoalSettled(gr.getActionPredicate())) {
-					ConstantPred constants = gr.getConstantConditions();
-					if (constants != null)
-						constantFacts.add(constants);
-				}
+				// TODO Extract the constant preds from the pre-goal.
+				ConstantPred constants = gr.getConstantConditions();
+				if (constants != null)
+					constantFacts.add(constants);
 			}
 		}
 		return constantFacts;

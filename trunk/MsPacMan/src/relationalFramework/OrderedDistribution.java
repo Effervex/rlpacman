@@ -15,10 +15,20 @@ import java.util.Set;
  * An ordered distribution is a distribution which attempts to optimise the
  * ordering of the elements contained within it.
  * 
+ * TODO Is an OrderedDistribution really necessary? I think the ordering value
+ * could be put with the slot and the slots just stored in any old collection.
+ * They're all drawn at each step anyway.
+ * 
  * @author Sam Sarjant
  */
 public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	private static final long serialVersionUID = 5024008061049583631L;
+
+	/** The initial ordering value. */
+	private static final double INITIAL_ORDERING = 0.5;
+
+	/** The initial ordering SD. */
+	private static final double INITIAL_ORDERING_SD = 0.25;
 
 	/** The elements contained within the distribution. */
 	private Map<T, Double> elements_;
@@ -239,6 +249,34 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
+	 * Gets the ordering of the element.
+	 * 
+	 * @param element
+	 *            The element to find the ordering for.
+	 * @return An ordering between 0 and 1 inclusive or null if not present.
+	 */
+	public Double getOrdering(T element) {
+		return elements_.get(element);
+	}
+
+	/**
+	 * Gets the ordering standard deviation of the element, with regard to a
+	 * numerical parameter between 0 and 1.
+	 * 
+	 * @param element
+	 *            The element to get the SD for.
+	 * @param sdParam
+	 *            The SD parameter to convert.
+	 * @return An SD value, between 0 and MAX_SD.
+	 */
+	public double getOrderingSD(T element, double sdParam) {
+		// TODO Factor in a decay value. It needs one for slots of size 1.
+		sdParam = Math.max(sdParam, 0);
+		sdParam = Math.min(sdParam, 1);
+		return INITIAL_ORDERING_SD * sdParam;
+	}
+
+	/**
 	 * Adds an element to the distribution with a default order of in the
 	 * middle.
 	 * 
@@ -248,7 +286,7 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 	 */
 	@Override
 	public boolean add(T e) {
-		elements_.put(e, 0.5);
+		elements_.put(e, INITIAL_ORDERING);
 		elementSelfMapping_.put(e, e);
 		return true;
 	}
@@ -368,17 +406,6 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		return null;
 	}
 
-	/**
-	 * Gets the ordering of the element.
-	 * 
-	 * @param element
-	 *            The element to find the ordering for.
-	 * @return An ordering between 0 and 1 inclusive or null if not present.
-	 */
-	public Double getOrdering(T element) {
-		return elements_.get(element);
-	}
-
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
@@ -392,9 +419,6 @@ public class OrderedDistribution<T> implements Collection<T>, Serializable {
 		return buffer.toString();
 	}
 
-	/**
-	 * TODO Temp testing method. Make it better if it's successful.
-	 */
 	public void normaliseSlotProbs() {
 		for (T slot : elements_.keySet()) {
 			((Slot) slot).setSelectionProb(1.0 / size());

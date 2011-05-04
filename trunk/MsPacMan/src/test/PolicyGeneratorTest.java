@@ -170,10 +170,10 @@ public class PolicyGeneratorTest {
 		Set<StringFact> actionsList = new HashSet<StringFact>();
 		actionsList.add(StateSpec.toStringFact("(move f a)"));
 		RuleAction ruleAction = new RuleAction(stackRule, actionsList, policy);
-		ruleAction.getActions();
+		ruleAction.triggerRule();
 		actions.switchOn(ruleAction);
 		assertNull(sut_.getPreGoal("move"));
-		sut_.formPreGoalState(preGoalFacts, actions, null);
+		sut_.formPreGoalState(preGoalFacts, actions, null, null);
 		Collection<StringFact> preGoalState = new HashSet<StringFact>(sut_
 				.getPreGoal("move"));
 		assertTrue(sut_.hasPreGoal());
@@ -263,11 +263,11 @@ public class PolicyGeneratorTest {
 		actionsList = new HashSet<StringFact>();
 		actionsList.add(StateSpec.toStringFact("(move b f)"));
 		ruleAction = new RuleAction(stackRule, actionsList, policy);
-		ruleAction.getActions();
+		ruleAction.triggerRule();
 		actions.switchOn(ruleAction);
 		assertEquals(preGoalState, sut_.getPreGoal("move"));
 		assertTrue(sut_.getPreGoal("move").contains(blockA));
-		sut_.formPreGoalState(preGoalFacts, actions, null);
+		sut_.formPreGoalState(preGoalFacts, actions, null, null);
 		assertFalse(sut_.getPreGoal("move").contains(blockA));
 		assertFalse(preGoalState.equals(sut_.getPreGoal("move")));
 		assertTrue(sut_.hasPreGoal());

@@ -56,7 +56,7 @@ public abstract class StateSpec {
 	private static final String ACTION_TERM_REPL = "__TYPE__";
 
 	/** The StringFact definition for the test predicate. */
-	private static final StringFact TEST_DEFINITION = new StringFact("test",
+	public static final StringFact TEST_DEFINITION = new StringFact("test",
 			new String[] { "testArgs" });
 
 	/** The singleton instance. */
@@ -637,7 +637,7 @@ public abstract class StateSpec {
 		if (result == null) {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// If the rule has parameters, declare them as variables.
+				// Create the query
 				rete_.eval("(defquery " + result + " " + fact + ")");
 				queryNames_.put(fact, result);
 			} catch (Exception e) {
