@@ -112,6 +112,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 						replacementTerms.inverseBidiMap(), true);
 			if (!replacedFact.isFullyAnonymous())
 				preConds.add(replacedFact);
+			else
+				return null;
 		}
 
 		return preConds;
@@ -161,10 +163,15 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
-		int result = Unification.getInstance().unifyStates(getAllConditions(),
+		Collection<StringFact> bckConditions = getAllConditions();
+		int result = Unification.getInstance().unifyStates(bckConditions,
 				ruleConds, replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
+		// TODO Need to modify this somehow so that the exact replacement can be
+		// found. Currently, anonymous terms are used, but not recorded. Yet if
+		// I note them, problems are created. They need to be used, but only in
+		// a limited manner.
 		if (result == 0) {
 			StringFact cond = getPostCond(replacementTerms);
 			if (ruleConds.remove(cond))
@@ -178,15 +185,17 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
 					replacementTerms, new String[0], true, false);
+			// Remove any replacements which specialise anonymous terms
+			replacementTerms.removeValue("?");
 
 			// If there is a unification, attempt to remove the right side
 			if (unifiedEquiv != null) {
 				unifiedEquiv.replaceArguments(
 						replacementTerms.inverseBidiMap(), true);
-				if (ruleConds.remove(unifiedEquiv)) {
-					// Swap variable
-					Collection<StringFact> equivFacts = getPreConds(replacementTerms);
 
+				// Swap variable
+				Collection<StringFact> equivFacts = getPreConds(replacementTerms);
+				if (equivFacts != null && ruleConds.remove(unifiedEquiv)) {
 					// Add all equivalent facts.
 					for (StringFact equivFact : equivFacts) {
 						if (!ruleConds.contains(equivFact)) {

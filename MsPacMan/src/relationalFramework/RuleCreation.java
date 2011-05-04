@@ -79,7 +79,7 @@ public class RuleCreation implements Serializable {
 					action);
 			for (String[] actionArgs : validActions.get(action)) {
 				StringFact actionFact = new StringFact(baseAction, actionArgs);
-				ao_.gatherActionFacts(actionFact, null, false);
+				ao_.gatherActionFacts(actionFact, null, false, null);
 			}
 		}
 
@@ -216,8 +216,10 @@ public class RuleCreation implements Serializable {
 					replacementTerms.put(preGoalTerms[i], ruleTerms[i]);
 
 					// Try to create term swapped specialisations
-					if (preGoalTerms[i].charAt(0) != '?'
-							&& ruleTerms[i].charAt(0) == '?') {
+					// If the rule term is variable and not equal to the
+					// pre-goal term, term swap.
+					if (ruleTerms[i].charAt(0) == '?'
+							&& !ruleTerms[i].equals(preGoalTerms[i])) {
 						SortedSet<StringFact> specConditions = new TreeSet<StringFact>(
 								ruleConditions.comparator());
 						boolean isTypeValid = true;
@@ -229,8 +231,10 @@ public class RuleCreation implements Serializable {
 								Collection<String> lineage = new HashSet<String>();
 								StateSpec.getInstance().getTypeLineage(
 										condition.getFactName(), lineage);
-								if (!lineage.containsAll(preGoal
-										.getTermTypes(preGoalTerms[i]))) {
+								Collection<String> termTypes = preGoal
+										.getTermTypes(preGoalTerms[i]);
+								if (termTypes == null
+										|| !lineage.containsAll(termTypes)) {
 									isTypeValid = false;
 									break;
 								}
@@ -542,14 +546,20 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param preGoalState
 	 *            The pre-goal state seen by the agent.
+	 * @param actionChoice
+	 *            The actions selected.
 	 * @param constants
-	 *            Extra constants to note down int he pre-goal.
-	 * @param actions
-	 *            The final action/s taken by the agent.
-	 * @return A collection of actions which have settled pre-goals.
+	 *            Extra constants to note down in the pre-goal.
+	 * @param replacements
+	 *            An optional replacement map for transforming the state and
+	 *            action.
+	 * @return True if the pre-goal has changed.
 	 */
-	public Collection<String> formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actionChoice, Collection<String> constants) {
+	public boolean formPreGoalState(Collection<Fact> preGoalState,
+			ActionChoice actionChoice, Collection<String> constants,
+			Map<String, String> replacements) {
+		// TODO Add an inactivity threshold, so the agent isn't ALWAYS making a
+		// pregoal.
 		// Scan the state first to create the term-mapped facts
 		ao_.scanState(preGoalState);
 
@@ -557,60 +567,59 @@ public class RuleCreation implements Serializable {
 		if (constants == null)
 			constants = StateSpec.getInstance().getConstants();
 
+		boolean changed = false;
 		for (RuleAction ruleAction : actionChoice.getActions()) {
 			String actionPred = ruleAction.getRule().getActionPredicate();
 			// If the state isn't yet settled, try unification
 			PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
-			if ((preGoal == null) || (!preGoal.isSettled())) {
-				Collection<StringFact> actions = ruleAction
-						.getUtilisedActions();
 
-				// Create a pre-goal from every action in the actions list.
-				if (actions != null) {
-					for (StringFact action : actions) {
-						Collection<StringFact> preGoalStringState = ao_
-								.gatherActionFacts(action, constants, true);
+			Collection<StringFact> actions = ruleAction.getUtilisedActions();
 
-						if (preGoal == null) {
-							preGoal = new PreGoalInformation(
-									preGoalStringState, action.getArguments());
-							ao_.setPreGoal(actionPred, preGoal);
-						} else {
-							// Unify the two states and check if it has changed
-							// at all.
-							int result = Unification.getInstance().unifyStates(
-									preGoal.getState(), preGoalStringState,
-									preGoal.getActionTerms(),
-									action.getArguments());
+			// Create a pre-goal from every action in the actions list.
+			if (actions != null) {
+				for (StringFact action : actions) {
+					Collection<StringFact> preGoalStringState = ao_
+							.gatherActionFacts(action, constants, false,
+									replacements);
+					if (replacements != null)
+						action.replaceArguments(replacements, true);
 
-							// If the states unified, reset the counter,
-							// otherwise increment.
-							if (result == 1) {
-								preGoal.resetInactivity();
-								ao_.clearHash();
-							} else if (result == 0) {
-								if (!formedActions.contains(actionPred))
-									preGoal.incrementInactivity();
-							} else if (result == -1) {
-								throw new RuntimeException(
-										"Pre-goal states did not unify: "
-												+ preGoal + ", "
-												+ preGoalStringState);
-							}
+					if (preGoal == null) {
+						preGoal = new PreGoalInformation(preGoalStringState,
+								action.getArguments());
+						changed = true;
+						ao_.setPreGoal(actionPred, preGoal);
+					} else {
+						// Unify the two states and check if it has changed
+						// at all.
+						int result = Unification.getInstance()
+								.unifyStates(preGoal.getState(),
+										preGoalStringState,
+										preGoal.getActionTerms(),
+										action.getArguments());
 
-							formedActions.add(actionPred);
+						// If the states unified, reset the counter,
+						// otherwise increment.
+						if (result == 1) {
+							preGoal.resetInactivity();
+							changed = true;
+							ao_.clearHash();
+						} else if (result == 0) {
+							if (!formedActions.contains(actionPred))
+								preGoal.incrementInactivity();
+						} else if (result == -1) {
+							throw new RuntimeException(
+									"Pre-goal states did not unify: " + preGoal
+											+ ", " + preGoalStringState);
 						}
+
+						formedActions.add(actionPred);
 					}
 				}
 			}
 		}
 
-		Collection<String> settled = new ArrayList<String>();
-		for (String action : StateSpec.getInstance().getActions().keySet()) {
-			if (isPreGoalSettled(action))
-				settled.add(action);
-		}
-		return settled;
+		return changed;
 	}
 
 	/**
@@ -724,21 +733,6 @@ public class RuleCreation implements Serializable {
 	 */
 	public boolean removeUnseenPreds(Collection<StringFact> removables) {
 		return ao_.removeUnseenPredicates(removables);
-	}
-
-	/**
-	 * If the pre-goal state has settled to a stable state.
-	 * 
-	 * @param actionPred
-	 *            The action predicate to check for pre-goal settlement.
-	 * @return True if the state has settled, false otherwise.
-	 */
-	public boolean isPreGoalSettled(String actionPred) {
-		// If the pre-goal isn't empty and is settled, return true
-		PreGoalInformation pgi = ao_.getPreGoal(actionPred);
-		if (pgi == null)
-			return false;
-		return pgi.isSettled();
 	}
 
 	/**

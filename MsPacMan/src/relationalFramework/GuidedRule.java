@@ -111,7 +111,8 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 			ruleConditions_.addAll(conditions);
 		} else
 			ruleConditions_ = (SortedSet<StringFact>) conditions;
-		ruleAction_ = new StringFact(action);
+		if (action != null)
+			ruleAction_ = new StringFact(action);
 		if (parent != null)
 			setMutant(parent);
 		slot_ = null;
@@ -479,8 +480,12 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 		for (Iterator<StringFact> condIter = strFacts.iterator(); condIter
 				.hasNext();) {
 			StringFact cond = condIter.next();
-			cond.replaceArguments(replacementMap, true);
+			if (cond.getFactName().equals("test"))
+				condIter.remove();
+			else
+				cond.replaceArguments(replacementMap, true);
 		}
+		expandConditions();
 	}
 
 	public String getStringConditions() {
@@ -725,10 +730,25 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 	 */
 	public String toNiceString() {
 		StringBuffer niceString = new StringBuffer();
+
+		// Parameter replacement map
+		Map<String, String> modularReplacement = new HashMap<String, String>();
+		if (parameters_ != null) {
+			for (int i = 0; i < parameters_.size(); i++)
+				modularReplacement.put(Module.createModuleParameter(i), "["
+						+ parameters_.get(i) + "]");
+		}
+
 		// Run through each condition, adding regular conditions and
 		// non-standard type predicates
 		Collection<StringFact> standardType = new HashSet<StringFact>();
 		for (StringFact stringFact : ruleConditions_) {
+			// Modify the fact if there are parameters
+			if (parameters_ != null) {
+				stringFact = new StringFact(stringFact);
+				stringFact.replaceArguments(modularReplacement, true);
+			}
+
 			if (StateSpec.getInstance().isTypePredicate(
 					stringFact.getFactName())) {
 				// If a type predicate, only add it if it's non-standard
@@ -810,7 +830,7 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 		int result = Double.compare(ruleHash_, o.ruleHash_);
 		if (result != 0)
 			return result;
-		
+
 		return toString().compareTo(o.toString());
 	}
 }

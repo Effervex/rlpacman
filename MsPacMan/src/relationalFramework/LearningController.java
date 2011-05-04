@@ -25,7 +25,7 @@ public class LearningController {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
 	/** The number of test episodes to run for performance measures. */
-	public static final int TEST_ITERATIONS = 50;
+	public static final int TEST_ITERATIONS = 5;
 	/** The best policy found output file. */
 	private File policyFile_;
 	/** The performance output file. */
@@ -33,8 +33,6 @@ public class LearningController {
 	/** The folder to store the temp files. */
 	private static final File TEMP_FOLDER = new File("temp"
 			+ File.separatorChar);
-	/** If this controller is using sliding window learning. */
-	private final boolean SLIDING_WINDOW = true;
 	/** If this controller is using cross-entrobeam learning. */
 	private final boolean ENTROBEAM = true;
 
@@ -304,16 +302,10 @@ public class LearningController {
 		SortedMap<Integer, Float> episodePerformances = new TreeMap<Integer, Float>();
 
 		// Forming a population of solutions
-		List<PolicyValue> pvs = new ArrayList<PolicyValue>();
+		SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
 		// How many steps to wait for testing
-		int testingStep = 1;
-		if (ENTROBEAM) {
-			testingStep = (int) (1 / (SELECTION_RATIO * SELECTION_RATIO));
-		} else if (SLIDING_WINDOW) {
-			testingStep = (int) (1 / SELECTION_RATIO);
-		} else {
-			testingStep = 1;
-		}
+		int testingStep = (int) (1 / (SELECTION_RATIO * SELECTION_RATIO));
+
 		// Learn for a finite number of episodes, or until it is converged.
 		int finiteNum = maxEpisodes_ * testingStep;
 		if (maxEpisodes_ < 0)
@@ -333,7 +325,7 @@ public class LearningController {
 			RLGlue.RL_agent_message("GetPolicy");
 
 			if (PolicyGenerator.getInstance().useModules_
-					&& (loadedGeneratorFile_ == null)) {
+					&& (loadedGeneratorFile_ == null) && t > 0) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
 			}
@@ -351,12 +343,8 @@ public class LearningController {
 				population = (int) Math.ceil(SELECTION_RATIO * population);
 			}
 
-			int samples = 0;
-			int maxSamples = population;
-			if (SLIDING_WINDOW) {
-				samples = pvs.size() - pvsSizeInitial;
-				maxSamples = population - pvsSizeInitial;
-			}
+			int samples = pvs.size() - pvsSizeInitial;
+			int maxSamples = population - pvsSizeInitial;
 
 			boolean restart = false;
 			// Fill the Policy Values list.
@@ -395,12 +383,8 @@ public class LearningController {
 					bestPolicy = thisPolicy;
 
 				// Give an ETA
-				samples = pvs.size();
-				maxSamples = population;
-				if (SLIDING_WINDOW) {
-					samples = pvs.size() - pvsSizeInitial;
-					maxSamples = population - pvsSizeInitial;
-				}
+				samples = pvs.size() - pvsSizeInitial;
+				maxSamples = population - pvsSizeInitial;
 				estimateETA(samples, maxSamples, t, finiteNum, run
 						- repetitionsStart_, repetitionsEnd_
 						- repetitionsStart_, experimentStart_, true);
@@ -458,10 +442,9 @@ public class LearningController {
 	 * @return How many iterations it has been since the last test.
 	 */
 	public int updateDistributions(PolicyGenerator localPolicy,
-			List<PolicyValue> elites, int testingStep, int iteration,
+			SortedSet<PolicyValue> elites, int testingStep, int iteration,
 			int population, int sinceLastTest, int finiteNum, int run,
 			SortedMap<Integer, Float> episodePerformances, int numEpisodes) {
-		Collections.sort(elites);
 		// Update the weights for all distributions using only the elite
 		// samples
 		int numElite = (int) Math.ceil(population * SELECTION_RATIO);
@@ -523,8 +506,8 @@ public class LearningController {
 	 */
 	private void testRecordAgent(PolicyGenerator localPolicy, int run,
 			SortedMap<Integer, Float> episodePerformances,
-			List<PolicyValue> pvs, int finiteNum, int t, boolean finalTest,
-			int numEpisodes) {
+			Collection<PolicyValue> pvs, int finiteNum, int t,
+			boolean finalTest, int numEpisodes) {
 		// Test the agent and record the performances
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
@@ -555,14 +538,32 @@ public class LearningController {
 	 *            policy values should be.
 	 * @return The modified policy values list.
 	 */
-	private void preUpdateModification(List<PolicyValue> pvs, int numElite) {
-		if (ENTROBEAM) {
-			if (pvs.size() > numElite) {
-				for (int i = pvs.size() - 1; i >= numElite; i--)
-					pvs.remove(i);
+	private SortedSet<PolicyValue> preUpdateModification(
+			SortedSet<PolicyValue> pvs, int numElite) {
+		// Remove any values worse than the value at numElites
+		if (pvs.size() > numElite) {
+			// Find the N_E value
+			Iterator<PolicyValue> pvIter = pvs.iterator();
+			PolicyValue currentPV = null;
+			for (int i = 0; i < numElite; i++)
+				currentPV = pvIter.next();
+			PolicyValue neValue = currentPV;
+			// Iter at N_E value. Remove any values less than N_E's value
+			do {
+				if (pvIter.hasNext())
+					currentPV = pvIter.next();
+				else
+					currentPV = null;
+			} while (currentPV != null
+					&& currentPV.getValue() == neValue.getValue());
+			// Remove the tail set
+			if (currentPV != null) {
+				SortedSet<PolicyValue> tailSet = pvs.tailSet(currentPV);
+				tailSet.clear();
 			}
-		} else if (SLIDING_WINDOW)
-			pvs = pvs.subList(0, pvs.size() - numElite);
+		}
+		
+		return pvs;
 	}
 
 	/**
@@ -579,8 +580,8 @@ public class LearningController {
 	 *            The local policy generator.
 	 * @return The cleaned list of policy values.
 	 */
-	private void postUpdateModification(List<PolicyValue> pvs, int iteration,
-			int staleValue, PolicyGenerator localPolicy) {
+	private void postUpdateModification(Collection<PolicyValue> pvs,
+			int iteration, int staleValue, PolicyGenerator localPolicy) {
 		// Remove any stale policies
 		for (Iterator<PolicyValue> iter = pvs.iterator(); iter.hasNext();) {
 			PolicyValue pv = iter.next();
@@ -598,7 +599,7 @@ public class LearningController {
 	 * @param pvs
 	 *            The list of policy values.
 	 */
-	private void filterPolicyValues(List<PolicyValue> pvs,
+	private void filterPolicyValues(Collection<PolicyValue> pvs,
 			PolicyGenerator localPolicyGenerator) {
 		for (Iterator<PolicyValue> pvIter = pvs.iterator(); pvIter.hasNext();) {
 			PolicyValue pv = pvIter.next();
@@ -692,8 +693,8 @@ public class LearningController {
 			int modsComplete = 0;
 			// Commence learning of the module
 			for (ConstantPred internalGoal : constantFacts) {
-				createModule(policyGenerator, constantFacts, modsComplete,
-						internalGoal);
+				createModule(policyGenerator, constantFacts.size(),
+						modsComplete, internalGoal);
 			}
 
 			// Ensure to reset the policy generator
@@ -713,9 +714,9 @@ public class LearningController {
 	 * @param internalGoal
 	 *            The current module being created.
 	 */
-	private void createModule(PolicyGenerator policyGenerator,
-			SortedSet<ConstantPred> constantFacts, int modsComplete,
-			ConstantPred internalGoal) {
+	@SuppressWarnings("unchecked")
+	private void createModule(PolicyGenerator policyGenerator, int numModules,
+			int modsComplete, ConstantPred internalGoal) {
 		if (PolicyGenerator.debugMode_) {
 			try {
 				System.out.println("\n\n\n------LEARNING MODULE: "
@@ -728,13 +729,29 @@ public class LearningController {
 			}
 		}
 
-		// Set the internal goal
-		String[] moduleGoal = new String[internalGoal.getFacts().size()];
-		for (int i = 0; i < internalGoal.getFacts().size(); i++)
-			moduleGoal[i] = internalGoal.getFacts().get(i).getFactName();
-		ObjectObservations.getInstance().objectArray = moduleGoal;
+		// Anonymise the goal
+		SortedSet<StringFact> goalPredicates = new TreeSet<StringFact>();
+		int modConst = 0;
+		Map<String, String> replacementMap = new HashMap<String, String>();
+		for (StringFact internalFact : internalGoal.getFacts()) {
+			for (String arg : internalFact.getArguments()) {
+				if ((arg.charAt(0) != '?')
+						&& (!replacementMap.containsKey(arg)))
+					replacementMap.put(arg, Module
+							.createModuleParameter(modConst++));
+			}
+
+			internalFact.replaceArguments(replacementMap, false);
+			goalPredicates.add(internalFact);
+		}
+		// Send it to the agent
+		ObjectObservations.getInstance().objectArray = new Object[2];
+		ObjectObservations.getInstance().objectArray[0] = goalPredicates;
+		ObjectObservations.getInstance().objectArray[1] = modConst;
 		RLGlue.RL_agent_message(INTERNAL_PREFIX);
-		String[] oldInternalGoal = (String[]) ObjectObservations.getInstance().objectArray;
+		SortedSet<StringFact> oldInternalGoal = (SortedSet<StringFact>) ObjectObservations
+				.getInstance().objectArray[0];
+		int oldNumArgs = (Integer) ObjectObservations.getInstance().objectArray[1];
 
 		// Begin development
 		PolicyGenerator modularGenerator = null;
@@ -751,7 +768,7 @@ public class LearningController {
 				Module partialMod = Module.loadModule(StateSpec.getInstance()
 						.getEnvironmentName(), fact.getFactName());
 				if (partialMod == null) {
-					unsetInternalGoal(oldInternalGoal);
+					unsetInternalGoal(oldInternalGoal, oldNumArgs);
 					return;
 				}
 
@@ -780,8 +797,7 @@ public class LearningController {
 			modularGenerator = PolicyGenerator.newInstance(policyGenerator,
 					internalGoal.getFacts());
 		}
-		developPolicy(modularGenerator, -constantFacts.size() + modsComplete,
-				-1);
+		developPolicy(modularGenerator, -numModules + modsComplete, -1);
 
 		// Save the module
 		Module.saveModule(internalGoal.getFacts(), modularGenerator
@@ -790,7 +806,7 @@ public class LearningController {
 		modsComplete++;
 
 		// Unset the internal goal
-		unsetInternalGoal(oldInternalGoal);
+		unsetInternalGoal(oldInternalGoal, oldNumArgs);
 	}
 
 	/**
@@ -799,14 +815,15 @@ public class LearningController {
 	 * @param oldInternalGoal
 	 *            The old internal goal to set.
 	 */
-	private void unsetInternalGoal(String[] oldInternalGoal) {
-		if (oldInternalGoal == null) {
-			ObjectObservations.getInstance().objectArray = null;
-			RLGlue.RL_agent_message(INTERNAL_PREFIX);
-		} else {
-			ObjectObservations.getInstance().objectArray = oldInternalGoal;
-			RLGlue.RL_agent_message(INTERNAL_PREFIX);
-		}
+	private void unsetInternalGoal(SortedSet<StringFact> oldInternalGoal,
+			int oldNumArgs) {
+		ObjectObservations.getInstance().objectArray = new Object[2];
+		if (oldInternalGoal == null)
+			ObjectObservations.getInstance().objectArray[0] = null;
+		else
+			ObjectObservations.getInstance().objectArray[0] = oldInternalGoal;
+		ObjectObservations.getInstance().objectArray[1] = oldNumArgs;
+		RLGlue.RL_agent_message(INTERNAL_PREFIX);
 	}
 
 	/**
@@ -934,7 +951,7 @@ public class LearningController {
 
 				RLGlue.RL_agent_message("GetPolicy");
 				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
-				pol.parameterArgs(null);
+				// pol.parameterArgs(null);
 				System.out.println(pol);
 				System.out.println(numEpisodes + ": " + score
 						/ AVERAGE_ITERATIONS + "\n");
@@ -1052,7 +1069,8 @@ public class LearningController {
 	 * @param elites
 	 *            The best policy, in string format.
 	 */
-	private void saveElitePolicies(List<PolicyValue> elites) throws Exception {
+	private void saveElitePolicies(Collection<PolicyValue> elites)
+			throws Exception {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 

@@ -31,10 +31,10 @@ public class StringFactTest {
 		replacementMap.put("a", "b");
 		strFact.replaceArguments(replacementMap, true);
 		assertArrayEquals(strFact.getArguments(), new String[] { "b" });
-		
+
 		// Swapsies
-		strFact = new StringFact(StateSpec.getInstance()
-				.getStringFact("on"), new String[] { "a", "b" });
+		strFact = new StringFact(StateSpec.getInstance().getStringFact("on"),
+				new String[] { "a", "b" });
 		assertArrayEquals(strFact.getArguments(), new String[] { "a", "b" });
 		replacementMap = new HashMap<String, String>();
 		replacementMap.put("a", "b");

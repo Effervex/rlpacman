@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import jess.Fact;
 import jess.QueryResult;
@@ -51,7 +53,10 @@ public class PolicyActor implements AgentInterface {
 
 	// ////////////// MODULAR MEMBERS //////////////////
 	/** An agent's internal goal to attempt to achieve. */
-	private String[] goalPredicate_;
+	private SortedSet<StringFact> goalPredicate_;
+
+	/** The number of arguments the goal takes. */
+	private int goalNumArgs_;
 
 	/** The agent's internal goal to chase, if learning modules. */
 	private String[] internalGoal_;
@@ -63,7 +68,10 @@ public class PolicyActor implements AgentInterface {
 	private boolean internalGoalMet_;
 
 	/** A collection of possible goals for the agent to pursue. */
-	private List<GoalState> possibleGoals_;
+	private Collection<GoalArg> possibleGoals_;
+
+	/** The goal arguments from the previous state. */
+	private Collection<GoalArg> prevGoalArgs_;
 
 	// /////////////// INTERNAL COUNTERS ////////////////////
 	/** The total reward accrued by the agent. */
@@ -96,13 +104,14 @@ public class PolicyActor implements AgentInterface {
 	public void agent_init(String arg0) {
 		prevState_ = null;
 		handCoded_ = false;
-		possibleGoals_ = new ArrayList<GoalState>();
+		possibleGoals_ = new ArrayList<GoalArg>();
 		totalReward_ = 0;
 		totalSteps_ = 0;
 		totalEpisodes_ = -1;
 	}
 
 	// @Override
+	@SuppressWarnings("unchecked")
 	public String agent_message(String arg0) {
 		// Receive a policy
 		if (arg0.equals("GetPolicy")) {
@@ -118,10 +127,8 @@ public class PolicyActor implements AgentInterface {
 			mostSteps_ = Integer.MIN_VALUE;
 		} else if (arg0.equals("SetPolicy")) {
 			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
-			if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
-				policy_.parameterArgs(possibleGoals_.get(
-						PolicyGenerator.random_.nextInt(possibleGoals_.size()))
-						.getFacts());
+			if ((goalPredicate_ != null) && (internalGoal_ != null)) {
+				policy_.parameterArgs(internalGoal_);
 			}
 		} else if (arg0.equals("Optimal")) {
 			handCoded_ = true;
@@ -136,17 +143,23 @@ public class PolicyActor implements AgentInterface {
 			// Only form pre-goal if the generator isn't a module.
 			if (!PolicyGenerator.getInstance().isModuleGenerator())
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, null);
+						prevActions_, null, null);
 		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
-			String[] oldGoal = null;
-			if (goalPredicate_ != null)
-				oldGoal = Arrays.copyOf(goalPredicate_, goalPredicate_.length);
-			goalPredicate_ = (String[]) ObjectObservations.getInstance().objectArray;
+			SortedSet<StringFact> oldGoal = null;
+			int oldNumArgs = -1;
+			if (goalPredicate_ != null) {
+				oldGoal = goalPredicate_;
+				oldNumArgs = goalNumArgs_;
+			}
+			goalPredicate_ = (SortedSet<StringFact>) ObjectObservations
+					.getInstance().objectArray[0];
+			goalNumArgs_ = (Integer) ObjectObservations.getInstance().objectArray[1];
 
 			internalGoal_ = null;
 			possibleGoals_.clear();
-			ObjectObservations.getInstance().objectArray = oldGoal;
+			ObjectObservations.getInstance().objectArray[0] = oldGoal;
+			ObjectObservations.getInstance().objectArray[1] = oldNumArgs;
 		}
 		return null;
 	}
@@ -167,9 +180,9 @@ public class PolicyActor implements AgentInterface {
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// Choosing an action
-		Collection<Fact> stateFacts = StateSpec.extractFacts(ObjectObservations
-				.getInstance().predicateKB);
-		setInternalGoal(stateFacts);
+		Rete rete = ObjectObservations.getInstance().predicateKB;
+		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
+		setInternalGoal(rete);
 
 		prevActions_ = chooseAction(
 				ObjectObservations.getInstance().predicateKB, stateFacts, null);
@@ -185,12 +198,12 @@ public class PolicyActor implements AgentInterface {
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		Collection<Fact> stateFacts = StateSpec.extractFacts(ObjectObservations
-				.getInstance().predicateKB);
+		Rete rete = ObjectObservations.getInstance().predicateKB;
+		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
 
 		// Check the internal goal here
 		if (!handCoded_ && (goalPredicate_ != null)) {
-			processInternalGoal(stateFacts, prevState_);
+			processInternalGoal(rete, prevGoalArgs_);
 		}
 
 		// Randomly resample the policy if the agent has been performing the
@@ -202,9 +215,10 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		policySteps_++;
-		prevActions_ = chooseAction(
-				ObjectObservations.getInstance().predicateKB, stateFacts, arg0);
+		prevActions_ = chooseAction(rete, stateFacts, arg0);
 		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
+		if (goalPredicate_ != null && internalGoalMet_)
+			ObjectObservations.getInstance().earlyExit = true;
 
 		return action;
 	}
@@ -217,15 +231,14 @@ public class PolicyActor implements AgentInterface {
 		// Save the pre-goal state and goal action
 		if (goalPredicate_ != null) {
 			if (!handCoded_) {
-				Collection<Fact> stateFacts = StateSpec
-						.extractFacts(ObjectObservations.getInstance().predicateKB);
-				processInternalGoal(stateFacts, prevState_);
+				Rete rete = ObjectObservations.getInstance().predicateKB;
+				processInternalGoal(rete, prevGoalArgs_);
 			}
 		} else {
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)) {
 				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, null);
+						prevActions_, null, null);
 			}
 		}
 
@@ -253,10 +266,8 @@ public class PolicyActor implements AgentInterface {
 			else
 				System.out.println(policy_);
 		}
-		if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
-			policy_.parameterArgs(possibleGoals_.get(
-					PolicyGenerator.random_.nextInt(possibleGoals_.size()))
-					.getFacts());
+		if ((goalPredicate_ != null) && (internalGoal_ != null)) {
+			policy_.parameterArgs(internalGoal_);
 		}
 
 		// Reset the state observations
@@ -383,75 +394,40 @@ public class PolicyActor implements AgentInterface {
 	 * learning one. This method also modifies the agent policy towards the
 	 * goal.
 	 * 
-	 * @param stateFacts
-	 *            The facts about the current state.
+	 * @param state
+	 *            The current state.
 	 */
-	private void setInternalGoal(Collection<Fact> stateFacts) {
-		if ((goalPredicate_ != null) && (!possibleGoals_.isEmpty())) {
-			internalReward_ = 0;
-			internalGoalMet_ = false;
+	private void setInternalGoal(Rete state) {
+		// If there is a modular goal
+		if (goalPredicate_ != null) {
+			// Scan the state for any met goals (noting the previous state goal
+			// args).
+			Collection<GoalArg> currentGoalArgs = extractPossibleGoals(state,
+					null);
+			// If there are possible unobtained goals
+			if (possibleGoals_.size() > currentGoalArgs.size()) {
+				internalReward_ = 0;
+				internalGoalMet_ = false;
 
-			// Examine the state for the goals that are true
-			List<ValueVector> trueFacts = new ArrayList<ValueVector>();
-			for (Fact fact : stateFacts) {
-				String[] factSplit = StateSpec.splitFact(fact.toString());
-				// Check that the predicate is in the goal predicates.
-				int index = Arrays.binarySearch(goalPredicate_, factSplit[0]);
-				if (index >= 0) {
-					try {
-						trueFacts.add(fact.getSlotValue("__data").listValue(
-								null));
-					} catch (Exception e) {
-						e.printStackTrace();
+				List<GoalArg> untrueGoals = new ArrayList<GoalArg>(
+						possibleGoals_);
+				untrueGoals.removeAll(currentGoalArgs);
+				if (!untrueGoals.isEmpty()) {
+					// Select a random goal
+					internalGoal_ = untrueGoals
+							.get(
+									PolicyGenerator.random_.nextInt(untrueGoals
+											.size())).getGoalArgs();
+					policy_.parameterArgs(internalGoal_);
+
+					if (PolicyGenerator.debugMode_) {
+						System.out.println("Internal goal: "
+								+ Arrays.toString(internalGoal_));
+						System.out.println(policy_);
 					}
 				}
 			}
-
-			Collections.shuffle(possibleGoals_, PolicyGenerator.random_);
-			GoalState chosenGoal = null;
-			for (int i = 0; i < possibleGoals_.size(); i++) {
-				chosenGoal = possibleGoals_.get(i);
-
-				// Check the goal hasn't already been achieved
-				if (!factsContains(chosenGoal, trueFacts)) {
-					break;
-				}
-			}
-
-			// Modify the policy towards the chosen goal
-			policy_.parameterArgs(chosenGoal.getFacts());
-			internalGoal_ = new String[goalPredicate_.length];
-			for (int i = 0; i < goalPredicate_.length; i++) {
-				internalGoal_[i] = "(" + goalPredicate_[i] + " "
-						+ chosenGoal.getFacts().get(i) + ")";
-			}
-
-			if (PolicyGenerator.debugMode_) {
-				System.out.println("Internal goal: "
-						+ Arrays.toString(internalGoal_));
-				System.out.println(policy_);
-			}
 		}
-	}
-
-	/**
-	 * If the facts contains the chosen goal, exactly.
-	 * 
-	 * @param chosenGoal
-	 *            The chosen goal, in GoalState form.
-	 * @param facts
-	 *            The set of facts.
-	 * @return True if the set of facts contains all goal facts.
-	 */
-	private boolean factsContains(GoalState chosenGoal, List<ValueVector> facts) {
-		List<ValueVector> goalFacts = chosenGoal.getFacts();
-		// Check each fact, and only if all facts are present is the goal
-		// contained.
-		for (ValueVector gf : goalFacts) {
-			if (!facts.contains(gf))
-				return false;
-		}
-		return true;
 	}
 
 	/**
@@ -461,147 +437,71 @@ public class PolicyActor implements AgentInterface {
 	 * 
 	 * @param stateFacts
 	 *            The current state facts.
-	 * @param prevState
-	 *            The facts from the previous state.
+	 * @param prevStateArgs
+	 *            The goal args from the previous state.
 	 */
-	private void processInternalGoal(Collection<Fact> stateFacts,
-			Collection<Fact> prevState) {
-		// Assigning reward
+	private void processInternalGoal(Rete rete,
+			Collection<GoalArg> prevStateArgs) {
+		// Check if the goal has been met
+		Collection<GoalArg> goalArgs = extractPossibleGoals(rete, internalGoal_);
+
+		// (Negative) reward per step if the goal is not achieved.
 		if (!internalGoalMet_) {
 			internalReward_ += INTERNAL_STEPWISE_REWARD;
 		}
 
-		// Check each predicate in the state
-		MultiMap<String, ValueVector> goalFactMap = MultiMap
-				.createListMultiMap();
-		boolean[] goalAchieved = new boolean[goalPredicate_.length];
-		for (Fact fact : stateFacts) {
-			String[] factSplit = StateSpec.splitFact(fact.toString());
-			// If the fact is a goal fact and wasn't in the previous state, we
-			// have an achieved goal.
-			if (isGoalFact(factSplit[0])) {
-				// Add the fact to the possible goals
-				try {
-					ValueVector vv = fact.getSlotValue("__data")
-							.listValue(null);
-					goalFactMap.put(factSplit[0], vv);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-
-				if (!prevState.contains(fact)) {
-					// Form the general pre-goal, replacing the 'goal' terms
-					// with general placeholders
-					formPlaceholderPreGoalState(factSplit);
-				}
-
-				// Checking if the internal goal is met
-				if ((internalGoal_ != null) && !internalGoalMet_) {
-					// Check if the fact is in the internal goal
-					for (int i = 0; i < internalGoal_.length; i++) {
-						// If this index of the goal hasn't been achieved.
-						if (!goalAchieved[i]) {
-							// If the fact is a goal fact.
-							if (StateSpec.reformFact(factSplit).equals(
-									internalGoal_[i]))
-								goalAchieved[i] = true;
-						}
-					}
-
-				}
-			}
-		}
-
-		// Check if the internal goal is met
-		if (!internalGoalMet_) {
-			boolean goalFound = true;
-			for (boolean b : goalAchieved) {
-				goalFound &= b;
-			}
-			internalGoalMet_ |= goalFound;
-		}
-
-		// Form the possible goals
-		formPossibleGoals(goalFactMap);
+		// If there are newly achieved possible goals, note them down as
+		// pre-goals
+		goalArgs.removeAll(prevStateArgs);
+		for (GoalArg ga : goalArgs)
+			formPlaceholderPreGoalState(ga.getGoalArgs());
 	}
 
 	/**
-	 * Forms the possible goals for the state, using the map of state facts.
+	 * Extracts the possible goals from a state. Also checks if the internal
+	 * goal is met.
 	 * 
-	 * @param stateFacts
-	 *            The state facts.
+	 * @param state
+	 *            The Rete state.
+	 * @param goalParams
+	 *            TODO Not being used yet. Will need to be to speed things up.
+	 *            Insert as a ValueVector parameter.
+	 * @return True if the goal is (or has been) met, false otherwise.
 	 */
-	@SuppressWarnings("unchecked")
-	private void formPossibleGoals(MultiMap<String, ValueVector> stateFacts) {
-		// Setting up the lists
-		List<ValueVector>[] goalFacts = new ArrayList[goalPredicate_.length];
+	private Collection<GoalArg> extractPossibleGoals(Rete state,
+			String[] goalParams) {
+		prevGoalArgs_ = new HashSet<GoalArg>();
 		try {
-			for (int i = 0; i < goalPredicate_.length; i++) {
-				goalFacts[i] = stateFacts.getList(goalPredicate_[i]);
+			GuidedRule gr = new GuidedRule(goalPredicate_, null, null);
+			gr.expandConditions();
+			String query = StateSpec.getInstance().getRuleQuery(gr);
+			// Set the goal parameters
+			ValueVector vv = new ValueVector();
+			QueryResult results = state.runQueryStar(query, vv);
+
+			// If there are results, then the goal COULD be met (can add
+			// possible goals here)
+			if (results.next()) {
+				do {
+					String[] arguments = new String[goalNumArgs_];
+					for (int i = 0; i < goalNumArgs_; i++)
+						arguments[i] = results.getSymbol(Module
+								.createModuleParameter(i).substring(1));
+
+					if (Arrays.equals(internalGoal_, arguments))
+						internalGoalMet_ = true;
+					GoalArg ga = new GoalArg(arguments);
+					if (!possibleGoals_.contains(ga))
+						possibleGoals_.add(ga);
+					prevGoalArgs_.add(ga);
+				} while (results.next());
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
-		// Iterate through the lists, combining facts together
-		recurseGoals(new ValueVector[goalFacts.length], 0, goalFacts,
-				new int[goalFacts.length]);
-	}
-
-	/**
-	 * Recurses through the facts, forming combinatorial goals.
-	 * 
-	 * @param possibleGoal
-	 *            A possible goal array - to be filled.
-	 * @param goalIndex
-	 *            The index of the goal facts.
-	 * @param goalFacts
-	 *            The goal facts.
-	 * @param goalFactIndex
-	 *            The index of each previous goal fact.
-	 */
-	private void recurseGoals(ValueVector[] possibleGoal, int goalIndex,
-			List<ValueVector>[] goalFacts, int[] goalFactIndex) {
-		// Find the begin index for the loop
-		int beginIndex = 0;
-		for (int i = goalIndex - 1; i >= 0; i--) {
-			// If using the same predicate, start from that index + 1
-			if (goalPredicate_[i].equals(goalPredicate_[goalIndex])) {
-				beginIndex = goalFactIndex[i] + 1;
-				break;
-			}
-		}
-
-		// For each goal fact
-		for (int i = beginIndex; i < goalFacts[goalIndex].size(); i++) {
-			possibleGoal[goalIndex] = goalFacts[goalIndex].get(i);
-			goalFactIndex[goalIndex] = i;
-			// If we're at the end of the possible goal, write it
-			if (goalIndex == (goalFacts.length - 1)) {
-				GoalState gs = new GoalState(possibleGoal);
-				if (!possibleGoals_.contains(gs))
-					possibleGoals_.add(gs);
-			} else {
-				// Recurse further
-				recurseGoals(possibleGoal, goalIndex + 1, goalFacts,
-						goalFactIndex);
-			}
-		}
-	}
-
-	/**
-	 * Checks if a fact pred is a goal fact.
-	 * 
-	 * @param factPred
-	 *            The fact predicate to check.
-	 * @return True if the fact predicate is a goal predicate.
-	 */
-	private boolean isGoalFact(String factPred) {
-		for (String goalPred : goalPredicate_) {
-			if (factPred.equals(goalPred))
-				return true;
-		}
-		return false;
+		Collection<GoalArg> goalArgs = new HashSet<GoalArg>(prevGoalArgs_);
+		return goalArgs;
 	}
 
 	/**
@@ -612,60 +512,20 @@ public class PolicyActor implements AgentInterface {
 	 * @param temporaryGoal
 	 *            The temporary goal.
 	 */
-	private void formPlaceholderPreGoalState(String[] temporaryGoal) {
+	private void formPlaceholderPreGoalState(String[] temporaryGoalArgs) {
 		// The constants are the terms used in the fact
-		List<String> placeholderConstants = new ArrayList<String>(
-				temporaryGoal.length - 1);
+		Collection<String> placeholderConstants = new ArrayList<String>(
+				temporaryGoalArgs.length);
 		Map<String, String> replacements = new HashMap<String, String>();
-		int paramIndex = 0;
-		for (int i = 1; i < temporaryGoal.length; i++) {
-			if (!replacements.containsKey(temporaryGoal[i])) {
-				String param = Module.createModuleParameter(paramIndex);
-				paramIndex++;
-				replacements.put(temporaryGoal[i], param);
-				placeholderConstants.add(param);
-			}
+		for (int i = 0; i < temporaryGoalArgs.length; i++) {
+			String param = Module.createModuleParameter(i);
+			replacements.put(temporaryGoalArgs[i], param);
+			placeholderConstants.add(temporaryGoalArgs[i]);
 		}
 
-		// Replacing the facts in the pre-goal and action with the placeholder
-		try {
-			Collection<Fact> prevStateClone = new ArrayList<Fact>();
-			for (Fact fact : prevState_) {
-				String[] factSplit = StateSpec.splitFact(fact.toString());
-				if (StateSpec.getInstance().isUsefulPredicate(factSplit[0])) {
-					// Swap any 'goal' constants with placeholders
-					boolean changed = false;
-					for (int i = 1; i < factSplit.length; i++) {
-						if (replacements.containsKey(factSplit[i])) {
-							factSplit[i] = replacements.get(factSplit[i]);
-							changed = true;
-						}
-					}
-
-					// If changed, make a fact and use that
-					if (changed) {
-						Fact newFact = new Fact(factSplit[0], StateSpec
-								.getInstance().getRete());
-						ValueVector vv = new ValueVector(factSplit.length - 1);
-						for (int i = 1; i < factSplit.length; i++)
-							vv.add(factSplit[i]);
-						newFact.setSlotValue("__data", new Value(vv, RU.LIST));
-						prevStateClone.add(newFact);
-					} else {
-						prevStateClone.add(fact);
-					}
-				}
-			}
-
-			// Changing all the actions to modular format
-			prevActions_.replaceTerms(replacements);
-
-			// Forming the pre-goal with placeholder constants
-			PolicyGenerator.getInstance().formPreGoalState(prevStateClone,
-					prevActions_, placeholderConstants);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		// Form the pre-goal using the replacement map.
+		PolicyGenerator.getInstance().formPreGoalState(prevState_,
+				prevActions_, placeholderConstants, replacements);
 	}
 
 	/**
@@ -674,9 +534,9 @@ public class PolicyActor implements AgentInterface {
 	 * 
 	 * @author Sam Sarjant
 	 */
-	private class GoalState {
+	private class GoalArg {
 		/** The facts present in the state. */
-		private List<ValueVector> facts_;
+		private String[] args_;
 
 		/**
 		 * Constructor for a new GoalState.
@@ -684,42 +544,28 @@ public class PolicyActor implements AgentInterface {
 		 * @param facts
 		 *            The facts of the goal state, sorted by predicate.
 		 */
-		public GoalState(ValueVector[] facts) {
-			facts_ = new ArrayList<ValueVector>();
-			for (int i = 0; i < facts.length; i++) {
-				facts_.add(facts[i]);
-			}
+		public GoalArg(String[] args) {
+			args_ = args;
 		}
 
 		/**
 		 * Gets the facts.
 		 * 
-		 * @return
+		 * @return The arguments for the goal.
 		 */
-		public List<ValueVector> getFacts() {
-			return facts_;
+		public String[] getGoalArgs() {
+			return args_;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * 
-		 * @see java.lang.Object#hashCode()
-		 */
 		@Override
 		public int hashCode() {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + getOuterType().hashCode();
-			result = prime * result
-					+ ((facts_ == null) ? 0 : facts_.hashCode());
+			result = prime * result + Arrays.hashCode(args_);
 			return result;
 		}
 
-		/*
-		 * (non-Javadoc)
-		 * 
-		 * @see java.lang.Object#equals(java.lang.Object)
-		 */
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -728,13 +574,10 @@ public class PolicyActor implements AgentInterface {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			GoalState other = (GoalState) obj;
+			GoalArg other = (GoalArg) obj;
 			if (!getOuterType().equals(other.getOuterType()))
 				return false;
-			if (facts_ == null) {
-				if (other.facts_ != null)
-					return false;
-			} else if (!facts_.equals(other.facts_))
+			if (!Arrays.equals(args_, other.args_))
 				return false;
 			return true;
 		}
@@ -745,7 +588,7 @@ public class PolicyActor implements AgentInterface {
 
 		@Override
 		public String toString() {
-			return facts_.toString();
+			return Arrays.toString(args_);
 		}
 	}
 }

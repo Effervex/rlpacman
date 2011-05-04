@@ -2,6 +2,7 @@ package relationalFramework;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,10 +81,8 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	public StringFact(StringFact stringFact) {
 		factName_ = stringFact.factName_;
 		negated_ = stringFact.negated_;
-		factTypes_ = Arrays.copyOf(stringFact.factTypes_,
-				stringFact.factTypes_.length);
-		arguments_ = Arrays.copyOf(stringFact.arguments_,
-				stringFact.arguments_.length);
+		factTypes_ = stringFact.factTypes_;
+		arguments_ = stringFact.arguments_.clone();
 	}
 
 	/**
@@ -161,18 +160,9 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 * @param retainedArgs
 	 *            The arguments to retain.
 	 */
-	public void retainArguments(String[] retainedArgs) {
+	public void retainArguments(Collection<String> retainedArgs) {
 		for (int i = 0; i < arguments_.length; i++) {
-			boolean retain = false;
-			// Check if it's a retainable arg
-			for (String retained : retainedArgs) {
-				if (arguments_[i].equals(retained)) {
-					retain = true;
-					break;
-				}
-			}
-
-			if (!retain)
+			if (!retainedArgs.contains(arguments_[i]))
 				arguments_[i] = "?";
 		}
 	}

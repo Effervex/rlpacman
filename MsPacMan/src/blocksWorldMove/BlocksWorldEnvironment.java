@@ -123,6 +123,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		ObjectObservations.getInstance().predicateKB = rete_;
+		ObjectObservations.getInstance().earlyExit = false;
 		return obs;
 	}
 
@@ -165,8 +166,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
 				/ nonOptimalSteps;
+		boolean isGoal = StateSpec.getInstance().isGoal(rete_)
+				|| ObjectObservations.getInstance().earlyExit;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
-				reward, obs, StateSpec.getInstance().isGoal(rete_));
+				reward, obs, isGoal);
 
 		return rot;
 	}

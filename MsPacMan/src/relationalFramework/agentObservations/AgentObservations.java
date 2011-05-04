@@ -38,7 +38,7 @@ import relationalFramework.Unification;
  * @author Sam Sarjant
  */
 public class AgentObservations implements Serializable {
-	private static final long serialVersionUID = -7206709504108716575L;
+	private static final long serialVersionUID = -8353673923958867860L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -74,7 +74,7 @@ public class AgentObservations implements Serializable {
 	// TODO Note facts which are always true or untrue and can be left out of
 	// learned knowledge
 	/** The observed invariants of the environment. */
-	private ConditionBeliefs invariants_;
+	private InvariantObservations invariants_;
 
 	/** The rules about the environment learned by the agent. */
 	private SortedSet<BackgroundKnowledge> learnedEnvironmentRules_;
@@ -87,7 +87,7 @@ public class AgentObservations implements Serializable {
 
 	/** A transient group of facts indexed by terms used within. */
 	private transient MultiMap<String, StringFact> termMappedFacts_;
-	
+
 	/** The collection of unseen predicates. */
 	private Collection<StringFact> unseenPreds_;
 
@@ -103,6 +103,7 @@ public class AgentObservations implements Serializable {
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 		observationHash_ = null;
 		learnedEnvironmentRules_ = formBackgroundKnowledge();
+		invariants_ = new InvariantObservations();
 
 		unseenPreds_ = new HashSet<StringFact>();
 		unseenPreds_.addAll(StateSpec.getInstance().getPredicates().values());
@@ -125,6 +126,7 @@ public class AgentObservations implements Serializable {
 		// Run through the facts, adding to term mapped facts and adding the raw
 		// facts for condition belief scanning.
 		Collection<StringFact> stateFacts = new ArrayList<StringFact>();
+		Collection<String> generalStateFacts = new HashSet<String>();
 		termMappedFacts_ = MultiMap.createSortedSetMultiMap();
 		for (Fact stateFact : state) {
 			// Ignore the type, inequal and actions pred
@@ -136,6 +138,7 @@ public class AgentObservations implements Serializable {
 						.getStringFact(split[0]), arguments);
 
 				stateFacts.add(strFact);
+				generalStateFacts.add(strFact.getFactName());
 
 				// Run through the arguments and index the fact by term
 				for (int i = 0; i < arguments.length; i++) {
@@ -146,8 +149,11 @@ public class AgentObservations implements Serializable {
 			}
 		}
 
+		// Note the invariants
+		invariants_.noteInvariants(stateFacts, generalStateFacts);
+
 		// Use the term mapped facts to generate collections of true facts.
-		recordConditionAssociations(stateFacts);
+		recordConditionAssociations(stateFacts, generalStateFacts);
 	}
 
 	/**
@@ -156,8 +162,12 @@ public class AgentObservations implements Serializable {
 	 * 
 	 * @param stateFacts
 	 *            The facts of the state in StringFact form.
+	 * @param generalStateFacts
+	 *            A recording of which predicates are active in the state,
+	 *            disregarding arguments.
 	 */
-	private void recordConditionAssociations(Collection<StringFact> stateFacts) {
+	private void recordConditionAssociations(Collection<StringFact> stateFacts,
+			Collection<String> generalStateFacts) {
 		boolean changed = false;
 		for (StringFact baseFact : stateFacts) {
 			// Getting the ConditionBeliefs object
@@ -199,17 +209,9 @@ public class AgentObservations implements Serializable {
 				observationHash_ = null;
 			}
 
-			// Note the invariants
-			// if (invariants_ == null)
-			// invariants_ = new ConditionBeliefs("invariants");
-			// invariants_.noteFacts(cb.getAlwaysTrue(), cb.getNeverTrue(), cb
-			// .getOccasionallyTrue());
-
 			// Form the condition beliefs for the not relative facts, using the
 			// relative facts as always true values (only for non-types
 			// predicates)
-			// if (!StateSpec.getInstance()
-			// .isTypePredicate(baseFact.getFactName()))
 			changed |= recordUntrueConditionAssociations(relativeFacts,
 					notRelativeFacts);
 		}
@@ -413,8 +415,31 @@ public class AgentObservations implements Serializable {
 	private void createRelation(StringFact cond, StringFact otherCond,
 			boolean negationType, SortedSet<BackgroundKnowledge> relations,
 			boolean checkEquivalence) {
+		// Remove any unnecessary terms in the cond based on the terms in the
+		// otherCond.
+		// String[] condArgs = cond.getArguments();
+		// String[] simpleCondArgs = new String[condArgs.length];
+		// for (int i = 0; i < simpleCondArgs.length; i++) {
+		// boolean containsArg = false;
+		// for (String otherArg : otherCond.getArguments()) {
+		// if (condArgs[i].equals(otherArg)) {
+		// containsArg = true;
+		// break;
+		// }
+		// }
+		//			
+		// if (!containsArg)
+		// simpleCondArgs[i] = StateSpec.ANONYMOUS;
+		// else
+		// simpleCondArgs[i] = condArgs[i];
+		// }
+
+		// StringFact left = new StringFact(cond, simpleCondArgs,
+		// cond.isNegated());
 		StringFact left = cond;
 		StringFact right = otherCond;
+		if (left.equals(right))
+			return;
 		String relation = " => ";
 
 		// Create the basic inference relation
@@ -522,39 +547,45 @@ public class AgentObservations implements Serializable {
 	 *            The constants to maintain.
 	 * @param onlyActionTerms
 	 *            If the method should anonymise non-action terms.
+	 * @param replacements
+	 *            Optional replacements for modifying the gathered facts.
 	 * @return The relevant facts pertaining to the action.
 	 */
 	public Collection<StringFact> gatherActionFacts(StringFact action,
-			Collection<String> constants, boolean onlyActionTerms) {
+			Collection<String> constants, boolean onlyActionTerms,
+			Map<String, String> replacements) {
 		// Note down action conditions if still unsettled.
 		Map<String, String> replacementMap = action
 				.createVariableTermReplacementMap(false);
-		// Add constants as replacements
-		if (constants != null) {
-			for (String constant : constants) {
-				// TODO Do I just replace straight away?
-				if (!replacementMap.containsKey(constant))
-					replacementMap.put(constant, constant);
-			}
-		}
 
 		Collection<StringFact> actionFacts = new HashSet<StringFact>();
 		Set<StringFact> actionConds = new HashSet<StringFact>();
+		// Gather facts for each (non-number) action argument
 		for (String argument : action.getArguments()) {
 			if (!StateSpec.isNumber(argument)) {
 				Collection<StringFact> termFacts = termMappedFacts_
 						.get(argument);
+				// Modify the term facts, retaining constants, replacing terms
 				for (StringFact termFact : termFacts) {
-					StringFact notedFact = termFact;
+					StringFact notedFact = new StringFact(termFact);
 					if (onlyActionTerms) {
-						notedFact = new StringFact(termFact);
-						notedFact.retainArguments(action.getArguments());
+						Collection<String> retained = new HashSet<String>(
+								replacementMap.keySet());
+						if (constants != null)
+							retained.addAll(constants);
+						notedFact.retainArguments(retained);
 					}
+
+					// If we have replacements, apply them
+					if (replacements != null)
+						notedFact.replaceArguments(replacements, true);
 
 					if (!actionFacts.contains(notedFact))
 						actionFacts.add(notedFact);
 
 					// Note the action condition
+					// TODO Add module/goal constants to specialisation
+					// operators?
 					StringFact actionCond = new StringFact(termFact);
 					actionCond.replaceArguments(replacementMap, false);
 					actionConds.add(actionCond);
