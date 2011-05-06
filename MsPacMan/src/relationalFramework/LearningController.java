@@ -856,9 +856,6 @@ public class LearningController {
 		// return (int) (POPULATION_CONSTANT * (sumSlot / policyGenerator
 		// .getGenerator().size()));
 		//
-		if (policyGenerator.isSlotOptimiser()) {
-			return (int) (policyGenerator.getGenerator().size() / SELECTION_RATIO);
-		}
 
 		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
 		double maxWeightedRuleCount = 0;

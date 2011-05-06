@@ -769,7 +769,7 @@ public class RuleCreationTest {
 		sut_ = new RuleCreation();
 		assertTrue("No loaded agent observations. Cannot run test.", sut_
 				.hasAgentObservations());
-		
+
 		// Strange issue:
 		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
 				ConditionComparator.getInstance());
@@ -782,20 +782,43 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec.toStringFact("(highest ?Y)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(block ?Y)")));
 		assertEquals(results.size(), 2);
-		
-		ruleConds = new TreeSet<StringFact>(
-				ConditionComparator.getInstance());
+
+		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(highest ?Y)"));
 		ruleConds.add(StateSpec.toStringFact("(above ?Y floor)"));
 		ruleConds.add(StateSpec.toStringFact("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toStringFact("(block ?Y)"));
-		results = sut_.simplifyRule(ruleConds, null,
-				false, true);
+		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(highest ?Y)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(above ?Y floor)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(block ?Y)")));
 		assertEquals(results.size(), 3);
+
+		// Test the (block X) <=> (above X ?) rule
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
+		results = sut_.simplifyRule(ruleConds, null, false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(block ?X)")));
+		assertEquals(results.size(), 1);
+
+		// Test the invariants
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toStringFact("(clear floor) (floor floor)"));
+		results = sut_.simplifyRule(ruleConds, null, false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(floor floor)")));
+		assertEquals(results.size(), 1);
+
+		ruleConds.clear();
+		ruleConds.add(StateSpec
+				.toStringFact("(above a floor) (block a) (floor floor)"));
+		results = sut_.simplifyRule(ruleConds, null, false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(floor floor)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(block a)")));
+		assertEquals(results.size(), 2);
 	}
 
 	@Test
@@ -887,22 +910,6 @@ public class RuleCreationTest {
 		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(above ? ?X)")));
-		assertEquals(results.size(), 1);
-	}
-
-	@Test
-	public void testSimplifyRuleMoveBW() {
-		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		sut_ = new RuleCreation();
-
-		// Test the (block X) <=> (above X ?) rule
-		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
-				ConditionComparator.getInstance());
-		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
-		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
-				false, true);
-		assertNotNull(results);
-		assertTrue(results.contains(StateSpec.toStringFact("(block ?X)")));
 		assertEquals(results.size(), 1);
 	}
 }
