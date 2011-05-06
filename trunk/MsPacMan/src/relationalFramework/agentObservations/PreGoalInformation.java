@@ -88,6 +88,10 @@ public class PreGoalInformation implements Serializable {
 		return false;
 	}
 
+	public boolean isSettled() {
+		return (inactivity_ >= AgentObservations.INACTIVITY_THRESHOLD);
+	}
+
 	public Collection<StringFact> getState() {
 		return state_;
 	}

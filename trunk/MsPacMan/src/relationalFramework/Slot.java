@@ -43,6 +43,9 @@ public class Slot implements Serializable {
 	/** If this slot is fixed. */
 	private boolean fixed_ = false;
 
+	/** The fixed rule if this slot is fixed. */
+	private GuidedRule fixedRule_;
+
 	/** The chance of this slot being selected. */
 	private double selectionProb_;
 
@@ -78,6 +81,21 @@ public class Slot implements Serializable {
 	public Slot(String action, Collection<StringFact> slotConditions) {
 		this(action);
 		slotSplitFacts_ = slotConditions;
+	}
+
+	/**
+	 * A constructor for a new slot of only one fixed rule. The slot's rule will
+	 * never change, but the slot paramaters may.
+	 * 
+	 * @param fixedRule
+	 *            The rule this slot is fixed on.
+	 */
+	public Slot(GuidedRule fixedRule) {
+		action_ = fixedRule.getActionPredicate();
+		selectionProb_ = 1;
+		selectionSD_ = 0.5;
+		fixed_ = true;
+		fixedRule_ = fixedRule;
 	}
 
 	/**
@@ -258,8 +276,34 @@ public class Slot implements Serializable {
 		return seedRule_;
 	}
 
+	/**
+	 * Samples a rule from the slot.
+	 * 
+	 * @param useMostLikely
+	 *            If the most likely rule should be sampled.
+	 * @return The sampled rule.
+	 */
 	public GuidedRule sample(boolean useMostLikely) {
+		if (fixed_)
+			return fixedRule_;
 		return ruleGenerator_.sample(useMostLikely);
+	}
+
+	/**
+	 * Samples a rule from the slot using an influenced distribution with the
+	 * given parameters.
+	 * 
+	 * @param influenceThreshold
+	 *            The influence threshold value.
+	 * @param influenceBoost
+	 *            The influence boost value.
+	 * @return The sampled rule.
+	 */
+	public GuidedRule sample(double influenceThreshold, double influenceBoost) {
+		if (fixed_)
+			return fixedRule_;
+		return getInfluencedDistribution(influenceThreshold, influenceBoost)
+				.sample(false);
 	}
 
 	/**
@@ -271,17 +315,16 @@ public class Slot implements Serializable {
 		return fixed_;
 	}
 
-	/**
-	 * Fixes the slot in place.
-	 */
-	public void fixSlot() {
-		fixed_ = true;
-		// TODO Fix the slot in place by creating a single rule for it
+	public GuidedRule getFixedRule() {
+		return fixedRule_;
 	}
 
 	// TODO Be careful when changing this (to the KLsize). Make sure the
 	// affected calls remain valid.
+	// One such call is adding new rules with average probability.
 	public int size() {
+		if (fixed_)
+			return 1;
 		return ruleGenerator_.size();
 	}
 
@@ -308,7 +351,10 @@ public class Slot implements Serializable {
 		clone.selectionProb_ = selectionProb_;
 		clone.selectionSD_ = selectionSD_;
 		clone.fixed_ = fixed_;
-		clone.ruleGenerator_ = ruleGenerator_.clone();
+		if (!fixed_)
+			clone.ruleGenerator_ = ruleGenerator_.clone();
+		else
+			clone.ruleGenerator_ = null;
 		if (slotSplitFacts_ != null)
 			clone.slotSplitFacts_ = new ArrayList<StringFact>(slotSplitFacts_);
 		clone.seedRule_ = seedRule_;
@@ -338,6 +384,9 @@ public class Slot implements Serializable {
 			return false;
 		if (fixed_ != other.fixed_)
 			return false;
+		// Special case for fixed slots
+		if (fixed_ && !fixedRule_.equals(other.fixedRule_))
+			return false;
 		return true;
 	}
 
@@ -347,6 +396,8 @@ public class Slot implements Serializable {
 		int result = 1;
 		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
 		result = prime * result + (fixed_ ? 1231 : 1237);
+		result = prime * result
+				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
 		result = prime * result
 				+ ((slotSplitFacts_ == null) ? 0 : slotSplitFacts_.hashCode());
 		return result;
@@ -367,12 +418,17 @@ public class Slot implements Serializable {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
-		buffer.append(" " + ruleGenerator_.toString() + "," + selectionProb_
-				+ "\u00b1" + selectionSD_);
+		if (fixed_)
+			buffer.append(" " + fixedRule_.toString());
+		else
+			buffer.append(" " + ruleGenerator_.toString());
+		buffer.append("," + selectionProb_ + "\u00b1" + selectionSD_);
 		return buffer.toString();
 	}
 
 	public boolean isEmpty() {
+		if (fixed_)
+			return false;
 		return ruleGenerator_.isEmpty();
 	}
 
@@ -386,10 +442,8 @@ public class Slot implements Serializable {
 	public static Slot parseSlotString(String slotString) {
 		int index = 0;
 		// Checking if slot is fixed
-		boolean fixed = false;
 		int fixIndex = FIXED.length() + ELEMENT_DELIMITER.length();
 		if (slotString.substring(0, fixIndex).equals(FIXED + ELEMENT_DELIMITER)) {
-			fixed = true;
 			index = fixIndex;
 		}
 
@@ -408,9 +462,6 @@ public class Slot implements Serializable {
 			double prob = Double.parseDouble(m.group(2));
 			slot.addNewRule(guidedRule, prob);
 		}
-
-		if (fixed)
-			slot.fixSlot();
 
 		return slot;
 	}

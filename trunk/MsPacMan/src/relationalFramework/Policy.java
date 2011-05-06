@@ -334,9 +334,15 @@ public class Policy {
 				String query = StateSpec.getInstance().getRuleQuery(gr);
 				// If there are parameters, temp or concrete, insert them here
 				ValueVector vv = new ValueVector();
-				if (gr.getParameters() != null) {
-					for (String param : gr.getParameters())
-						vv.add(param);
+				if (gr.getQueryParameters() != null) {
+					if (gr.getParameters() != null) {
+						for (String param : gr.getParameters())
+							vv.add(param);
+					} else {
+						// Use anonymous placeholder
+						for (int i = 0; i < gr.getQueryParameters().size(); i++)
+							vv.add(StateSpec.ANONYMOUS);
+					}
 				}
 				QueryResult results = state.runQueryStar(query, vv);
 

@@ -75,6 +75,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
 			return "(on a b)";
+//			return "(on ?G1 ?G2) (block ?G1) (block ?G2)";
 		}
 
 		// Unstack goal

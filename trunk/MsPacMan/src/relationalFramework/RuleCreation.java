@@ -558,8 +558,6 @@ public class RuleCreation implements Serializable {
 	public boolean formPreGoalState(Collection<Fact> preGoalState,
 			ActionChoice actionChoice, Collection<String> constants,
 			Map<String, String> replacements) {
-		// TODO Add an inactivity threshold, so the agent isn't ALWAYS making a
-		// pregoal.
 		// Scan the state first to create the term-mapped facts
 		ao_.scanState(preGoalState);
 
@@ -581,8 +579,10 @@ public class RuleCreation implements Serializable {
 					Collection<StringFact> preGoalStringState = ao_
 							.gatherActionFacts(action, constants, false,
 									replacements);
-					if (replacements != null)
+					if (replacements != null) {
+						action = new StringFact(action);
 						action.replaceArguments(replacements, true);
+					}
 
 					if (preGoal == null) {
 						preGoal = new PreGoalInformation(preGoalStringState,
@@ -868,5 +868,13 @@ public class RuleCreation implements Serializable {
 		if (ao_.getConditionBeliefs().isEmpty())
 			return false;
 		return true;
+	}
+
+	public Collection<StringFact> getSpecificInvariants() {
+		return ao_.getSpecificInvariants();
+	}
+
+	public boolean isPreGoalSettled(String actionPred) {
+		return ao_.isPreGoalSettled(actionPred);
 	}
 }

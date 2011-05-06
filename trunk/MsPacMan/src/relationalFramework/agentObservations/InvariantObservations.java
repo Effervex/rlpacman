@@ -2,7 +2,7 @@ package relationalFramework.agentObservations;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.TreeSet;
 
 import relationalFramework.StringFact;
 
@@ -39,8 +39,8 @@ public class InvariantObservations implements Serializable {
 		// If the first pass, invariants are just the state.
 		counter_++;
 		if (specificInvariants_ == null) {
-			specificInvariants_ = new HashSet<StringFact>(stateFacts);
-			generalInvariants_ = new HashSet<String>(generalStateFacts);
+			specificInvariants_ = new TreeSet<StringFact>(stateFacts);
+			generalInvariants_ = new TreeSet<String>(generalStateFacts);
 			return true;
 		}
 
@@ -51,11 +51,52 @@ public class InvariantObservations implements Serializable {
 	}
 
 	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime
+				* result
+				+ ((generalInvariants_ == null) ? 0 : generalInvariants_
+						.hashCode());
+		result = prime
+				* result
+				+ ((specificInvariants_ == null) ? 0 : specificInvariants_
+						.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		InvariantObservations other = (InvariantObservations) obj;
+		if (generalInvariants_ == null) {
+			if (other.generalInvariants_ != null)
+				return false;
+		} else if (!generalInvariants_.equals(other.generalInvariants_))
+			return false;
+		if (specificInvariants_ == null) {
+			if (other.specificInvariants_ != null)
+				return false;
+		} else if (!specificInvariants_.equals(other.specificInvariants_))
+			return false;
+		return true;
+	}
+
+	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer("Invariants (" + counter_
 				+ " counts):\n");
 		buffer.append("Specific: " + specificInvariants_.toString() + "\n");
 		buffer.append("General: " + generalInvariants_.toString());
 		return buffer.toString();
+	}
+
+	public Collection<StringFact> getSpecificInvariants() {
+		return specificInvariants_;
 	}
 }
