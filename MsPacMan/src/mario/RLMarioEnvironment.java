@@ -6,7 +6,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 
-import jess.Fact;
 import jess.JessException;
 import jess.Rete;
 
@@ -88,7 +87,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Observation env_start() {
-		levelDifficulty_ = 1;
+		levelDifficulty_ = 0;
 		resetEnvironment();
 		environment_.tick();
 
@@ -197,7 +196,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList
-			StringFact bestAction = null;
 			for (StringFact action : actionStrings) {
 				boolean[] actionArray = ((RLMarioStateSpec) StateSpec
 						.getInstance()).applyAction(action, marioGroundPos_,
@@ -210,7 +208,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 				if (actionWeight > bestWeight) {
 					bestWeight = actionWeight;
 					selectedAction = actionArray;
-					bestAction = action;
 				} else if (actionWeight == bestWeight
 						&& !Arrays.equals(selectedAction, actionArray)) {
 					// If two objects are of the same distance, and they're not
@@ -317,7 +314,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 			// Assert the enemies
 			Collection<String> currentShells = new HashSet<String>();
-			boolean assertedEnemies = false;
 			for (int e = 0; e < enemyPos.length; e++) {
 				float enemyType = enemyPos[e++];
 				float x = enemyPos[e++];
@@ -330,7 +326,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 							levelObs);
 					if (isShell != null)
 						currentShells.add(isShell);
-					assertedEnemies = true;
 				}
 			}
 			shellPositions_ = currentShells;

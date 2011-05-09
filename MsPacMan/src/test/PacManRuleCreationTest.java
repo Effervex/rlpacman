@@ -16,6 +16,7 @@ import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManRuleCreationTest {
 	private RuleCreation sut_;
@@ -28,9 +29,6 @@ public class PacManRuleCreationTest {
 
 	@Test
 	public void testSpecialiseToPreGoal() {
-		// Specialising a range without a pregoal (splitting an LGG rule)
-		sut_.clearPreGoalState();
-
 		GuidedRule rule = new GuidedRule(
 				"(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
 						+ "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)");
@@ -114,7 +112,7 @@ public class PacManRuleCreationTest {
 		assertEquals(results.size(), 4);
 
 		// Special case: Range goes through 0 (no pregoal)
-		sut_.clearPreGoalState();
+		AgentObservations.getInstance().clearPreGoal();
 
 		rule = new GuidedRule(
 				"(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 -16.0 26.0)) "
@@ -122,22 +120,17 @@ public class PacManRuleCreationTest {
 		results = sut_.specialiseToPreGoal(rule);
 		mutant = new GuidedRule(
 				"(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 -16.0 0.0)) "
-						+ "(junction ?X) => (toJunction ?X ?__Num0)",
-				rule);
+						+ "(junction ?X) => (toJunction ?X ?__Num0)", rule);
 		assertTrue(results.contains(mutant));
 		mutant = new GuidedRule(
 				"(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 0.0 26.0)) "
-						+ "(junction ?X) => (toJunction ?X ?__Num0)",
-				rule);
+						+ "(junction ?X) => (toJunction ?X ?__Num0)", rule);
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 5);
 	}
 
 	@Test
 	public void testSpecialiseRangedPreGoal() throws Exception {
-		// Init PacMan
-		sut_.clearAgentObservations();
-
 		GuidedRule rule = new GuidedRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -10.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");

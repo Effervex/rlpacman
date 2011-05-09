@@ -104,12 +104,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 		resetEnvironment();
 
 		// Run the optimal policy if it hasn't yet been run
-		if (testHandCodedPolicy_
-				|| (!skipHandCodedPolicy_
-						&& !PolicyGenerator.getInstance().hasPreGoal() && !PolicyGenerator
-						.getInstance().isFrozen())) {
-			handCodedPolicy();
-		}
+//		if (testHandCodedPolicy_
+//				|| (!skipHandCodedPolicy_
+//						&& !PolicyGenerator.getInstance().hasPreGoal() && !PolicyGenerator
+//						.getInstance().isFrozen())) {
+//			handCodedPolicy();
+//		}
 
 		// If we're not in full experiment mode, redraw the scene.
 		if (!experimentMode_) {

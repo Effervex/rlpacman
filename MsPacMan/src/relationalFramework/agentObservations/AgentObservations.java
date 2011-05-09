@@ -56,6 +56,9 @@ public class AgentObservations implements Serializable {
 	// TODO Set this as a better measure
 	public static final int INACTIVITY_THRESHOLD = 50;
 
+	/** The AgentObservations instance. */
+	private static AgentObservations instance_;
+
 	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
 
@@ -95,7 +98,7 @@ public class AgentObservations implements Serializable {
 	/**
 	 * The constructor for the agent observations.
 	 */
-	public AgentObservations() {
+	private AgentObservations() {
 		conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
 		negatedConditionBeliefs_ = new TreeMap<String, Map<Byte, ConditionBeliefs>>();
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
@@ -869,7 +872,8 @@ public class AgentObservations implements Serializable {
 	}
 
 	/**
-	 * Simplifies a set of facts using the learned background knowledge.
+	 * Simplifies a set of facts using the learned background knowledge and
+	 * invariants.
 	 * 
 	 * @param simplified
 	 *            The facts to be simplified.
@@ -887,6 +891,9 @@ public class AgentObservations implements Serializable {
 		SortedSet<StringFact> testedFacts = new TreeSet<StringFact>(simplified
 				.comparator());
 		boolean changedThisIter = true;
+
+		// Simplify using the invariants first
+		changedOverall |= removeInvariants(simplified);
 
 		// Check each fact for simplifications, and check new facts when they're
 		// added
@@ -928,7 +935,31 @@ public class AgentObservations implements Serializable {
 		return changedOverall;
 	}
 
-	public static AgentObservations loadAgentObservations() {
+	/**
+	 * Removes all non-type invariants from the conditions.
+	 * 
+	 * @param conditions
+	 *            The conditions to remove invariants from.
+	 * @return If invariants were removed.
+	 */
+	private boolean removeInvariants(SortedSet<StringFact> conditions) {
+		boolean changed = false;
+		for (StringFact invariant : invariants_.getSpecificInvariants()) {
+			// Only remove non-type invariants, as type invariants are either
+			// needed, or will be added back anyway.
+			if (!StateSpec.getInstance().isTypePredicate(
+					invariant.getFactName())) {
+				changed |= conditions.remove(invariant);
+			}
+		}
+		return changed;
+	}
+
+	/**
+	 * Loads an AgentObservation serialised class from file, or if no file
+	 * available, creates a new one.
+	 */
+	public static boolean loadAgentObservations() {
 		try {
 			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
 					.getInstance().getEnvironmentName()
@@ -946,12 +977,25 @@ public class AgentObservations implements Serializable {
 								.values())
 							abo.rlggRule_ = null;
 					}
-					return ao;
+					instance_ = ao;
+					return true;
 				}
 			}
 		} catch (Exception e) {
 		}
-		return null;
+		instance_ = getInstance();
+		return false;
+	}
+
+	/**
+	 * Gets the AgentObservations instance.
+	 * 
+	 * @return The instance.
+	 */
+	public static AgentObservations getInstance() {
+		if (instance_ == null)
+			instance_ = new AgentObservations();
+		return instance_;
 	}
 
 	/**

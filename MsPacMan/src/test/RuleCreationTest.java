@@ -28,6 +28,7 @@ import relationalFramework.Policy;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class RuleCreationTest {
@@ -102,7 +103,7 @@ public class RuleCreationTest {
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?X)")));
 
 		// Generalising test (different predicates, same action)
-		sut_.clearPreGoalState();
+		AgentObservations.getInstance().clearPreGoal();
 		state.reset();
 		state.eval("(assert (block a))");
 		state.eval("(assert (block b))");
@@ -202,7 +203,7 @@ public class RuleCreationTest {
 		ac.switchOn(ra);
 		Map<String, String> replacement = new HashMap<String, String>();
 		replacement.put("b", Module.createModuleParameter(0));
-		sut_.clearPreGoalState();
+		AgentObservations.getInstance().clearPreGoal();
 		sut_.formPreGoalState(facts, ac, null, replacement);
 		preGoal = sut_.getPreGoalState("move");
 		// Contains less than the defined preds, above and clear preds
@@ -304,7 +305,7 @@ public class RuleCreationTest {
 
 		rule = new GuidedRule("(clear a) (clear b) => (move a b)");
 		results = sut_.specialiseToPreGoal(rule);
-		assertEquals(0, results.size());
+		assertEquals(results.toString(), 0, results.size());
 
 		// Using constants for general rule addition
 		pregoal.clear();
@@ -805,15 +806,17 @@ public class RuleCreationTest {
 
 		// Test the invariants
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toStringFact("(clear floor) (floor floor)"));
+		ruleConds.add(StateSpec.toStringFact("(clear floor)"));
+		ruleConds.add(StateSpec.toStringFact("(floor floor)"));
 		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(floor floor)")));
 		assertEquals(results.size(), 1);
 
 		ruleConds.clear();
-		ruleConds.add(StateSpec
-				.toStringFact("(above a floor) (block a) (floor floor)"));
+		ruleConds.add(StateSpec.toStringFact("(above a floor)"));
+		ruleConds.add(StateSpec.toStringFact("(floor floor)"));
+		ruleConds.add(StateSpec.toStringFact("(block a)"));
 		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(floor floor)")));
