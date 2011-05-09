@@ -584,12 +584,6 @@ public class AgentObservations implements Serializable {
 		observationHash_ = null;
 	}
 
-	public void clearPreGoal() {
-		for (String action : actionBasedObservations_.keySet()) {
-			actionBasedObservations_.get(action).setPGI(null);
-		}
-	}
-
 	/**
 	 * Gathers all relevant facts for a particular action and returns them.
 	 * 
@@ -650,18 +644,6 @@ public class AgentObservations implements Serializable {
 			observationHash_ = null;
 
 		return actionFacts;
-	}
-
-	public Map<String, ConditionBeliefs> getConditionBeliefs() {
-		return conditionBeliefs_;
-	}
-
-	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
-		return learnedEnvironmentRules_;
-	}
-
-	public Map<String, Map<Byte, ConditionBeliefs>> getNegatedConditionBeliefs() {
-		return negatedConditionBeliefs_;
 	}
 
 	public int getObservationHash() {
@@ -892,16 +874,6 @@ public class AgentObservations implements Serializable {
 
 		// Use the term mapped facts to generate collections of true facts.
 		recordConditionAssociations(stateFacts, generalStateFacts);
-	}
-
-	public void setActionConditions(String action,
-			Collection<StringFact> conditions) {
-		getActionBasedObservation(action).setActionConditions(conditions);
-		observationHash_ = null;
-	}
-
-	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
-		learnedEnvironmentRules_ = backKnow;
 	}
 
 	public void setPreGoal(String actionPred, PreGoalInformation preGoal) {
@@ -1338,5 +1310,34 @@ public class AgentObservations implements Serializable {
 		public void setPGI(PreGoalInformation preGoal) {
 			pgi_ = preGoal;
 		}
+	}
+
+	// TEST METHODS
+	public void clearPreGoal() {
+		for (String action : actionBasedObservations_.keySet()) {
+			actionBasedObservations_.get(action).setPGI(null);
+		}
+	}
+	
+	public Map<String, ConditionBeliefs> getConditionBeliefs() {
+		return conditionBeliefs_;
+	}
+
+	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
+		return learnedEnvironmentRules_;
+	}
+
+	public Map<String, Map<Byte, ConditionBeliefs>> getNegatedConditionBeliefs() {
+		return negatedConditionBeliefs_;
+	}
+
+	public void setActionConditions(String action,
+			Collection<StringFact> conditions) {
+		getActionBasedObservation(action).setActionConditions(conditions);
+		observationHash_ = null;
+	}
+
+	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
+		learnedEnvironmentRules_ = backKnow;
 	}
 }

@@ -38,8 +38,8 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = new RuleCreation();
-		assertTrue("No loaded agent observations. Cannot run test.", sut_
-				.hasAgentObservations());
+		assertTrue("No loaded agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
 	}
 
 	@Test
@@ -79,7 +79,8 @@ public class RuleCreationTest {
 		ra.triggerRule();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null, null);
-		Collection<StringFact> preGoal = sut_.getPreGoalState("moveFloor");
+		Collection<StringFact> preGoal = AgentObservations.getInstance()
+				.getPreGoal("moveFloor").getState();
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block a)")));
@@ -97,7 +98,8 @@ public class RuleCreationTest {
 		ra.triggerRule();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null, null);
-		preGoal = sut_.getPreGoalState("moveFloor");
+		preGoal = AgentObservations.getInstance().getPreGoal("moveFloor")
+				.getState();
 		assertEquals(preGoal.size(), 2);
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(block ?X)")));
@@ -128,7 +130,7 @@ public class RuleCreationTest {
 		ra.triggerRule();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null, null);
-		preGoal = sut_.getPreGoalState("move");
+		preGoal = AgentObservations.getInstance().getPreGoal("move").getState();
 		// Contains the defined preds, above and clear preds
 		assertEquals(10, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
@@ -164,7 +166,7 @@ public class RuleCreationTest {
 		ra.triggerRule();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null, null);
-		preGoal = sut_.getPreGoalState("move");
+		preGoal = AgentObservations.getInstance().getPreGoal("move").getState();
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(6, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
@@ -184,7 +186,7 @@ public class RuleCreationTest {
 		ra.triggerRule();
 		ac.switchOn(ra);
 		sut_.formPreGoalState(facts, ac, null, null);
-		preGoal = sut_.getPreGoalState("move");
+		preGoal = AgentObservations.getInstance().getPreGoal("move").getState();
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(4, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear ?X)")));
@@ -205,7 +207,7 @@ public class RuleCreationTest {
 		replacement.put("b", Module.createModuleParameter(0));
 		AgentObservations.getInstance().clearPreGoal();
 		sut_.formPreGoalState(facts, ac, null, replacement);
-		preGoal = sut_.getPreGoalState("move");
+		preGoal = AgentObservations.getInstance().getPreGoal("move").getState();
 		// Contains less than the defined preds, above and clear preds
 		assertEquals(preGoal.toString(), 8, preGoal.size());
 		assertTrue(preGoal.contains(StateSpec.toStringFact("(clear a)")));
@@ -236,7 +238,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(above ?Y ?)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?Y)"));
 		pregoal.add(StateSpec.toStringFact("(block ?Y)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		GuidedRule rule = new GuidedRule(
 				"(clear ?X) (clear ?Y) => (move ?X ?Y)");
@@ -268,7 +271,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(block ?X)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?Y)"));
 		pregoal.add(StateSpec.toStringFact("(block ?Y)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -285,7 +289,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(block a)"));
 		pregoal.add(StateSpec.toStringFact("(clear b)"));
 		pregoal.add(StateSpec.toStringFact("(block b)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move a b)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move a b)"), pregoal);
 
 		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -301,7 +306,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(block ?X)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?Y)"));
 		pregoal.add(StateSpec.toStringFact("(block ?Y)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		rule = new GuidedRule("(clear a) (clear b) => (move a b)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -315,7 +321,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(above b ?)"));
 		pregoal.add(StateSpec.toStringFact("(clear b)"));
 		pregoal.add(StateSpec.toStringFact("(block b)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move a b)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move a b)"), pregoal);
 
 		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -333,7 +340,8 @@ public class RuleCreationTest {
 		pregoal.clear();
 		pregoal.add(StateSpec.toStringFact("(above ?X a)"));
 		pregoal.add(StateSpec.toStringFact("(above ?Y b)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		rule = new GuidedRule("(above ?X ?) (above ?Y ?) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -347,7 +355,8 @@ public class RuleCreationTest {
 		pregoal.clear();
 		pregoal.add(StateSpec.toStringFact("(above ?X ?Y)"));
 		pregoal.add(StateSpec.toStringFact("(above ?Y b)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		rule = new GuidedRule("(above ?X ?) => (move ?X a)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -365,7 +374,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(above b ?)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?Y)"));
 		pregoal.add(StateSpec.toStringFact("(block ?Y)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move ?X ?Y)"), pregoal);
 
 		rule = new GuidedRule(
 				"(clear ?X) (onFloor ?X) (clear ?Y) (above ?Y ?) => (move ?X ?Y)");
@@ -384,7 +394,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(clear a)"));
 		pregoal.add(StateSpec.toStringFact("(block a)"));
 		pregoal.add(StateSpec.toStringFact("(block b)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(move a b)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(move a b)"), pregoal);
 
 		rule = new GuidedRule("(on ?X ?Y) (clear ?X) => (move ?X ?Y)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -401,7 +412,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(on ?X a)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?X)"));
 		pregoal.add(StateSpec.toStringFact("(above ?X a)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(moveFloor ?X)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(moveFloor ?X)"), pregoal);
 
 		rule = new GuidedRule(
 				"(clear ?X) (above ?X ?) (block ?X) (block a) => (moveFloor ?X)");
@@ -422,7 +434,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(above ?X ?)"));
 		pregoal.add(StateSpec.toStringFact("(clear ?X)"));
 		pregoal.add(StateSpec.toStringFact("(above ?X ?_MOD_a)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(moveFloor ?X)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(moveFloor ?X)"), pregoal);
 
 		rule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
 		results = sut_.specialiseToPreGoal(rule);
@@ -438,7 +451,8 @@ public class RuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(on d j)"));
 		pregoal.add(StateSpec.toStringFact("(block d)"));
 		pregoal.add(StateSpec.toStringFact("(highest d)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(moveFloor d)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				StateSpec.toStringFact("(moveFloor d)"), pregoal);
 
 		rule = new GuidedRule(
 				"(clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
@@ -768,8 +782,8 @@ public class RuleCreationTest {
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
 		sut_ = new RuleCreation();
-		assertTrue("No loaded agent observations. Cannot run test.", sut_
-				.hasAgentObservations());
+		assertTrue("No loaded agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
 
 		// Strange issue:
 		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
@@ -832,7 +846,7 @@ public class RuleCreationTest {
 		conditions.add(StateSpec.toStringFact("(above ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(highest ?X)"));
 		conditions.add(StateSpec.toStringFact("(clear ?X)"));
-		sut_.setAllowedActionConditions("moveFloor", conditions);
+		AgentObservations.getInstance().setActionConditions("moveFloor", conditions);
 		conditions = new HashSet<StringFact>();
 		conditions.add(StateSpec.toStringFact("(on ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(on ?Y ?)"));
@@ -844,7 +858,7 @@ public class RuleCreationTest {
 		conditions.add(StateSpec.toStringFact("(clear ?Y)"));
 		conditions.add(StateSpec.toStringFact("(onFloor ?X)"));
 		conditions.add(StateSpec.toStringFact("(onFloor ?Y)"));
-		sut_.setAllowedActionConditions("move", conditions);
+		AgentObservations.getInstance().setActionConditions("move", conditions);
 
 		// Set up the equivalence and other rules
 		SortedSet<BackgroundKnowledge> backKnow = new TreeSet<BackgroundKnowledge>();
@@ -886,7 +900,7 @@ public class RuleCreationTest {
 				.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)", false));
 		backKnow.add(new BackgroundKnowledge(
 				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", false));
-		sut_.setBackgroundKnowledge(backKnow);
+		AgentObservations.getInstance().setBackgroundKnowledge(backKnow);
 
 		// Basic implication test
 		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
