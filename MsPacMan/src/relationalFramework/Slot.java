@@ -7,6 +7,8 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import relationalFramework.agentObservations.AgentObservations;
+
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
  * within and any other pertinent information.
@@ -336,7 +338,7 @@ public class Slot implements Serializable {
 	 *         mutations will be allowed.
 	 */
 	public int getMaximumCapacity() {
-		return PolicyGenerator.getInstance().getNumSpecialisations(action_) + 1;
+		return AgentObservations.getInstance().getNumSpecialisations(action_) + 1;
 	}
 
 	/**

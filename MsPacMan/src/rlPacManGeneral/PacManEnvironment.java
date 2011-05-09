@@ -23,6 +23,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;
@@ -35,7 +36,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private PacManLowAction lastDirection_;
 	private DistanceDir[][] distanceGrid_;
 	private Collection<Junction> closeJunctions_;
-	private boolean skipHandCodedPolicy_ = false;
 	private boolean testHandCodedPolicy_ = false;
 
 	@Override
@@ -79,9 +79,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;
-		} else if (arg0.equals("skipOptimal"))
-			skipHandCodedPolicy_ = true;
-		else if (arg0.equals("testHandCoded"))
+		} else if (arg0.equals("testHandCoded"))
 			testHandCodedPolicy_ = true;
 		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
 			StateSpec.reinitInstance(arg0.substring(5));
@@ -183,7 +181,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			testHandCodedPolicy(handCodedPolicy);
 
 		// Run the policy through the environment until goal is satisfied.
-		while (!PolicyGenerator.getInstance().hasPreGoal()) {
+		while (!AgentObservations.getInstance().hasPreGoal()) {
 			PolicyActor handCodedAgent = new PolicyActor();
 			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
@@ -199,7 +197,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Form the pre-goal.
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)
-					&& !PolicyGenerator.getInstance().hasPreGoal())
+					&& !AgentObservations.getInstance().hasPreGoal())
 				handCodedAgent.agent_message("formPreGoal");
 
 			// Return the state to normal

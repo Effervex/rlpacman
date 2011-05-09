@@ -24,6 +24,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 import rlPacManGeneral.PacManLowAction;
 
 public class PacManEnvironment implements EnvironmentInterface {
@@ -185,7 +186,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			testHandCodedPolicy(handCodedPolicy);
 
 		// Run the policy through the environment until goal is satisfied.
-		while (!PolicyGenerator.getInstance().hasPreGoal()) {
+		while (!AgentObservations.getInstance().hasPreGoal()) {
 			PolicyActor handCodedAgent = new PolicyActor();
 			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
@@ -201,7 +202,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Form the pre-goal.
 			if (!ObjectObservations.getInstance().objectArray[0]
 					.equals(ObjectObservations.NO_PRE_GOAL)
-					&& !PolicyGenerator.getInstance().hasPreGoal())
+					&& !AgentObservations.getInstance().hasPreGoal())
 				handCodedAgent.agent_message("formPreGoal");
 
 			// Return the state to normal

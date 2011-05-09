@@ -23,6 +23,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 
 /**
  * The environment for the blocks world interface.
@@ -382,7 +383,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Form the first pre-goal.
-		if (!PolicyGenerator.getInstance().hasPreGoal())
+		if (!AgentObservations.getInstance().hasPreGoal())
 			optimalAgent.agent_message("formPreGoal");
 
 		// Return the state to normal

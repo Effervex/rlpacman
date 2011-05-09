@@ -29,7 +29,7 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = new AgentObservations();
+		sut_ = AgentObservations.getInstance();
 	}
 
 	private void assertBeliefs(ConditionBeliefs cb,
@@ -452,7 +452,7 @@ public class AgentObservationsTest {
 	@Test
 	public void testMoveBWScanState() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		sut_ = new AgentObservations();
+		sut_ = AgentObservations.newInstance();
 
 		// [e]
 		// [b][d]
@@ -818,7 +818,7 @@ public class AgentObservationsTest {
 	@Test
 	public void testPacManScanState() {
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new AgentObservations();
+		sut_ = AgentObservations.newInstance();
 
 		// Rete state = StateSpec.getInstance().getRete();
 		// state.eval("(assert (dot d))");

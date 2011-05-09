@@ -20,6 +20,7 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 
 /**
  * The environment for the blocks world interface.
@@ -100,7 +101,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		state_ = initialiseHanoi(numTiles_);
 
 		// Run the optimal policy if it hasn't yet been run
-		if (!PolicyGenerator.getInstance().hasPreGoal()) {
+		if (!AgentObservations.getInstance().hasPreGoal()) {
 			optimalSteps();
 		}
 
@@ -299,7 +300,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		}
 
 		// Form the first pre-goal.
-		if (!PolicyGenerator.getInstance().hasPreGoal())
+		if (!AgentObservations.getInstance().hasPreGoal())
 			optimalAgent.agent_message("formPreGoal");
 
 		// Return the state to normal
