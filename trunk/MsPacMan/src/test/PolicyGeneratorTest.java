@@ -171,11 +171,11 @@ public class PolicyGeneratorTest {
 		RuleAction ruleAction = new RuleAction(stackRule, actionsList, policy);
 		ruleAction.triggerRule();
 		actions.switchOn(ruleAction);
-		assertNull(sut_.getPreGoal("move"));
+		assertNull(AgentObservations.getInstance().getPreGoal("move"));
 		sut_.formPreGoalState(preGoalFacts, actions, null, null);
-		Collection<StringFact> preGoalState = new HashSet<StringFact>(sut_
-				.getPreGoal("move"));
-		assertTrue(sut_.hasPreGoal());
+		Collection<StringFact> preGoalState = new HashSet<StringFact>(AgentObservations.getInstance()
+				.getPreGoal("move").getState());
+		assertTrue(AgentObservations.getInstance().hasPreGoal());
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -264,12 +264,12 @@ public class PolicyGeneratorTest {
 		ruleAction = new RuleAction(stackRule, actionsList, policy);
 		ruleAction.triggerRule();
 		actions.switchOn(ruleAction);
-		assertEquals(preGoalState, sut_.getPreGoal("move"));
-		assertTrue(sut_.getPreGoal("move").contains(blockA));
+		assertEquals(preGoalState, AgentObservations.getInstance().getPreGoal("move").getState());
+		assertTrue(AgentObservations.getInstance().getPreGoal("move").getState().contains(blockA));
 		sut_.formPreGoalState(preGoalFacts, actions, null, null);
-		assertFalse(sut_.getPreGoal("move").contains(blockA));
-		assertFalse(preGoalState.equals(sut_.getPreGoal("move")));
-		assertTrue(sut_.hasPreGoal());
+		assertFalse(AgentObservations.getInstance().getPreGoal("move").getState().contains(blockA));
+		assertFalse(preGoalState.equals(AgentObservations.getInstance().getPreGoal("move").getState()));
+		assertTrue(AgentObservations.getInstance().hasPreGoal());
 
 		// Test the state of the slot generator
 		slotGenerator = sut_.getGenerator();

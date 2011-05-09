@@ -14,7 +14,6 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.AgentObservations;
-import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.PreGoalInformation;
 
 import jess.Fact;
