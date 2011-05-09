@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -17,7 +18,8 @@ import jess.ValueVector;
  * 
  * @author Samuel J. Sarjant
  */
-public class Policy {
+public class Policy implements Serializable {
+	private static final long serialVersionUID = -8362692831702469438L;
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = '#';
 	/** The rules of this policy, organised in a deterministic list format. */

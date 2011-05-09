@@ -19,6 +19,8 @@ import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
+import relationalFramework.agentObservations.AgentObservations;
+
 /**
  * An agent that chooses its decisions based on a fixed policy, fed in via agent
  * message.
@@ -105,6 +107,7 @@ public class PolicyActor implements AgentInterface {
 		totalReward_ = 0;
 		totalSteps_ = 0;
 		totalEpisodes_ = -1;
+		AgentObservations.loadAgentObservations();
 	}
 
 	// @Override

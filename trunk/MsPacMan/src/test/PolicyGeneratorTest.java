@@ -2,7 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -18,14 +17,13 @@ import relationalFramework.ActionChoice;
 import relationalFramework.ArgumentComparator;
 import relationalFramework.GuidedRule;
 import relationalFramework.MultiMap;
-import relationalFramework.OrderedDistribution;
 import relationalFramework.Policy;
 import relationalFramework.PolicyGenerator;
-import relationalFramework.ProbabilityDistribution;
 import relationalFramework.RuleAction;
 import relationalFramework.Slot;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
 
 public class PolicyGeneratorTest {
 	private PolicyGenerator sut_;
@@ -34,11 +32,12 @@ public class PolicyGeneratorTest {
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = PolicyGenerator.newInstance(0);
+		AgentObservations.loadAgentObservations();
 	}
 
 	@Test
 	public void testTriggerRLGGCovering() throws Exception {
-		sut_.clearAgentObservations();
+		AgentObservations.getInstance().clearActionBasedObservations();
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		state.eval("(assert (clear b))");
@@ -305,7 +304,7 @@ public class PolicyGeneratorTest {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
 		sut_ = PolicyGenerator.newInstance(0);
-		sut_.clearAgentObservations();
+		AgentObservations.getInstance().clearActionBasedObservations();
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");

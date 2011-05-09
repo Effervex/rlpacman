@@ -91,12 +91,19 @@ public class InvariantObservations implements Serializable {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer("Invariants (" + counter_
 				+ " counts):\n");
+		if (specificInvariants_ == null) {
+			buffer.append("NONE RECORDED");
+			return buffer.toString();
+		}
+			
 		buffer.append("Specific: " + specificInvariants_.toString() + "\n");
 		buffer.append("General: " + generalInvariants_.toString());
 		return buffer.toString();
 	}
 
 	public Collection<StringFact> getSpecificInvariants() {
+		if (specificInvariants_ == null)
+			return new TreeSet<StringFact>();
 		return specificInvariants_;
 	}
 }

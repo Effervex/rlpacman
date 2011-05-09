@@ -29,9 +29,6 @@ public class PacManGeneralRuleCreationTest {
 
 	@Test
 	public void testSpecialiseToPreGoal() {
-		// Specialising a range without a pregoal (splitting an LGG rule)
-		sut_.clearPreGoalState();
-
 		// Test typed and constant specialising
 		List<StringFact> pregoal = new ArrayList<StringFact>();
 		pregoal.add(StateSpec.toStringFact("(ghost blinky)"));

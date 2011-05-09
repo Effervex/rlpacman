@@ -16,6 +16,8 @@ import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
+import relationalFramework.agentObservations.AgentObservations;
+
 /**
  * The cross entropy algorithm implementation.
  * 
@@ -520,7 +522,7 @@ public class LearningController {
 			// Output the episode averages
 			savePerformance(episodePerformances, run, finalTest);
 			if (!Module.saveAtEnd_)
-				localPolicy.saveAgentObservations(run);
+				AgentObservations.getInstance().saveAgentObservations();
 
 		} catch (Exception e) {
 			e.printStackTrace();
