@@ -26,6 +26,8 @@ import java.util.TreeSet;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
+import relationalFramework.agentObservations.AgentObservations;
+
 import jess.Fact;
 import jess.Rete;
 
@@ -286,42 +288,6 @@ public class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * A method which checks if covering is necessary or required, based on the
-	 * valid actions of the state.
-	 * 
-	 * @param validActions
-	 *            The set of valid actions for the state. If we're creating LGG
-	 *            covering rules, the activated actions need to equal this set.
-	 * @param activatedActions
-	 *            The set of actions already activated by the policy. We only
-	 *            consider these when we're creating new rules.
-	 * @return True if covering is needed.
-	 */
-	private boolean isCoveringNeeded(MultiMap<String, String[]> validActions,
-			MultiMap<String, String[]> activatedActions) {
-		for (String action : validActions.keySet()) {
-			// If the activated actions don't even contain the key, return
-			// true.
-			if (!activatedActions.containsKey(action)) {
-				ruleCreation_.resetInactivity();
-				return true;
-			}
-
-			// Check each set of actions match up
-			if (!activatedActions.get(action).containsAll(
-					(validActions.get(action)))) {
-				ruleCreation_.resetInactivity();
-				return true;
-			}
-		}
-
-		// TODO Also, cover every X episodes, checking more and more
-		// infrequently if no changes occur.
-
-		return false;
-	}
-
-	/**
 	 * Mutates a rule (if it hasn't spawned already, though the covered rule is
 	 * always checked) and creates and adds children to the slots.
 	 * 
@@ -334,8 +300,7 @@ public class PolicyGenerator implements Serializable {
 	 *            -1 for don't care.
 	 */
 	private void mutateRule(GuidedRule baseRule, Slot ruleSlot, int mutationUses) {
-		int preGoalHash = ruleCreation_.getMutationHash(baseRule
-				.getActionPredicate());
+		int preGoalHash = AgentObservations.getInstance().getObservationHash();
 		// If the rule can mutate.
 		if (ruleCanMutate(baseRule, mutationUses, preGoalHash)) {
 			boolean needToPause = false;
@@ -347,8 +312,10 @@ public class PolicyGenerator implements Serializable {
 					System.out.println("PRE-GOAL: ");
 					for (String action : StateSpec.getInstance().getActions()
 							.keySet()) {
-						System.out.println(action + ": "
-								+ ruleCreation_.getPreGoalState(action));
+						System.out.println(action
+								+ ": "
+								+ AgentObservations.getInstance().getPreGoal(
+										action));
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -523,8 +490,8 @@ public class PolicyGenerator implements Serializable {
 		boolean changed = false;
 		for (GuidedRule rlgg : rlggRules_.values()) {
 			// Only re-split the slots if the observation hash has changed.
-			if (ruleCanMutate(rlgg, -1, ruleCreation_.getMutationHash(rlgg
-					.getActionPredicate()))) {
+			if (ruleCanMutate(rlgg, -1, AgentObservations.getInstance()
+					.getObservationHash())) {
 				if (debugMode_) {
 					try {
 						System.out.println("\tSPLITTING SLOT "
@@ -630,13 +597,6 @@ public class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Should only be a test method.
-	 */
-	public void clearAgentObservations() {
-		ruleCreation_.clearAgentObservations();
-	}
-
-	/**
 	 * Checks if a particular rule is present in the policy generator.
 	 * 
 	 * @param gr
@@ -689,7 +649,8 @@ public class PolicyGenerator implements Serializable {
 			// If the pre-goal has recently changed and we have an LGG rule for
 			// it, create and remove mutants.
 			for (String action : StateSpec.getInstance().getActions().keySet()) {
-				if (ruleCreation_.isPreGoalRecentlyChanged(action)
+				if (AgentObservations.getInstance().getPreGoal(action)
+						.isRecentlyChanged()
 						&& rlggRules_.containsKey(action)) {
 					splitSlots();
 				}
@@ -699,8 +660,10 @@ public class PolicyGenerator implements Serializable {
 				try {
 					for (String stateAction : StateSpec.getInstance()
 							.getActions().keySet()) {
-						System.out.println(stateAction + ": "
-								+ ruleCreation_.getPreGoalState(stateAction));
+						System.out.println(stateAction
+								+ ": "
+								+ AgentObservations.getInstance().getPreGoal(
+										stateAction));
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -839,41 +802,6 @@ public class PolicyGenerator implements Serializable {
 
 	public String getModuleName() {
 		return Module.formName(moduleGoal_);
-	}
-
-	public int getNumSpecialisations(String action) {
-		return ruleCreation_.getNumSpecialisations(action);
-	}
-
-	// TODO Agent Observations should really be separated from Rule Creation
-	// through a singleton instance.
-	/**
-	 * Testing method. Gets the pregoal for move.
-	 * 
-	 * @param actionPred
-	 *            The name of the action.
-	 * @return The pre-goal for that action.
-	 */
-	public Collection<StringFact> getPreGoal(String actionPred) {
-		return ruleCreation_.getPreGoalState(actionPred);
-	}
-
-	/**
-	 * Gets the specific invariants from the agent observations.
-	 * 
-	 * @return The invariants.
-	 */
-	public Collection<StringFact> getSpecificInvariants() {
-		return ruleCreation_.getSpecificInvariants();
-	}
-
-	/**
-	 * If the pre-goal state exists.
-	 * 
-	 * @return True if the state exists, false otherwise.
-	 */
-	public boolean hasPreGoal() {
-		return ruleCreation_.hasPreGoal();
 	}
 
 	/**
@@ -1112,7 +1040,9 @@ public class PolicyGenerator implements Serializable {
 			MultiMap<String, String[]> validActions,
 			MultiMap<String, String[]> activatedActions, boolean createNewRules) {
 		// If there are actions to cover, cover them.
-		if (!frozen_ && isCoveringNeeded(validActions, activatedActions)) {
+		if (!frozen_
+				&& AgentObservations.getInstance().isCoveringNeeded(
+						validActions, activatedActions)) {
 			List<GuidedRule> covered = null;
 			try {
 				covered = ruleCreation_.rlggState(state, validActions,

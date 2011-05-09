@@ -25,6 +25,7 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import jess.Fact;
 import relationalFramework.ConditionComparator;
 import relationalFramework.GuidedRule;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
 import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
@@ -134,27 +135,6 @@ public class AgentObservations implements Serializable {
 	private void createRelation(StringFact cond, StringFact otherCond,
 			boolean negationType, SortedSet<BackgroundKnowledge> relations,
 			boolean checkEquivalence) {
-		// Remove any unnecessary terms in the cond based on the terms in the
-		// otherCond.
-		// String[] condArgs = cond.getArguments();
-		// String[] simpleCondArgs = new String[condArgs.length];
-		// for (int i = 0; i < simpleCondArgs.length; i++) {
-		// boolean containsArg = false;
-		// for (String otherArg : otherCond.getArguments()) {
-		// if (condArgs[i].equals(otherArg)) {
-		// containsArg = true;
-		// break;
-		// }
-		// }
-		//			
-		// if (!containsArg)
-		// simpleCondArgs[i] = StateSpec.ANONYMOUS;
-		// else
-		// simpleCondArgs[i] = condArgs[i];
-		// }
-
-		// StringFact left = new StringFact(cond, simpleCondArgs,
-		// cond.isNegated());
 		StringFact left = cond;
 		StringFact right = otherCond;
 		if (left.equals(right))
@@ -540,6 +520,42 @@ public class AgentObservations implements Serializable {
 	}
 
 	/**
+	 * A method which checks if covering is necessary or required, based on the
+	 * valid actions of the state.
+	 * 
+	 * @param validActions
+	 *            The set of valid actions for the state. If we're creating LGG
+	 *            covering rules, the activated actions need to equal this set.
+	 * @param activatedActions
+	 *            The set of actions already activated by the policy. We only
+	 *            consider these when we're creating new rules.
+	 * @return True if covering is needed.
+	 */
+	public boolean isCoveringNeeded(MultiMap<String, String[]> validActions,
+			MultiMap<String, String[]> activatedActions) {
+		for (String action : validActions.keySet()) {
+			// If the activated actions don't even contain the key, return
+			// true.
+			if (!activatedActions.containsKey(action)) {
+				resetInactivity();
+				return true;
+			}
+
+			// Check each set of actions match up
+			if (!activatedActions.get(action).containsAll(
+					(validActions.get(action)))) {
+				resetInactivity();
+				return true;
+			}
+		}
+
+		// TODO Also, cover every X episodes, checking more and more
+		// infrequently if no changes occur.
+
+		return false;
+	}
+
+	/**
 	 * Backs up the pre-goals into a single mapping and removes them from the
 	 * observations so a different learning algorithm can use the agent
 	 * observations.
@@ -679,6 +695,28 @@ public class AgentObservations implements Serializable {
 			return null;
 		return actionBasedObservations_.get(actionPred)
 				.getSpecialisationConditions();
+	}
+
+	/**
+	 * Gets the number of specialisations an action can have.
+	 * 
+	 * @param actionPredicate
+	 *            The action predicate to check.
+	 * @return The total possible number of specialisations the action can make.
+	 */
+	public int getNumSpecialisations(String action) {
+		Collection<StringFact> specConditions = getSpecialisationConditions(action);
+		int num = 0;
+		if (specConditions != null)
+			num = specConditions.size();
+		// Also, if the action has numerical arguments, add them to the count
+		// too
+		for (String type : StateSpec.getInstance().getStringFact(action)
+				.getArgTypes()) {
+			if (StateSpec.isNumberType(type))
+				num += PolicyGenerator.NUM_NUMERICAL_SPLITS;
+		}
+		return num;
 	}
 
 	public Collection<StringFact> getSpecificInvariants() {
@@ -995,6 +1033,16 @@ public class AgentObservations implements Serializable {
 	public static AgentObservations getInstance() {
 		if (instance_ == null)
 			instance_ = new AgentObservations();
+		return instance_;
+	}
+
+	/**
+	 * Gets the AgentObservations instance.
+	 * 
+	 * @return The instance.
+	 */
+	public static AgentObservations newInstance() {
+		instance_ = new AgentObservations();
 		return instance_;
 	}
 

@@ -271,21 +271,6 @@ public class RuleCreation implements Serializable {
 		return subranges;
 	}
 
-//	/**
-//	 * Should only be a test method.
-//	 */
-//	public void clearAgentObservations() {
-//		ao_.clearActionBasedObservations();
-//	}
-//
-//	/**
-//	 * Clears the pre-goal from the agent observations. Generally a testing
-//	 * method.
-//	 */
-//	public void clearPreGoalState() {
-//		ao_.clearPreGoal();
-//	}
-
 	/**
 	 * Forms the pre-goal state by adding to it a pre-goal state the agent has
 	 * seen (or was given). This method forms the pre-goal state by finding the
@@ -306,7 +291,7 @@ public class RuleCreation implements Serializable {
 			ActionChoice actionChoice, Collection<String> constants,
 			Map<String, String> replacements) {
 		// Scan the state first to create the term-mapped facts
-		ao_.scanState(preGoalState);
+		AgentObservations.getInstance().scanState(preGoalState);
 
 		Set<String> formedActions = new HashSet<String>();
 		if (constants == null)
@@ -316,16 +301,17 @@ public class RuleCreation implements Serializable {
 		for (RuleAction ruleAction : actionChoice.getActions()) {
 			String actionPred = ruleAction.getRule().getActionPredicate();
 			// If the state isn't yet settled, try unification
-			PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
+			PreGoalInformation preGoal = AgentObservations.getInstance()
+					.getPreGoal(actionPred);
 
 			Collection<StringFact> actions = ruleAction.getUtilisedActions();
 
 			// Create a pre-goal from every action in the actions list.
 			if (actions != null) {
 				for (StringFact action : actions) {
-					Collection<StringFact> preGoalStringState = ao_
-							.gatherActionFacts(action, constants, false,
-									replacements);
+					Collection<StringFact> preGoalStringState = AgentObservations
+							.getInstance().gatherActionFacts(action, constants,
+									false, replacements);
 					if (replacements != null) {
 						action = new StringFact(action);
 						action.replaceArguments(replacements, true);
@@ -335,7 +321,8 @@ public class RuleCreation implements Serializable {
 						preGoal = new PreGoalInformation(preGoalStringState,
 								action.getArguments());
 						changed = true;
-						ao_.setPreGoal(actionPred, preGoal);
+						AgentObservations.getInstance().setPreGoal(actionPred,
+								preGoal);
 					} else {
 						// Unify the two states and check if it has changed
 						// at all.
@@ -350,7 +337,7 @@ public class RuleCreation implements Serializable {
 						if (result == 1) {
 							preGoal.resetInactivity();
 							changed = true;
-							ao_.clearHash();
+							AgentObservations.getInstance().clearHash();
 						} else if (result == 0) {
 							if (!formedActions.contains(actionPred))
 								preGoal.incrementInactivity();
@@ -369,149 +356,6 @@ public class RuleCreation implements Serializable {
 		return changed;
 	}
 
-//	/**
-//	 * Gets the hash code for the current pre-goal.
-//	 * 
-//	 * @param actionPredicate
-//	 *            The action predicate for the pre-goal.
-//	 * @return An integer hash code corresponding to the pre-goal state.
-//	 */
-//	public int getMutationHash(String actionPredicate) {
-//		Integer hash = ao_.getObservationHash();
-//		if (hash == null)
-//			return 0;
-//		return hash;
-//	}
-
-	/**
-	 * Gets the number of specialisations an action can have.
-	 * 
-	 * @param actionPredicate
-	 *            The action predicate to check.
-	 * @return The total possible number of specialisations the action can make.
-	 */
-	public int getNumSpecialisations(String action) {
-		Collection<StringFact> specConditions = ao_
-				.getSpecialisationConditions(action);
-		int num = 0;
-		if (specConditions != null)
-			num = specConditions.size();
-		// Also, if the action has numerical arguments, add them to the count
-		// too
-		for (String type : StateSpec.getInstance().getStringFact(action)
-				.getArgTypes()) {
-			if (StateSpec.isNumberType(type))
-				num += PolicyGenerator.NUM_NUMERICAL_SPLITS;
-		}
-		return num;
-	}
-
-//	/**
-//	 * Gets the pre-goal general state, seen by the agent.
-//	 * 
-//	 * @param action
-//	 *            The pre-goal action.
-//	 * @return The pre-goal state, in the form of a list of facts.
-//	 */
-//	public Collection<StringFact> getPreGoalState(String action) {
-//		PreGoalInformation pgi = ao_.getPreGoal(action);
-//		if (pgi == null)
-//			return null;
-//		return pgi.getState();
-//	}
-//
-//	public Collection<StringFact> getSpecificInvariants() {
-//		return ao_.getSpecificInvariants();
-//	}
-//
-//	/**
-//	 * Gets the agent's unseen predicates.
-//	 * 
-//	 * @return The agent's yet to be observed, but defined predicates.
-//	 */
-//	public Collection<StringFact> getUnseenPreds() {
-//		return ao_.getUnseenPredicates();
-//	}
-//
-//	/**
-//	 * Checks if agent observations have been loaded.
-//	 * 
-//	 * @return True if observations were loaded (and they're not empty).
-//	 */
-//	public boolean hasAgentObservations() {
-//		if (ao_.getConditionBeliefs().isEmpty())
-//			return false;
-//		return true;
-//	}
-//
-//	/**
-//	 * If a pre-goal has been initialised.
-//	 * 
-//	 * @return True if there is a pre-goal, false otherwise.
-//	 */
-//	public boolean hasPreGoal() {
-//		return ao_.hasPreGoal();
-//	}
-//
-//	/**
-//	 * Checks if the pregoal for the given action is recently changed.
-//	 * 
-//	 * @param actionPred
-//	 *            The action predicate.
-//	 * @return True if the pregoal was recently modified, false otherwise.
-//	 */
-//	public boolean isPreGoalRecentlyChanged(String actionPred) {
-//		PreGoalInformation pgi = ao_.getPreGoal(actionPred);
-//		if (pgi == null)
-//			return false;
-//		return pgi.isRecentlyChanged();
-//	}
-//
-//	public boolean isPreGoalSettled(String actionPred) {
-//		return ao_.isPreGoalSettled(actionPred);
-//	}
-//
-//	public void loadBackupPreGoal() {
-//		if (backupPreGoals_ == null)
-//			return;
-//		ao_.loadPreGoals(backupPreGoals_);
-//		backupPreGoals_ = null;
-//	}
-//
-//	/**
-//	 * Migrates any relevant agent observations from one covering object to
-//	 * another.
-//	 * 
-//	 * @param otherCovering
-//	 *            The other covering object to migrate the observations to.
-//	 */
-//	public void migrateAgentObservations(RuleCreation otherCovering) {
-//		if (backupPreGoals_ == null)
-//			backupPreGoals_ = ao_.backupAndClearPreGoals();
-//		else
-//			ao_.clearPreGoal();
-//		otherCovering.ao_ = ao_;
-//	}
-//
-//	/**
-//	 * Removes a collection of predicates from the unseen predicates.
-//	 * 
-//	 * @param removables
-//	 *            The predicates to be removed.
-//	 * @return True if the unseen predicates collection changed as a result of
-//	 *         this method.
-//	 */
-//	public boolean removeUnseenPreds(Collection<StringFact> removables) {
-//		return ao_.removeUnseenPredicates(removables);
-//	}
-//
-//	/**
-//	 * Resets the inactivity counters of the AgentObservations object.
-//	 */
-//	public void resetInactivity() {
-//		ao_.resetInactivity();
-//	}
-
 	/**
 	 * Covers a state using RLGG by creating a rule for every action type
 	 * present in the valid actions for the state.
@@ -528,7 +372,8 @@ public class RuleCreation implements Serializable {
 			MultiMap<String, String[]> validActions,
 			MultiMap<String, GuidedRule> coveredRules) throws Exception {
 		// The relevant facts which contain the key term
-		ao_.scanState(StateSpec.extractFacts(state));
+		AgentObservations.getInstance()
+				.scanState(StateSpec.extractFacts(state));
 
 		// Run through each valid action.
 		for (String action : validActions.keySet()) {
@@ -542,60 +387,15 @@ public class RuleCreation implements Serializable {
 					action);
 			for (String[] actionArgs : validActions.get(action)) {
 				StringFact actionFact = new StringFact(baseAction, actionArgs);
-				ao_.gatherActionFacts(actionFact, null, false, null);
+				AgentObservations.getInstance().gatherActionFacts(actionFact,
+						null, false, null);
 			}
 		}
 
 		// Get the RLGG from the invariant conditions from the action
 		// conditions.
-		return ao_.getRLGGActionRules();
+		return AgentObservations.getInstance().getRLGGActionRules();
 	}
-
-//	/**
-//	 * Saves the agent observations to file, in the agent obs directory.
-//	 */
-//	public void saveAgentObservations() {
-//		ao_.saveAgentObservations();
-//	}
-//
-//	/**
-//	 * Sets the individual conditions that have been observed to be true for
-//	 * executing an action. Testing method.
-//	 * 
-//	 * @param action
-//	 *            The action to set the conditions for.
-//	 * @param conditions
-//	 *            The conditions that have been observed to be true for the
-//	 *            action.
-//	 */
-//	public void setAllowedActionConditions(String action,
-//			Collection<StringFact> conditions) {
-//		ao_.setActionConditions(action, conditions);
-//	}
-//
-//	/**
-//	 * Test method for adding background knowledge.
-//	 * 
-//	 * @param backKnow
-//	 *            The background knowledge to add.
-//	 */
-//	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
-//		ao_.setBackgroundKnowledge(backKnow);
-//	}
-//
-//	/**
-//	 * Sets the pre-goal state to the arguments given. Should just be used for
-//	 * testing.
-//	 * 
-//	 * @param action
-//	 *            The full action in least general terms.
-//	 * @param preGoal
-//	 *            The state itself.
-//	 */
-//	public void setPreGoal(StringFact action, List<StringFact> preGoal) {
-//		ao_.setPreGoal(action.getFactName(), new PreGoalInformation(preGoal,
-//				action.getArguments()));
-//	}
 
 	/**
 	 * Simplifies a rule with an optional added condition by removing any
@@ -647,7 +447,8 @@ public class RuleCreation implements Serializable {
 		}
 
 		// Simplify using the learned background knowledge
-		ao_.simplifyRule(simplified, testForIllegalRule, false);
+		AgentObservations.getInstance().simplifyRule(simplified,
+				testForIllegalRule, false);
 
 		if (simplified.equals(ruleConds))
 			return null;
@@ -669,8 +470,8 @@ public class RuleCreation implements Serializable {
 
 		String actionPred = rule.getActionPredicate();
 		// If the action has no action conditions, return empty
-		Collection<StringFact> actionConditions = ao_
-				.getSpecialisationConditions(actionPred);
+		Collection<StringFact> actionConditions = AgentObservations
+				.getInstance().getSpecialisationConditions(actionPred);
 		if (actionConditions == null)
 			return specialisations;
 		SortedSet<StringFact> conditions = rule.getConditions(false);
@@ -717,7 +518,8 @@ public class RuleCreation implements Serializable {
 		// ?Y with 0.
 		Set<GuidedRule> mutants = new HashSet<GuidedRule>();
 		String actionPred = rule.getActionPredicate();
-		PreGoalInformation preGoal = ao_.getPreGoal(actionPred);
+		PreGoalInformation preGoal = AgentObservations.getInstance()
+				.getPreGoal(actionPred);
 
 		// If we have a pre goal state
 		SortedSet<StringFact> ruleConditions = rule.getConditions(false);

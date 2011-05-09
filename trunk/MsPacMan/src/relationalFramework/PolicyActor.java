@@ -362,8 +362,8 @@ public class PolicyActor implements AgentInterface {
 			// Run through the unseen preds, triggering covering if necessary.
 			boolean triggerCovering = false;
 			Collection<StringFact> removables = new HashSet<StringFact>();
-			for (StringFact unseenPred : PolicyGenerator.getInstance().ruleCreation_
-					.getUnseenPreds()) {
+			for (StringFact unseenPred : AgentObservations.getInstance()
+					.getUnseenPredicates()) {
 				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
 				QueryResult results = state.runQueryStar(query,
 						new ValueVector());
@@ -381,8 +381,8 @@ public class PolicyActor implements AgentInterface {
 								.getInstance());
 				PolicyGenerator.getInstance().triggerRLGGCovering(state,
 						validActions, emptyActions, false);
-				PolicyGenerator.getInstance().ruleCreation_
-						.removeUnseenPreds(removables);
+				AgentObservations.getInstance().removeUnseenPredicates(
+						removables);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -480,7 +480,7 @@ public class PolicyActor implements AgentInterface {
 			// Set the goal parameters
 			ValueVector vv = new ValueVector();
 			QueryResult results = state.runQueryStar(query, vv);
-			Collection<StringFact> invariants = PolicyGenerator.getInstance()
+			Collection<StringFact> invariants = AgentObservations.getInstance()
 					.getSpecificInvariants();
 
 			// If there are results, then the goal COULD be met (can add
@@ -502,7 +502,8 @@ public class PolicyActor implements AgentInterface {
 					if (!ga.includesInvariants(invariants)) {
 						if (!possibleGoals_.contains(ga)) {
 							possibleGoals_.add(ga);
-							// If the goal has never been evaluated, note it down
+							// If the goal has never been evaluated, note it
+							// down
 							unseenGoals.add(ga);
 						}
 						prevGoalArgs_.add(ga);
