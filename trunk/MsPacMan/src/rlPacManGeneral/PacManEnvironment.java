@@ -26,7 +26,7 @@ import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static int playerDelay_ = 0;
+	public static int playerDelay_ = 24;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
