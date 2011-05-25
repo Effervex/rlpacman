@@ -17,6 +17,7 @@ import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.PreGoalInformation;
 
 public class PacManRuleCreationTest {
 	private RuleCreation sut_;
@@ -78,7 +79,8 @@ public class PacManRuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(dot ?X)"));
 		pregoal.add(StateSpec.toStringFact("(pacman player)"));
 		pregoal.add(StateSpec.toStringFact("(distanceDot player ?X 14.0)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X 14.0)"), pregoal);
+		AgentObservations.getInstance().setPreGoal("toDot",
+				new PreGoalInformation(pregoal, new String[] { "?X", "14.0" }));
 
 		rule = new GuidedRule(
 				"(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
@@ -99,7 +101,10 @@ public class PacManRuleCreationTest {
 		pregoal
 				.add(StateSpec
 						.toStringFact("(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 14.0 23.0))"));
-		sut_.setPreGoal(StateSpec.toStringFact("(toDot ?X ?__Num3)"), pregoal);
+		AgentObservations.getInstance().setPreGoal(
+				"toDot",
+				new PreGoalInformation(pregoal,
+						new String[] { "?X", "?__Num3" }));
 
 		rule = new GuidedRule(
 				"(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
@@ -205,7 +210,8 @@ public class PacManRuleCreationTest {
 		conditions.add(StateSpec.toStringFact("(blinking ?X)"));
 		conditions.add(StateSpec.toStringFact("(not (edible ?X))"));
 		conditions.add(StateSpec.toStringFact("(not (blinking ?X))"));
-		sut_.setAllowedActionConditions("toGhost", conditions);
+		AgentObservations.getInstance().setActionConditions("toGhost",
+				conditions);
 
 		GuidedRule rule = new GuidedRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (pacman player) => (toGhost ?X ?__Num6)");
