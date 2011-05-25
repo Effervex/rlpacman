@@ -13,6 +13,8 @@ import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.PreGoalInformation;
 
 public class PacManGeneralRuleCreationTest {
 	private RuleCreation sut_;
@@ -23,8 +25,8 @@ public class PacManGeneralRuleCreationTest {
 		sut_ = new RuleCreation();
 
 		// Set up the allowable conditions
-		assertTrue("No loaded agent observations. Cannot run test.", sut_
-				.hasAgentObservations());
+		assertTrue("No loaded agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
 	}
 
 	@Test
@@ -35,7 +37,11 @@ public class PacManGeneralRuleCreationTest {
 		pregoal.add(StateSpec.toStringFact("(thing blinky)"));
 		pregoal.add(StateSpec.toStringFact("(edible blinky)"));
 		pregoal.add(StateSpec.toStringFact("(distance blinky 2)"));
-		sut_.setPreGoal(StateSpec.toStringFact("(moveTo blinky 2)"), pregoal);
+		AgentObservations.getInstance()
+				.setPreGoal(
+						"moveTo",
+						new PreGoalInformation(pregoal, new String[] {
+								"blinky", "2" }));
 
 		GuidedRule rule = new GuidedRule(
 				"(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
