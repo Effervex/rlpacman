@@ -555,23 +555,6 @@ public class AgentObservations implements Serializable {
 		return false;
 	}
 
-	/**
-	 * Backs up the pre-goals into a single mapping and removes them from the
-	 * observations so a different learning algorithm can use the agent
-	 * observations.
-	 * 
-	 * @return The backed up pre-goals.
-	 */
-	public Map<String, PreGoalInformation> backupAndClearPreGoals() {
-		Map<String, PreGoalInformation> backups = new HashMap<String, PreGoalInformation>();
-		for (String action : actionBasedObservations_.keySet()) {
-			backups.put(action, actionBasedObservations_.get(action).getPGI());
-			actionBasedObservations_.get(action).setPGI(null);
-		}
-
-		return backups;
-	}
-
 	public void clearActionBasedObservations() {
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
 	}
@@ -651,12 +634,6 @@ public class AgentObservations implements Serializable {
 		return observationHash_;
 	}
 
-	public PreGoalInformation getPreGoal(String actionPred) {
-		if (!actionBasedObservations_.containsKey(actionPred))
-			return null;
-		return actionBasedObservations_.get(actionPred).getPGI();
-	}
-
 	/**
 	 * Gets the RLGG rules found through the action observations. This is found
 	 * by observing the invariants in the actions.
@@ -707,33 +684,6 @@ public class AgentObservations implements Serializable {
 
 	public Collection<StringFact> getUnseenPredicates() {
 		return unseenPreds_;
-	}
-
-	public boolean hasPreGoal() {
-		for (String action : actionBasedObservations_.keySet()) {
-			if (actionBasedObservations_.get(action).getPGI() != null)
-				return true;
-		}
-		return false;
-	}
-
-	public boolean isPreGoalSettled(String action) {
-		if (actionBasedObservations_.get(action).getPGI() != null)
-			return actionBasedObservations_.get(action).getPGI().isSettled();
-		return false;
-	}
-
-	/**
-	 * Loads a backed up mapping of pregoals into the agent observations.
-	 * 
-	 * @param backupPreGoals
-	 *            The backup pre-goals being loaded.
-	 */
-	public void loadPreGoals(Map<String, PreGoalInformation> backupPreGoals) {
-		for (String key : backupPreGoals.keySet()) {
-			getActionBasedObservation(key).setPGI(backupPreGoals.get(key));
-		}
-		observationHash_ = null;
 	}
 
 	public boolean removeUnseenPredicates(Collection<StringFact> removables) {
@@ -800,24 +750,6 @@ public class AgentObservations implements Serializable {
 			buf.close();
 			wr.close();
 
-			// Pre goal saving
-			File preGoalFile = new File(environmentDir, PREGOAL_FILE);
-			preGoalFile.createNewFile();
-			wr = new FileWriter(preGoalFile);
-			buf = new BufferedWriter(wr);
-
-			for (String action : actionBasedObservations_.keySet()) {
-				PreGoalInformation pgi = actionBasedObservations_.get(action)
-						.getPGI();
-				if (pgi != null) {
-					buf.write(action + "\n");
-					buf.write(pgi.toString() + "\n");
-				}
-			}
-
-			buf.close();
-			wr.close();
-
 			// Serialise observations
 			File serialisedFile = new File(environmentDir, SERIALISATION_FILE);
 			serialisedFile.createNewFile();
@@ -874,11 +806,6 @@ public class AgentObservations implements Serializable {
 
 		// Use the term mapped facts to generate collections of true facts.
 		recordConditionAssociations(stateFacts, generalStateFacts);
-	}
-
-	public void setPreGoal(String actionPred, PreGoalInformation preGoal) {
-		getActionBasedObservation(actionPred).setPGI(preGoal);
-		observationHash_ = null;
 	}
 
 	/**
@@ -1037,9 +964,6 @@ public class AgentObservations implements Serializable {
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<StringFact> invariantActionConditions_;
-
-		/** The pre-goal information. */
-		private transient PreGoalInformation pgi_;
 
 		/** If the RLGG rule needs to be recreated. */
 		private boolean recreateRLGG_ = true;
@@ -1232,16 +1156,7 @@ public class AgentObservations implements Serializable {
 			} else if (!variantActionConditions_
 					.equals(other.variantActionConditions_))
 				return false;
-			if (pgi_ == null) {
-				if (other.pgi_ != null)
-					return false;
-			} else if (!pgi_.equals(other.pgi_))
-				return false;
 			return true;
-		}
-
-		public PreGoalInformation getPGI() {
-			return pgi_;
 		}
 
 		/**
@@ -1299,26 +1214,15 @@ public class AgentObservations implements Serializable {
 					* result
 					+ ((variantActionConditions_ == null) ? 0
 							: variantActionConditions_.hashCode());
-			result = prime * result + ((pgi_ == null) ? 0 : pgi_.hashCode());
 			return result;
 		}
 
 		public void setActionConditions(Collection<StringFact> conditions) {
 			specialisationConditions_ = new HashSet<StringFact>(conditions);
 		}
-
-		public void setPGI(PreGoalInformation preGoal) {
-			pgi_ = preGoal;
-		}
 	}
 
 	// TEST METHODS
-	public void clearPreGoal() {
-		for (String action : actionBasedObservations_.keySet()) {
-			actionBasedObservations_.get(action).setPGI(null);
-		}
-	}
-	
 	public Map<String, ConditionBeliefs> getConditionBeliefs() {
 		return conditionBeliefs_;
 	}
