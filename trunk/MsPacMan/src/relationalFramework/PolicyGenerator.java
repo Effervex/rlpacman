@@ -309,14 +309,6 @@ public class PolicyGenerator implements Serializable {
 			if (debugMode_) {
 				try {
 					System.out.println("\tMUTATING " + baseRule);
-					System.out.println("PRE-GOAL: ");
-					for (String action : StateSpec.getInstance().getActions()
-							.keySet()) {
-						System.out.println(action
-								+ ": "
-								+ AgentObservations.getInstance().getPreGoal(
-										action));
-					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -609,67 +601,6 @@ public class PolicyGenerator implements Serializable {
 				return true;
 		}
 		return false;
-	}
-
-	/**
-	 * Forms the pre-goal state using the given pre-goal state seen by the
-	 * agent.
-	 * 
-	 * @param preGoalState
-	 *            The pre-goal state seen by the agent.
-	 * @param actions
-	 *            The final action(s) taken by the agent.
-	 * @param constants
-	 *            Extra constants to note down in the pre-goal.
-	 * @param replacements
-	 *            An optional replacement map for transforming the state and
-	 *            actions.
-	 */
-	public void formPreGoalState(Collection<Fact> preGoalState,
-			ActionChoice actions, Collection<String> constants,
-			Map<String, String> replacements) {
-		if (!frozen_) {
-			// Form the pre-goal using the final action/s as a parameter.
-			boolean changedPreGoal = ruleCreation_.formPreGoalState(
-					preGoalState, actions, constants, replacements);
-			String actionPred = actions.getActionPreds();
-			if (debugMode_) {
-				try {
-					if (changedPreGoal)
-						System.out.println("\tFORMING PRE-GOAL STATE " + "("
-								+ actionPred + "):");
-					else
-						System.out.println("\tEXISTING PRE-GOAL STATE " + "("
-								+ actionPred + "):");
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-
-			// If the pre-goal has recently changed and we have an LGG rule for
-			// it, create and remove mutants.
-			for (String action : StateSpec.getInstance().getActions().keySet()) {
-				if (AgentObservations.getInstance().getPreGoal(action)
-						.isRecentlyChanged()
-						&& rlggRules_.containsKey(action)) {
-					splitSlots();
-				}
-			}
-
-			if (debugMode_) {
-				try {
-					for (String stateAction : StateSpec.getInstance()
-							.getActions().keySet()) {
-						System.out.println(stateAction
-								+ ": "
-								+ AgentObservations.getInstance().getPreGoal(
-										stateAction));
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		}
 	}
 
 	/**
@@ -1218,6 +1149,5 @@ public class PolicyGenerator implements Serializable {
 		instance_ = generator;
 		instance_.moduleGenerator_ = false;
 		instance_.moduleGoal_ = null;
-		instance_.ruleCreation_.loadBackupPreGoal();
 	}
 }

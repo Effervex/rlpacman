@@ -101,9 +101,9 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		state_ = initialiseHanoi(numTiles_);
 
 		// Run the optimal policy if it hasn't yet been run
-		if (!AgentObservations.getInstance().hasPreGoal()) {
-			optimalSteps();
-		}
+//		if (!AgentObservations.getInstance().hasPreGoal()) {
+//			optimalSteps();
+//		}
 
 		if (PolicyGenerator.debugMode_) {
 			System.out.println("\tAgent:\n" + state_);
@@ -298,10 +298,6 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			optimalAgent.agent_step(rot.r, rot.o);
 			rot = env_step(act);
 		}
-
-		// Form the first pre-goal.
-		if (!AgentObservations.getInstance().hasPreGoal())
-			optimalAgent.agent_message("formPreGoal");
 
 		// Return the state to normal
 		state_ = new HanoiState(numTiles_);

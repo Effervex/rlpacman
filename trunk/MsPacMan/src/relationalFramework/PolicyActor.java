@@ -139,11 +139,6 @@ public class PolicyActor implements AgentInterface {
 				return internalReward_ + "";
 			else
 				return -Math.abs(internalReward_ * 100) + "";
-		} else if (arg0.equals("formPreGoal")) {
-			// Only form pre-goal if the generator isn't a module.
-			if (!PolicyGenerator.getInstance().isModuleGenerator())
-				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, null, null);
 		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
 			// Setting an internal goal
 			SortedSet<StringFact> oldGoal = null;
@@ -233,12 +228,6 @@ public class PolicyActor implements AgentInterface {
 			if (!handCoded_) {
 				Rete rete = ObjectObservations.getInstance().predicateKB;
 				processInternalGoal(rete, prevGoalArgs_);
-			}
-		} else {
-			if (!ObjectObservations.getInstance().objectArray[0]
-					.equals(ObjectObservations.NO_PRE_GOAL)) {
-				PolicyGenerator.getInstance().formPreGoalState(prevState_,
-						prevActions_, null, null);
 			}
 		}
 
@@ -449,12 +438,6 @@ public class PolicyActor implements AgentInterface {
 		if (!internalGoalMet_) {
 			internalReward_ += INTERNAL_STEPWISE_REWARD;
 		}
-
-		// If there are newly achieved possible goals, note them down as
-		// pre-goals
-		goalArgs.removeAll(prevStateArgs);
-		for (GoalArg ga : goalArgs)
-			formPlaceholderPreGoalState(ga.getGoalArgs());
 	}
 
 	/**
@@ -515,30 +498,6 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		return unseenGoals;
-	}
-
-	/**
-	 * Forms a pre-goal state using a new fact as the supposed goal. This new
-	 * fact becomes the temporary goal, with its terms swapped for placeholder
-	 * parameter terms.
-	 * 
-	 * @param temporaryGoal
-	 *            The temporary goal.
-	 */
-	private void formPlaceholderPreGoalState(String[] temporaryGoalArgs) {
-		// The constants are the terms used in the fact
-		Collection<String> placeholderConstants = new ArrayList<String>(
-				temporaryGoalArgs.length);
-		Map<String, String> replacements = new HashMap<String, String>();
-		for (int i = 0; i < temporaryGoalArgs.length; i++) {
-			String param = Module.createModuleParameter(i);
-			replacements.put(temporaryGoalArgs[i], param);
-			placeholderConstants.add(temporaryGoalArgs[i]);
-		}
-
-		// Form the pre-goal using the replacement map.
-		PolicyGenerator.getInstance().formPreGoalState(prevState_,
-				prevActions_, placeholderConstants, replacements);
 	}
 
 	/**

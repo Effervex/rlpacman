@@ -102,12 +102,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 		resetEnvironment();
 
 		// Run the optimal policy if it hasn't yet been run
-//		if (testHandCodedPolicy_
-//				|| (!skipHandCodedPolicy_
-//						&& !PolicyGenerator.getInstance().hasPreGoal() && !PolicyGenerator
-//						.getInstance().isFrozen())) {
-//			handCodedPolicy();
-//		}
+		// if (testHandCodedPolicy_
+		// || (!skipHandCodedPolicy_
+		// && !PolicyGenerator.getInstance().hasPreGoal() && !PolicyGenerator
+		// .getInstance().isFrozen())) {
+		// handCodedPolicy();
+		// }
 
 		// If we're not in full experiment mode, redraw the scene.
 		if (!experimentMode_) {
@@ -181,29 +181,21 @@ public class PacManEnvironment implements EnvironmentInterface {
 			testHandCodedPolicy(handCodedPolicy);
 
 		// Run the policy through the environment until goal is satisfied.
-		while (!AgentObservations.getInstance().hasPreGoal()) {
-			PolicyActor handCodedAgent = new PolicyActor();
-			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
-			handCodedAgent.agent_message("Optimal");
-			handCodedAgent.agent_message("SetPolicy");
-			Action act = handCodedAgent.agent_start(formObservations(rete_));
-			// Loop until the task is complete
-			Reward_observation_terminal rot = env_step(act);
-			while ((rot == null) || !rot.isTerminal()) {
-				handCodedAgent.agent_step(rot.r, rot.o);
-				rot = env_step(act);
-			}
-
-			// Form the pre-goal.
-			if (!ObjectObservations.getInstance().objectArray[0]
-					.equals(ObjectObservations.NO_PRE_GOAL)
-					&& !AgentObservations.getInstance().hasPreGoal())
-				handCodedAgent.agent_message("formPreGoal");
-
-			// Return the state to normal
-			model_.m_highScore = 0;
-			resetEnvironment();
+		PolicyActor handCodedAgent = new PolicyActor();
+		ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
+		handCodedAgent.agent_message("Optimal");
+		handCodedAgent.agent_message("SetPolicy");
+		Action act = handCodedAgent.agent_start(formObservations(rete_));
+		// Loop until the task is complete
+		Reward_observation_terminal rot = env_step(act);
+		while ((rot == null) || !rot.isTerminal()) {
+			handCodedAgent.agent_step(rot.r, rot.o);
+			rot = env_step(act);
 		}
+
+		// Return the state to normal
+		model_.m_highScore = 0;
+		resetEnvironment();
 	}
 
 	/**
@@ -445,7 +437,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			closeJunctions_ = distanceGridCache_.getCloseJunctions(
 					model_.m_stage, model_.m_player.m_locX,
 					model_.m_player.m_locY);
-//			 DistanceGridCache.printDistanceGrid(distanceGrid_);
+			// DistanceGridCache.printDistanceGrid(distanceGrid_);
 
 			// Ghost Centre. Note that the centre can shift based on how the
 			// ghosts are positioned, as the warp points make the map

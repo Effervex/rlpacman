@@ -382,10 +382,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			rot = env_step(act);
 		}
 
-		// Form the first pre-goal.
-		if (!AgentObservations.getInstance().hasPreGoal())
-			optimalAgent.agent_message("formPreGoal");
-
 		// Return the state to normal
 		state_ = initialState;
 		formState(state_.getState());
