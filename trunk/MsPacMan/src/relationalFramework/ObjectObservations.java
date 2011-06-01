@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import org.apache.commons.collections.BidiMap;
+
 import jess.Rete;
 
 /**
@@ -8,7 +10,7 @@ import jess.Rete;
  * 
  * @author Sam Sarjant
  */
-public class ObjectObservations {
+public final class ObjectObservations {
 	/** The ID used in the regular observations to identify this. */
 	public static final String OBSERVATION_ID = "ObjectObservations";
 
@@ -31,6 +33,9 @@ public class ObjectObservations {
 	 * prompting.
 	 */
 	public boolean earlyExit;
+
+	/** The goal replacement map (a -> ?G_0) form. */
+	public BidiMap goalReplacements;
 
 	/**
 	 * The private, empty constructor

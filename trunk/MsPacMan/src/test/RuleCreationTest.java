@@ -2,35 +2,21 @@ package test;
 
 import static org.junit.Assert.*;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import jess.Fact;
-import jess.JessException;
-import jess.Rete;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.ActionChoice;
 import relationalFramework.ConditionComparator;
-import relationalFramework.Module;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
-import relationalFramework.Policy;
-import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
-import relationalFramework.agentObservations.PreGoalInformation;
 
 public class RuleCreationTest {
 	private RuleCreation sut_;
@@ -38,9 +24,12 @@ public class RuleCreationTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		StateSpec.reinitInstance("onab");
 		sut_ = new RuleCreation();
-		assertTrue("No loaded agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
+		assertTrue(
+				"No onAB agent observations. Cannot run test.",
+				AgentObservations
+						.loadAgentObservations("blocksWorld/onABObservations.ser"));
 	}
 
 	@Test
@@ -176,6 +165,50 @@ public class RuleCreationTest {
 		assertTrue(results.contains(mutant));
 		mutant = new GuidedRule("(clear ?X) (highest ?Y) => (move ?X ?Y)");
 		assertTrue(results.contains(mutant));
+	}
+
+	@Test
+	public void testSpecialiseRuleMinor() {
+		// Basic moveFloor variable swapping
+		GuidedRule rule = new GuidedRule(
+				"(above ?X ?) (highest ?X) => (moveFloor ?X)");
+		Collection<GuidedRule> results = sut_.specialiseRuleMinor(rule);
+
+		GuidedRule mutant = new GuidedRule(
+				"(above ?G_0 ?) (highest ?G_0) => (moveFloor ?G_0)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(above ?G_1 ?) (highest ?G_1) => (moveFloor ?G_1)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 2);
+
+		// Move variable swapping
+		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+
+		mutant = new GuidedRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?X) (clear ?G_0) => (move ?X ?G_0)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?G_1) (clear ?Y) => (move ?G_1 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?X) (clear ?G_1) => (move ?X ?G_1)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 4);
+		
+		// Second level specialisation
+		rule = new GuidedRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+		
+		mutant = new GuidedRule("(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 1);
+
+		// Impossible specialisation
+		rule = new GuidedRule("(clear ?X) (on ?X ?Y) => (move ?X ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+		
+		assertEquals(results.size(), 0);
 	}
 
 	@Test

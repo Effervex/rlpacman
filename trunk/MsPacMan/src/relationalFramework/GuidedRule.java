@@ -14,6 +14,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.collections.BidiMap;
+
 /**
  * A class that keeps track of the guided predicates that make up the rule
  * contained within.
@@ -86,7 +88,8 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 	public GuidedRule(String ruleString) {
 		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
 		ruleConditions_ = splitConditions(split[0]);
-		ruleAction_ = StateSpec.toStringFact(split[1].trim());
+		if (split.length == 2)
+			ruleAction_ = StateSpec.toStringFact(split[1].trim());
 		slot_ = null;
 		expandConditions();
 		findConstants();
@@ -252,9 +255,10 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 				// Adding the type arguments
 				addedConditions.addAll(StateSpec.getInstance().createTypeConds(
 						condition));
-			} else {
+			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED))
+				addedConditions.add(condition);
+			else
 				removedConditions.add(condition);
-			}
 		}
 
 		ruleConditions_.removeAll(removedConditions);
@@ -728,6 +732,7 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 	 * 
 	 * @return A nice, shortened version of the rule.
 	 */
+	@SuppressWarnings("unchecked")
 	public String toNiceString() {
 		StringBuffer niceString = new StringBuffer();
 
@@ -738,6 +743,9 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 				modularReplacement.put(Module.createModuleParameter(i), "["
 						+ parameters_.get(i) + "]");
 		}
+
+		BidiMap goalReplacements = ObjectObservations.getInstance().goalReplacements
+				.inverseBidiMap();
 
 		// Run through each condition, adding regular conditions and
 		// non-standard type predicates
@@ -753,10 +761,15 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 					stringFact.getFactName())) {
 				// If a type predicate, only add it if it's non-standard
 				if (!standardType.contains(stringFact))
-					niceString.append(stringFact + " ");
+					niceString.append(stringFact.toNiceString(goalReplacements)
+							+ " ");
+			} else if (stringFact.getFactName().equals(StateSpec.GOALARGS_PRED)) {
+				// Add the goal arg pred.
+				// niceString.append(stringFact + " ");
 			} else if (!stringFact.getFactName().equals("test")) {
 				// If not a type or test, add the fact.
-				niceString.append(stringFact + " ");
+				niceString.append(stringFact.toNiceString(goalReplacements)
+						+ " ");
 
 				// Scan the arguments and extract the standard type preds
 				for (int i = 0; i < stringFact.getArgTypes().length; i++) {
@@ -774,7 +787,7 @@ public class GuidedRule implements Serializable, Comparable<GuidedRule> {
 				}
 			}
 		}
-		niceString.append("=> " + ruleAction_);
+		niceString.append("=> " + ruleAction_.toNiceString(goalReplacements));
 
 		return niceString.toString();
 	}

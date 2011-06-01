@@ -145,12 +145,21 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 	 *            The term to be replaced.
 	 * @param replacementTerm
 	 *            the term to replace the old term.
+	 * @param retainOtherArgs
+	 *            If retaining the other arguments.
+	 * @return True if the fact is still valid (not anonymous)
 	 */
-	public void replaceArguments(String replacedTerm, String replacementTerm) {
+	public boolean replaceArguments(String replacedTerm,
+			String replacementTerm, boolean retainOtherArgs) {
+		boolean notAnonymous = false;
 		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].equals(replacedTerm))
+			if (arguments_[i].equals(replacedTerm)) {
 				arguments_[i] = replacementTerm;
+				notAnonymous = true;
+			} else if (!retainOtherArgs)
+				arguments_[i] = "?";
 		}
+		return notAnonymous;
 	}
 
 	/**
@@ -246,6 +255,28 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		buffer.append("(" + factName_);
 		for (int i = 0; i < arguments_.length; i++)
 			buffer.append(" " + arguments_[i]);
+		buffer.append(")");
+		if (negated_)
+			buffer.append(")");
+		return buffer.toString();
+	}
+
+	/**
+	 * Formats the string as a nice string (includes goal args).
+	 * 
+	 * @return The StringFact as a nice string (including goal args).
+	 */
+	public String toNiceString(Map<String, String> replacements) {
+		StringBuffer buffer = new StringBuffer();
+		if (negated_)
+			buffer.append("(not ");
+		buffer.append("(" + factName_);
+		for (int i = 0; i < arguments_.length; i++) {
+			String arg = arguments_[i];
+			if (PolicyGenerator.debugMode_ && replacements.containsKey(arg))
+				arg = "[" + replacements.get(arg) + "]";
+			buffer.append(" " + arg);
+		}
 		buffer.append(")");
 		if (negated_)
 			buffer.append(")");

@@ -9,6 +9,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
 
+import org.apache.commons.collections.BidiMap;
+
+import relationalFramework.agentObservations.AgentObservations;
+
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -257,7 +261,13 @@ public class Policy implements Serializable {
 		if (policyRules_.isEmpty())
 			return "<EMPTY POLICY>";
 
-		StringBuffer buffer = new StringBuffer("Policy:\n");
+		StringBuffer buffer = new StringBuffer("Policy");
+		if (PolicyGenerator.debugMode_) {
+			buffer.append(" (Goal: " + StateSpec.getInstance().formGoalString()
+					+ ")");
+		}
+		buffer.append(":\n");
+
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
 				if (!isRLGGRule(rule))
@@ -296,6 +306,8 @@ public class Policy implements Serializable {
 	 *            The current state in predicates.
 	 * @param validActions
 	 *            The set of valid actions to choose from in the state.
+	 * @param goalReplacements
+	 *            The goal term replacements.
 	 * @param actionSwitch
 	 *            The current actions.
 	 * @param actionsReturned
@@ -309,10 +321,11 @@ public class Policy implements Serializable {
 	 *            If this policy is noting the rules fired as triggered. Usually
 	 *            deactivated after agent has found internal goal.
 	 */
+	@SuppressWarnings("unchecked")
 	public ActionChoice evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions, ActionChoice actionSwitch,
-			int actionsReturned, boolean optimal, boolean alreadyCovered,
-			boolean noteTriggered) {
+			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
+			ActionChoice actionSwitch, int actionsReturned, boolean optimal,
+			boolean alreadyCovered, boolean noteTriggered) {
 		noteTriggered_ = noteTriggered;
 		actionSwitch.switchOffAll();
 		MultiMap<String, String[]> activatedActions = MultiMap
@@ -409,7 +422,7 @@ public class Policy implements Serializable {
 			if (actionsFound < actionsReturnedModified) {
 				List<GuidedRule> coveredRules = PolicyGenerator.getInstance()
 						.triggerRLGGCovering(state, validActions,
-								activatedActions, true);
+								goalReplacements, activatedActions, true);
 
 				if (coveredRules != null) {
 					// Add any new rules to the policy
@@ -417,12 +430,14 @@ public class Policy implements Serializable {
 						if (!policyRules_.contains(gr))
 							policyRules_.add(gr);
 					}
-					evaluatePolicy(state, validActions, actionSwitch,
-							actionsReturned, optimal, true, noteTriggered);
+					evaluatePolicy(state, validActions, goalReplacements,
+							actionSwitch, actionsReturned, optimal, true,
+							noteTriggered);
 				}
 			} else {
-				PolicyGenerator.getInstance().triggerRLGGCovering(state,
-						validActions, activatedActions, false);
+				PolicyGenerator.getInstance()
+						.triggerRLGGCovering(state, validActions,
+								goalReplacements, activatedActions, false);
 			}
 		}
 

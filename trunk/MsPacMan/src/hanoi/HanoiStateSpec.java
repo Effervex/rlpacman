@@ -18,8 +18,8 @@ public class HanoiStateSpec extends StateSpec {
 		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
 		// Put the pure precondition in, the rest is taken care of...
-		actionPreconditions.put("move",
-				"(clear ?X ?Y) (clear ?Z ?A&:(neq ?A ?Y)) "
+		actionPreconditions
+				.put("move", "(clear ?X ?Y) (clear ?Z ?A&:(neq ?A ?Y)) "
 						+ "(smaller ?X ?Y)");
 
 		return actionPreconditions;
@@ -76,8 +76,10 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState() {
-		return "(tower t2) (forall (tile ?X) (or (towerBase ?X) (on ?X ? t2)))";
+	protected String[] initialiseGoalState() {
+		String[] result = { "hanoi",
+				"(tower t2) (forall (tile ?X) (or (towerBase ?X) (on ?X ? t2)))" };
+		return result;
 	}
 
 	@Override

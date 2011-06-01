@@ -23,7 +23,6 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-import relationalFramework.agentObservations.AgentObservations;
 
 /**
  * The environment for the blocks world interface.
@@ -60,6 +59,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	/** Similar to debug mode, but only shows ASCII representation of blocks. */
 	private boolean viewingMode_ = false;
+
+	/** The arguments for the goal. */
+	private List<String> goalArgs_;
 
 	// @Override
 	public void env_cleanup() {
@@ -105,6 +107,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
 				.getGoalState());
+		if ((PolicyGenerator.debugMode_ || viewingMode_)) {
+			System.out.println("Goal args: " + goalArgs_);
+		}
 		optimalSteps_ = optimalSteps();
 		if (PolicyGenerator.debugMode_ || viewingMode_) {
 			System.out.println("\tAgent:\n" + state_);
@@ -229,6 +234,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The newly initialised blocks world state.
 	 */
 	private BlocksState initialiseWorld(int numBlocks, String goalState) {
+		// If we have some goal args (not empty ones), reset the goal args.
+		if (goalArgs_ != null && !goalArgs_.isEmpty())
+			goalArgs_ = null;
 		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
@@ -310,6 +318,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			}
 
 			rete_.run();
+
+			// Add the goal
+			goalArgs_ = StateSpec.getInstance().generateAddGoal(goalArgs_,
+					rete_);
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec

@@ -8,8 +8,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
@@ -24,6 +29,9 @@ import jess.ValueVector;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
+	/** The goal variable prefix. */
+	public static final String GOAL_VARIABLE_PREFIX = "?G_";
+
 	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
 
@@ -41,6 +49,12 @@ public abstract class StateSpec {
 
 	/** The goal query name */
 	public static final String GOAL_QUERY = "isGoal";
+
+	/** The query name for finding all non-achieved goals (possible goals). */
+	public static final String NON_GOALS = "nonGoal";
+
+	/** The goal predicate. */
+	public static final String GOALARGS_PRED = "goalArgs";
 
 	/** The policy rule prefix. */
 	public static final String POLICY_QUERY_PREFIX = "polRule";
@@ -85,11 +99,24 @@ public abstract class StateSpec {
 	/** The terms present in an action's precondition. */
 	private MultiMap<String, String> actionPreconditions_;
 
+	/** The name of the goal. */
+	private String goalName_;
+
 	/** The state the agent must reach to successfully end the episode. */
 	private String goalState_;
 
+	/**
+	 * The goal StringFact definition (goalArgs on a b...). Is simply a
+	 * StringFact definition created with arguments equalling the number of goal
+	 * arguments.
+	 */
+	private StringFact goalStringFactDef_;
+
 	/** The constants found within the goal. */
-	private Collection<String> constants_;
+	private List<String> constants_;
+
+	/** If the goal can have parameterisable args. */
+	private boolean parameterisableGoal_;
 
 	/** The parameter of the environment. */
 	protected String envParameter_;
@@ -109,6 +136,9 @@ public abstract class StateSpec {
 	/** The count value for the query names. */
 	private int queryCount_;
 
+	/** The goal arguments. */
+	private List<String> goalArgs_;
+
 	/**
 	 * Forms the list of variable action terms the action expects to be in the
 	 * precondition rule.
@@ -125,13 +155,14 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Extracts the constants from the goal (also includes modular variables).
+	 * Extracts the constants from the goal (also includes goal variables).
 	 * 
 	 * @param goalState
 	 *            The goal state to parse.
 	 */
-	private Collection<String> extractConstants(String goalState) {
-		Collection<String> constants = new HashSet<String>();
+	private List<String> extractConstants(String goalState) {
+		List<String> constants = new ArrayList<String>();
+		parameterisableGoal_ = false;
 
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(goalState);
@@ -139,8 +170,16 @@ public abstract class StateSpec {
 		while (m.find()) {
 			String[] factSplit = splitFact(m.group());
 			for (int i = 1; i < factSplit.length; i++) {
-				if (factSplit[i].charAt(0) != '?' && !isNumber(factSplit[i])) {
-					constants.add(factSplit[i]);
+				if (!constants.contains(factSplit[i])) {
+					// If the fact is a constant (not a number)
+					if (factSplit[i].charAt(0) != '?'
+							&& !isNumber(factSplit[i]))
+						constants.add(factSplit[i]);
+					// If the fact is a parameterisable goal constant
+					if (factSplit[i].contains(GOAL_VARIABLE_PREFIX)) {
+						parameterisableGoal_ = true;
+						constants.add(factSplit[i]);
+					}
 				}
 			}
 		}
@@ -272,13 +311,24 @@ public abstract class StateSpec {
 					+ "return TRUE))");
 
 			// Initialise the goal state rules
-			goalState_ = initialiseGoalState();
+			String[] goal = initialiseGoalState();
+			goalName_ = goal[0];
+			goalState_ = goal[1];
 			constants_ = extractConstants(goalState_);
+			String[] factTypes = new String[constants_.size() + 1];
+			factTypes[0] = "goalPred";
+			for (int i = 1; i < factTypes.length; i++)
+				factTypes[i] = "arg" + (i - 1);
+			goalStringFactDef_ = new StringFact(GOALARGS_PRED, factTypes);
 			rete_.eval("(deftemplate goal (slot goalMet))");
-			rete_.eval("(defrule goalState " + goalState_
-					+ " => (assert (goal (goalMet TRUE))))");
+			String goalPred = formGoalPred(constants_);
+			String goalRule = "(defrule goalState " + goalPred + " "
+					+ goalState_ + " => (assert (goal (goalMet TRUE))))";
+			rete_.eval(goalRule);
 			// Initialise the goal checking query
 			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
+			rete_.eval("(defquery " + NON_GOALS + " " + formNonGoal(goalState_)
+					+ ")");
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
@@ -301,6 +351,76 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Forms the non-goals by negating the non-type conditions required for the
+	 * goal to be met.
+	 * 
+	 * @param goalState
+	 *            The goal state.
+	 * @return A negated goal state (except for the type preds).
+	 */
+	private String formNonGoal(String goalState) throws Exception {
+		GuidedRule nonGoalRule = new GuidedRule(goalState_);
+		SortedSet<StringFact> conds = nonGoalRule.getConditions(false);
+
+		// Split the conds up into 2 sets: types and normal
+		Collection<StringFact> types = new TreeSet<StringFact>(conds
+				.comparator());
+		Collection<StringFact> normal = new TreeSet<StringFact>(conds
+				.comparator());
+		Collection<StringFact> inequalities = new TreeSet<StringFact>(conds
+				.comparator());
+		for (StringFact cond : conds) {
+			if (isTypePredicate(cond.getFactName()))
+				types.add(cond);
+			else if (cond.getFactName().equals("test"))
+				inequalities.add(cond);
+			else
+				normal.add(cond);
+		}
+		// If there are no normal conds, negate the types instead (otherwise
+		// there would be an infinite number of goals)
+		if (normal.isEmpty()) {
+			throw new Exception("Goal is only type conditions! Cannot negate.");
+		}
+
+		// Build the string
+		StringBuffer nonGoalStr = new StringBuffer();
+		// Types first
+		for (StringFact type : types)
+			nonGoalStr.append(type + " ");
+		// Then Inequalities
+		for (StringFact ineq : inequalities)
+			nonGoalStr.append(ineq + " ");
+		// Then normals
+		nonGoalStr.append("(not");
+		if (normal.size() > 1)
+			nonGoalStr.append(" (and");
+		for (StringFact norm : normal)
+			nonGoalStr.append(" " + norm);
+		nonGoalStr.append(")");
+		if (normal.size() > 1)
+			nonGoalStr.append(")");
+
+		return nonGoalStr.toString();
+	}
+
+	/**
+	 * Forms the goal predicate to link into the definite goal.
+	 * 
+	 * @param constants
+	 *            The goal constants.
+	 * @return The goal predicate to inject the variables.
+	 */
+	private String formGoalPred(Collection<String> constants) {
+		StringBuffer buffer = new StringBuffer("(" + GOALARGS_PRED + " "
+				+ goalName_);
+		for (String constant : constants)
+			buffer.append(" " + constant);
+		buffer.append(")");
+		return buffer.toString();
 	}
 
 	/**
@@ -335,9 +455,10 @@ public abstract class StateSpec {
 	/**
 	 * Initialises the goal state.
 	 * 
-	 * @return The minimal state that is true when the goal is satisfied.
+	 * @return The name of the goal and the minimal state that is true when the
+	 *         goal is satisfied.
 	 */
-	protected abstract String initialiseGoalState();
+	protected abstract String[] initialiseGoalState();
 
 	/**
 	 * Initialises the optimal policy for the goal.
@@ -442,6 +563,72 @@ public abstract class StateSpec {
 			}
 		}
 		return replacement;
+	}
+
+	/**
+	 * Generates a new, or adds an existing goal to the state.
+	 * 
+	 * @param goalArgs
+	 *            The goal args to add, or if null, generate new ones.
+	 * @param state
+	 *            The state to add to.
+	 * @return The new goal args (may be an empty list if no args required).
+	 */
+	public List<String> generateAddGoal(List<String> goalArgs, Rete state)
+			throws Exception {
+		// If the args are null, find some new ones in the state
+		if (goalArgs == null) {
+			// If there are no variable goal constants, simply use constants
+			goalArgs = new ArrayList<String>();
+			if (parameterisableGoal_) {
+				QueryResult result = state.runQueryStar(NON_GOALS,
+						new ValueVector());
+				List<List<String>> possibleGoals = new ArrayList<List<String>>();
+				while (result.next()) {
+					List<String> possibleGoal = new ArrayList<String>();
+					for (String constant : constants_) {
+						if (constant.charAt(0) == '?')
+							possibleGoal.add(result.getSymbol(constant
+									.substring(1)));
+						else
+							possibleGoal.add(constant);
+					}
+					possibleGoals.add(possibleGoal);
+				}
+				goalArgs = possibleGoals.get(PolicyGenerator.random_
+						.nextInt(possibleGoals.size()));
+			} else
+				goalArgs = new ArrayList<String>(constants_);
+		}
+
+		// Add the goalArgs predicate to the state
+		goalArgs_ = goalArgs;
+		rete_.assertString("(" + GOALARGS_PRED + " " + formGoalString() + ")");
+		rete_.run();
+
+		// Setting the ObjectObservations
+		BidiMap goalReplacements = new DualHashBidiMap();
+		int i = 0;
+		for (String goalTerm : goalArgs) {
+			if (!goalReplacements.containsKey(goalTerm))
+				goalReplacements.put(goalTerm, StateSpec.createGoalTerm(i));
+			i++;
+		}
+		ObjectObservations.getInstance().goalReplacements = goalReplacements;
+
+		return goalArgs;
+	}
+
+	/**
+	 * Forms a goal string from the current goal and arguments.
+	 * 
+	 * @return A string detailing the current goal.
+	 */
+	public String formGoalString() {
+		StringBuffer goalStr = new StringBuffer(goalName_);
+		for (String arg : goalArgs_)
+			goalStr.append(" " + arg);
+		return goalStr.toString();
 	}
 
 	/**
@@ -664,6 +851,8 @@ public abstract class StateSpec {
 			return typePredicates_.get(factName);
 		if (factName.equals("test"))
 			return TEST_DEFINITION;
+		if (factName.equals(GOALARGS_PRED))
+			return goalStringFactDef_;
 		return null;
 	}
 
@@ -711,6 +900,8 @@ public abstract class StateSpec {
 		if (predicate.equals(VALID_ACTIONS))
 			return false;
 		if (predicate.equals("initial-fact"))
+			return false;
+		if (predicate.equals(GOALARGS_PRED))
 			return false;
 		return true;
 	}
@@ -956,6 +1147,8 @@ public abstract class StateSpec {
 	 */
 	public static StringFact toStringFact(String fact) {
 		String[] condSplit = StateSpec.splitFact(fact);
+		if (condSplit[0].equals("initial-fact"))
+			return null;
 		int offset = 1;
 		boolean negated = false;
 		// Negated case
@@ -980,8 +1173,19 @@ public abstract class StateSpec {
 		}
 		String[] arguments = new String[condSplit.length - offset];
 		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
-		return new StringFact(StateSpec.getInstance().getStringFact(
-				condSplit[offset - 1]), arguments, negated);
+		return new StringFact(getInstance()
+				.getStringFact(condSplit[offset - 1]), arguments, negated);
+	}
+
+	/**
+	 * Creates a variable representing a goal term at a given index.
+	 * 
+	 * @param i
+	 *            The index of the goal condition.
+	 * @return The variable goal condition.
+	 */
+	public static String createGoalTerm(int i) {
+		return GOAL_VARIABLE_PREFIX + i;
 	}
 
 	/**

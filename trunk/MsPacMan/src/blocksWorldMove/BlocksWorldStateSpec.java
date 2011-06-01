@@ -68,35 +68,48 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState() {
+	protected String[] initialiseGoalState() {
 		if (envParameter_ == null)
 			envParameter_ = "onab";
 
+		String[] result = new String[2];
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
-			return "(on a b)";
-//			return "(on ?G1 ?G2) (block ?G1) (block ?G2)";
+			result[0] = "onAB";
+			result[1] = "(on " + StateSpec.createGoalTerm(0) + " "
+					+ StateSpec.createGoalTerm(1) + ") (block "
+					+ StateSpec.createGoalTerm(0) + ") (block "
+					+ StateSpec.createGoalTerm(1) + ")";
+			return result;
 		}
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
-			return "(forall (block ?X) (clear ?X))";
+			result[0] = "unstack";
+			result[1] = "(forall (block ?X) (clear ?X))";
+			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
-			return "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X)))";
+			result[0] = "stack";
+			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X)))";
+			return result;
 		}
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
-			return "(clear a)";
+			result[0] = "clearA";
+			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ") (block "
+					+ StateSpec.createGoalTerm(0) + ")";
+			return result;
 		}
 
 		if (envParameter_.equals("highestA")) {
-			return "(highest a)";
+			result[0] = "highestA";
+			result[1] = "(highest " + StateSpec.createGoalTerm(0) + ")";
+			return result;
 		}
-
 		return null;
 	}
 
