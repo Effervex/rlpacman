@@ -68,24 +68,35 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState() {
+	protected String[] initialiseGoalState() {
 		if (envParameter_ == null)
 			envParameter_ = "10000";
 
+		String[] result = new String[2];
 		if (envParameter_.equals("lvl10")) {
 			// Actual goal condition
-			return "(level 11)";
-		} else if (envParameter_.equals("10000")) {
+			result[0] = "10levels";
+			result[1] = "(level 11)";
+			return result;
+		}
+		
+		if (envParameter_.equals("10000")) {
 			// Score maximisation
-			return "(score ?Y &:(>= ?Y 10000))";
-		} else if (envParameter_.equals("levelMax")
+			result[0] = "10000points";
+			result[1] = "(score ?Y &:(>= ?Y 10000))";
+			return result;
+		}
+		
+		if (envParameter_.equals("levelMax")
 				|| envParameter_.equals("oneLevel")) {
 			// Score maximisation over a single level
-			return "(level 2)";
+			result[0] = "1level";
+			result[1] = "(level 2)";
+			return result;
 		}
 
 		// Score maximisation by default
-		return "(score ?Y &:(>= ?Y 10000))";
+		return null;
 	}
 
 	@Override

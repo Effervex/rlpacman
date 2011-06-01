@@ -69,7 +69,7 @@ public class PolicyGeneratorTest {
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, activatedActions, true);
+				validActions, null, activatedActions, true);
 
 		// [e]
 		// [b][d]
@@ -97,7 +97,7 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
 				activatedActions, true);
 
 		state.reset();
@@ -123,7 +123,7 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
 				activatedActions, true);
 		GuidedRule rlggRule = new GuidedRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
@@ -159,7 +159,7 @@ public class PolicyGeneratorTest {
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, activatedActions, true);
+				validActions, null, activatedActions, true);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -174,7 +174,7 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
 				activatedActions, true);
 
 		state.reset();
@@ -189,7 +189,7 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
 				activatedActions, true);
 		GuidedRule rlggRule = new GuidedRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"

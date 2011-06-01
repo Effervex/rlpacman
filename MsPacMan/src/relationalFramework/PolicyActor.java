@@ -302,8 +302,9 @@ public class PolicyActor implements AgentInterface {
 		MultiMap<String, String[]> validActions = ObjectObservations
 				.getInstance().validActions;
 
-		actions = policy_.evaluatePolicy(state, validActions, actions,
-				StateSpec.getInstance().getNumReturnedActions(), handCoded_,
+		actions = policy_.evaluatePolicy(state, validActions,
+				ObjectObservations.getInstance().goalReplacements, actions, StateSpec
+						.getInstance().getNumReturnedActions(), handCoded_,
 				false, noteTriggered);
 
 		// This allows action covering to catch variant action conditions.
@@ -369,7 +370,9 @@ public class PolicyActor implements AgentInterface {
 						.createSortedSetMultiMap(ArgumentComparator
 								.getInstance());
 				PolicyGenerator.getInstance().triggerRLGGCovering(state,
-						validActions, emptyActions, false);
+						validActions,
+						ObjectObservations.getInstance().goalReplacements,
+						emptyActions, false);
 				AgentObservations.getInstance().removeUnseenPredicates(
 						removables);
 			}

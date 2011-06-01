@@ -68,32 +68,44 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState() {
+	protected String[] initialiseGoalState() {
 		if (envParameter_ == null)
 			envParameter_ = "onab";
 
 		// On(a,b) goal
+		String[] result = new String[2];
 		if (envParameter_.equals("onab")) {
-			return "(on a b)";
+			result[0] = "onAB";
+			result[1] = "(on " + StateSpec.createGoalTerm(0) + " "
+					+ StateSpec.createGoalTerm(1) + ")";
+			return result;
 		}
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
-			return "(not (on ? ?))";
+			result[0] = "unstack";
+			result[1] = "(not (on ? ?))";
+			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
-			return "(onFloor ?X) (not (onFloor ?Y &:(<> ?Y ?X)))";
+			result[0] = "stack";
+			result[1] = "(onFloor ?X) (not (onFloor ?Y &:(<> ?Y ?X)))";
+			return result;
 		}
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
-			return "(clear a)";
+			result[0] = "clearA";
+			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ")";
+			return result;
 		}
 
 		if (envParameter_.equals("highestA")) {
-			return "(highest a)";
+			result[0] = "highestA";
+			result[1] = "(highest " + StateSpec.createGoalTerm(0) + ")";
+			return result;
 		}
 
 		return null;
@@ -107,9 +119,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
 			rules = new String[3];
-			rules[0] = "(clear a) (clear b) => (move a b)";
-			rules[1] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
-			rules[2] = "(clear ?X) (above ?X b) => (moveFloor ?X)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?X) (above ?X ?G_1) => (moveFloor ?X)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";

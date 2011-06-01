@@ -37,7 +37,7 @@ import jess.Rete;
  * 
  * @author Samuel J. Sarjant
  */
-public class PolicyGenerator implements Serializable {
+public final class PolicyGenerator implements Serializable {
 	/**
 	 * If the summed total update value is only at this percentage of the
 	 * update, the distribution is converged.
@@ -315,7 +315,7 @@ public class PolicyGenerator implements Serializable {
 			}
 
 			Set<GuidedRule> mutants = ruleCreation_
-					.specialiseToPreGoal(baseRule);
+					.specialiseRuleMinor(baseRule);
 			if (ruleSlot.getSlotSplitFacts() != null)
 				mutants.addAll(ruleCreation_.specialiseRule(baseRule));
 			baseRule.setSpawned(preGoalHash);
@@ -957,6 +957,8 @@ public class PolicyGenerator implements Serializable {
 	 *            actions to take.
 	 * @param validActions
 	 *            The set of valid actions to choose from.
+	 * @param goalTerms
+	 *            The replacement terms for the goal.
 	 * @param activatedActions
 	 *            The set of actions that have already been activated by
 	 *            existing rules in the policy. By the way policies are set up,
@@ -969,6 +971,7 @@ public class PolicyGenerator implements Serializable {
 	 */
 	public List<GuidedRule> triggerRLGGCovering(Rete state,
 			MultiMap<String, String[]> validActions,
+			Map<String, String> goalReplacements,
 			MultiMap<String, String[]> activatedActions, boolean createNewRules) {
 		// If there are actions to cover, cover them.
 		if (!frozen_
@@ -977,7 +980,7 @@ public class PolicyGenerator implements Serializable {
 			List<GuidedRule> covered = null;
 			try {
 				covered = ruleCreation_.rlggState(state, validActions,
-						rlggRules_);
+						goalReplacements, rlggRules_);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

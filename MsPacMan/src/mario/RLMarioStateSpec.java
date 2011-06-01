@@ -47,9 +47,11 @@ public class RLMarioStateSpec extends StateSpec {
 				+ "(distance ?X ?Y&:(outsideRange ?Y -16 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
-		preconds.put("search",
-				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
-						+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
+		preconds
+				.put(
+						"search",
+						"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
+								+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
 		preconds
@@ -153,9 +155,10 @@ public class RLMarioStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected String initialiseGoalState() {
+	protected String[] initialiseGoalState() {
 		// The goal is 0 units away.
-		return "(distance goal 0)";
+		String[] result = { "goal", "(distance goal 0)" };
+		return result;
 	}
 
 	@Override

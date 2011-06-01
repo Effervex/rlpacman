@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import jess.Fact;
@@ -17,6 +18,7 @@ import org.junit.Test;
 import blocksWorld.BlocksWorldStateSpec;
 
 import relationalFramework.Module;
+import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
@@ -101,7 +103,7 @@ public class AgentObservationsTest {
 		state.eval("(assert (block f))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 		Map<String, ConditionBeliefs> condBeliefs = sut_.getConditionBeliefs();
 
 		// Clear
@@ -292,7 +294,7 @@ public class AgentObservationsTest {
 		state.eval("(assert (block f))");
 		facts = StateSpec.extractFacts(state);
 
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 		condBeliefs = sut_.getConditionBeliefs();
 
 		// Clear
@@ -450,6 +452,112 @@ public class AgentObservationsTest {
 	}
 
 	@Test
+	public void testScanStateWithGoal() throws Exception {
+		// [e]
+		// [b][d]
+		// [f][a][c]
+		Rete state = StateSpec.getInstance().getRete();
+		state.eval("(assert (clear d))");
+		state.eval("(assert (clear e))");
+		state.eval("(assert (clear c))");
+		state.eval("(assert (highest e))");
+		state.eval("(assert (on d a))");
+		state.eval("(assert (on e b))");
+		state.eval("(assert (on b f))");
+		state.eval("(assert (above e b))");
+		state.eval("(assert (above e f))");
+		state.eval("(assert (above b f))");
+		state.eval("(assert (above d a))");
+		state.eval("(assert (onFloor c))");
+		state.eval("(assert (onFloor a))");
+		state.eval("(assert (onFloor f))");
+		state.eval("(assert (block a))");
+		state.eval("(assert (block b))");
+		state.eval("(assert (block c))");
+		state.eval("(assert (block d))");
+		state.eval("(assert (block e))");
+		state.eval("(assert (block f))");
+		Collection<Fact> facts = StateSpec.extractFacts(state);
+
+		Map<String, String> goalReplacements = new HashMap<String, String>();
+		goalReplacements.put("a", StateSpec.createGoalTerm(0));
+		goalReplacements.put("b", StateSpec.createGoalTerm(1));
+		sut_.scanState(facts, goalReplacements);
+		MultiMap<String, StringFact> goalPredicates = sut_
+				.getGoalPredicateMap();
+		Collection<StringFact> goalTermPreds = goalPredicates.get(StateSpec
+				.createGoalTerm(0));
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ? ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ? ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(onFloor ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(block ?G_0)")));
+		assertEquals(goalTermPreds.size(), 4);
+
+		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ? ?G_1)")));
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ?G_1 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ? ?G_1)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ?G_1 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(block ?G_1)")));
+		assertEquals(goalTermPreds.size(), 5);
+
+		// Different goal terms
+		goalReplacements.clear();
+		goalReplacements.put("e", StateSpec.createGoalTerm(0));
+		goalReplacements.put("c", StateSpec.createGoalTerm(0));
+		sut_.scanState(facts, goalReplacements);
+		goalPredicates = sut_.getGoalPredicateMap();
+		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(0));
+		// OLD ONES
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ? ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ? ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(onFloor ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(block ?G_0)")));
+		// NEW ONES
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ?G_0 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ?G_0 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(clear ?G_0)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(highest ?G_0)")));
+		assertEquals(goalTermPreds.size(), 8);
+
+		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
+		// OLD ONES
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ? ?G_1)")));
+		assertTrue(goalTermPreds
+				.contains(StateSpec.toStringFact("(on ?G_1 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ? ?G_1)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(above ?G_1 ?)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(block ?G_1)")));
+		// NEW ONES
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(onFloor ?G_1)")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(clear ?G_1)")));
+		assertEquals(goalTermPreds.size(), 7);
+	}
+
+	@Test
 	public void testMoveBWScanState() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
 		sut_ = AgentObservations.newInstance();
@@ -475,7 +583,7 @@ public class AgentObservationsTest {
 		state.run();
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 		Map<String, ConditionBeliefs> condBeliefs = sut_.getConditionBeliefs();
 
 		// Clear
@@ -712,7 +820,7 @@ public class AgentObservationsTest {
 		state.eval("(assert (block f))");
 		facts = StateSpec.extractFacts(state);
 
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 		condBeliefs = sut_.getConditionBeliefs();
 
 		/*
@@ -873,7 +981,7 @@ public class AgentObservationsTest {
 		state.eval("(assert (block e))");
 		state.eval("(assert (block f))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 
 		// Check the negated assertion rules that should always hold
 		Map<String, Map<Byte, ConditionBeliefs>> negatedConds = sut_
@@ -917,10 +1025,10 @@ public class AgentObservationsTest {
 		state.eval("(assert (block e))");
 		state.eval("(assert (block f))");
 		Collection<Fact> facts = StateSpec.extractFacts(state);
-		sut_.scanState(facts);
+		sut_.scanState(facts, null);
 
 		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move c e)"), null, false, null);
+				.toStringFact("(move c e)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -940,7 +1048,7 @@ public class AgentObservationsTest {
 
 		// A different move action
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move d c)"), null, false, null);
+				.toStringFact("(move d c)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear d)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block d)")));
@@ -975,7 +1083,7 @@ public class AgentObservationsTest {
 
 		// And another
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), null, false, null);
+				.toStringFact("(move e c)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -1014,27 +1122,15 @@ public class AgentObservationsTest {
 				.toStringFact("(onFloor ?Y)")));
 		assertEquals(specialisationConditions.size(), 8);
 
-		// Replacements
-		Map<String, String> replacements = new HashMap<String, String>();
-		replacements.put("e", Module.createModuleParameter(0));
+		// [e]
+		// [b][d]
+		// [f][a][c]
+		// Goal terms
+		Map<String, String> goalReplacements = new HashMap<String, String>();
+		goalReplacements.put("f", StateSpec.createGoalTerm(0));
+		goalReplacements.put("c", StateSpec.createGoalTerm(1));
 		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), null, true, replacements);
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear "
-				+ Module.createModuleParameter(0) + ")")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block "
-				+ Module.createModuleParameter(0) + ")")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(highest "
-				+ Module.createModuleParameter(0) + ")")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(on "
-				+ Module.createModuleParameter(0) + " ?)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(above "
-				+ Module.createModuleParameter(0) + " ?)")));
-		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(onFloor c)")));
-		assertEquals(relevantFacts.size(), 8);
-		// Testing the action conditions
+				.toStringFact("(move e c)"), goalReplacements);
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?X)")));
@@ -1050,12 +1146,52 @@ public class AgentObservationsTest {
 				.toStringFact("(on ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?X ?)")));
+		assertTrue(specialisationConditions
+				.contains(StateSpec.toStringFact("(above ?X "
+						+ StateSpec.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(onFloor ?Y)")));
-		assertEquals(specialisationConditions.size(), 8);
+		assertEquals(specialisationConditions.size(), 9);
+
+		// [e]
+		// [b][d]
+		// [f][a][c]
+		// Goal terms
+		goalReplacements.clear();
+		goalReplacements.put("b", StateSpec.createGoalTerm(0));
+		goalReplacements.put("d", StateSpec.createGoalTerm(1));
+		relevantFacts = sut_.gatherActionFacts(StateSpec
+				.toStringFact("(move e c)"), goalReplacements);
+		specialisationConditions = sut_.getSpecialisationConditions("move");
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(highest ?X)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(highest ?Y)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?X))")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(not (highest ?Y))")));
+		assertFalse(specialisationConditions.contains(StateSpec
+				.toStringFact("(on ?X ?)")));
+		assertFalse(specialisationConditions.contains(StateSpec
+				.toStringFact("(on ?Y ?)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(above ?X ?)")));
+		assertTrue(specialisationConditions
+				.contains(StateSpec.toStringFact("(above ?X "
+						+ StateSpec.createGoalTerm(0) + ")")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(on ?X " + StateSpec.createGoalTerm(0) + ")")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(above ?Y ?)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(onFloor ?X)")));
+		assertTrue(specialisationConditions.contains(StateSpec
+				.toStringFact("(onFloor ?Y)")));
+		assertEquals(specialisationConditions.size(), 10);
 	}
 }

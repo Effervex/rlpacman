@@ -193,12 +193,12 @@ public class Unification {
 				String variable = RuleCreation.getVariableTermString(i);
 				// Replace old term if necessary
 				if ((oldTerm.charAt(0) != '?')
-						|| (oldTerm.contains(Module.MOD_VARIABLE_PREFIX))) {
+						|| (oldTerm.contains(StateSpec.GOAL_VARIABLE_PREFIX))) {
 					oldReplacementMap.put(oldTerm, variable);
 					bothVariables = false;
 				}
 				if ((newTerm.charAt(0) != '?')
-						|| (newTerm.contains(Module.MOD_VARIABLE_PREFIX))) {
+						|| (newTerm.contains(StateSpec.GOAL_VARIABLE_PREFIX))) {
 					newReplacementMap.put(newTerm, variable);
 					bothVariables = false;
 				}
@@ -344,7 +344,7 @@ public class Unification {
 		// If removing the unityFact, do so here
 		if (removeUnifiedFact)
 			unityFacts.remove(unityResult);
-		
+
 		return result;
 	}
 

@@ -10,15 +10,17 @@ import java.util.Comparator;
  * 
  * @author Sam Sarjant
  */
-public class ConditionComparator implements Comparator<StringFact>, Serializable {
+public class ConditionComparator implements Comparator<StringFact>,
+		Serializable {
 	private static final long serialVersionUID = 2187893240541148300L;
 	private static Comparator<StringFact> instance_;
+	private final int GOAL = -1;
 	private final int BASE = 0;
 	private final int INEQ = 2;
 	private final int TYPE = 1;
-	
+
 	private ConditionComparator() {
-		
+
 	}
 
 	@Override
@@ -38,12 +40,18 @@ public class ConditionComparator implements Comparator<StringFact>, Serializable
 		int condType0 = BASE;
 		int condType1 = BASE;
 
-		if (StateSpec.getInstance().isTypePredicate(str0.getFactName()))
+		// Checking str0
+		if (str0.getFactName().equals(StateSpec.GOALARGS_PRED))
+			condType0 = GOAL;
+		else if (StateSpec.getInstance().isTypePredicate(str0.getFactName()))
 			condType0 = TYPE;
 		else if (str0.getFactName().equals("test"))
 			condType0 = INEQ;
 
-		if (StateSpec.getInstance().isTypePredicate(str1.getFactName()))
+		// Checking str1
+		if (str1.getFactName().equals(StateSpec.GOALARGS_PRED))
+			condType1 = GOAL;
+		else if (StateSpec.getInstance().isTypePredicate(str1.getFactName()))
 			condType1 = TYPE;
 		else if (str1.getFactName().equals("test"))
 			condType1 = INEQ;
