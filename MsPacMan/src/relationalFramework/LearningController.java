@@ -27,7 +27,7 @@ public class LearningController {
 	/** The number of iterations a policy is repeated to get an average score. */
 	public static final int AVERAGE_ITERATIONS = 3;
 	/** The number of test episodes to run for performance measures. */
-	public static final int TEST_ITERATIONS = 5;
+	public static final int TEST_ITERATIONS = 100;
 	/** The best policy found output file. */
 	private File policyFile_;
 	/** The performance output file. */
@@ -213,9 +213,13 @@ public class LearningController {
 			e.printStackTrace();
 		}
 		extraArgs_ = extraArgs;
+		String goalArg = null;
+		for (String extraArg : extraArgs)
+			if (extraArg.startsWith("goal"))
+				goalArg = extraArg.substring(5);
 
 		// Initialise the state spec.
-		StateSpec.initInstance(environmentClass);
+		StateSpec.initInstance(environmentClass, goalArg);
 	}
 
 	/**
@@ -564,7 +568,7 @@ public class LearningController {
 				tailSet.clear();
 			}
 		}
-		
+
 		return pvs;
 	}
 
