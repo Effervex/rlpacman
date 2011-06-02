@@ -23,13 +23,12 @@ public class RuleCreationTest {
 
 	@Before
 	public void setUp() throws Exception {
-		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		StateSpec.reinitInstance("onab");
+		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue(
 				"No onAB agent observations. Cannot run test.",
 				AgentObservations
-						.loadAgentObservations("blocksWorld/onABObservations.ser"));
+						.loadAgentObservations());
 	}
 
 	@Test
@@ -407,7 +406,7 @@ public class RuleCreationTest {
 
 	@Test
 	public void testSimplifyRuleBWMove() {
-		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onAB");
 		sut_ = new RuleCreation();
 		assertTrue("No loaded agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations());

@@ -133,11 +133,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "(highest ?X) => (moveFloor ?X)";
 		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
-			rules[0] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
 		} else if (envParameter_.equals("highestA")) {
 			rules = new String[2];
-			rules[0] = "(clear ?X) (above ?X a) => (moveFloor ?X)";
-			rules[1] = "(clear a) (highest ?Y) => (move a ?Y)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
 
 		optimal = new Policy();

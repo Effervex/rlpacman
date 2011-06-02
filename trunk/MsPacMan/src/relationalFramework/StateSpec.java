@@ -164,22 +164,19 @@ public abstract class StateSpec {
 		List<String> constants = new ArrayList<String>();
 		parameterisableGoal_ = false;
 
-		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
+		// Find each term used in the goal
+		Pattern p = Pattern.compile(" ([?\\w].*?)(?=\\)| |&)");
 		Matcher m = p.matcher(goalState);
-
 		while (m.find()) {
-			String[] factSplit = splitFact(m.group());
-			for (int i = 1; i < factSplit.length; i++) {
-				if (!constants.contains(factSplit[i])) {
-					// If the fact is a constant (not a number)
-					if (factSplit[i].charAt(0) != '?'
-							&& !isNumber(factSplit[i]))
-						constants.add(factSplit[i]);
-					// If the fact is a parameterisable goal constant
-					if (factSplit[i].contains(GOAL_VARIABLE_PREFIX)) {
-						parameterisableGoal_ = true;
-						constants.add(factSplit[i]);
-					}
+			String term = m.group(1);
+			if (!constants.contains(term)) {
+				// If the fact is a constant (not a number)
+				if (term.charAt(0) != '?' && !isNumber(term))
+					constants.add(term);
+				// If the fact is a parameterisable goal constant
+				if (term.contains(GOAL_VARIABLE_PREFIX)) {
+					parameterisableGoal_ = true;
+					constants.add(term);
 				}
 			}
 		}
@@ -314,6 +311,7 @@ public abstract class StateSpec {
 			String[] goal = initialiseGoalState();
 			goalName_ = goal[0];
 			goalState_ = goal[1];
+			goalArgs_ = null;
 			constants_ = extractConstants(goalState_);
 			String[] factTypes = new String[constants_.size() + 1];
 			factTypes[0] = "goalPred";
@@ -327,8 +325,10 @@ public abstract class StateSpec {
 			rete_.eval(goalRule);
 			// Initialise the goal checking query
 			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
-			rete_.eval("(defquery " + NON_GOALS + " " + formNonGoal(goalState_)
-					+ ")");
+			// Only need a non-goal if the goal is parameterisable
+			if (!constants_.isEmpty())
+				rete_.eval("(defquery " + NON_GOALS + " "
+						+ formNonGoal(goalState_) + ")");
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
@@ -685,6 +685,10 @@ public abstract class StateSpec {
 		return goalState_;
 	}
 
+	public String getGoalName() {
+		return goalName_;
+	}
+
 	/**
 	 * Gets the optimal policy for the problem. Or at least gets a good policy.
 	 * 
@@ -1027,11 +1031,12 @@ public abstract class StateSpec {
 		return instance_;
 	}
 
-	public static StateSpec initInstance(String classPrefix) {
+	public static StateSpec initInstance(String classPrefix, String goalArg) {
 		try {
 			instance_ = (StateSpec) Class.forName(
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
+			instance_.envParameter_ = goalArg;
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -83,7 +83,7 @@ public class PacManStateSpec extends StateSpec {
 		if (envParameter_.equals("10000")) {
 			// Score maximisation
 			result[0] = "10000points";
-			result[1] = "(score ?Y &:(>= ?Y 10000))";
+			result[1] = "(score ?Y&:(>= ?Y 10000))";
 			return result;
 		}
 		

@@ -23,7 +23,6 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-import relationalFramework.agentObservations.AgentObservations;
 
 /**
  * The environment for the blocks world interface.
@@ -60,6 +59,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	/** Similar to debug mode, but only shows ASCII representation of blocks. */
 	private boolean viewingMode_ = false;
+
+	/** The arguments for the goal. */
+	private List<String> goalArgs_;
 
 	// @Override
 	public void env_cleanup() {
@@ -313,6 +315,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			}
 
 			rete_.run();
+			
+			// Add the goal
+			goalArgs_ = StateSpec.getInstance().generateAddGoal(goalArgs_,
+					rete_);
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec

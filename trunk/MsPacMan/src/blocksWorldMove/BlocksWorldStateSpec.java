@@ -121,9 +121,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
 			rules = new String[3];
-			rules[0] = "(clear a) (clear b) => (move a b)";
-			rules[1] = "(clear ?X) (above ?X a) (floor ?Y) => (move ?X ?Y)";
-			rules[2] = "(clear ?X) (above ?X b) (floor ?Y) => (move ?X ?Y)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?X) (above ?X ?G_1) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
@@ -132,11 +135,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
-			rules[0] = "(clear ?X) (above ?X a) (floor ?Y) => (move ?X ?Y)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("highestA")) {
 			rules = new String[2];
-			rules[0] = "(clear ?X) (above ?X a) (floor ?Y) => (move ?X ?Y)";
-			rules[1] = "(clear a) (highest ?Y) => (move a ?Y)";
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
 
 		optimal = new Policy();
