@@ -330,6 +330,12 @@ public class Slot implements Serializable {
 		return ruleGenerator_.size();
 	}
 
+	public double klSize() {
+		if (fixed_)
+			return 1;
+		return ruleGenerator_.klSize();
+	}
+
 	/**
 	 * Gets the slot's maximum capacity, based on the number of possible rule
 	 * specialisations.

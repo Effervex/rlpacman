@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,9 +73,6 @@ public final class PolicyGenerator implements Serializable {
 	 * value clashes.
 	 */
 	private static final double ORDER_CLASH_INCREMENT = 0.001;
-
-	/** Just a value to add to the ordering to keep RLGG rules seperate. */
-	private static final double RLGG_ORDERING_VALUE = 10;
 
 	private static final long serialVersionUID = -3840268992962159336L;
 
@@ -415,12 +413,15 @@ public final class PolicyGenerator implements Serializable {
 			return false;
 
 		// (Only check for postUpdate mutations - not split slot mutations)
-		// If the rule's slot isn't already full
+		// If the rule's slot isn't already full (using klSize() to simulate
+		// pruning)
 		int maximumSlotCapacity = rule.getSlot().getMaximumCapacity();
-		if ((mutationUses > -1) && rule.getSlot().size() > maximumSlotCapacity)
+		if ((mutationUses > -1)
+				&& rule.getSlot().klSize() > maximumSlotCapacity)
 			return false;
 
-		// If the rule is below average probability
+		// If the rule is below average probability (this remains as .size() as
+		// probabilities will change to reflect a changing size)
 		if (mutationUses > 0
 				&& rule.getSlot().getGenerator().getProb(rule) < (1.0 / rule
 						.getSlot().size()))
@@ -681,24 +682,10 @@ public final class PolicyGenerator implements Serializable {
 		if (policyOrdering.isEmpty())
 			return generatePolicy(influenceUntestedRules);
 
-		// Add the RLGG rules
-		for (GuidedRule rlggRule : rlggRules_.values()) {
-			if (!policyOrdering.containsValue(rlggRule)) {
-				double ordering = RLGG_ORDERING_VALUE
-						+ slotGenerator_.getOrdering(rlggRule.getSlot());
-				while (policyOrdering.containsKey(ordering))
-					ordering += ORDER_CLASH_INCREMENT;
-				policyOrdering.put(ordering, rlggRule);
-			}
-		}
-
 		// Add the rules, noting the RLGG rules.
 		for (Double orders : policyOrdering.keySet()) {
 			GuidedRule rule = policyOrdering.get(orders);
-			if (orders >= RLGG_ORDERING_VALUE)
-				policy.addRule(rule, false, true);
-			else
-				policy.addRule(rule, true, false);
+			policy.addRule(rule, true, false);
 		}
 
 		return policy;
@@ -733,6 +720,10 @@ public final class PolicyGenerator implements Serializable {
 
 	public String getModuleName() {
 		return Module.formName(moduleGoal_);
+	}
+
+	public Collection<GuidedRule> getRLGGRules() {
+		return rlggRules_.values();
 	}
 
 	/**
@@ -780,33 +771,35 @@ public final class PolicyGenerator implements Serializable {
 		// For each slot
 		for (Slot slot : slotGenerator_) {
 			if (!slot.isFixed()) {
+				// TODO No need to prune with KLsize
 				// Pruning unused rules from the slots
 				ProbabilityDistribution<GuidedRule> distribution = slot
 						.getGenerator();
-				// Only prune if the distribution is bigger than 1
-				if (distribution.size() > 1) {
-					double pruneProb = (1.0 / distribution.size()) * pruneConst;
-					Collection<GuidedRule> removables = new ArrayList<GuidedRule>();
-					for (GuidedRule rule : distribution) {
-						double ruleProb = distribution.getProb(rule);
-						if (ruleProb <= pruneProb) {
-							removables.add(rule);
-							// Note the rule in the no-create list
-							removedRules_.add(rule);
-							currentRules_.remove(rule);
-						}
-					}
-
-					// If rules are to be removed, remove them.
-					if (!removables.isEmpty()) {
-						for (GuidedRule rule : removables) {
-							distribution.remove(rule);
-							System.out.println("\tREMOVED RULE: " + rule);
-						}
-
-						distribution.normaliseProbs();
-					}
-				}
+				// // Only prune if the distribution is bigger than 1
+				// if (distribution.size() > 1) {
+				// double pruneProb = (1.0 / distribution.size()) * pruneConst;
+				// Collection<GuidedRule> removables = new
+				// ArrayList<GuidedRule>();
+				// for (GuidedRule rule : distribution) {
+				// double ruleProb = distribution.getProb(rule);
+				// if (ruleProb <= pruneProb) {
+				// removables.add(rule);
+				// // Note the rule in the no-create list
+				// removedRules_.add(rule);
+				// currentRules_.remove(rule);
+				// }
+				// }
+				//
+				// // If rules are to be removed, remove them.
+				// if (!removables.isEmpty()) {
+				// for (GuidedRule rule : removables) {
+				// distribution.remove(rule);
+				// System.out.println("\tREMOVED RULE: " + rule);
+				// }
+				//
+				// distribution.normaliseProbs();
+				// }
+				// }
 
 				// Sample a rule from the slot and mutate it if it has seen
 				// sufficient states.
@@ -1046,8 +1039,8 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		// Update the slot distribution
-		klDivergence_ += slotGenerator_.updateDistribution(ed
-				.getSlotPositions(), stepSize);
+		klDivergence_ += slotGenerator_.updateDistribution(
+				ed.getSlotPositions(), stepSize);
 
 		convergedValue_ = stepSize * CONVERGED_EPSILON;
 	}
@@ -1109,8 +1102,8 @@ public final class PolicyGenerator implements Serializable {
 			ArrayList<StringFact> internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addCoveredRules(policyGenerator.rlggRules_);
-		policyGenerator.ruleCreation_
-				.migrateAgentObservations(instance_.ruleCreation_);
+//		policyGenerator.ruleCreation_
+//				.migrateAgentObservations(instance_.ruleCreation_);
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
 		return instance_;

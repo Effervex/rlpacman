@@ -168,10 +168,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				ruleConds, replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
-		// TODO Need to modify this somehow so that the exact replacement can be
-		// found. Currently, anonymous terms are used, but not recorded. Yet if
-		// I note them, problems are created. They need to be used, but only in
-		// a limited manner.
 		if (result == 0) {
 			StringFact cond = getPostCond(replacementTerms);
 			if (ruleConds.remove(cond))
@@ -184,7 +180,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
-					replacementTerms, new String[0], true, false);
+					replacementTerms, new String[0], true, false, false);
 			// Remove any replacements which specialise anonymous terms
 			replacementTerms.removeValue("?");
 

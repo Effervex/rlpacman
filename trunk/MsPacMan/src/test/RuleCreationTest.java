@@ -25,10 +25,8 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		assertTrue(
-				"No onAB agent observations. Cannot run test.",
-				AgentObservations
-						.loadAgentObservations());
+		assertTrue("No onAB agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
 	}
 
 	@Test
@@ -62,13 +60,16 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear ?X) (above ?X ?) (onFloor ?X) => (moveFloor ?X)");
 		assertFalse(results.contains(mutant));
-		assertEquals(results.size(), 2);
-
-		// Second (impossible) step specialisation
-		Collection<GuidedRule> subResults = new HashSet<GuidedRule>();
-		for (GuidedRule gr : results)
-			subResults.addAll(sut_.specialiseRule(gr));
-		assertEquals(subResults.size(), 0);
+		// Local specialisations
+		mutant = new GuidedRule("(clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 6);
 
 		// Constant term in action
 		rule = new GuidedRule("(clear a) (above a ?) => (moveFloor a)");
@@ -79,7 +80,15 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear a) (not (highest a)) (above a ?) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		assertEquals(results.size(), 2);
+		mutant = new GuidedRule("(clear a) (above a ?G_0) => (moveFloor a)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear a) (above a ?G_1) => (moveFloor a)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear a) (on a ?G_0) => (moveFloor a)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule("(clear a) (on a ?G_1) => (moveFloor a)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 6);
 
 		// Constant term in rule
 		rule = new GuidedRule(
@@ -92,7 +101,19 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear a) (clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		assertEquals(results.size(), 2);
+		mutant = new GuidedRule(
+				"(clear a) (clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 6);
 
 		// Harder action
 		rule = new GuidedRule("(clear a) (clear ?Y) => (move a ?Y)");
@@ -120,6 +141,31 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear a) (clear ?Y) (not (highest ?Y)) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
+		// Local specialisations
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (above a ?G_0) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (on a ?G_0) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (above ?Y ?G_0) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (on ?Y ?G_0) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (above a ?G_1) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (on a ?G_1) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (above ?Y ?G_1) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new GuidedRule(
+				"(clear a) (clear ?Y) (on ?Y ?G_1) => (move a ?Y)");
+		assertTrue(results.contains(mutant));
 		// Due to equality background knowledge, can remove these negated rules.
 		mutant = new GuidedRule(
 				"(clear a) (clear ?Y) (not (onFloor a)) => (move a ?Y)");
@@ -133,7 +179,7 @@ public class RuleCreationTest {
 		mutant = new GuidedRule(
 				"(clear a) (clear ?Y) (not (above ?Y ?)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
-		assertEquals(results.size(), 8);
+		assertEquals(results.size(), 16);
 
 		// Avoiding impossible specialisations
 		rule = new GuidedRule(
@@ -194,11 +240,11 @@ public class RuleCreationTest {
 		mutant = new GuidedRule("(clear ?X) (clear ?G_1) => (move ?X ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 4);
-		
+
 		// Second level specialisation
 		rule = new GuidedRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
 		results = sut_.specialiseRuleMinor(rule);
-		
+
 		mutant = new GuidedRule("(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 1);
@@ -206,7 +252,7 @@ public class RuleCreationTest {
 		// Impossible specialisation
 		rule = new GuidedRule("(clear ?X) (on ?X ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseRuleMinor(rule);
-		
+
 		assertEquals(results.size(), 0);
 	}
 
@@ -232,15 +278,15 @@ public class RuleCreationTest {
 		// Using an added condition (null result)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(on ?X ?)"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(on ?X ?)"), false, true);
 		assertNull(results);
 
 		// Using an added condition (no simplification)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(clear ?X)"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(clear ?X)"), false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(above ?X ?)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(clear ?X)")));
@@ -249,8 +295,8 @@ public class RuleCreationTest {
 		// Using an added condition (swapped result)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(above ?X ?)"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(above ?X ?)"), false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(above ?X ?)")));
 		assertEquals(results.size(), 1);
@@ -258,8 +304,8 @@ public class RuleCreationTest {
 		// Testing double-negated condition
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(not (above ?X ?))"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(not (above ?X ?))"), false, true);
 		assertNull(results);
 
 		// Testing illegal condition
@@ -276,21 +322,21 @@ public class RuleCreationTest {
 		// Testing same condition
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(on ?X ?)"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(on ?X ?)"), false, true);
 		assertNull(results);
 
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(not (on ?X ?))"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(not (on ?X ?))"), false, true);
 		assertNull(results);
 
 		// Testing unification
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toStringFact("(on ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toStringFact("(on ?X ?Y)"), false, true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(on ?X ?Y)"), false, true);
 		assertNull(results);
 
 		// Testing double unification (onX? -> aboveX? which is removed)
@@ -406,7 +452,7 @@ public class RuleCreationTest {
 
 	@Test
 	public void testSimplifyRuleBWMove() {
-		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onAB");
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue("No loaded agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations());
@@ -523,8 +569,7 @@ public class RuleCreationTest {
 		backKnow.add(new BackgroundKnowledge("(on ?X ?Y) => (on ? ?Y)", false));
 		backKnow.add(new BackgroundKnowledge(
 				"(block ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
-		backKnow
-				.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)", false));
+		backKnow.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)", false));
 		backKnow.add(new BackgroundKnowledge(
 				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", false));
 		AgentObservations.getInstance().setBackgroundKnowledge(backKnow);

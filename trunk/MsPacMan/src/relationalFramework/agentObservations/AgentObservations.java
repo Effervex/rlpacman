@@ -310,9 +310,11 @@ public final class AgentObservations implements Serializable {
 		try {
 			// Make the environment directory if necessary
 			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
-					.getInstance().getEnvironmentName()
-					+ File.separatorChar);
+					.getInstance().getEnvironmentName() + File.separatorChar);
 			environmentDir.mkdir();
+			File localEnvironmentDir = new File(environmentDir, StateSpec
+					.getInstance().getGoalName() + File.separatorChar);
+			localEnvironmentDir.mkdir();
 
 			// Condition beliefs
 			File condBeliefFile = new File(environmentDir,
@@ -325,8 +327,7 @@ public final class AgentObservations implements Serializable {
 			for (String condition : conditionObservations_.conditionBeliefs_
 					.keySet()) {
 				buf.write(conditionObservations_.conditionBeliefs_
-						.get(condition)
-						+ "\n");
+						.get(condition) + "\n");
 			}
 			buf.write("\n");
 			buf.write("Background Knowledge\n");
@@ -341,7 +342,7 @@ public final class AgentObservations implements Serializable {
 			buf.close();
 			wr.close();
 
-			// Action Conditions and ranges
+			// Global action Conditions and ranges
 			File actionCondsFile = new File(environmentDir,
 					ACTION_CONDITIONS_FILE);
 			actionCondsFile.createNewFile();
@@ -356,6 +357,24 @@ public final class AgentObservations implements Serializable {
 				buf.write("Global conditions: "
 						+ abo.recreateSpecialisations(
 								abo.variantActionConditions_, true) + "\n");
+				buf.write("\n");
+			}
+
+			buf.close();
+			wr.close();
+
+			// Local action Conditions and ranges
+			actionCondsFile = new File(localEnvironmentDir,
+					ACTION_CONDITIONS_FILE);
+			actionCondsFile.createNewFile();
+			wr = new FileWriter(actionCondsFile);
+			buf = new BufferedWriter(wr);
+
+			// Write action conditions and ranges
+			for (String action : actionBasedObservations_.keySet()) {
+				buf.write(action + "\n");
+				ActionBasedObservations abo = actionBasedObservations_
+						.get(action);
 				buf.write("Local conditions: "
 						+ abo.recreateSpecialisations(localAgentObservations_
 								.getVariantGoalActionConditions(action), false)
@@ -367,18 +386,15 @@ public final class AgentObservations implements Serializable {
 			wr.close();
 
 			// Serialise observations
-			// TODO Write two serialised objects: the global agent observations
-			// for this environment, and a smaller local one (containing only
-			// the local facts)
 			File serialisedFile = new File(environmentDir, SERIALISATION_FILE);
 			serialisedFile.createNewFile();
 			FileOutputStream fos = new FileOutputStream(serialisedFile);
 			ObjectOutputStream oos = new ObjectOutputStream(fos);
 			oos.writeObject(this);
-			
+
 			oos.close();
 			fos.close();
-			
+
 			localAgentObservations_.saveLocalObservations(environmentDir);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -459,14 +475,15 @@ public final class AgentObservations implements Serializable {
 	/**
 	 * Loads an AgentObservation serialised class from file, or if no file
 	 * available, creates a new one.
+	 * 
+	 * @return True if local observations were also loaded.
 	 */
 	public static boolean loadAgentObservations() {
 		try {
-			// TODO Load two files: the global environment one and the smaller
-			// local one (if available).
 			File globalObsFile = new File(AGENT_OBSERVATIONS_DIR, StateSpec
 					.getInstance().getEnvironmentName()
-					+ File.separatorChar + SERIALISATION_FILE);
+					+ File.separatorChar
+					+ SERIALISATION_FILE);
 			if (globalObsFile.exists()) {
 				FileInputStream fis = new FileInputStream(globalObsFile);
 				ObjectInputStream ois = new ObjectInputStream(fis);
@@ -479,7 +496,7 @@ public final class AgentObservations implements Serializable {
 					instance_.localAgentObservations_ = LocalAgentObservations
 							.loadAgentObservations();
 
-					return true;
+					return instance_.localAgentObservations_.getGoalArgsPred() != null;
 				}
 			}
 		} catch (Exception e) {
@@ -555,6 +572,8 @@ public final class AgentObservations implements Serializable {
 		 * 
 		 * @param actionConds
 		 *            The action conditions being added.
+		 * @param actionArgs
+		 *            The arguments for the actions.
 		 * @param invariants
 		 *            Invariant action conditions. Can only get smaller.
 		 * @param variants
@@ -570,9 +589,10 @@ public final class AgentObservations implements Serializable {
 
 			// Run through each invariant fact
 			for (StringFact invFact : invariants) {
+				// Merge any numerical ranges
 				StringFact mergedFact = Unification.getInstance().unifyFact(
 						invFact, actionConds, new DualHashBidiMap(),
-						new DualHashBidiMap(), actionArgs, false, true);
+						new DualHashBidiMap(), actionArgs, false, true, true);
 				if (mergedFact != null) {
 					changed |= !invFact.equals(mergedFact);
 					newInvariantConditions.add(mergedFact);
@@ -599,9 +619,10 @@ public final class AgentObservations implements Serializable {
 		private void recreateAllSpecialisations(String action) {
 			specialisationConditions_ = recreateSpecialisations(
 					variantActionConditions_, true);
-			specialisationConditions_.addAll(recreateSpecialisations(
-					localAgentObservations_
-							.getVariantGoalActionConditions(action), false));
+			if (localAgentObservations_.getVariantGoalActionConditions(action) != null)
+				specialisationConditions_
+						.addAll(recreateSpecialisations(localAgentObservations_
+								.getVariantGoalActionConditions(action), false));
 		}
 
 		/**
@@ -659,16 +680,12 @@ public final class AgentObservations implements Serializable {
 				// If the condition is not in the invariants and if it's not
 				// negated, IS in the variants, keep it.
 				if (!invariantActionConditions_.contains(simplify)
-						&& !localAgentObservations_
-								.getInvariantGoalActionConditions(
-										action_.getFactName()).contains(
-										simplify)) {
+						&& !localAgentObservations_.invariantsContains(
+								action_.getFactName(), simplify)) {
 					if (simplify.isNegated()
 							|| variantActionConditions_.contains(simplify)
-							|| localAgentObservations_
-									.getVariantGoalActionConditions(
-											action_.getFactName()).contains(
-											simplify))
+							|| localAgentObservations_.variantsContains(
+									action_.getFactName(), simplify))
 						return simplify;
 				}
 			} else
@@ -694,8 +711,8 @@ public final class AgentObservations implements Serializable {
 
 			// If the goal conditions haven't been initialised, they start as
 			// invariant.
-			changed = localAgentObservations_.initLocalActionConds(action
-					.getFactName(), goalActionConds);
+			changed = localAgentObservations_.initLocalActionConds(
+					action.getFactName(), goalActionConds);
 
 			// If this is the first action condition, then all the actions are
 			// considered invariant.
@@ -714,12 +731,12 @@ public final class AgentObservations implements Serializable {
 			String[] actionArgs = action_.getArguments();
 			changed |= intersectActionConditions(actionConds, actionArgs,
 					invariantActionConditions_, variantActionConditions_);
+			Collection<StringFact> localInvariants = localAgentObservations_
+					.getInvariantGoalActionConditions(action.getFactName());
+			Collection<StringFact> localVariants = localAgentObservations_
+					.getVariantGoalActionConditions(action.getFactName());
 			changed |= intersectActionConditions(goalActionConds, actionArgs,
-					localAgentObservations_
-							.getInvariantGoalActionConditions(action
-									.getFactName()), localAgentObservations_
-							.getVariantGoalActionConditions(action
-									.getFactName()));
+					localInvariants, localVariants);
 
 			// Generalise the action if necessary
 			for (int i = 0; i < action_.getArguments().length; i++) {
@@ -1136,8 +1153,8 @@ public final class AgentObservations implements Serializable {
 				String[] otherArgs = otherCond.getArguments();
 				for (int i = 0; i < otherArgs.length; i++) {
 					if (!otherArgs[i].equals("?"))
-						replacementMap.put(otherArgs[i], RuleCreation
-								.getVariableTermString(i));
+						replacementMap.put(otherArgs[i],
+								RuleCreation.getVariableTermString(i));
 				}
 
 				StringFact modCond = new StringFact(cond);
@@ -1351,8 +1368,8 @@ public final class AgentObservations implements Serializable {
 				Map<String, String> replacementMap = new HashMap<String, String>();
 				for (int i = 0; i < untrueFactArgs.length; i++) {
 					if (!untrueFactArgs[i].equals("?"))
-						replacementMap.put(untrueFactArgs[i], RuleCreation
-								.getVariableTermString(i));
+						replacementMap.put(untrueFactArgs[i],
+								RuleCreation.getVariableTermString(i));
 				}
 
 				Collection<StringFact> modTrueRelativeFacts = new HashSet<StringFact>();

@@ -2,16 +2,16 @@ package relationalFramework;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 
 import org.apache.commons.collections.BidiMap;
-
-import relationalFramework.agentObservations.AgentObservations;
 
 import jess.QueryResult;
 import jess.Rete;
@@ -28,8 +28,6 @@ public class Policy implements Serializable {
 	public static final char DELIMITER = '#';
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<GuidedRule> policyRules_;
-	/** The LGG rules added to the end of the policy. */
-	private Set<GuidedRule> rlggRules_;
 	/** The triggered rules in the policy */
 	private Set<GuidedRule> triggeredRules_;
 	/** The number of rules added to this policy (excluding modular) */
@@ -46,7 +44,6 @@ public class Policy implements Serializable {
 	public Policy() {
 		policyRules_ = new ArrayList<GuidedRule>();
 		triggeredRules_ = new HashSet<GuidedRule>();
-		rlggRules_ = new HashSet<GuidedRule>();
 		policySize_ = 0;
 	}
 
@@ -59,7 +56,6 @@ public class Policy implements Serializable {
 	public Policy(Policy policy) {
 		this();
 		policyRules_.addAll(policy.policyRules_);
-		rlggRules_.addAll(policy.rlggRules_);
 		policySize_ = policy.policySize_;
 	}
 
@@ -82,8 +78,6 @@ public class Policy implements Serializable {
 				checkModular(rule);
 			policyRules_.add(rule);
 			policySize_++;
-			if (isLGGRule)
-				rlggRules_.add(rule);
 		}
 	}
 
@@ -150,19 +144,6 @@ public class Policy implements Serializable {
 	}
 
 	/**
-	 * Checks if a rule is an RLGG rule added automatically to the end of
-	 * policies. Not necessarily if the rule is an RLGG rule, as those can be
-	 * added manually too.
-	 * 
-	 * @param rule
-	 *            The rule being checked.
-	 * @return True if the rule was an automatically added RLGG rule.
-	 */
-	public boolean isRLGGRule(GuidedRule rule) {
-		return rlggRules_.contains(rule);
-	}
-
-	/**
 	 * Gets the rules that this policy is made up of.
 	 * 
 	 * @param excludeModular
@@ -214,8 +195,6 @@ public class Policy implements Serializable {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result
-				+ ((rlggRules_ == null) ? 0 : rlggRules_.hashCode());
 		result = prime * result + (noteTriggered_ ? 1231 : 1237);
 		result = prime * result
 				+ ((policyRules_ == null) ? 0 : policyRules_.hashCode());
@@ -234,11 +213,6 @@ public class Policy implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		Policy other = (Policy) obj;
-		if (rlggRules_ == null) {
-			if (other.rlggRules_ != null)
-				return false;
-		} else if (!rlggRules_.equals(other.rlggRules_))
-			return false;
 		if (noteTriggered_ != other.noteTriggered_)
 			return false;
 		if (policyRules_ == null) {
@@ -270,8 +244,7 @@ public class Policy implements Serializable {
 
 		for (GuidedRule rule : policyRules_) {
 			if (!rule.isLoadedModuleRule()) {
-				if (!isRLGGRule(rule))
-					buffer.append(rule.toNiceString() + "\n");
+				buffer.append(rule.toNiceString() + "\n");
 			} else {
 				buffer.append("MODULAR: " + rule.toNiceString() + "\n");
 			}
@@ -330,86 +303,41 @@ public class Policy implements Serializable {
 		actionSwitch.switchOffAll();
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
-
+		int actionsFound = 0;
 		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
 				: actionsReturned;
-		// Check every slot, from top-to-bottom until enough have activated (as
-		// per actionsReturned)
-		// TODO Evaluate RLGG rules first, so policy evaluation can stop early
-		// if an action has been found (not applicable in environments where all
-		// actions are required.)
-		int actionsFound = 0;
-		Iterator<GuidedRule> iter = policyRules_.iterator();
-		while (iter.hasNext()) {
-			GuidedRule gr = iter.next();
 
-			// Find the result set
-			try {
-				// Forming the query
-				String query = StateSpec.getInstance().getRuleQuery(gr);
-				// If there are parameters, temp or concrete, insert them here
-				ValueVector vv = new ValueVector();
-				if (gr.getQueryParameters() != null) {
-					if (gr.getParameters() != null) {
-						for (String param : gr.getParameters())
-							vv.add(param);
-					} else {
-						// Use anonymous placeholder
-						for (int i = 0; i < gr.getQueryParameters().size(); i++)
-							vv.add(StateSpec.ANONYMOUS);
-					}
-				}
-				QueryResult results = state.runQueryStar(query, vv);
-
-				// If there is at least one result
-				if (results.next()) {
-					List<StringFact> actionsCollection = new ArrayList<StringFact>();
-
-					// For each possible replacement
-					do {
-						// Get the rule action, without brackets
-						StringFact action = new StringFact(gr.getAction());
-
-						// Find the arguments.
-						String[] arguments = action.getArguments();
-						for (int i = 0; i < arguments.length; i++) {
-							// If the action is variable, use the replacement
-							if (arguments[i].charAt(0) == '?')
-								arguments[i] = results.getSymbol(arguments[i]
-										.substring(1));
-						}
-
-						// Check this is a valid action
-						if (isValidAction(arguments, validActions
-								.getSortedSet(action.getFactName()))) {
-							activatedActions.putContains(action.getFactName(),
-									arguments);
-
-							// Use the found action set as a result.
-							if (canAddRule(gr, actionsFound, actionsReturned))
-								actionsCollection.add(action);
-						}
-					} while (results.next());
-
-					if (actionsFound < actionsReturnedModified) {
-						if ((actionsFound + actionsCollection.size()) > actionsReturnedModified) {
-							Collections.shuffle(actionsCollection,
-									PolicyGenerator.random_);
-							actionsCollection = actionsCollection.subList(0,
-									actionsReturnedModified - actionsFound);
-						}
-
-						// Turn on the actions
-						if (canAddRule(gr, actionsFound, actionsReturned))
-							actionSwitch.switchOn(new RuleAction(gr,
-									actionsCollection, this));
-					}
-					actionsFound += actionsCollection.size();
-				}
-				results.close();
-			} catch (Exception e) {
-				e.printStackTrace();
+		try {
+			// First evaluate the RLGG rules (if any). If the actions there
+			// don't match up to the activated actions, covering will be
+			// required.
+			for (GuidedRule rlgg : PolicyGenerator.getInstance().getRLGGRules()) {
+				SortedSet<String[]> rlggActions = new TreeSet<String[]>(
+						ArgumentComparator.getInstance());
+				evaluateRule(rlgg, state,
+						validActions.getSortedSet(rlgg.getActionPredicate()),
+						rlggActions);
+				activatedActions.putCollection(rlgg.getActionPredicate(),
+						rlggActions);
 			}
+
+			// Next, evaluate the rest of the policy until an adequate number of
+			// rules are evaluated (usually 1 or all; may be the entire policy).
+			Iterator<GuidedRule> iter = policyRules_.iterator();
+			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
+				GuidedRule polRule = iter.next();
+				Collection<StringFact> firedRules = evaluateRule(
+						polRule,
+						state,
+						validActions.getSortedSet(polRule.getActionPredicate()),
+						null);
+				RuleAction ruleAction = new RuleAction(polRule, firedRules,
+						this);
+				actionSwitch.switchOn(ruleAction);
+				actionsFound += firedRules.size();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
 		// If optimal, just exit
@@ -445,6 +373,71 @@ public class Policy implements Serializable {
 	}
 
 	/**
+	 * Evaluates a single rule against the state to see which actions fire.
+	 * 
+	 * @param rule
+	 *            The rule to be evaluated.
+	 * @param state
+	 *            The state to be evaluated against.
+	 * @param validActions
+	 *            The set of valid actions the agent can take at this state.
+	 * @param activatedActions
+	 *            The (possibly null) to-be-filled activated actions.
+	 * @return A collection of actions which the rule creates.
+	 */
+	private Collection<StringFact> evaluateRule(GuidedRule rule, Rete state,
+			SortedSet<String[]> validActions,
+			SortedSet<String[]> activatedActions) throws Exception {
+		Collection<StringFact> returnedActions = new TreeSet<StringFact>();
+
+		// Forming the query
+		String query = StateSpec.getInstance().getRuleQuery(rule);
+		// If there are parameters, temp or concrete, insert them here
+		ValueVector vv = new ValueVector();
+		if (rule.getQueryParameters() != null) {
+			if (rule.getParameters() != null) {
+				for (String param : rule.getParameters())
+					vv.add(param);
+			} else {
+				// Use anonymous placeholder
+				for (int i = 0; i < rule.getQueryParameters().size(); i++)
+					vv.add(StateSpec.ANONYMOUS);
+			}
+		}
+		QueryResult results = state.runQueryStar(query, vv);
+
+		// If there is at least one result
+		if (results.next()) {
+			// For each possible replacement
+			do {
+				// Get the rule action, without brackets
+				StringFact action = new StringFact(rule.getAction());
+
+				// Find the arguments.
+				String[] arguments = action.getArguments();
+				for (int i = 0; i < arguments.length; i++) {
+					// If the action is variable, use the replacement
+					if (arguments[i].charAt(0) == '?')
+						arguments[i] = results.getSymbol(arguments[i]
+								.substring(1));
+				}
+
+				// Check this is a valid action
+				if (isValidAction(arguments, validActions)) {
+					if (activatedActions != null)
+						activatedActions.add(arguments);
+
+					// Use the found action set as a result.
+					returnedActions.add(action);
+				}
+			} while (results.next());
+		}
+		results.close();
+
+		return returnedActions;
+	}
+
+	/**
 	 * Checks if this action is in the valid actions.
 	 * 
 	 * @param actionArgs
@@ -462,38 +455,6 @@ public class Policy implements Serializable {
 		if (validArgs.contains(actionArgs))
 			return true;
 		return false;
-	}
-
-	/**
-	 * Checks if a rule can be added to the actions switch, which involves
-	 * whether it is an automatically added covered rule or not or if the number
-	 * of actions returned is already full. If it is an covered rule, it will
-	 * only be added if no other rules have been added (also, further covered
-	 * rules will be added in this way too).
-	 * 
-	 * @param gr
-	 *            The rule being possibly added.
-	 * @param actionsFound
-	 *            The number of actions found.
-	 * @param actionsReturned
-	 *            the number of actions returned.
-	 * @return True if the rule can be added, false otherwise.
-	 */
-	private boolean canAddRule(GuidedRule gr, int actionsFound,
-			int actionsReturned) {
-		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
-				: actionsReturned;
-		// If we already have enough actions, don't add it.
-		if (actionsFound >= actionsReturnedModified)
-			return false;
-
-		// If adding a covered rule to an infinite action list, don't add it if
-		// other actions have been.
-		if (isRLGGRule(gr) && (actionsReturned <= -1) && (actionsFound > 0)) {
-			return false;
-		}
-
-		return true;
 	}
 
 	/**
