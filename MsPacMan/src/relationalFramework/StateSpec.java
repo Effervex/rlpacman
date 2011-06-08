@@ -1031,12 +1031,37 @@ public abstract class StateSpec {
 		return instance_;
 	}
 
+	/**
+	 * Initialises the environment with a given goal argument.
+	 * 
+	 * @param classPrefix The class prefix of the environment to load.
+	 * @param goalArg The goal for the environment.
+	 * @return The initialised environment specification.
+	 */
 	public static StateSpec initInstance(String classPrefix, String goalArg) {
 		try {
 			instance_ = (StateSpec) Class.forName(
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
 			instance_.envParameter_ = goalArg;
+			instance_.initialise();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return instance_;
+	}
+	
+	/**
+	 * Initialises the environment without a goal argument (so it uses default).
+	 * 
+	 * @param classPrefix The class prefix of the environment to load.
+	 * @return The initialised environment specification.
+	 */
+	public static StateSpec initInstance(String classPrefix) {
+		try {
+			instance_ = (StateSpec) Class.forName(
+					classPrefix + StateSpec.class.getSimpleName())
+					.newInstance();
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();

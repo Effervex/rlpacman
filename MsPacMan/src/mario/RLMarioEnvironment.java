@@ -61,7 +61,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_.setVisualization(!experimentMode_);
 		staticObjectFacts_ = new HashSet<String>();
 		// cmdLineOptions_.setEnemies("off");
-		// cmdLineOptions_.setFPS(10);
+//		 cmdLineOptions_.setFPS(100);
 		// cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
@@ -337,7 +337,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			rete.assertString("(canJumpOn goal)");
 			rete.assertString("(heightDiff goal 0)");
 
-			rete.run();
+			StateSpec.getInstance().generateAddGoal(new ArrayList<String>(), rete);
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec

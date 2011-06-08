@@ -136,8 +136,8 @@ public class LearningController {
 			reader.close();
 
 			initialise(environmentClass, repetitionsStart, repetitionsEnd,
-					episodes, elitesFile, performanceFile, extraArgsList
-							.toArray(new String[extraArgsList.size()]));
+					episodes, elitesFile, performanceFile,
+					extraArgsList.toArray(new String[extraArgsList.size()]));
 
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
@@ -481,12 +481,11 @@ public class LearningController {
 		}
 
 		// Run the post update operations
-		localPolicy.postUpdateOperations(population, Math.pow((1 - STEP_SIZE),
-				PRUNING_ITERATIONS));
+		localPolicy.postUpdateOperations(population,
+				Math.pow((1 - STEP_SIZE), PRUNING_ITERATIONS));
 
 		// Clear the restart
 		localPolicy.shouldRestart();
-
 		return sinceLastTest;
 	}
 
@@ -517,8 +516,44 @@ public class LearningController {
 		// Test the agent and record the performances
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
-		episodePerformances.put(numEpisodes, testAgent(t, maxSteps_, run,
-				(repetitionsEnd_ - repetitionsStart_), expProg, numEpisodes));
+		float averageScore = 0;
+		if (runningTests_) {
+			localPolicy.freeze(true);
+			System.out.println();
+			System.out.println("Beginning testing for episode " + t + ".");
+			System.out.println();
+
+			long startTime = System.currentTimeMillis();
+
+			// Run the agent through several test iterations, resampling the
+			// agent at each step
+			for (int i = 0; i < TEST_ITERATIONS; i++) {
+				estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
+
+				double score = 0;
+				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+					RLGlue.RL_episode(maxSteps_);
+					if (PolicyGenerator.getInstance().isModuleGenerator())
+						score += Double.parseDouble(RLGlue
+								.RL_agent_message("internalReward"));
+					else
+						score += RLGlue.RL_return();
+				}
+				averageScore += score;
+
+				RLGlue.RL_agent_message("GetPolicy");
+				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
+				// pol.parameterArgs(null);
+				System.out.println(pol);
+				System.out.println(numEpisodes + ": " + score
+						/ AVERAGE_ITERATIONS + "\n");
+			}
+			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
+			localPolicy.freeze(false);
+		}
+
+		learningStartTime_ = System.currentTimeMillis();
+		episodePerformances.put(numEpisodes, averageScore);
 
 		// Save the results at each episode
 		try {
@@ -743,8 +778,8 @@ public class LearningController {
 			for (String arg : internalFact.getArguments()) {
 				if ((arg.charAt(0) != '?')
 						&& (!replacementMap.containsKey(arg)))
-					replacementMap.put(arg, Module
-							.createModuleParameter(modConst++));
+					replacementMap.put(arg,
+							Module.createModuleParameter(modConst++));
 			}
 
 			internalFact.replaceArguments(replacementMap, false);
@@ -806,8 +841,8 @@ public class LearningController {
 		developPolicy(modularGenerator, -numModules + modsComplete, -1);
 
 		// Save the module
-		Module.saveModule(internalGoal.getFacts(), modularGenerator
-				.getGenerator());
+		Module.saveModule(internalGoal.getFacts(),
+				modularGenerator.getGenerator());
 
 		modsComplete++;
 
@@ -875,7 +910,9 @@ public class LearningController {
 			if (weight > maxSlotMean)
 				maxSlotMean = weight;
 			sumSlotMean += weight;
-			double weightedRuleCount = slot.size() * weight;
+			// Use klSize to determine the skew of the slot size
+			double klSize = slot.klSize();
+			double weightedRuleCount = klSize * weight;
 			sumWeightedRuleCount += weightedRuleCount;
 			if (weightedRuleCount > maxWeightedRuleCount)
 				maxWeightedRuleCount = weightedRuleCount;
@@ -905,67 +942,6 @@ public class LearningController {
 	 */
 	private void preliminaryProcessing() {
 		RLGlue.RL_episode(maxSteps_);
-	}
-
-	/**
-	 * Tests the agent at its current state. This is achieved by 'freezing' the
-	 * generators and trialling the agent several times over the environment to
-	 * get an idea of the average performance at this point.
-	 * 
-	 * @param maxSteps
-	 *            The maximum number of allowed.
-	 * @param episode
-	 *            The current episode
-	 * @param run
-	 *            The current run number.
-	 * @param runs
-	 *            The total number of runs to complete.
-	 * @param numEpisodes
-	 *            The number of episodes that have passed.
-	 * @return The average performance of the agent.
-	 */
-	public float testAgent(int episode, int maxSteps, int run, int runs,
-			double expProg, int numEpisodes) {
-		float averageScore = 0;
-		RLGlue.RL_env_message("freeze");
-		if (runningTests_) {
-			System.out.println();
-			System.out
-					.println("Beginning testing for episode " + episode + ".");
-			System.out.println();
-
-			long startTime = System.currentTimeMillis();
-
-			// Run the agent through several test iterations, resampling the
-			// agent at each step
-			for (int i = 0; i < TEST_ITERATIONS; i++) {
-				estimateTestTime(i, TEST_ITERATIONS, expProg, startTime);
-
-				double score = 0;
-				for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
-					RLGlue.RL_episode(maxSteps);
-					if (PolicyGenerator.getInstance().isModuleGenerator())
-						score += Double.parseDouble(RLGlue
-								.RL_agent_message("internalReward"));
-					else
-						score += RLGlue.RL_return();
-				}
-				averageScore += score;
-
-				RLGlue.RL_agent_message("GetPolicy");
-				Policy pol = (Policy) ObjectObservations.getInstance().objectArray[0];
-				// pol.parameterArgs(null);
-				System.out.println(pol);
-				System.out.println(numEpisodes + ": " + score
-						/ AVERAGE_ITERATIONS + "\n");
-			}
-			averageScore /= (AVERAGE_ITERATIONS * TEST_ITERATIONS);
-		}
-
-		RLGlue.RL_env_message("unfreeze");
-
-		learningStartTime_ = System.currentTimeMillis();
-		return averageScore;
 	}
 
 	private void estimateTestTime(int i, int testIterations, double expProg,
@@ -1106,8 +1082,7 @@ public class LearningController {
 					+ TEMP_FOLDER + File.separatorChar);
 			modTemps.mkdirs();
 			tempPerf = new File(modTemps, PolicyGenerator.getInstance()
-					.getModuleName()
-					+ performanceFile_.getName());
+					.getModuleName() + performanceFile_.getName());
 		} else {
 			TEMP_FOLDER.mkdir();
 			tempPerf = new File(TEMP_FOLDER, performanceFile_.getName() + run);

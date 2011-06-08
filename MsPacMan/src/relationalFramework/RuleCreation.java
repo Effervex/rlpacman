@@ -320,7 +320,7 @@ public class RuleCreation implements Serializable {
 			if (checkConditionUnification) {
 				StringFact unification = Unification.getInstance().unifyFact(
 						condition, ruleConds, new DualHashBidiMap(),
-						new DualHashBidiMap(), new String[0], false, false);
+						new DualHashBidiMap(), new String[0], false, false, false);
 				if (unification != null)
 					return null;
 			}
@@ -328,7 +328,7 @@ public class RuleCreation implements Serializable {
 			condition.swapNegated();
 			StringFact negUnification = Unification.getInstance().unifyFact(
 					condition, ruleConds, new DualHashBidiMap(),
-					new DualHashBidiMap(), new String[0], false, false);
+					new DualHashBidiMap(), new String[0], false, false, false);
 			condition.swapNegated();
 			if (negUnification != null)
 				return null;
@@ -378,7 +378,7 @@ public class RuleCreation implements Serializable {
 
 			// Check for the regular condition
 			SortedSet<StringFact> specConditions = simplifyRule(conditions,
-					condition, true, true);
+					condition, true, false);
 			if (specConditions != null) {
 				GuidedRule specialisation = new GuidedRule(specConditions,
 						action, rule);

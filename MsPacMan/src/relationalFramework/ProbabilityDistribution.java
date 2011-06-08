@@ -447,19 +447,20 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		// Set the new value.
 		itemProbs_.put(element, newValue);
 
-		return klDivergence(oldValue, newValue);
+		return klDivergence(newValue, oldValue);
 	}
 
 	/**
 	 * Calculates the KL divergence between two probability values.
 	 * 
-	 * @param oldValue
-	 *            The old value.
 	 * @param newValue
 	 *            The new value.
+	 * @param oldValue
+	 *            The old value.
+	 * 
 	 * @return The KL divergence between the values.
 	 */
-	private double klDivergence(double oldValue, double newValue) {
+	private double klDivergence(double newValue, double oldValue) {
 		if (newValue == 0)
 			return 0;
 		if (oldValue == 0)
@@ -487,6 +488,28 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public int size() {
 		return itemProbs_.size();
+	}
+
+	/**
+	 * Returns the KL divergence of the distribution from a uniform distribution
+	 * with the values representing the number of useful items in the
+	 * distribution.
+	 * 
+	 * @return The KL size of the distribution. Max = size(), Min = 1 (or 0 if
+	 *         empty).
+	 */
+	public double klSize() {
+		double klSum = 0;
+		int size = size();
+		if (size == 1)
+			return 1;
+		double uniform = 1.0 / size;
+		for (Double prob : itemProbs_.values()) {
+			klSum += klDivergence(prob, uniform);
+		}
+		double logBase = Math.log(size);
+		double klSize = Math.max(size * (1 - klSum / logBase), 1);
+		return klSize;
 	}
 
 	/**
@@ -596,7 +619,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		buffer.append("}");
 		return buffer.toString();
 	}
-	
+
 	public String toString(boolean seperateElements) {
 		if (!seperateElements)
 			return toString();

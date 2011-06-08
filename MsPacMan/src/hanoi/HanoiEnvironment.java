@@ -101,9 +101,9 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		state_ = initialiseHanoi(numTiles_);
 
 		// Run the optimal policy if it hasn't yet been run
-//		if (!AgentObservations.getInstance().hasPreGoal()) {
-//			optimalSteps();
-//		}
+		// if (!AgentObservations.getInstance().hasPreGoal()) {
+		// optimalSteps();
+		// }
 
 		if (PolicyGenerator.debugMode_) {
 			System.out.println("\tAgent:\n" + state_);
@@ -128,11 +128,14 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		List<StringFact> actions = new ArrayList<StringFact>(ruleAction
-				.getActions());
-		ruleAction.triggerRule();
-		StringFact action = actions.get(PolicyGenerator.random_.nextInt(actions
-				.size()));
+		StringFact action = null;
+		if (ruleAction != null) {
+			List<StringFact> actions = new ArrayList<StringFact>(
+					ruleAction.getActions());
+			ruleAction.triggerRule();
+			action = actions
+					.get(PolicyGenerator.random_.nextInt(actions.size()));
+		}
 
 		HanoiState newState = actOnAction(action, state_);
 		if (PolicyGenerator.debugMode_) {
@@ -214,9 +217,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 				}
 
 				// Tower base
-				rete_
-						.eval("(assert (towerBase " + TOWER_BASE_PREFIX + t
-								+ "))");
+				rete_.eval("(assert (towerBase " + TOWER_BASE_PREFIX + t + "))");
 				if (tileStack.isEmpty())
 					rete_.eval("(assert (clear " + TOWER_BASE_PREFIX + t + " t"
 							+ t + "))");

@@ -117,7 +117,7 @@ public class LocalAgentObservations implements Serializable {
 		FileOutputStream fos = new FileOutputStream(serialisedFile);
 		ObjectOutputStream oos = new ObjectOutputStream(fos);
 		oos.writeObject(this);
-		
+
 		oos.close();
 		fos.close();
 	}
@@ -136,6 +136,18 @@ public class LocalAgentObservations implements Serializable {
 
 	public Collection<StringFact> getVariantGoalActionConditions(String action) {
 		return variantGoalActionConditions_.get(action);
+	}
+
+	public boolean invariantsContains(String action, StringFact fact) {
+		if (invariantGoalActionConditions_.containsKey(action))
+			return invariantGoalActionConditions_.get(action).contains(fact);
+		return false;
+	}
+
+	public boolean variantsContains(String action, StringFact fact) {
+		if (variantGoalActionConditions_.containsKey(action))
+			return variantGoalActionConditions_.get(action).contains(fact);
+		return false;
 	}
 
 	@Override
@@ -210,8 +222,6 @@ public class LocalAgentObservations implements Serializable {
 	public static LocalAgentObservations loadAgentObservations() {
 		String localGoal = StateSpec.getInstance().getGoalName();
 		try {
-			// TODO Load two files: the global environment one and the smaller
-			// local one (if available).
 			File localObsFile = new File(
 					AgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
 							.getInstance().getEnvironmentName()

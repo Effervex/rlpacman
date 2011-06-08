@@ -136,11 +136,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public Reward_observation_terminal env_step(Action arg0) {
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		List<StringFact> actions = new ArrayList<StringFact>(ruleAction
-				.getActions());
-		ruleAction.triggerRule();
-		StringFact action = actions.get(PolicyGenerator.random_.nextInt(actions
-				.size()));
+		StringFact action = null;
+		if (ruleAction != null) {
+			List<StringFact> actions = new ArrayList<StringFact>(
+					ruleAction.getActions());
+			ruleAction.triggerRule();
+			action = actions
+					.get(PolicyGenerator.random_.nextInt(actions.size()));
+		}
 
 		BlocksState newState = actOnAction(action, state_);
 		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
