@@ -13,6 +13,9 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.BidiMap;
 
+import relationalFramework.util.ArgumentComparator;
+import relationalFramework.util.MultiMap;
+
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;

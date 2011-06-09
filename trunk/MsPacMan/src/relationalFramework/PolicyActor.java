@@ -20,6 +20,8 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.ArgumentComparator;
+import relationalFramework.util.MultiMap;
 
 /**
  * An agent that chooses its decisions based on a fixed policy, fed in via agent

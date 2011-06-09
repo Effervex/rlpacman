@@ -17,6 +17,8 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
+import relationalFramework.util.ArgumentComparator;
+import relationalFramework.util.MultiMap;
 
 import jess.Fact;
 import jess.QueryResult;

@@ -8,6 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.ProbabilityDistribution;
 
 /**
  * An inner class forming the slot of the policy generator. Contains the rules
@@ -15,8 +16,8 @@ import relationalFramework.agentObservations.AgentObservations;
  * 
  * @author Samuel J. Sarjant
  */
-public class Slot implements Serializable {
-	private static final long serialVersionUID = -6840374248845210786L;
+public class Slot implements Serializable, Comparable<Slot> {
+	private static final long serialVersionUID = -6398791301712325018L;
 
 	private static final String ELEMENT_DELIMITER = ":";
 
@@ -25,7 +26,11 @@ public class Slot implements Serializable {
 	/** The maximum amount of variance the selection probability can have. */
 	public static final double MAX_SELECTION_VARIANCE = 0.5;
 
+	/** String prefix for fixed. */
 	private static final String FIXED = "FIXED";
+
+	/** The initial ordering SD. */
+	private static final double INITIAL_ORDERING_SD = 0.25;
 
 	/** The rule generator within the slot. */
 	private ProbabilityDistribution<GuidedRule> ruleGenerator_;
@@ -54,6 +59,9 @@ public class Slot implements Serializable {
 	/** The variance on the chances of the slot being selected. */
 	private double selectionSD_;
 
+	/** The ordering of the slot (0..1) */
+	private double ordering_;
+
 	/**
 	 * The constructor for a new Slot.
 	 * 
@@ -69,6 +77,7 @@ public class Slot implements Serializable {
 		else
 			selectionProb_ = INITIAL_SLOT_PROB;
 		selectionSD_ = 0.5;
+		ordering_ = 0.5;
 	}
 
 	/**
@@ -87,7 +96,7 @@ public class Slot implements Serializable {
 
 	/**
 	 * A constructor for a new slot of only one fixed rule. The slot's rule will
-	 * never change, but the slot paramaters may.
+	 * never change, but the slot parameters may.
 	 * 
 	 * @param fixedRule
 	 *            The rule this slot is fixed on.
@@ -96,6 +105,7 @@ public class Slot implements Serializable {
 		action_ = fixedRule.getActionPredicate();
 		selectionProb_ = 1;
 		selectionSD_ = 0.5;
+		ordering_ = 0.5;
 		fixed_ = true;
 		fixedRule_ = fixedRule;
 	}
@@ -185,14 +195,19 @@ public class Slot implements Serializable {
 	 * Updates the selection values of this slot stepwise towards the given
 	 * values.
 	 * 
+	 * @param ordering
+	 *            The (possibly null) average ordering of the slot (0..1)
 	 * @param mean
 	 *            The mean value to step towards.
-	 * @param variance
+	 * @param sd
 	 *            The variance to step towards.
 	 * @param stepSize
 	 *            The amount the value should update by.
 	 */
-	public void updateSelectionValues(double mean, double sd, double stepSize) {
+	public void updateValues(Double ordering, double mean, double sd,
+			double stepSize) {
+		if (ordering != null)
+			ordering_ = ordering * stepSize + (1 - stepSize) * ordering_;
 		selectionProb_ = mean * stepSize + (1 - stepSize) * selectionProb_;
 		selectionSD_ = sd * stepSize + (1 - stepSize) * selectionSD_;
 
@@ -270,6 +285,14 @@ public class Slot implements Serializable {
 		selectionSD_ = sd;
 	}
 
+	public double getOrdering() {
+		return ordering_;
+	}
+
+	public void setOrdering(double ordering) {
+		ordering_ = ordering;
+	}
+
 	public Collection<StringFact> getSlotSplitFacts() {
 		return slotSplitFacts_;
 	}
@@ -321,9 +344,6 @@ public class Slot implements Serializable {
 		return fixedRule_;
 	}
 
-	// TODO Be careful when changing this (to the KLsize). Make sure the
-	// affected calls remain valid.
-	// One such call is adding new rules with average probability.
 	public int size() {
 		if (fixed_)
 			return 1;
@@ -412,6 +432,24 @@ public class Slot implements Serializable {
 	}
 
 	@Override
+	public int compareTo(Slot other) {
+		int result = action_.compareTo(other.action_);
+		if (result == 0) {
+			result = Double.compare(slotSplitFacts_.hashCode(),
+					other.slotSplitFacts_.hashCode());
+			if (result == 0) {
+				if (fixed_ && !other.fixed_)
+					return -1;
+				else if (!fixed_ && other.fixed_)
+					return 1;
+				else if (fixed_ && other.fixed_)
+					return fixedRule_.compareTo(other.fixedRule_);
+			}
+		}
+		return result;
+	}
+
+	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
 		buffer.append("Slot (");
@@ -472,5 +510,14 @@ public class Slot implements Serializable {
 		}
 
 		return slot;
+	}
+
+	public double getOrderingSD() {
+		int maxCapacity = getMaximumCapacity();
+		double slotFillLevel = (maxCapacity > 1) ? (1.0 * klSize() - 1)
+				/ (maxCapacity - 1) : 1;
+		slotFillLevel = Math.max(slotFillLevel, 0);
+		slotFillLevel = Math.min(slotFillLevel, 1);
+		return INITIAL_ORDERING_SD * slotFillLevel;
 	}
 }

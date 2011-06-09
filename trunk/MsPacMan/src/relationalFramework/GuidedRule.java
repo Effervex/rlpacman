@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 
+import relationalFramework.util.ConditionComparator;
+
 /**
  * A class that keeps track of the guided predicates that make up the rule
  * contained within.

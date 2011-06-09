@@ -23,14 +23,14 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Fact;
-import relationalFramework.ConditionComparator;
 import relationalFramework.GuidedRule;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
-import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.Unification;
+import relationalFramework.util.ConditionComparator;
+import relationalFramework.util.MultiMap;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -169,6 +169,10 @@ public final class AgentObservations implements Serializable {
 
 	public void clearActionBasedObservations() {
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
+	}
+
+	public void clearLocalObservations() {
+		localAgentObservations_ = LocalAgentObservations.newAgentObservations();
 	}
 
 	/**
@@ -523,6 +527,8 @@ public final class AgentObservations implements Serializable {
 	 */
 	public static AgentObservations newInstance() {
 		instance_ = new AgentObservations();
+		instance_.localAgentObservations_ = LocalAgentObservations
+				.newAgentObservations();
 		return instance_;
 	}
 
@@ -807,7 +813,10 @@ public final class AgentObservations implements Serializable {
 				}
 
 				// Add the goal condition
-				ruleConds.add(localAgentObservations_.getGoalArgsPred());
+				StringFact localGoalArgsPred = localAgentObservations_
+						.getGoalArgsPred();
+				if (localGoalArgsPred != null)
+					ruleConds.add(localGoalArgsPred);
 
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false);
@@ -878,14 +887,14 @@ public final class AgentObservations implements Serializable {
 		 * conditions AREN'T true), ordered using a second mapping of argument
 		 * index
 		 */
-		private Map<String, Map<Byte, ConditionBeliefs>> negatedConditionBeliefs_;
+		private Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs_;
 
 		/** The collection of unseen predicates. */
 		private Collection<StringFact> unseenPreds_;
 
 		public ConditionObservations() {
 			conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
-			negatedConditionBeliefs_ = new TreeMap<String, Map<Byte, ConditionBeliefs>>();
+			negatedConditionBeliefs_ = new TreeMap<String, Map<IntegerArray, ConditionBeliefs>>();
 			learnedEnvironmentRules_ = formBackgroundKnowledge();
 			invariants_ = new InvariantObservations();
 
@@ -1211,32 +1220,14 @@ public final class AgentObservations implements Serializable {
 				// Negation - return the appropriate conjunction of condition
 				// beliefs
 				if (negatedConditionBeliefs_.containsKey(factName)) {
-					Map<Byte, ConditionBeliefs> negatedCBs = negatedConditionBeliefs_
+					Map<IntegerArray, ConditionBeliefs> negatedCBs = negatedConditionBeliefs_
 							.get(factName);
-					byte argState = determineArgState(otherCond);
+					IntegerArray argState = determineArgState(otherCond);
 					if (negatedCBs.containsKey(argState))
 						return negatedCBs.get(argState).getAlwaysTrue();
 				}
 			}
 			return null;
-		}
-
-		/**
-		 * Determines the state of a string fact by encoding whether an argument
-		 * is non-anonymous using bitwise indexing operations.
-		 * 
-		 * @param fact
-		 *            The fact being analysed.
-		 * @return A byte >= 0 representing the fact's arguments state.
-		 */
-		private byte determineArgState(StringFact fact) {
-			byte state = 0;
-			String[] factArgs = fact.getArguments();
-			for (int argIndex = 0; argIndex < factArgs.length; argIndex++) {
-				if (!factArgs[argIndex].equals("?"))
-					state += 1 << argIndex;
-			}
-			return state;
 		}
 
 		/**
@@ -1341,35 +1332,39 @@ public final class AgentObservations implements Serializable {
 				Collection<StringFact> falseRelativeFacts) {
 			boolean changed = false;
 			for (StringFact untrueFact : falseRelativeFacts) {
+				untrueFact = new StringFact(untrueFact);
 				String factName = untrueFact.getFactName();
 
 				// Getting the ConditionBeliefs object
-				Map<Byte, ConditionBeliefs> untrueCBs = negatedConditionBeliefs_
+				Map<IntegerArray, ConditionBeliefs> untrueCBs = negatedConditionBeliefs_
 						.get(factName);
 				if (untrueCBs == null) {
-					untrueCBs = new HashMap<Byte, ConditionBeliefs>();
+					untrueCBs = new HashMap<IntegerArray, ConditionBeliefs>();
 					negatedConditionBeliefs_.put(factName, untrueCBs);
 				}
 
 				// Create a separate condition beliefs object for each
 				// non-anonymous argument position
 				String[] untrueFactArgs = untrueFact.getArguments();
-				byte argState = determineArgState(untrueFact);
-
-				ConditionBeliefs untrueCB = untrueCBs.get(argState);
-				if (untrueCB == null) {
-					untrueCB = new ConditionBeliefs(factName, argState);
-					untrueCBs.put(argState, untrueCB);
-					observationHash_ = null;
-				}
-
-				// Make the untrue fact the 'main' fact (align variables
-				// properly with replacement map)
+				// Form the replacement map, modifying the args if necessary
+				// (such that ?X is first arg, ?Y second, etc).
 				Map<String, String> replacementMap = new HashMap<String, String>();
 				for (int i = 0; i < untrueFactArgs.length; i++) {
-					if (!untrueFactArgs[i].equals("?"))
-						replacementMap.put(untrueFactArgs[i],
-								RuleCreation.getVariableTermString(i));
+					if (!untrueFactArgs[i].equals("?")) {
+						if (!replacementMap.containsKey(untrueFactArgs[i]))
+							replacementMap.put(untrueFactArgs[i],
+									RuleCreation.getVariableTermString(i));
+						untrueFactArgs[i] = replacementMap
+								.get(untrueFactArgs[i]);
+					}
+				}
+
+				IntegerArray argState = determineArgState(untrueFact);
+				ConditionBeliefs untrueCB = untrueCBs.get(argState);
+				if (untrueCB == null) {
+					untrueCB = new ConditionBeliefs(factName, untrueFactArgs);
+					untrueCBs.put(argState, untrueCB);
+					observationHash_ = null;
 				}
 
 				Collection<StringFact> modTrueRelativeFacts = new HashSet<StringFact>();
@@ -1388,6 +1383,28 @@ public final class AgentObservations implements Serializable {
 			}
 
 			return changed;
+		}
+
+		/**
+		 * Converts a StringFact into an integer array representing the
+		 * structure of the fact.
+		 * 
+		 * @param fact
+		 *            The fact to convert.
+		 * @return An IntegerArray representing the structure of the fact.
+		 */
+		private IntegerArray determineArgState(StringFact fact) {
+			String[] args = fact.getArguments();
+			int[] structure = new int[args.length];
+			Map<String, Integer> seenArgs = new HashMap<String, Integer>();
+			for (int i = 0; i < args.length; i++) {
+				if (!args[i].equals("?")) {
+					if (!seenArgs.containsKey(args[i]))
+						seenArgs.put(args[i], seenArgs.size() + 1);
+					structure[i] = seenArgs.get(args[i]);
+				}
+			}
+			return new IntegerArray(structure);
 		}
 
 		@Override
@@ -1435,7 +1452,7 @@ public final class AgentObservations implements Serializable {
 		return conditionObservations_.learnedEnvironmentRules_;
 	}
 
-	public Map<String, Map<Byte, ConditionBeliefs>> getNegatedConditionBeliefs() {
+	public Map<String, Map<IntegerArray, ConditionBeliefs>> getNegatedConditionBeliefs() {
 		return conditionObservations_.negatedConditionBeliefs_;
 	}
 

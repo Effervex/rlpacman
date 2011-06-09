@@ -16,7 +16,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
 import relationalFramework.ActionChoice;
 import relationalFramework.LearningController;
-import relationalFramework.MultiMap;
 import relationalFramework.ObjectObservations;
 import relationalFramework.Policy;
 import relationalFramework.PolicyActor;
@@ -25,6 +24,7 @@ import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.MultiMap;
 import rlPacManGeneral.PacManLowAction;
 
 public class PacManEnvironment implements EnvironmentInterface {
@@ -86,12 +86,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			skipHandCodedPolicy_ = true;
 		else if (arg0.equals("testHandCoded"))
 			testHandCodedPolicy_ = true;
-		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
-			StateSpec.reinitInstance(arg0.substring(5));
-			// if (arg0.substring(4).contains("levelMax")
-			// || arg0.substring(4).contains("oneLevel"))
-			// model_.oneLife_ = true;
-		} else {
+		else {
 			try {
 				int delay = Integer.parseInt(arg0);
 				playerDelay_ = delay;

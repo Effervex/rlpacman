@@ -15,6 +15,7 @@ import java.util.TreeSet;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.MultiMap;
 
 import jess.Rete;
 
@@ -320,7 +321,8 @@ public class RuleCreation implements Serializable {
 			if (checkConditionUnification) {
 				StringFact unification = Unification.getInstance().unifyFact(
 						condition, ruleConds, new DualHashBidiMap(),
-						new DualHashBidiMap(), new String[0], false, false, false);
+						new DualHashBidiMap(), new String[0], false, false,
+						false);
 				if (unification != null)
 					return null;
 			}
@@ -411,56 +413,77 @@ public class RuleCreation implements Serializable {
 		String[] oldTerms = rule.getActionTerms();
 		// For every goal term
 		for (String goalTerm : goalPredicates.keySet()) {
-			// For every action term
-			for (int i = 0; i < oldTerms.length; i++) {
-				String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
-				newTerms[i] = goalTerm;
-				SortedSet<StringFact> ruleConditions = rule.getConditions(true);
-				Collection<StringFact> specConditions = new TreeSet<StringFact>(
-						ruleConditions.comparator());
-				// Formt he replacement map
-				Map<String, String> replacementMap = new HashMap<String, String>();
-				replacementMap.put(oldTerms[i], goalTerm);
-				replacementMap.put(goalTerm, goalTerm);
-
-				// Run through the rule conditions, checking each replaced term
-				// is valid in regards to goal options.
-				boolean validRule = true;
-				for (StringFact cond : ruleConditions) {
-					// Replace the terms and check it, removing all other args.
-					StringFact checkedCond = new StringFact(cond);
-					boolean notAnonymous = checkedCond.replaceArguments(
-							replacementMap, false);
-					if (goalPredicates.get(goalTerm).contains(checkedCond)
-							|| !notAnonymous
-							|| checkedCond.getFactName().equals(
-									StateSpec.GOALARGS_PRED)) {
-						// If the replacement is valid, then add a replaced fact
-						// (retaining other args) to the specialised conditions.
-						StringFact specCond = new StringFact(cond);
-						specCond.replaceArguments(replacementMap, true);
-						specConditions.add(specCond);
-					} else {
-						validRule = false;
-						break;
-					}
-				}
-
-				if (validRule) {
-					// Create the mutant
-					GuidedRule mutant = new GuidedRule(specConditions,
-							new StringFact(rule.getAction(), newTerms), rule);
-					mutant.setQueryParams(rule.getQueryParameters());
-					mutant.expandConditions();
-					mutants.add(mutant);
+			boolean termPresent = false;
+			// If the old terms already contain the goal term, can't swap
+			for (String oldTerm : oldTerms) {
+				if (goalTerm.equals(oldTerm)) {
+					termPresent = true;
+					break;
 				}
 			}
+
+			if (!termPresent)
+				// For every action term
+				for (int i = 0; i < oldTerms.length; i++) {
+					// If the term is already a goal term, can't swap
+					if (!oldTerms[i].startsWith(StateSpec.GOAL_VARIABLE_PREFIX))
+						swapRuleTerm(rule, mutants, goalPredicates, oldTerms,
+								i, goalTerm);
+				}
 		}
 
 		// Split any ranges up
 		mutants.addAll(splitRanges(rule, null, 0, rule.isMutant()));
 
 		return mutants;
+	}
+
+	private void swapRuleTerm(GuidedRule rule, Set<GuidedRule> mutants,
+			MultiMap<String, StringFact> goalPredicates, String[] oldTerms,
+			int i, String goalTerm) {
+		String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
+		newTerms[i] = goalTerm;
+		SortedSet<StringFact> ruleConditions = rule.getConditions(true);
+		Collection<StringFact> specConditions = new TreeSet<StringFact>(
+				ruleConditions.comparator());
+		// Form the replacement map
+		Map<String, String> replacementMap = new HashMap<String, String>();
+		replacementMap.put(oldTerms[i], goalTerm);
+		replacementMap.put(goalTerm, goalTerm);
+
+		// Run through the rule conditions, checking each replaced
+		// term is valid in regards to goal options.
+		boolean validRule = true;
+		for (StringFact cond : ruleConditions) {
+			// Replace the terms and check it, removing all other
+			// args.
+			StringFact checkedCond = new StringFact(cond);
+			boolean notAnonymous = checkedCond.replaceArguments(replacementMap,
+					false);
+			if (goalPredicates.get(goalTerm).contains(checkedCond)
+					|| !notAnonymous
+					|| checkedCond.getFactName()
+							.equals(StateSpec.GOALARGS_PRED)) {
+				// If the replacement is valid, then add a replaced
+				// fact (retaining other args) to the specialised
+				// conditions.
+				StringFact specCond = new StringFact(cond);
+				specCond.replaceArguments(replacementMap, true);
+				specConditions.add(specCond);
+			} else {
+				validRule = false;
+				break;
+			}
+		}
+
+		if (validRule) {
+			// Create the mutant
+			GuidedRule mutant = new GuidedRule(specConditions, new StringFact(
+					rule.getAction(), newTerms), rule);
+			mutant.setQueryParams(rule.getQueryParameters());
+			mutant.expandConditions();
+			mutants.add(mutant);
+		}
 	}
 
 	/**

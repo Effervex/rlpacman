@@ -11,8 +11,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import relationalFramework.util.SlotOrderComparator;
 
 /**
  * A class representing a loaded module. Modules typically have parameterisable
@@ -64,7 +68,7 @@ public class Module {
 	 *            The state of the distribution for the agent.
 	 */
 	private Module(ArrayList<StringFact> facts,
-			OrderedDistribution<Slot> slotDistribution) {
+			Collection<Slot> slotDistribution) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = formName(facts);
@@ -78,7 +82,9 @@ public class Module {
 
 		// Add the rules by taking the most likely rule from the ordered slots.
 		moduleRules_ = new ArrayList<GuidedRule>();
-		List<Slot> orderedSlots = slotDistribution.getOrderedElements();
+		SortedSet<Slot> orderedSlots = new TreeSet<Slot>(
+				SlotOrderComparator.getInstance());
+		orderedSlots.addAll(slotDistribution);
 		for (Slot slot : orderedSlots) {
 			Slot removalSlot = slot.clone();
 			double repetitions = Math.round(slot.getSelectionProbability());
@@ -194,7 +200,7 @@ public class Module {
 	 *            The policy generator which solves the goal.
 	 */
 	public static void saveModule(ArrayList<StringFact> facts,
-			OrderedDistribution<Slot> slotDistribution) {
+			Collection<Slot> slotDistribution) {
 		String modName = formName(facts);
 		Module newModule = null;
 		if (!loadedModules_.containsKey(modName)) {
@@ -233,8 +239,7 @@ public class Module {
 				FileWriter writer = new FileWriter(modLocation);
 				BufferedWriter bf = new BufferedWriter(writer);
 
-				bf
-						.write(";; The parameter variables given to the module on loading.\n");
+				bf.write(";; The parameter variables given to the module on loading.\n");
 				bf.write("(declare (variables");
 				// Write the parameters out for each fact in the module.
 				for (String param : newModule.getParameterTerms()) {
