@@ -10,13 +10,13 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.ConditionComparator;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
+import relationalFramework.util.ConditionComparator;
 
 public class RuleCreationTest {
 	private RuleCreation sut_;
@@ -248,12 +248,6 @@ public class RuleCreationTest {
 		mutant = new GuidedRule("(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 1);
-
-		// Impossible specialisation
-		rule = new GuidedRule("(clear ?X) (on ?X ?Y) => (move ?X ?Y)");
-		results = sut_.specialiseRuleMinor(rule);
-
-		assertEquals(results.size(), 0);
 	}
 
 	@Test
@@ -454,7 +448,7 @@ public class RuleCreationTest {
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		assertTrue("No loaded agent observations. Cannot run test.",
+		assertTrue("No loaded onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations());
 
 		// Strange issue:

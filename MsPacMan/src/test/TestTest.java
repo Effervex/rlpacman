@@ -19,8 +19,8 @@ import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
 
-import relationalFramework.ArgumentComparator;
 import relationalFramework.StateSpec;
+import relationalFramework.util.ArgumentComparator;
 
 public class TestTest {
 	@Test

@@ -13,9 +13,9 @@ import org.junit.Test;
 
 import relationalFramework.ConstantPred;
 import relationalFramework.GuidedRule;
-import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.util.MultiMap;
 
 public class BlocksWorldStateSpecTest {
 

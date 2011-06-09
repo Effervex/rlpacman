@@ -11,9 +11,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.GuidedRule;
-import relationalFramework.ProbabilityDistribution;
 import relationalFramework.Slot;
 import relationalFramework.StateSpec;
+import relationalFramework.util.ProbabilityDistribution;
 
 public class PacManStateSpecTest {
 

@@ -16,12 +16,13 @@ import org.junit.Test;
 
 import blocksWorld.BlocksWorldStateSpec;
 
-import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
+import relationalFramework.agentObservations.IntegerArray;
+import relationalFramework.util.MultiMap;
 
 public class AgentObservationsTest {
 	private AgentObservations sut_;
@@ -43,11 +44,11 @@ public class AgentObservationsTest {
 	private void assertBeliefs2(Collection<String> beliefs,
 			Collection<StringFact> agentBeliefs) {
 		for (String fact : beliefs) {
-			assertTrue(beliefs + " did not match " + agentBeliefs, agentBeliefs
-					.contains(StateSpec.toStringFact(fact)));
+			assertTrue(beliefs + " did not match " + agentBeliefs,
+					agentBeliefs.contains(StateSpec.toStringFact(fact)));
 		}
-		assertEquals(beliefs + " did not match " + agentBeliefs, agentBeliefs
-				.size(), beliefs.size());
+		assertEquals(beliefs + " did not match " + agentBeliefs,
+				agentBeliefs.size(), beliefs.size());
 	}
 
 	private void assertRules(Collection<String[]> equivalencePairs,
@@ -61,13 +62,13 @@ public class AgentObservationsTest {
 		}
 	}
 
-	private void assertBeliefContains(String condition, byte byteHash,
+	private void assertBeliefContains(String condition, IntegerArray argState,
 			String alwaysTrue,
-			Map<String, Map<Byte, ConditionBeliefs>> negatedCondBeliefs) {
+			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedCondBeliefs) {
 		if (negatedCondBeliefs.containsKey(condition)
-				&& negatedCondBeliefs.get(condition).containsKey(byteHash)) {
+				&& negatedCondBeliefs.get(condition).containsKey(argState)) {
 			ConditionBeliefs cb = negatedCondBeliefs.get(condition).get(
-					byteHash);
+					argState);
 			assertTrue(alwaysTrue + " not present in " + cb, cb.getAlwaysTrue()
 					.contains(StateSpec.toStringFact(alwaysTrue)));
 		}
@@ -78,6 +79,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
+		sut_ = AgentObservations.newInstance();
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -183,7 +185,7 @@ public class AgentObservationsTest {
 		neverTrue.add("(above ?Y ?Y)");
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
-		// Highest (Only 1 observation so no occasionnals)
+		// Highest (Only 1 observation so no occasionals)
 		cb = condBeliefs.get("highest");
 		alwaysTrue.clear();
 		alwaysTrue.add("(clear ?X)");
@@ -454,6 +456,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
+		sut_ = AgentObservations.newInstance();
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -493,7 +496,16 @@ public class AgentObservationsTest {
 				.toStringFact("(onFloor ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toStringFact("(block ?G_0)")));
-		assertEquals(goalTermPreds.size(), 4);
+		// Negated facts too
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (on ? ?G_0))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (above ? ?G_0))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (onFloor ?G_0))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (block ?G_0))")));
+		assertEquals(goalTermPreds.size(), 8);
 
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
 		assertTrue(goalTermPreds
@@ -506,12 +518,22 @@ public class AgentObservationsTest {
 				.toStringFact("(above ?G_1 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toStringFact("(block ?G_1)")));
-		assertEquals(goalTermPreds.size(), 5);
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (on ? ?G_1))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (on ?G_1 ?))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (above ? ?G_1))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (above ?G_1 ?))")));
+		assertTrue(goalTermPreds.contains(StateSpec
+				.toStringFact("(not (block ?G_1))")));
+		assertEquals(goalTermPreds.size(), 10);
 
 		// Different goal terms
 		goalReplacements.clear();
 		goalReplacements.put("e", StateSpec.createGoalTerm(0));
-		goalReplacements.put("c", StateSpec.createGoalTerm(0));
+		goalReplacements.put("c", StateSpec.createGoalTerm(1));
 		sut_.scanState(facts, goalReplacements);
 		goalPredicates = sut_.getGoalPredicateMap();
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(0));
@@ -533,7 +555,8 @@ public class AgentObservationsTest {
 				.toStringFact("(clear ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toStringFact("(highest ?G_0)")));
-		assertEquals(goalTermPreds.size(), 8);
+		// Include negated too
+		assertEquals(goalTermPreds.size(), 16);
 
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
 		// OLD ONES
@@ -552,7 +575,8 @@ public class AgentObservationsTest {
 				.toStringFact("(onFloor ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toStringFact("(clear ?G_1)")));
-		assertEquals(goalTermPreds.size(), 7);
+		// Include negated too
+		assertEquals(goalTermPreds.size(), 14);
 	}
 
 	@Test
@@ -982,18 +1006,19 @@ public class AgentObservationsTest {
 		sut_.scanState(facts, null);
 
 		// Check the negated assertion rules that should always hold
-		Map<String, Map<Byte, ConditionBeliefs>> negatedConds = sut_
+		Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConds = sut_
 				.getNegatedConditionBeliefs();
-		byte byteHash = 1;
-		assertBeliefContains("above", byteHash, "(onFloor ?X)", negatedConds);
-		assertBeliefContains("on", byteHash, "(onFloor ?X)", negatedConds);
-		assertBeliefContains("above", byteHash = 2, "(clear ?Y)", negatedConds);
-		assertBeliefContains("on", byteHash, "(clear ?Y)", negatedConds);
-		assertBeliefContains("clear", byteHash = 1, "(above ? ?X)",
-				negatedConds);
-		assertBeliefContains("clear", byteHash, "(on ? ?X)", negatedConds);
-		assertBeliefContains("onFloor", byteHash, "(above ?X ?)", negatedConds);
-		assertBeliefContains("onFloor", byteHash, "(on ?X ?)", negatedConds);
+		IntegerArray argState = new IntegerArray(new int[] { 1, 0 });
+		assertBeliefContains("above", argState, "(onFloor ?X)", negatedConds);
+		assertBeliefContains("on", argState, "(onFloor ?X)", negatedConds);
+		argState = new IntegerArray(new int[] { 0, 1 });
+		assertBeliefContains("above", argState, "(clear ?Y)", negatedConds);
+		assertBeliefContains("on", argState, "(clear ?Y)", negatedConds);
+		argState = new IntegerArray(new int[] { 1 });
+		assertBeliefContains("clear", argState, "(above ? ?X)", negatedConds);
+		assertBeliefContains("clear", argState, "(on ? ?X)", negatedConds);
+		assertBeliefContains("onFloor", argState, "(above ?X ?)", negatedConds);
+		assertBeliefContains("onFloor", argState, "(on ?X ?)", negatedConds);
 	}
 
 	@Test
@@ -1025,8 +1050,8 @@ public class AgentObservationsTest {
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 		sut_.scanState(facts, null);
 
-		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move c e)"), null);
+		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(
+				StateSpec.toStringFact("(move c e)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -1045,8 +1070,8 @@ public class AgentObservationsTest {
 		assertTrue(sut_.getSpecialisationConditions("move").isEmpty());
 
 		// A different move action
-		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move d c)"), null);
+		relevantFacts = sut_.gatherActionFacts(
+				StateSpec.toStringFact("(move d c)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear d)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block d)")));
@@ -1080,8 +1105,8 @@ public class AgentObservationsTest {
 		assertEquals(specialisationConditions.size(), 6);
 
 		// And another
-		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), null);
+		relevantFacts = sut_.gatherActionFacts(
+				StateSpec.toStringFact("(move e c)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
@@ -1127,8 +1152,8 @@ public class AgentObservationsTest {
 		Map<String, String> goalReplacements = new HashMap<String, String>();
 		goalReplacements.put("f", StateSpec.createGoalTerm(0));
 		goalReplacements.put("c", StateSpec.createGoalTerm(1));
-		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), goalReplacements);
+		relevantFacts = sut_.gatherActionFacts(
+				StateSpec.toStringFact("(move e c)"), goalReplacements);
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?X)")));
@@ -1162,8 +1187,8 @@ public class AgentObservationsTest {
 		goalReplacements.clear();
 		goalReplacements.put("b", StateSpec.createGoalTerm(0));
 		goalReplacements.put("d", StateSpec.createGoalTerm(1));
-		relevantFacts = sut_.gatherActionFacts(StateSpec
-				.toStringFact("(move e c)"), goalReplacements);
+		relevantFacts = sut_.gatherActionFacts(
+				StateSpec.toStringFact("(move e c)"), goalReplacements);
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?X)")));

@@ -10,9 +10,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import relationalFramework.RuleCreation;
-import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.util.MultiMap;
 
 /**
  * A class representing the beliefs the agent has regarding the inter-relations
@@ -21,7 +21,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class ConditionBeliefs implements Serializable {
-	private static final long serialVersionUID = 3058227596295767897L;
+	private static final long serialVersionUID = -6450025081298227538L;
 
 	/** The condition this class represents as a base. */
 	private String condition_;
@@ -54,7 +54,7 @@ public class ConditionBeliefs implements Serializable {
 	 * The argument index for the condition belief. Only used for negated
 	 * condition beliefs.
 	 */
-	private byte argIndex_ = -1;
+	private String[] args_ = null;
 
 	/**
 	 * The initialisation for condition beliefs, taking the condition, and the
@@ -77,12 +77,12 @@ public class ConditionBeliefs implements Serializable {
 	 * 
 	 * @param factName
 	 *            The (negated) fact name.
-	 * @param argIndex
-	 *            he argument index this condition beliefs object represents.
+	 * @param untrueFactArgs
+	 *            The arguments this condition beliefs object represents.
 	 */
-	public ConditionBeliefs(String factName, byte argIndex) {
+	public ConditionBeliefs(String factName, String[] untrueFactArgs) {
 		this(factName);
-		argIndex_ = argIndex;
+		args_ = untrueFactArgs;
 	}
 
 	/**
@@ -414,14 +414,20 @@ public class ConditionBeliefs implements Serializable {
 		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
 			if (!StateSpec.isNumberType(argTypes[i])) {
-				String varName = RuleCreation.getVariableTermString(i);
-				actionTerms.putContains(argTypes[i], varName);
-				// Also put any parent type of the given type
-				Collection<String> parentTypes = new HashSet<String>();
-				StateSpec.getInstance()
-						.getTypeLineage(argTypes[i], parentTypes);
-				for (String parent : parentTypes)
-					actionTerms.putContains(parent, varName);
+				String varName = null;
+				if (args_ != null)
+					varName = args_[i];
+				else
+					varName = RuleCreation.getVariableTermString(i);
+				if (!varName.equals("?")) {
+					actionTerms.putContains(argTypes[i], varName);
+					// Also put any parent type of the given type
+					Collection<String> parentTypes = new HashSet<String>();
+					StateSpec.getInstance().getTypeLineage(argTypes[i],
+							parentTypes);
+					for (String parent : parentTypes)
+						actionTerms.putContains(parent, varName);
+				}
 			}
 		}
 
@@ -512,14 +518,14 @@ public class ConditionBeliefs implements Serializable {
 		StringFact cbFact = StateSpec.getInstance().getStringFact(condition_);
 		String[] arguments = new String[cbFact.getArguments().length];
 		for (int i = 0; i < arguments.length; i++) {
-			if ((argIndex_ == -1) || (argIndex_ & (1 << i)) != 0)
+			if (args_ == null)
 				arguments[i] = RuleCreation.getVariableTermString(i);
 			else
-				arguments[i] = "?";
+				arguments[i] = args_[i];
 		}
 
 		cbFact = new StringFact(cbFact, arguments);
-		if (argIndex_ != -1)
+		if (args_ != null)
 			cbFact.swapNegated();
 		return cbFact;
 	}
@@ -530,16 +536,20 @@ public class ConditionBeliefs implements Serializable {
 		int result = 1;
 		result = prime * result
 				+ ((alwaysTrue_ == null) ? 0 : alwaysTrue_.hashCode());
+		result = prime * result + Arrays.hashCode(args_);
 		result = prime * result
 				+ ((condition_ == null) ? 0 : condition_.hashCode());
 		result = prime * result
-				+ ((neverTrue_ == null) ? 0 : neverTrue_.hashCode());
+				+ ((disallowed_ == null) ? 0 : disallowed_.hashCode());
 		result = prime * result + (firstState ? 1231 : 1237);
+		result = prime * result
+				+ ((generalities_ == null) ? 0 : generalities_.hashCode());
+		result = prime * result
+				+ ((neverTrue_ == null) ? 0 : neverTrue_.hashCode());
 		result = prime
 				* result
 				+ ((occasionallyTrue_ == null) ? 0 : occasionallyTrue_
 						.hashCode());
-		result = prime * result + argIndex_;
 		return result;
 	}
 
@@ -552,24 +562,34 @@ public class ConditionBeliefs implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		ConditionBeliefs other = (ConditionBeliefs) obj;
-		if (argIndex_ != other.argIndex_)
-			return false;
 		if (alwaysTrue_ == null) {
 			if (other.alwaysTrue_ != null)
 				return false;
 		} else if (!alwaysTrue_.equals(other.alwaysTrue_))
+			return false;
+		if (!Arrays.equals(args_, other.args_))
 			return false;
 		if (condition_ == null) {
 			if (other.condition_ != null)
 				return false;
 		} else if (!condition_.equals(other.condition_))
 			return false;
+		if (disallowed_ == null) {
+			if (other.disallowed_ != null)
+				return false;
+		} else if (!disallowed_.equals(other.disallowed_))
+			return false;
+		if (firstState != other.firstState)
+			return false;
+		if (generalities_ == null) {
+			if (other.generalities_ != null)
+				return false;
+		} else if (!generalities_.equals(other.generalities_))
+			return false;
 		if (neverTrue_ == null) {
 			if (other.neverTrue_ != null)
 				return false;
 		} else if (!neverTrue_.equals(other.neverTrue_))
-			return false;
-		if (firstState != other.firstState)
 			return false;
 		if (occasionallyTrue_ == null) {
 			if (other.occasionallyTrue_ != null)

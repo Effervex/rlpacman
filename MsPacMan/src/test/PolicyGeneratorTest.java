@@ -3,27 +3,20 @@ package test;
 import static org.junit.Assert.*;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-import jess.Fact;
 import jess.Rete;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.ActionChoice;
-import relationalFramework.ArgumentComparator;
 import relationalFramework.GuidedRule;
-import relationalFramework.MultiMap;
-import relationalFramework.Policy;
 import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleAction;
 import relationalFramework.Slot;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.ArgumentComparator;
+import relationalFramework.util.MultiMap;
 
 public class PolicyGeneratorTest {
 	private PolicyGenerator sut_;
@@ -32,12 +25,13 @@ public class PolicyGeneratorTest {
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = PolicyGenerator.newInstance(0);
-		AgentObservations.loadAgentObservations();
 	}
 
 	@Test
 	public void testTriggerRLGGCovering() throws Exception {
-		AgentObservations.getInstance().clearActionBasedObservations();
+		assertTrue("No agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
+		AgentObservations.getInstance().clearLocalObservations();
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		state.eval("(assert (clear b))");
@@ -142,7 +136,9 @@ public class PolicyGeneratorTest {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
 		sut_ = PolicyGenerator.newInstance(0);
-		AgentObservations.getInstance().clearActionBasedObservations();
+		assertTrue("No agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations());
+		AgentObservations.getInstance().clearLocalObservations();
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -205,15 +201,4 @@ public class PolicyGeneratorTest {
 		Collection<Slot> slotGenerator = sut_.getGenerator();
 		assertEquals(slotGenerator.size(), 17);
 	}
-
-	@Test
-	public void testUpdateDistributions() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testPostUpdateOperations() {
-		fail("Not yet implemented");
-	}
-
 }

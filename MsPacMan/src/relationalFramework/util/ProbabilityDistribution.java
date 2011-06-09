@@ -1,4 +1,4 @@
-package relationalFramework;
+package relationalFramework.util;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+
 
 /**
  * A class representing a probability distribution of values. These values are

@@ -11,7 +11,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,8 +27,11 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.util.MultiMap;
+import relationalFramework.util.ProbabilityDistribution;
+import relationalFramework.util.SelectableSet;
+import relationalFramework.util.SlotOrderComparator;
 
-import jess.Fact;
 import jess.Rete;
 
 /**
@@ -152,7 +154,7 @@ public final class PolicyGenerator implements Serializable {
 	private MultiMap<String, GuidedRule> rlggRules_;
 
 	/** The probability distributions defining the policy generator. */
-	private OrderedDistribution<Slot> slotGenerator_;
+	private SelectableSet<Slot> slotGenerator_;
 
 	/** The rule creation object. */
 	protected RuleCreation ruleCreation_;
@@ -516,7 +518,7 @@ public final class PolicyGenerator implements Serializable {
 					splitSlot.addNewRule(seedRule);
 
 					// Check if the slot already exists
-					Slot existingSlot = slotGenerator_.getElement(splitSlot);
+					Slot existingSlot = slotGenerator_.findMatch(splitSlot);
 					if (existingSlot != null) {
 						if (existingSlot.getSeedRule().equals(seedRule)) {
 							splitSlot = existingSlot;
@@ -644,12 +646,8 @@ public final class PolicyGenerator implements Serializable {
 		// sorted map, which determines the ordering.
 		boolean noRules = true;
 		for (Slot slot : slotGenerator_) {
-			double slotOrdering = slotGenerator_.getOrdering(slot);
-			int maxCapacity = slot.getMaximumCapacity();
-			double slotFillLevel = (maxCapacity > 1) ? (1.0 * slot.size() - 1)
-					/ (maxCapacity - 1) : 1;
-			double slotOrderSD = slotGenerator_.getOrderingSD(slot,
-					slotFillLevel);
+			double slotOrdering = slot.getOrdering();
+			double slotOrderSD = slot.getOrderingSD();
 
 			// Insert the slot as many times as required.
 			if (!slot.isEmpty()) {
@@ -714,7 +712,7 @@ public final class PolicyGenerator implements Serializable {
 		return constantFacts;
 	}
 
-	public OrderedDistribution<Slot> getGenerator() {
+	public Collection<Slot> getGenerator() {
 		return slotGenerator_;
 	}
 
@@ -826,7 +824,7 @@ public final class PolicyGenerator implements Serializable {
 	 * Resets the generator to where it started.
 	 */
 	public void resetGenerator() {
-		slotGenerator_ = new OrderedDistribution<Slot>(random_);
+		slotGenerator_ = new SelectableSet<Slot>();
 		currentSlots_ = MultiMap.createListMultiMap();
 		for (String action : actionSet_.keySet()) {
 			Slot slot = new Slot(action);
@@ -886,7 +884,9 @@ public final class PolicyGenerator implements Serializable {
 		buf.write("A typical policy:\n");
 
 		// Go through each slot, writing out those that fire
-		List<Slot> orderedElements = slotGenerator_.getOrderedElements();
+		SortedSet<Slot> orderedElements = new TreeSet<Slot>(
+				SlotOrderComparator.getInstance());
+		orderedElements.addAll(slotGenerator_);
 		for (Slot slot : orderedElements) {
 			// Output each slot a number of times based on its selection
 			// probability.
@@ -1026,10 +1026,11 @@ public final class PolicyGenerator implements Serializable {
 
 		// Update the rule distributions and slot activation probability
 		for (Slot slot : slotGenerator_) {
-			// Slot selection values
+			// Slot values
+			Double ordering = ed.getSlotPosition(slot);
 			double mean = ed.getSlotNumeracyMean(slot);
 			double sd = ed.getSlotNumeracySD(slot);
-			slot.updateSelectionValues(mean, sd, stepSize);
+			slot.updateValues(ordering, mean, sd, stepSize);
 
 			// double numeracyBalancedStepSize = stepSize * mean;
 			if (!slot.isFixed())
@@ -1037,10 +1038,6 @@ public final class PolicyGenerator implements Serializable {
 						ed.getSlotCount(slot), ed.getRuleCounts(), stepSize);
 			// stepSizes.put(slot, numeracyBalancedStepSize);
 		}
-
-		// Update the slot distribution
-		klDivergence_ += slotGenerator_.updateDistribution(
-				ed.getSlotPositions(), stepSize);
 
 		convergedValue_ = stepSize * CONVERGED_EPSILON;
 	}
@@ -1102,8 +1099,8 @@ public final class PolicyGenerator implements Serializable {
 			ArrayList<StringFact> internalGoal) {
 		instance_ = new PolicyGenerator();
 		instance_.addCoveredRules(policyGenerator.rlggRules_);
-//		policyGenerator.ruleCreation_
-//				.migrateAgentObservations(instance_.ruleCreation_);
+		// policyGenerator.ruleCreation_
+		// .migrateAgentObservations(instance_.ruleCreation_);
 		instance_.moduleGenerator_ = true;
 		instance_.moduleGoal_ = internalGoal;
 		return instance_;

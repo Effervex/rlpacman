@@ -166,9 +166,6 @@ public class RLMarioStateSpec extends StateSpec {
 		Policy goodPolicy = new Policy();
 
 		// Defining a good policy (basic at the moment)
-		// TODO Mario REALLY needs a pre-goal for constant specialisation. Maybe
-		// just load one in from file obtained by a human playing (and an agent
-		// watching)
 		ArrayList<String> rules = new ArrayList<String>();
 
 		rules.add("(distance goal ?Y) (flag goal) => (move goal ?Y)");

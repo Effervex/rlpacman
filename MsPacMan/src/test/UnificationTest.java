@@ -509,23 +509,24 @@ public class UnificationTest {
 		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 
-		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(clear ?X)"));
-		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
-		newState.clear();
-		newState.add(StateSpec.toStringFact("(clear ?_MOD_a)"));
-		newState.add(StateSpec.toStringFact("(clear b)"));
-		oldTerms = new String[2];
-		oldTerms[0] = "?X";
-		oldTerms[1] = "?Y";
-		newTerms = new String[2];
-		newTerms[0] = "?_MOD_a";
-		newTerms[1] = "b";
-		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
-		assertEquals(0, result);
-		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
+		// Modular unification
+//		oldState.clear();
+//		oldState.add(StateSpec.toStringFact("(clear ?X)"));
+//		oldState.add(StateSpec.toStringFact("(clear ?Y)"));
+//		newState.clear();
+//		newState.add(StateSpec.toStringFact("(clear ?_MOD_a)"));
+//		newState.add(StateSpec.toStringFact("(clear b)"));
+//		oldTerms = new String[2];
+//		oldTerms[0] = "?X";
+//		oldTerms[1] = "?Y";
+//		newTerms = new String[2];
+//		newTerms[0] = "?_MOD_a";
+//		newTerms[1] = "b";
+//		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+//		assertEquals(0, result);
+//		assertEquals(2, oldState.size());
+//		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?X)")));
+//		assertTrue(oldState.contains(StateSpec.toStringFact("(clear ?Y)")));
 	}
 
 	@Test

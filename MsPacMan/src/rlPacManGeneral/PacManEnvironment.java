@@ -23,13 +23,13 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManEnvironment implements EnvironmentInterface {
-	public static int playerDelay_ = 24;
+	public static int playerDelay_ = 0;
 	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
+	private int prevLives_;
 	private GameModel model_;
 	private DistanceGridCache distanceGridCache_;
 	private boolean experimentMode_ = false;
@@ -81,12 +81,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			experimentMode_ = true;
 		} else if (arg0.equals("testHandCoded"))
 			testHandCodedPolicy_ = true;
-		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
-			StateSpec.reinitInstance(arg0.substring(5));
-			// if (arg0.substring(4).contains("levelMax")
-			// || arg0.substring(4).contains("oneLevel"))
-			// model_.oneLife_ = true;
-		} else {
+		else {
 			try {
 				int delay = Integer.parseInt(arg0);
 				playerDelay_ = delay;
@@ -254,6 +249,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		rete_ = StateSpec.getInstance().getRete();
 
 		prevScore_ = 0;
+		prevLives_ = model_.m_nLives;
 
 		// Letting the thread 'sleep' when not experiment mode, so it's
 		// watchable for humans.
@@ -396,6 +392,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private double calculateReward() {
 		int scoreDiff = model_.m_player.m_score - prevScore_;
 		prevScore_ += scoreDiff;
+		// Including -10000 if suvival environment
+		if (StateSpec.getInstance().getGoalName().equals("survive")
+				&& model_.m_nLives < prevLives_)
+			scoreDiff -= (prevLives_ - model_.m_nLives) * 10000;
+		prevLives_ = model_.m_nLives;
 		return scoreDiff;
 	}
 
@@ -584,7 +585,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 			rete_.eval("(assert (score " + model_.m_player.m_score + "))");
 			rete_.eval("(assert (highScore " + model_.m_highScore + "))");
 
-			StateSpec.getInstance().generateAddGoal(new ArrayList<String>(), rete);
+			StateSpec.getInstance().generateAddGoal(new ArrayList<String>(),
+					rete);
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
@@ -624,9 +626,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			// Use Euclidean distance, rounding
 			int distance = (int) Math.round(Point2D.distance(thing.m_locX,
 					thing.m_locY, pacMan.m_locX, pacMan.m_locY));
-			rete_
-					.eval("(assert (distance " + thingName + " " + distance
-							+ "))");
+			rete_.eval("(assert (distance " + thingName + " " + distance + "))");
 		}
 	}
 

@@ -3,6 +3,8 @@ package relationalFramework;
 import java.util.HashMap;
 import java.util.Map;
 
+import relationalFramework.util.ProbabilityDistribution;
+
 /**
  * A class for containing all of the data gathered about the elite solutions,
  * such as counts, positions, etc.
@@ -89,24 +91,17 @@ public class ElitesData {
 	public ProbabilityDistribution<Slot> getObservedSlotDistribution() {
 		ProbabilityDistribution<Slot> observedDistribution = new ProbabilityDistribution<Slot>();
 		for (Slot slot : slotData_.keySet()) {
-			observedDistribution.add(slot, Math.pow(1 - slotData_.get(slot)
-					.getAverageOrdering(), 2));
+			observedDistribution.add(slot,
+					Math.pow(1 - slotData_.get(slot).getAverageOrdering(), 2));
 		}
 		observedDistribution.normaliseProbs();
 		return observedDistribution;
 	}
 
-	/**
-	 * Gets the slot positions.
-	 * 
-	 * @return A mapping of slots and their average relative positions.
-	 */
-	public Map<Slot, Double> getSlotPositions() {
-		Map<Slot, Double> slotPositions = new HashMap<Slot, Double>();
-		for (Slot slot : slotData_.keySet()) {
-			slotPositions.put(slot, slotData_.get(slot).getAverageOrdering());
-		}
-		return slotPositions;
+	public Double getSlotPosition(Slot slot) {
+		if (slotData_.containsKey(slot))
+			return slotData_.get(slot).getAverageOrdering();
+		return null;
 	}
 
 	/**

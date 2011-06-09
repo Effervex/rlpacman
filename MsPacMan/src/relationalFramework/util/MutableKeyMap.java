@@ -1,4 +1,4 @@
-package relationalFramework;
+package relationalFramework.util;
 
 import java.io.Serializable;
 import java.util.ArrayList;

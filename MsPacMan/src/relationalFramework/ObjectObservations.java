@@ -2,6 +2,8 @@ package relationalFramework;
 
 import org.apache.commons.collections.BidiMap;
 
+import relationalFramework.util.MultiMap;
+
 import jess.Rete;
 
 /**

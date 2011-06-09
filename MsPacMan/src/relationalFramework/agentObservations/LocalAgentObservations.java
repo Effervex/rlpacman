@@ -10,9 +10,9 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.TreeSet;
 
-import relationalFramework.MultiMap;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
+import relationalFramework.util.MultiMap;
 
 /**
  * A part of AgentObservations. The LocalAgentObservations contain observation
@@ -240,5 +240,9 @@ public class LocalAgentObservations implements Serializable {
 		}
 		System.out.println("No local agent observations to load.");
 		return new LocalAgentObservations(localGoal);
+	}
+
+	public static LocalAgentObservations newAgentObservations() {
+		return new LocalAgentObservations(StateSpec.getInstance().getGoalName());
 	}
 }
