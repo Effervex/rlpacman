@@ -10,6 +10,7 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
+import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
@@ -25,6 +26,7 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
+		PolicyGenerator.newInstance(0);
 		assertTrue("No onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations());
 	}
@@ -502,6 +504,17 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec.toStringFact("(floor floor)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(block a)")));
 		assertEquals(results.size(), 2);
+
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toStringFact("(clear ?X)"));
+		ruleConds.add(StateSpec.toStringFact("(clear ?Y)"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toStringFact("(not (above ?X ?Y))"), false, true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec.toStringFact("(clear ?X)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(clear ?Y)")));
+		assertTrue(results.contains(StateSpec.toStringFact("(not (above ?X ?Y))")));
+		assertEquals(results.size(), 3);
 	}
 
 	@Test

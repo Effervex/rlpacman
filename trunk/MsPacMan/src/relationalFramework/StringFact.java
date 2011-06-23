@@ -13,7 +13,7 @@ import java.util.Map;
  * @author Sam Sarjant
  */
 public class StringFact implements Comparable<StringFact>, Serializable {
-	private static final long serialVersionUID = 7493617342280103699L;
+	private static final long serialVersionUID = -2426239299662874771L;
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -192,8 +192,8 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i])
 					|| formNumericalReplacement)
-				replacementMap.put(arguments_[i], RuleCreation
-						.getVariableTermString(i));
+				replacementMap.put(arguments_[i],
+						RuleCreation.getVariableTermString(i));
 			else
 				replacementMap.put(arguments_[i], arguments_[i]);
 		}
@@ -247,6 +247,18 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		return true;
 	}
 
+	/**
+	 * Checks if this fact is fully NOT anonymous (has no anonymous terms).
+	 * 
+	 * @return True if the fact contains no anonymous terms.
+	 */
+	public boolean isFullyNotAnonymous() {
+		for (String argument : arguments_)
+			if (argument.equals(StateSpec.ANONYMOUS))
+				return false;
+		return true;
+	}
+
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
@@ -273,8 +285,9 @@ public class StringFact implements Comparable<StringFact>, Serializable {
 		buffer.append("(" + factName_);
 		for (int i = 0; i < arguments_.length; i++) {
 			String arg = arguments_[i];
-			if (PolicyGenerator.debugMode_ && replacements.containsKey(arg))
-				arg = "[" + replacements.get(arg) + "]";
+			if (replacements != null && replacements.containsKey(arg))
+				arg = replacements.get(arg);
+
 			buffer.append(" " + arg);
 		}
 		buffer.append(")");

@@ -41,6 +41,8 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public final class PolicyGenerator implements Serializable {
+	private static final long serialVersionUID = 8104672417350638719L;
+
 	/**
 	 * If the summed total update value is only at this percentage of the
 	 * update, the distribution is converged.
@@ -76,8 +78,6 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private static final double ORDER_CLASH_INCREMENT = 0.001;
 
-	private static final long serialVersionUID = -3840268992962159336L;
-
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
 
@@ -98,6 +98,9 @@ public final class PolicyGenerator implements Serializable {
 	 * episode length without changing action or state, resample policy.
 	 */
 	public static final double RESAMPLE_POLICY_BOUND = 0.1;
+
+	/** The name of a module-saved policy generator serialised file. */
+	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
 	/** The actions set the generator was initialised with. */
 	private Map<String, StringFact> actionSet_;
@@ -132,11 +135,14 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private transient double klDivergence_;
 
+	/** Gets the local goal this policy generator is working towards. */
+	private String localGoal_;
+
 	/** If this policy generator is being used for learning a module. */
-	private transient boolean moduleGenerator_;
+	private boolean moduleGenerator_;
 
 	/** The goal this generator is working towards if modular. */
-	private transient ArrayList<StringFact> moduleGoal_;
+	private GoalCondition moduleGoal_;
 
 	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
 	private MultiMap<Slot, GuidedRule> mutatedRules_;
@@ -469,6 +475,8 @@ public final class PolicyGenerator implements Serializable {
 		FileOutputStream fos = new FileOutputStream(serFile);
 		ObjectOutputStream oos = new ObjectOutputStream(fos);
 
+		Module.saveGenerator(this);
+
 		oos.writeObject(this);
 		oos.close();
 	}
@@ -510,7 +518,7 @@ public final class PolicyGenerator implements Serializable {
 					seedRule.removeMutation();
 
 					SortedSet<StringFact> slotConditions = seedRule
-							.getConditions(false);
+							.getConditions(true);
 					slotConditions.removeAll(rlggConditions);
 
 					Slot splitSlot = new Slot(rlggSlot.getAction(),
@@ -664,9 +672,9 @@ public final class PolicyGenerator implements Serializable {
 					GuidedRule gr = null;
 					if (influenceUntestedRules) {
 						gr = slot.sample(INFLUENCE_THRESHOLD, INFLUENCE_BOOST);
-						gr.incrementRuleUses();
 					} else
 						gr = slot.sample(false);
+					gr.incrementRuleUses();
 					policyOrdering.put(slotOrderVal, gr);
 				}
 			}
@@ -689,39 +697,20 @@ public final class PolicyGenerator implements Serializable {
 		return policy;
 	}
 
-	/**
-	 * Gets the predicates for every rule fact which is a constant fact and has
-	 * a settled pre-goal.
-	 * 
-	 * @return A collection of predicates, each of which is involved in a rule
-	 *         where the predicate has only constant terms.
-	 */
-	public SortedSet<ConstantPred> getConstantFacts() {
-		SortedSet<ConstantPred> constantFacts = new TreeSet<ConstantPred>();
-
-		// Run through each slot and rule for conditions that only use constant
-		// terms.
-		for (Slot slot : slotGenerator_) {
-			if (!slot.isFixed())
-				for (GuidedRule gr : slot.getGenerator()) {
-					ConstantPred constants = gr.getConstantConditions();
-					if (constants != null)
-						constantFacts.add(constants);
-				}
-		}
-		return constantFacts;
-	}
-
 	public Collection<Slot> getGenerator() {
 		return slotGenerator_;
 	}
 
-	public String getModuleName() {
-		return Module.formName(moduleGoal_);
+	public GoalCondition getModuleGoal() {
+		return moduleGoal_;
 	}
 
 	public Collection<GuidedRule> getRLGGRules() {
 		return rlggRules_.values();
+	}
+
+	public String getLocalGoal() {
+		return localGoal_;
 	}
 
 	/**
@@ -769,35 +758,8 @@ public final class PolicyGenerator implements Serializable {
 		// For each slot
 		for (Slot slot : slotGenerator_) {
 			if (!slot.isFixed()) {
-				// TODO No need to prune with KLsize
-				// Pruning unused rules from the slots
 				ProbabilityDistribution<GuidedRule> distribution = slot
 						.getGenerator();
-				// // Only prune if the distribution is bigger than 1
-				// if (distribution.size() > 1) {
-				// double pruneProb = (1.0 / distribution.size()) * pruneConst;
-				// Collection<GuidedRule> removables = new
-				// ArrayList<GuidedRule>();
-				// for (GuidedRule rule : distribution) {
-				// double ruleProb = distribution.getProb(rule);
-				// if (ruleProb <= pruneProb) {
-				// removables.add(rule);
-				// // Note the rule in the no-create list
-				// removedRules_.add(rule);
-				// currentRules_.remove(rule);
-				// }
-				// }
-				//
-				// // If rules are to be removed, remove them.
-				// if (!removables.isEmpty()) {
-				// for (GuidedRule rule : removables) {
-				// distribution.remove(rule);
-				// System.out.println("\tREMOVED RULE: " + rule);
-				// }
-				//
-				// distribution.normaliseProbs();
-				// }
-				// }
 
 				// Sample a rule from the slot and mutate it if it has seen
 				// sufficient states.
@@ -861,8 +823,15 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public void saveGenerators(BufferedWriter buf, String performanceFile)
 			throws Exception {
+		SortedSet<Slot> orderSlots = new TreeSet<Slot>(
+				SlotOrderComparator.getInstance());
+		orderSlots.addAll(slotGenerator_);
+		StringBuffer slotBuffer = new StringBuffer();
+		for (Slot s : orderSlots)
+			slotBuffer.append(s.toString() + "\n");
+
 		// For each of the rule generators
-		buf.write(slotGenerator_.toString() + "\n");
+		buf.write(slotBuffer.toString() + "\n");
 		buf.write("Total Update Size: " + klDivergence_ + "\n");
 		buf.write("Converged Value: " + convergedValue_);
 		// Serialise and save policy generator.
@@ -876,48 +845,9 @@ public final class PolicyGenerator implements Serializable {
 	 *            The stream to save the generators to.
 	 */
 	public void saveHumanGenerators(BufferedWriter buf) throws IOException {
-		// First check if the slots are frozen
-		boolean unfreeze = !frozen_;
-		if (unfreeze)
-			freeze(true);
-
 		buf.write("A typical policy:\n");
 
-		// Go through each slot, writing out those that fire
-		SortedSet<Slot> orderedElements = new TreeSet<Slot>(
-				SlotOrderComparator.getInstance());
-		orderedElements.addAll(slotGenerator_);
-		for (Slot slot : orderedElements) {
-			// Output each slot a number of times based on its selection
-			// probability.
-			double repetitions = Math.round(slot.getSelectionProbability());
-			StringBuffer slotOutput = null;
-			for (int i = 0; i < repetitions; i++) {
-				if (slotOutput == null) {
-					slotOutput = new StringBuffer();
-					if (slot.isFixed())
-						slotOutput.append(slot.getFixedRule().toNiceString());
-					else {
-						// Output every non-zero rule
-						boolean single = true;
-						for (GuidedRule rule : slot.getGenerator()
-								.getNonZeroOrderedElements()) {
-							if (!single)
-								slotOutput.append(" / ");
-							slotOutput.append(rule.toNiceString());
-							single = false;
-						}
-					}
-
-					slotOutput.append("\n");
-				}
-
-				buf.write(slotOutput.toString());
-			}
-		}
-
-		if (unfreeze)
-			freeze(false);
+		buf.write(generatePolicy(false).toString());
 	}
 
 	/**
@@ -1012,13 +942,11 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param sortedPolicies
 	 *            The sorted policy values.
-	 * @param numElite
-	 *            The number of elite samples to use.
 	 * @param stepSize
 	 *            The step size update parameter.
 	 */
 	public void updateDistributions(SortedSet<PolicyValue> sortedPolicies,
-			int numElite, double stepSize) {
+			double stepSize) {
 		// Keep count of the rules seen (and slots used)
 		ElitesData ed = countRules(sortedPolicies);
 
@@ -1061,16 +989,38 @@ public final class PolicyGenerator implements Serializable {
 	 * @return The instantiated Policy Generator of the file.
 	 */
 	public static PolicyGenerator loadPolicyGenerator(File serializedFile) {
+		ObjectInputStream ois = null;
 		try {
 			FileInputStream fis = new FileInputStream(serializedFile);
-			ObjectInputStream ois = new ObjectInputStream(fis);
+			ois = new ObjectInputStream(fis);
 			instance_ = (PolicyGenerator) ois.readObject();
+			AgentObservations.loadAgentObservations();
 			ois.close();
 			return instance_;
 		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		return null;
+	}
+
+	/**
+	 * Loads a serialised policy generator and sets it as a module generator.
+	 * 
+	 * @param modFile
+	 *            The serialised policy generator module file.
+	 * @param goalCondition
+	 *            The goal condition to set, if necessary.
+	 * @return The loaded policy generator, or null if it doesn't exist.
+	 */
+	public static PolicyGenerator loadPolicyGenerator(File modFile,
+			GoalCondition goalCondition) {
+		PolicyGenerator modPG = loadPolicyGenerator(modFile);
+		if (modPG != null) {
+			modPG.moduleGenerator_ = true;
+			goalCondition.normaliseArgs();
+			modPG.moduleGoal_ = goalCondition;
+		}
+		instance_ = modPG;
+		return instance_;
 	}
 
 	/**
@@ -1081,7 +1031,10 @@ public final class PolicyGenerator implements Serializable {
 	public static PolicyGenerator newInstance(int randSeed) {
 		random_ = new Random(randSeed);
 		instance_ = new PolicyGenerator();
+		instance_.localGoal_ = StateSpec.getInstance().getGoalName();
 		instance_.moduleGenerator_ = false;
+
+		AgentObservations.loadAgentObservations();
 		return instance_;
 	}
 
@@ -1091,42 +1044,21 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param policyGenerator
 	 *            The policy generator containing the old LGG rules.
-	 * @param internalGoal
+	 * @param goalCondition
 	 *            The modular goal being worked towards.
 	 * @return The new PolicyGenerator.
 	 */
 	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			ArrayList<StringFact> internalGoal) {
+			GoalCondition goalCondition) {
 		instance_ = new PolicyGenerator();
-		instance_.addCoveredRules(policyGenerator.rlggRules_);
-		// policyGenerator.ruleCreation_
-		// .migrateAgentObservations(instance_.ruleCreation_);
+
+		// Set up the new local goal.
+		instance_.localGoal_ = goalCondition.toString();
+		AgentObservations.loadAgentObservations();
 		instance_.moduleGenerator_ = true;
-		instance_.moduleGoal_ = internalGoal;
-		return instance_;
-	}
+		goalCondition.normaliseArgs();
+		instance_.moduleGoal_ = goalCondition;
 
-	/**
-	 * Initialises the instance as a new policy generator using fixed slots for
-	 * specified rules.
-	 * 
-	 * @param policyGenerator
-	 *            The policy generator containing the old LGG rules.
-	 * @param rules
-	 *            The rules to be optimised orderly.
-	 * @return The new PolicyGenerator
-	 */
-	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			Collection<GuidedRule> rules, List<String> newQueryParams,
-			ArrayList<StringFact> internalGoal) {
-		instance_ = newInstance(policyGenerator, internalGoal);
-
-		// Set the slot rules
-		for (GuidedRule rule : rules) {
-			rule.setQueryParams(newQueryParams);
-			Slot slot = new Slot(rule);
-			instance_.slotGenerator_.add(slot);
-		}
 		return instance_;
 	}
 

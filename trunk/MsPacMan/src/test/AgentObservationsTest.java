@@ -16,6 +16,7 @@ import org.junit.Test;
 
 import blocksWorld.BlocksWorldStateSpec;
 
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.agentObservations.AgentObservations;
@@ -30,6 +31,7 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		PolicyGenerator.newInstance(0);
 		sut_ = AgentObservations.getInstance();
 	}
 
@@ -1026,6 +1028,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
+		sut_ = AgentObservations.newInstance();
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");

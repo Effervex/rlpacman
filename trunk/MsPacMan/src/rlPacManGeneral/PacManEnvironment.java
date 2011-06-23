@@ -585,8 +585,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 			rete_.eval("(assert (score " + model_.m_player.m_score + "))");
 			rete_.eval("(assert (highScore " + model_.m_highScore + "))");
 
-			StateSpec.getInstance().generateAddGoal(new ArrayList<String>(),
+			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(),
 					rete);
+			rete_.run();
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec

@@ -35,13 +35,4 @@ public class ModuleTest {
 		result = Module.loadModule("blocksWorld", "magicWin");
 		assertNull(result);
 	}
-
-	@Test
-	public void testShiftModularVariables() {
-		Module result = Module.loadModule("blocksWorld", "clear");
-		assertNotNull(result);
-		for (GuidedRule modRule : result.getModuleRules()) {
-			modRule.shiftModularVariables(1);
-		}
-	}
 }

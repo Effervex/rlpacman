@@ -10,6 +10,7 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
+import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
@@ -23,6 +24,7 @@ public class PacManRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacMan.PacMan");
 		sut_ = new RuleCreation();
+		PolicyGenerator.newInstance(0);
 	}
 
 	// @Test

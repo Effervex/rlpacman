@@ -235,9 +235,9 @@ public class Unification {
 	 * @param removeUnifiedFact
 	 *            If the unityFact this fact unifies with should be removed from
 	 *            the unityFacts.
-	 * @param onlyModifyNumerical
-	 *            If the unification process only modifies numerical values (so
-	 *            is essentially a contains method).
+	 * @param noGeneralisations
+	 *            If the unification process doesn't allow generalisation - only
+	 *            term swap or range split.
 	 * @return The unified version of the fact (possibly more general than the
 	 *         input fact) or null if no unification.
 	 */
@@ -246,7 +246,7 @@ public class Unification {
 			Collection<StringFact> unityFacts, BidiMap factReplacementMap,
 			BidiMap unityReplacementMap, String[] factTerms,
 			boolean flexibleReplacement, boolean removeUnifiedFact,
-			boolean onlyModifyNumerical) {
+			boolean noGeneralisations) {
 		StringFact result = null;
 		StringFact unityResult = null;
 		BidiMap resultReplacements = null;
@@ -254,7 +254,8 @@ public class Unification {
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
 		int generalisation = Integer.MAX_VALUE;
-		// Check against each item in the unity state.
+
+		// Check every fact in the unity facts.
 		for (StringFact unityFact : unityFacts) {
 			// Check it if the same fact
 			boolean sameFact = fact.getFactName().equals(
@@ -263,6 +264,12 @@ public class Unification {
 
 			// If dealing with the same fact
 			if (sameFact) {
+				// If dealing with negated facts, ensure both are the same, but
+				// do not allow generalisations. (!abv(X,Y) != !abv(X,?)
+				if (fact.isNegated()) {
+					noGeneralisations = true;
+				}
+
 				String[] factArguments = fact.getArguments();
 				String[] unityArguments = unityFact.getArguments();
 				String[] unification = new String[factArguments.length];
@@ -279,43 +286,75 @@ public class Unification {
 					String unityTerm = findUnityReplacement(
 							unityReplacementMap, unityArguments[i],
 							flexibleReplacement, tempUnityReplacementMap,
-							factTerm);
-					// Check generality incrementation
-					if (unityTerm != null
-							&& !unityTerm.equals(StateSpec.ANONYMOUS)
-							&& unityArguments[i].equals(StateSpec.ANONYMOUS))
-						thisGeneralness++;
+							factTerm, noGeneralisations);
 
-					// If either are anonymous, the unification must be
-					// anonymous
+					// If the unity term was ununifiable, the fact is
+					// ununifiable
+					if (unityTerm == null) {
+						validFact = false;
+						break;
+					}
+
+					// If the fact and unity term are the same, great! So far,
+					// so good
 					if (factTerm.equals(unityTerm)) {
-						// If the two are the same term (not anonymous) and
-						// their replacements match up, use that
 						unification[i] = factTerm;
-						validFact = true;
-					} else if (factTerm.equals(StateSpec.ANONYMOUS)
-							|| ((unityTerm != null) && (unityTerm
-									.equals(StateSpec.ANONYMOUS)))) {
-						unification[i] = StateSpec.ANONYMOUS;
-						thisGeneralness++;
-						if (onlyModifyNumerical) {
+						validFact |= !factTerm.equals(StateSpec.ANONYMOUS);
+					} else if (!numericalValueCheck(factArguments[i],
+							unityArguments[i], unification, i, factTerms)) {
+						// Not a number, we have differing terms here. Use
+						// anonymous
+						if (noGeneralisations) {
+							// If anonymous generalisation is not allowed, break
 							validFact = false;
 							break;
 						}
-					} else if (!numericalValueCheck(factArguments[i],
-							unityArguments[i], unification, i, factTerms)) {
-						// Failing that simply use an anonymous variable (if not
-						// negated)
-						if (!fact.isNegated()) {
-							unification[i] = StateSpec.ANONYMOUS;
-							thisGeneralness++;
-							if (onlyModifyNumerical) {
-								validFact = false;
-								break;
-							}
-						} else
-							return null;
+						unification[i] = StateSpec.ANONYMOUS;
+						thisGeneralness++;
 					}
+
+					// // Check generality incrementation
+					// if (unityTerm != null
+					// && !unityTerm.equals(StateSpec.ANONYMOUS)
+					// && unityArguments[i].equals(StateSpec.ANONYMOUS)) {
+					// thisGeneralness++;
+					// if (noGeneralisations) {
+					// validFact = false;
+					// break;
+					// }
+					// }
+					//
+					// // If either are anonymous, the unification must be
+					// // anonymous
+					// if (factTerm.equals(unityTerm)) {
+					// // If the two are the same term (not anonymous) and
+					// // their replacements match up, use that
+					// unification[i] = factTerm;
+					// validFact = true;
+					// } else if (factTerm.equals(StateSpec.ANONYMOUS)
+					// && unityTerm != null
+					// || ((unityTerm != null) && (unityTerm
+					// .equals(StateSpec.ANONYMOUS)))) {
+					// unification[i] = StateSpec.ANONYMOUS;
+					// // thisGeneralness++;
+					// // if (noGeneralisations) {
+					// // validFact = false;
+					// // break;
+					// // }
+					// } else if (!numericalValueCheck(factArguments[i],
+					// unityArguments[i], unification, i, factTerms)) {
+					// // Failing that simply use an anonymous variable (if not
+					// // negated)
+					// if (!fact.isNegated()) {
+					// unification[i] = StateSpec.ANONYMOUS;
+					// thisGeneralness++;
+					// if (noGeneralisations) {
+					// validFact = false;
+					// break;
+					// }
+					// } else
+					// return null;
+					// }
 				}
 
 				// Store if:
@@ -375,27 +414,39 @@ public class Unification {
 	 *            replacement is created.
 	 * @param factTerm
 	 *            The term the fact is using.
+	 * @param noGeneralisations
+	 *            If generalisations (using the anonymous variable) are not
+	 *            allowed.
 	 * @return The replacement term, or the same term if no replacement
 	 *         used/created.
 	 */
 	private String findUnityReplacement(BidiMap unityReplacementMap,
 			String unityTerm, boolean flexibleReplacement,
-			BidiMap tempUnityReplacementMap, String factTerm) {
+			BidiMap tempUnityReplacementMap, String factTerm,
+			boolean noGeneralisations) {
+		// CHECK THE REPLACEMENT MAPS FIRST
 		// If the temp already has a replacement, then replace.
 		if (tempUnityReplacementMap.containsKey(unityTerm))
 			return (String) tempUnityReplacementMap.get(unityTerm);
 		// If the unity map already has a replacement, then replace
 		if (unityReplacementMap.containsKey(unityTerm))
 			return (String) unityReplacementMap.get(unityTerm);
+
 		// If we're allowing flexible replacements, create a replacement and use
 		// the replacement
 		if (flexibleReplacement) {
 			// If the fact term hasn't already been mapped to another unity term
 			if (!unityReplacementMap.containsValue(factTerm)
 					&& !tempUnityReplacementMap.containsValue(factTerm)) {
-				if (!factTerm.equals(StateSpec.ANONYMOUS))
+				// If the fact isn't anonymous, assign it as the replacement
+				if (!factTerm.equals(StateSpec.ANONYMOUS)
+						&& !unityTerm.equals(StateSpec.ANONYMOUS)) {
 					tempUnityReplacementMap.put(unityTerm, factTerm);
-				return factTerm;
+					return factTerm;
+				}
+				// If fact term is anonymous, it doesn't matter what the unity
+				// term is.
+				return unityTerm;
 			}
 			return null;
 		}

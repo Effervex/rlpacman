@@ -659,7 +659,61 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec.toStringFact("(on ?X ?)")));
+		
+		// Negated generalised unification (ILLEGAL)
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(not (above ?X ?))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(not (above ?X ?Y))"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(-1, result);
+		
+		// Mirrored case
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(not (above ?X ?Y))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(not (above ?X ?))"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(-1, result);
+		
+		// Same negation is fine
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(not (above ?X ?))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(not (above ?X ?))"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(0, result);
+		
+		// Same negation term-swapped
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(not (above ?X ?))"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(not (above ?Y ?))"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(0, result);
+		
+		// Un-negated case is fine
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(above ?X ?)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(above ?X ?Y)"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(0, result);
+		
+		oldState.clear();
+		oldState.add(StateSpec.toStringFact("(above ?X ?Y)"));
+		newState.clear();
+		newState.add(StateSpec.toStringFact("(above ?X ?)"));
+		replacementMap.clear();
+		result = sut_.unifyStates(oldState, newState, replacementMap);
+		assertEquals(1, result);
+		assertTrue(oldState.contains(StateSpec.toStringFact("(above ?X ?)")));
 	}
 
 }

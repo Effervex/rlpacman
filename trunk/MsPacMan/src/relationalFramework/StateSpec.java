@@ -31,901 +31,79 @@ import jess.ValueVector;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
-	/** The goal variable prefix. */
-	public static final String GOAL_VARIABLE_PREFIX = "?G_";
+	/**
+	 * A basic class which holds parent-child data for a given type predicate.
+	 * 
+	 * @author Sam Sarjant
+	 */
+	private class ParentChildren {
+		private Collection<String> children_;
+		private String parent_;
 
-	/** The infers symbol. */
-	public static final String INFERS_ACTION = "=>";
+		public void addChild(String child) {
+			if (children_ == null)
+				children_ = new HashSet<String>();
+			children_.add(child);
+		}
 
-	/** The equivalent symbol. */
-	public static final String EQUIVALENT_RULE = "<=>";
+		public Collection<String> getChildren() {
+			return children_;
+		}
 
-	/** The anonymous variable symbol. */
-	public static final String ANONYMOUS = "?";
+		public String getParent() {
+			return parent_;
+		}
+
+		public void setParent(String parent) {
+			parent_ = parent;
+		}
+	}
 
 	/** The suffix for an action precondition. */
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
-	/** The valid actions predicate name. */
-	public static final String VALID_ACTIONS = "validActions";
+	/** The replacement value for unnecessary facts. */
+	private static final String ACTION_TERM_REPL = "__TYPE__";
 
-	/** The goal query name */
-	public static final String GOAL_QUERY = "isGoal";
-
-	/** The query name for finding all non-achieved goals (possible goals). */
-	public static final String NON_GOALS = "nonGoal";
-
-	/** The goal predicate. */
-	public static final String GOALARGS_PRED = "goalArgs";
-
-	/** The policy rule prefix. */
-	public static final String POLICY_QUERY_PREFIX = "polRule";
+	/** The anonymous variable symbol. */
+	public static final String ANONYMOUS = "?";
 
 	/** The between a range of values function name. */
 	public static final String BETWEEN_RANGE = "betweenRange";
 
+	/** The equivalent symbol. */
+	public static final String EQUIVALENT_RULE = "<=>";
+
+	/** The goal query name */
+	public static final String GOAL_QUERY = "isGoal";
+
+	/** The goal variable prefix. */
+	public static final String GOAL_VARIABLE_PREFIX = "?G_";
+
+	/** The goal predicate. */
+	public static final String GOALARGS_PRED = "goalArgs";
+
+	/** The infers symbol. */
+	public static final String INFERS_ACTION = "=>";
+
+	/** The singleton instance. */
+	private static StateSpec instance_;
+
+	/** The query name for finding all non-achieved goals (possible goals). */
+	public static final String NON_GOALS = "nonGoal";
+
 	/** The outside a range of values function name. */
 	public static final String OUTSIDE_RANGE = "outsideRange";
 
-	/** The replacement value for unnecessary facts. */
-	private static final String ACTION_TERM_REPL = "__TYPE__";
+	/** The policy rule prefix. */
+	public static final String POLICY_QUERY_PREFIX = "polRule";
 
 	/** The StringFact definition for the test predicate. */
 	public static final StringFact TEST_DEFINITION = new StringFact("test",
 			new String[] { "testArgs" });
 
-	/** The singleton instance. */
-	private static StateSpec instance_;
-
-	/** The environment package name. */
-	private String environment_;
-
-	/** The prerequisites of the rules and their structure. */
-	private Map<String, StringFact> predicates_;
-
-	/** The type predicates, only used implicitly. */
-	private Map<String, StringFact> typePredicates_;
-
-	/** The type hierarchy. */
-	private Map<String, ParentChildren> typeHierarchy_;
-
-	/** The actions of the rules and their structure. */
-	private Map<String, StringFact> actions_;
-
-	/** The background rules and illegalities of the state. */
-	private Map<String, BackgroundKnowledge> backgroundRules_;
-
-	/** The number of simultaneous actions per step to take. */
-	private int actionNum_;
-
-	/** The terms present in an action's precondition. */
-	private MultiMap<String, String> actionPreconditions_;
-
-	/** The name of the goal. */
-	private String goalName_;
-
-	/** The state the agent must reach to successfully end the episode. */
-	private String goalState_;
-
-	/**
-	 * The goal StringFact definition (goalArgs on a b...). Is simply a
-	 * StringFact definition created with arguments equalling the number of goal
-	 * arguments.
-	 */
-	private StringFact goalStringFactDef_;
-
-	/** The constants found within the goal. */
-	private List<String> constants_;
-
-	/** If the goal can have parameterisable args. */
-	private boolean parameterisableGoal_;
-
-	/** The parameter of the environment. */
-	protected String envParameter_;
-
-	/** The hand coded policy for the goal. */
-	private Policy handCodedPolicy_;
-
-	/** The LogicFactory for the experiment. */
-	private Rete rete_;
-
-	/** A RegExp for filtering out unnecessary facts from a rule. */
-	private String unnecessaries_;
-
-	/** The mapping for rules to queries in the Rete object. */
-	private Map<Object, String> queryNames_;
-
-	/** The count value for the query names. */
-	private int queryCount_;
-
-	/** The goal arguments. */
-	private List<String> goalArgs_;
-
-	/**
-	 * Forms the list of variable action terms the action expects to be in the
-	 * precondition rule.
-	 * 
-	 * @param action
-	 *            The StringFact definition for the action.
-	 * @return A list of variable terms, from ?X onwards.
-	 */
-	private List<String> formActionTerms(StringFact action) {
-		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
-		for (int i = 0; i < action.getArgTypes().length; i++)
-			terms.add(RuleCreation.getVariableTermString(i).substring(1));
-		return terms;
-	}
-
-	/**
-	 * Extracts the constants from the goal (also includes goal variables).
-	 * 
-	 * @param goalState
-	 *            The goal state to parse.
-	 */
-	private List<String> extractConstants(String goalState) {
-		List<String> constants = new ArrayList<String>();
-		parameterisableGoal_ = false;
-
-		// Find each term used in the goal
-		Pattern p = Pattern.compile(" ([?\\w].*?)(?=\\)| |&)");
-		Matcher m = p.matcher(goalState);
-		while (m.find()) {
-			String term = m.group(1);
-			if (!constants.contains(term)) {
-				// If the fact is a constant (not a number)
-				if (term.charAt(0) != '?' && !isNumber(term))
-					constants.add(term);
-				// If the fact is a parameterisable goal constant
-				if (term.contains(GOAL_VARIABLE_PREFIX)) {
-					parameterisableGoal_ = true;
-					constants.add(term);
-				}
-			}
-		}
-
-		return constants;
-	}
-
-	/**
-	 * Forms the unnecessaries regexp replacement string to only replace
-	 * unnecessary type facts that are present in the action.
-	 * 
-	 * @param terms
-	 *            The action terms of the rule.
-	 * @return A regexp modified to match the rule.
-	 */
-	private String formRuleSpecificRegexp(String[] terms) {
-		StringBuffer actionRepl = new StringBuffer("(");
-		boolean first = true;
-		for (String term : terms) {
-			if (!first)
-				actionRepl.append("|");
-			actionRepl.append("(" + Pattern.quote(term) + ")");
-			first = false;
-		}
-		actionRepl.append(")");
-		return unnecessaries_.replace(ACTION_TERM_REPL, actionRepl.toString());
-	}
-
-	/**
-	 * Forms the unnecessary facts regexp string.
-	 * 
-	 * @param types
-	 *            The types that need not be in rules.
-	 * @return The regexp string.
-	 */
-	private String formUnnecessaryString(Collection<String> types) {
-		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
-		for (String type : types)
-			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
-		buffer.append(")( |$)");
-		return buffer.toString();
-	}
-
-	/**
-	 * The constructor for a state specification.
-	 */
-	private final void initialise() {
-		try {
-			rete_ = new Rete();
-
-			environment_ = this.getClass().getPackage().getName();
-
-			// Type predicates and their hierarchy background rules.
-			typePredicates_ = new HashMap<String, StringFact>();
-			Map<String, String> typeAssertions = new HashMap<String, String>();
-			Map<String, String> typeParents = initialiseTypePredicateTemplates();
-			typeHierarchy_ = new HashMap<String, ParentChildren>();
-			for (String type : typeParents.keySet()) {
-				typePredicates_.put(type, new StringFact(type,
-						new String[] { type }));
-				defineTemplate(type, rete_);
-
-				// Define background knowledge rule
-				if (typeParents.get(type) != null) {
-					String assertion = "(" + type + " ?X) " + INFERS_ACTION
-							+ " (assert (" + typeParents.get(type) + " ?X))";
-					typeAssertions.put(type + "ParentRule", assertion);
-
-					// Record the parent children relationship
-					ParentChildren thisPC = (typeHierarchy_.containsKey(type)) ? typeHierarchy_
-							.get(type)
-							: new ParentChildren();
-					String parentType = typeParents.get(type);
-					thisPC.setParent(parentType);
-					typeHierarchy_.put(type, thisPC);
-
-					ParentChildren parentPC = (typeHierarchy_
-							.containsKey(parentType)) ? typeHierarchy_
-							.get(parentType) : new ParentChildren();
-					parentPC.addChild(type);
-					typeHierarchy_.put(parentType, parentPC);
-				}
-			}
-			unnecessaries_ = formUnnecessaryString(typePredicates_.keySet());
-
-			// Main predicates
-			predicates_ = new HashMap<String, StringFact>();
-			for (StringFact pred : initialisePredicateTemplates()) {
-				predicates_.put(pred.getFactName(), pred);
-				defineTemplate(pred.getFactName(), rete_);
-			}
-
-			// Set up the valid actions template
-			StringBuffer actBuf = new StringBuffer("(deftemplate "
-					+ VALID_ACTIONS);
-			// Actions
-			actions_ = new HashMap<String, StringFact>();
-			for (StringFact action : initialiseActionTemplates()) {
-				actions_.put(action.getFactName(), action);
-				defineTemplate(action.getFactName(), rete_);
-				actBuf.append(" (multislot " + action.getFactName() + ")");
-			}
-			actBuf.append(")");
-			rete_.eval(actBuf.toString());
-			actionNum_ = initialiseActionsPerStep();
-
-			// Initialise the background knowledge rules
-
-			// Type hierarchy rules
-			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
-			for (String name : typeAssertions.keySet())
-				backgroundRules_.put(name, new BackgroundKnowledge(
-						typeAssertions.get(name), true));
-
-			// State Spec rules
-			backgroundRules_.putAll(initialiseBackgroundKnowledge());
-			for (String ruleNames : backgroundRules_.keySet()) {
-				if (backgroundRules_.get(ruleNames).assertInJess())
-					rete_.eval("(defrule " + ruleNames + " "
-							+ backgroundRules_.get(ruleNames) + ")");
-			}
-
-			// Initialise the betweenRange and outsideRange functions
-			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
-					+ "(if (and (>= ?val ?low) (<= ?val ?high)) then "
-					+ "return TRUE))");
-			rete_.eval("(deffunction " + OUTSIDE_RANGE + " (?val ?low ?high) "
-					+ "(if (or (< ?val ?low) (> ?val ?high)) then "
-					+ "return TRUE))");
-
-			// Initialise the goal state rules
-			String[] goal = initialiseGoalState();
-			goalName_ = goal[0];
-			goalState_ = goal[1];
-			goalArgs_ = null;
-			constants_ = extractConstants(goalState_);
-			String[] factTypes = new String[constants_.size() + 1];
-			factTypes[0] = "goalPred";
-			for (int i = 1; i < factTypes.length; i++)
-				factTypes[i] = "arg" + (i - 1);
-			goalStringFactDef_ = new StringFact(GOALARGS_PRED, factTypes);
-			rete_.eval("(deftemplate goal (slot goalMet))");
-			String goalPred = formGoalPred(constants_);
-			String goalRule = "(defrule goalState " + goalPred + " "
-					+ goalState_ + " => (assert (goal (goalMet TRUE))))";
-			rete_.eval(goalRule);
-			// Initialise the goal checking query
-			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
-			// Only need a non-goal if the goal is parameterisable
-			if (!constants_.isEmpty())
-				rete_.eval("(defquery " + NON_GOALS + " "
-						+ formNonGoal(goalState_) + ")");
-
-			// Initialise the queries for determining action preconditions
-			Map<String, String> purePreConds = initialiseActionPreconditions();
-			actionPreconditions_ = MultiMap.createListMultiMap();
-			for (String action : purePreConds.keySet()) {
-				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
-						+ " " + purePreConds.get(action) + ")";
-				rete_.eval(query);
-				actionPreconditions_.putCollection(action,
-						formActionTerms(actions_.get(action)));
-			}
-
-			// Initialise the optimal policy
-			handCodedPolicy_ = initialiseOptimalPolicy();
-
-			queryNames_ = new HashMap<Object, String>();
-			queryCount_ = 0;
-
-			Unification.getInstance().resetRangeIndex();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Forms the non-goals by negating the non-type conditions required for the
-	 * goal to be met.
-	 * 
-	 * @param goalState
-	 *            The goal state.
-	 * @return A negated goal state (except for the type preds).
-	 */
-	private String formNonGoal(String goalState) throws Exception {
-		GuidedRule nonGoalRule = new GuidedRule(goalState_);
-		SortedSet<StringFact> conds = nonGoalRule.getConditions(false);
-
-		// Split the conds up into 2 sets: types and normal
-		Collection<StringFact> types = new TreeSet<StringFact>(conds
-				.comparator());
-		Collection<StringFact> normal = new TreeSet<StringFact>(conds
-				.comparator());
-		Collection<StringFact> inequalities = new TreeSet<StringFact>(conds
-				.comparator());
-		for (StringFact cond : conds) {
-			if (isTypePredicate(cond.getFactName()))
-				types.add(cond);
-			else if (cond.getFactName().equals("test"))
-				inequalities.add(cond);
-			else
-				normal.add(cond);
-		}
-		// If there are no normal conds, negate the types instead (otherwise
-		// there would be an infinite number of goals)
-		if (normal.isEmpty()) {
-			throw new Exception("Goal is only type conditions! Cannot negate.");
-		}
-
-		// Build the string
-		StringBuffer nonGoalStr = new StringBuffer();
-		// Types first
-		for (StringFact type : types)
-			nonGoalStr.append(type + " ");
-		// Then Inequalities
-		for (StringFact ineq : inequalities)
-			nonGoalStr.append(ineq + " ");
-		// Then normals
-		nonGoalStr.append("(not");
-		if (normal.size() > 1)
-			nonGoalStr.append(" (and");
-		for (StringFact norm : normal)
-			nonGoalStr.append(" " + norm);
-		nonGoalStr.append(")");
-		if (normal.size() > 1)
-			nonGoalStr.append(")");
-
-		return nonGoalStr.toString();
-	}
-
-	/**
-	 * Forms the goal predicate to link into the definite goal.
-	 * 
-	 * @param constants
-	 *            The goal constants.
-	 * @return The goal predicate to inject the variables.
-	 */
-	private String formGoalPred(Collection<String> constants) {
-		StringBuffer buffer = new StringBuffer("(" + GOALARGS_PRED + " "
-				+ goalName_);
-		for (String constant : constants)
-			buffer.append(" " + constant);
-		buffer.append(")");
-		return buffer.toString();
-	}
-
-	/**
-	 * Initialises the rules for finding valid actions.
-	 * 
-	 * @return A map of actions and the pure preconditions to be valid.
-	 */
-	protected abstract Map<String, String> initialiseActionPreconditions();
-
-	/**
-	 * Initialises the number of actions to take per time step.
-	 * 
-	 * @return The number of actions to take per step.
-	 */
-	protected abstract int initialiseActionsPerStep();
-
-	/**
-	 * Initialises the state actions.
-	 * 
-	 * @return The list of guided actions.
-	 */
-	protected abstract Collection<StringFact> initialiseActionTemplates();
-
-	/**
-	 * Initialises the background knowledge.
-	 * 
-	 * @return A mapping of rule names to the pure rules themselves (just pre =>
-	 *         post).
-	 */
-	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
-
-	/**
-	 * Initialises the goal state.
-	 * 
-	 * @return The name of the goal and the minimal state that is true when the
-	 *         goal is satisfied.
-	 */
-	protected abstract String[] initialiseGoalState();
-
-	/**
-	 * Initialises the optimal policy for the goal.
-	 * 
-	 * @param factory
-	 *            The factory for creating rules.
-	 * 
-	 * @return The policy that solves the goal in optimal time.
-	 */
-	protected abstract Policy initialiseOptimalPolicy();
-
-	/**
-	 * Initialises the state predicates.
-	 * 
-	 * @return The list of guided predicate names.
-	 */
-	protected abstract Collection<StringFact> initialisePredicateTemplates();
-
-	/**
-	 * Initialises the state type predicates.
-	 * 
-	 * @param rete
-	 *            The rete object.
-	 * @return A map of types, where the possibly null value corresponds to the
-	 *         keys parent in the type hierarchy.
-	 */
-	protected abstract Map<String, String> initialiseTypePredicateTemplates();
-
-	/**
-	 * Creates the necessary type conditions for a rule.
-	 * 
-	 * @param fact
-	 *            The fact.
-	 * @return The type cocditions.
-	 */
-	public Collection<StringFact> createTypeConds(StringFact fact) {
-		Collection<StringFact> typeConds = new HashSet<StringFact>();
-		// If the term itself is a type pred, return.
-		if (isTypePredicate(fact.getFactName())) {
-			return typeConds;
-		}
-
-		String[] types = fact.getArgTypes();
-		for (int i = 0; i < types.length; i++) {
-			if (!fact.getArguments()[i].equals("?")) {
-				StringFact typeFact = typePredicates_.get(types[i]);
-				if (typeFact != null) {
-					typeConds.add(new StringFact(typeFact, new String[] { fact
-							.getArguments()[i] }));
-				}
-			}
-		}
-		return typeConds;
-	}
-
-	/**
-	 * Creates a template for a fact using the given arguments and asserts it to
-	 * the rete object. Returns the name of the fact template.
-	 * 
-	 * @param factName
-	 *            The name of the fact template.
-	 * @param rete
-	 *            The rete object being asserted to.
-	 * @return The name of the fact template.
-	 */
-	public String defineTemplate(String factName, Rete rete) {
-		try {
-			rete
-					.eval("(deftemplate " + factName
-							+ " (declare (ordered TRUE)))");
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return factName;
-	}
-
-	/**
-	 * Creates a string representation of a rule, in a light, easy-to-read, and
-	 * parsable format.
-	 * 
-	 * @param rule
-	 *            The rule begin output.
-	 * @return A light, parsable representation of the rule.
-	 */
-	public final String encodeRule(GuidedRule rule) {
-		String ruleSpecificUnnecessaries = formRuleSpecificRegexp(rule
-				.getActionTerms());
-		String replacement = rule.toString().replaceAll(
-				ruleSpecificUnnecessaries, "");
-		if (replacement.split(INFERS_ACTION)[0].isEmpty())
-			return rule.toString();
-
-		// If there are parameters, swap them in
-		List<String> parameters = rule.getParameters();
-		if (parameters != null) {
-			List<String> queryParameters = rule.getQueryParameters();
-			for (int i = 0; i < parameters.size(); i++) {
-				String temp = " " + Pattern.quote(queryParameters.get(i))
-						+ "(?=( |\\)))";
-				replacement = replacement.replaceAll(temp, " "
-						+ parameters.get(i));
-			}
-		}
-		return replacement;
-	}
-
-	/**
-	 * Generates a new, or adds an existing goal to the state.
-	 * 
-	 * @param goalArgs
-	 *            The goal args to add, or if null, generate new ones.
-	 * @param state
-	 *            The state to add to.
-	 * @return The new goal args (may be an empty list if no args required).
-	 */
-	public List<String> generateAddGoal(List<String> goalArgs, Rete state)
-			throws Exception {
-		// If the args are null, find some new ones in the state
-		if (goalArgs == null) {
-			// If there are no variable goal constants, simply use constants
-			goalArgs = new ArrayList<String>();
-			if (parameterisableGoal_) {
-				QueryResult result = state.runQueryStar(NON_GOALS,
-						new ValueVector());
-				List<List<String>> possibleGoals = new ArrayList<List<String>>();
-				while (result.next()) {
-					List<String> possibleGoal = new ArrayList<String>();
-					for (String constant : constants_) {
-						if (constant.charAt(0) == '?')
-							possibleGoal.add(result.getSymbol(constant
-									.substring(1)));
-						else
-							possibleGoal.add(constant);
-					}
-					possibleGoals.add(possibleGoal);
-				}
-				goalArgs = possibleGoals.get(PolicyGenerator.random_
-						.nextInt(possibleGoals.size()));
-			} else
-				goalArgs = new ArrayList<String>(constants_);
-		}
-
-		// Add the goalArgs predicate to the state
-		goalArgs_ = goalArgs;
-		rete_.assertString("(" + GOALARGS_PRED + " " + formGoalString() + ")");
-		rete_.run();
-
-		// Setting the ObjectObservations
-		BidiMap goalReplacements = new DualHashBidiMap();
-		int i = 0;
-		for (String goalTerm : goalArgs) {
-			if (!goalReplacements.containsKey(goalTerm))
-				goalReplacements.put(goalTerm, StateSpec.createGoalTerm(i));
-			i++;
-		}
-		ObjectObservations.getInstance().goalReplacements = goalReplacements;
-
-		return goalArgs;
-	}
-
-	/**
-	 * Forms a goal string from the current goal and arguments.
-	 * 
-	 * @return A string detailing the current goal.
-	 */
-	public String formGoalString() {
-		StringBuffer goalStr = new StringBuffer(goalName_);
-		for (String arg : goalArgs_)
-			goalStr.append(" " + arg);
-		return goalStr.toString();
-	}
-
-	/**
-	 * Generates the valid actions for the state into the state for the agent to
-	 * use. Actions are given in string format of just the arguments.
-	 * 
-	 * @param state
-	 *            The state from which the actions are generated.
-	 * @return A multimap with each valid action predicate as the key and the
-	 *         values as the arguments.
-	 */
-	public final MultiMap<String, String[]> generateValidActions(Rete state) {
-		MultiMap<String, String[]> validActions = MultiMap
-				.createSortedSetMultiMap(ArgumentComparator.getInstance());
-
-		for (String action : actions_.keySet()) {
-			try {
-				QueryResult result = state.runQueryStar(action
-						+ ACTION_PRECOND_SUFFIX, new ValueVector());
-				while (result.next()) {
-					List<String> actionTerms = actionPreconditions_
-							.getList(action);
-					String[] arguments = new String[actionTerms.size()];
-					for (int i = 0; i < arguments.length; i++) {
-						arguments[i] = result.getSymbol(actionTerms.get(i));
-					}
-					validActions.put(action, arguments);
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return validActions;
-	}
-
-	public Map<String, StringFact> getActions() {
-		return actions_;
-	}
-
-	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
-		return backgroundRules_.values();
-	}
-
-	public Collection<String> getConstants() {
-		return constants_;
-	}
-
-	public String getEnvironmentName() {
-		return environment_;
-	}
-
-	public String getGoalState() {
-		return goalState_;
-	}
-
-	public String getGoalName() {
-		return goalName_;
-	}
-
-	/**
-	 * Gets the optimal policy for the problem. Or at least gets a good policy.
-	 * 
-	 * @return The policy that is optimal.
-	 */
-	public Policy getHandCodedPolicy() {
-		return handCodedPolicy_;
-	}
-
-	public int getNumReturnedActions() {
-		return actionNum_;
-	}
-
-	/**
-	 * Gets the parent, child, and itself types of this given type, so unless
-	 * this type is alone, the returned collection will be greater than size 1.
-	 * 
-	 * @param type
-	 *            The type to get the lineage for, from parent to child (not
-	 *            necessarily in order).
-	 * @param lineage
-	 *            A to-be-filled collection of all types that are in the type
-	 *            lineage, be they parent, grandparent or child, grandchild,
-	 *            etc.
-	 */
-	public void getTypeLineage(String type, Collection<String> lineage) {
-		// Add itself
-		lineage.add(type);
-
-		ParentChildren typePC = typeHierarchy_.get(type);
-		if (typePC != null) {
-			// Add children
-			recurseChildrenTypes(typePC, lineage);
-
-			// Add parents
-			recurseParentTypes(typePC, lineage);
-		}
-	}
-
-	/**
-	 * Recurse through the parent types.
-	 * 
-	 * @param typePC
-	 *            The type Parent-Child relationship.
-	 * @param lineage
-	 *            The lineage to add to.
-	 */
-	private void recurseChildrenTypes(ParentChildren typePC,
-			Collection<String> lineage) {
-		if (typePC != null) {
-			Collection<String> children = typePC.getChildren();
-			if (children != null) {
-				for (String child : children) {
-					lineage.add(child);
-					recurseChildrenTypes(typeHierarchy_.get(child), lineage);
-				}
-			}
-		}
-	}
-
-	/**
-	 * Recurse through the parent types.
-	 * 
-	 * @param typePC
-	 *            The type Parent-Child relationship.
-	 * @param lineage
-	 *            The lineage to add to.
-	 */
-	private void recurseParentTypes(ParentChildren typePC,
-			Collection<String> lineage) {
-		if (typePC != null) {
-			String parent = typePC.getParent();
-			if (parent != null) {
-				lineage.add(parent);
-				recurseParentTypes(typeHierarchy_.get(parent), lineage);
-			}
-		}
-	}
-
-	public Map<String, StringFact> getPredicates() {
-		return predicates_;
-	}
-
-	public Rete getRete() {
-		return rete_;
-	}
-
-	/**
-	 * Gets or creates a rule query for a guided rule.
-	 * 
-	 * @param gr
-	 *            The guided rule associated with a query.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(GuidedRule gr) {
-		String result = queryNames_.get(gr);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() == null) {
-					rete_.eval("(defquery " + result + " "
-							+ gr.getStringConditions() + ")");
-				} else {
-					StringBuffer declares = new StringBuffer(
-							"(declare (variables");
-
-					for (String param : gr.getQueryParameters()) {
-						declares.append(" " + param);
-					}
-					declares.append("))");
-
-					rete_.eval("(defquery " + result + " "
-							+ declares.toString() + " "
-							+ gr.getStringConditions() + ")");
-				}
-				queryNames_.put(gr, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets or creates a rule query for a fact (an anonymous fact which only
-	 * matches the existence of the fact).
-	 * 
-	 * @param fact
-	 *            The anonymous fact.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(StringFact fact) {
-		String result = queryNames_.get(fact);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// Create the query
-				rete_.eval("(defquery " + result + " " + fact + ")");
-				queryNames_.put(fact, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets a string fact by the fact name.
-	 * 
-	 * @param factName
-	 *            The fact name.
-	 * @return The StringFact corresponding to the fact name, or null if
-	 *         non-existant.
-	 */
-	public StringFact getStringFact(String factName) {
-		if (predicates_.containsKey(factName))
-			return predicates_.get(factName);
-		if (actions_.containsKey(factName))
-			return actions_.get(factName);
-		if (typePredicates_.containsKey(factName))
-			return typePredicates_.get(factName);
-		if (factName.equals("test"))
-			return TEST_DEFINITION;
-		if (factName.equals(GOALARGS_PRED))
-			return goalStringFactDef_;
-		return null;
-	}
-
-	public Map<String, StringFact> getTypePredicates() {
-		return typePredicates_;
-	}
-
-	/**
-	 * Checks if the current state is a goal state by looking for the terminal
-	 * fact.
-	 * 
-	 * @param rete
-	 *            The state.
-	 * @return True if we're in the goal state, false otherwise.
-	 */
-	public boolean isGoal(Rete rete) {
-		try {
-			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
-					new ValueVector());
-			if (result.next())
-				return true;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return false;
-	}
-
-	public boolean isTypePredicate(String predicate) {
-		if (typePredicates_.containsKey(predicate))
-			return true;
-		return false;
-	}
-
-	/**
-	 * Checks if the predicate is useful (not action or inequal).
-	 * 
-	 * @param predicate
-	 *            The predicate being checked.
-	 * @return True if the predicate is useful, false if it is action, inequal
-	 *         or otherwise.
-	 */
-	public boolean isUsefulPredicate(String predicate) {
-		if (predicate.equals("test"))
-			return false;
-		if (predicate.equals(VALID_ACTIONS))
-			return false;
-		if (predicate.equals("initial-fact"))
-			return false;
-		if (predicate.equals(GOALARGS_PRED))
-			return false;
-		return true;
-	}
-
-	/**
-	 * This should really only be used by the test class.
-	 * 
-	 * @param constants
-	 *            The constants set in the state.
-	 */
-	public void setConstants(List<String> constants) {
-		constants_ = constants;
-	}
-
-	@Override
-	public String toString() {
-		return "StateSpec";
-	}
+	/** The valid actions predicate name. */
+	public static final String VALID_ACTIONS = "validActions";
 
 	/**
 	 * Adds an array element to a list of arrays if the array is not already in
@@ -962,6 +140,17 @@ public abstract class StateSpec {
 			if (arg.equals(str))
 				return true;
 		return false;
+	}
+
+	/**
+	 * Creates a variable representing a goal term at a given index.
+	 * 
+	 * @param i
+	 *            The index of the goal condition.
+	 * @return The variable goal condition.
+	 */
+	public static String createGoalTerm(int i) {
+		return GOAL_VARIABLE_PREFIX + i;
 	}
 
 	/**
@@ -1034,10 +223,31 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Initialises the environment without a goal argument (so it uses default).
+	 * 
+	 * @param classPrefix
+	 *            The class prefix of the environment to load.
+	 * @return The initialised environment specification.
+	 */
+	public static StateSpec initInstance(String classPrefix) {
+		try {
+			instance_ = (StateSpec) Class.forName(
+					classPrefix + StateSpec.class.getSimpleName())
+					.newInstance();
+			instance_.initialise();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return instance_;
+	}
+
+	/**
 	 * Initialises the environment with a given goal argument.
 	 * 
-	 * @param classPrefix The class prefix of the environment to load.
-	 * @param goalArg The goal for the environment.
+	 * @param classPrefix
+	 *            The class prefix of the environment to load.
+	 * @param goalArg
+	 *            The goal for the environment.
 	 * @return The initialised environment specification.
 	 */
 	public static StateSpec initInstance(String classPrefix, String goalArg) {
@@ -1046,24 +256,6 @@ public abstract class StateSpec {
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
 			instance_.envParameter_ = goalArg;
-			instance_.initialise();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return instance_;
-	}
-	
-	/**
-	 * Initialises the environment without a goal argument (so it uses default).
-	 * 
-	 * @param classPrefix The class prefix of the environment to load.
-	 * @return The initialised environment specification.
-	 */
-	public static StateSpec initInstance(String classPrefix) {
-		try {
-			instance_ = (StateSpec) Class.forName(
-					classPrefix + StateSpec.class.getSimpleName())
-					.newInstance();
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1209,42 +401,779 @@ public abstract class StateSpec {
 				.getStringFact(condSplit[offset - 1]), arguments, negated);
 	}
 
+	/** The number of simultaneous actions per step to take. */
+	private int actionNum_;
+
+	/** The terms present in an action's precondition. */
+	private MultiMap<String, String> actionPreconditions_;
+
+	/** The actions of the rules and their structure. */
+	private Map<String, StringFact> actions_;
+
+	/** The background rules and illegalities of the state. */
+	private Map<String, BackgroundKnowledge> backgroundRules_;
+
+	/** The constants found within the goal. */
+	private List<String> constants_;
+
+	/** The environment package name. */
+	private String environment_;
+
+	/** The parameter of the environment. */
+	protected String envParameter_;
+
+	/** The name of the goal. */
+	private String goalName_;
+
+	/** The state the agent must reach to successfully end the episode. */
+	private String goalState_;
+
 	/**
-	 * Creates a variable representing a goal term at a given index.
-	 * 
-	 * @param i
-	 *            The index of the goal condition.
-	 * @return The variable goal condition.
+	 * The goal StringFact definition (goalArgs on a b...). Is simply a
+	 * StringFact definition created with arguments equalling the number of goal
+	 * arguments.
 	 */
-	public static String createGoalTerm(int i) {
-		return GOAL_VARIABLE_PREFIX + i;
+	private StringFact goalStringFactDef_;
+
+	/** The hand coded policy for the goal. */
+	private Policy handCodedPolicy_;
+
+	/** The prerequisites of the rules and their structure. */
+	private Map<String, StringFact> predicates_;
+
+	/** The count value for the query names. */
+	private int queryCount_;
+
+	/** The mapping for rules to queries in the Rete object. */
+	private Map<Object, String> queryNames_;
+
+	/** The LogicFactory for the experiment. */
+	private Rete rete_;
+
+	/** The type hierarchy. */
+	private Map<String, ParentChildren> typeHierarchy_;
+
+	/** The type predicates, only used implicitly. */
+	private Map<String, StringFact> typePredicates_;
+
+	/** A RegExp for filtering out unnecessary facts from a rule. */
+	private String unnecessaries_;
+
+	/**
+	 * Simply asserts the goal predicate with the given argument.
+	 * 
+	 * @param goalArgs
+	 *            The goal args to add, or if null, generate new ones.
+	 * @param state
+	 *            The state to add to.
+	 */
+	public void assertGoalPred(List<String> goalArgs, Rete state)
+			throws Exception {
+		StringBuffer goalString = new StringBuffer();
+		for (String arg : goalArgs)
+			goalString.append(" " + arg);
+		String assertion = "(" + GOALARGS_PRED + " " + goalName_ + goalString
+				+ ")";
+		rete_.assertString(assertion);
+
+		// Setting the ObjectObservations
+		BidiMap goalReplacements = new DualHashBidiMap();
+		int i = 0;
+		for (String goalTerm : goalArgs) {
+			if (!goalReplacements.containsKey(goalTerm))
+				goalReplacements.put(goalTerm, StateSpec.createGoalTerm(i));
+			i++;
+		}
+		ObjectObservations.getInstance().goalReplacements = goalReplacements;
 	}
 
 	/**
-	 * A basic class which holds parent-child data for a given type predicate.
+	 * Creates the necessary type conditions for a rule.
 	 * 
-	 * @author Sam Sarjant
+	 * @param fact
+	 *            The fact.
+	 * @return The type cocditions.
 	 */
-	private class ParentChildren {
-		private String parent_;
-		private Collection<String> children_;
-
-		public String getParent() {
-			return parent_;
+	public Collection<StringFact> createTypeConds(StringFact fact) {
+		Collection<StringFact> typeConds = new HashSet<StringFact>();
+		// If the term itself is a type pred, return.
+		if (isTypePredicate(fact.getFactName())) {
+			return typeConds;
 		}
 
-		public void setParent(String parent) {
-			parent_ = parent;
+		String[] types = fact.getArgTypes();
+		for (int i = 0; i < types.length; i++) {
+			if (!fact.getArguments()[i].equals("?")) {
+				StringFact typeFact = typePredicates_.get(types[i]);
+				if (typeFact != null) {
+					typeConds.add(new StringFact(typeFact, new String[] { fact
+							.getArguments()[i] }));
+				}
+			}
+		}
+		return typeConds;
+	}
+
+	/**
+	 * Creates a template for a fact using the given arguments and asserts it to
+	 * the rete object. Returns the name of the fact template.
+	 * 
+	 * @param factName
+	 *            The name of the fact template.
+	 * @param rete
+	 *            The rete object being asserted to.
+	 * @return The name of the fact template.
+	 */
+	public String defineTemplate(String factName, Rete rete) {
+		try {
+			rete.eval("(deftemplate " + factName + " (declare (ordered TRUE)))");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return factName;
+	}
+
+	/**
+	 * Extracts the constants from the goal (also includes goal variables).
+	 * 
+	 * @param goalState
+	 *            The goal state to parse.
+	 */
+	private List<String> extractConstants(String goalState) {
+		List<String> constants = new ArrayList<String>();
+
+		// Find each term used in the goal
+		Pattern p = Pattern.compile(" ([?\\w].*?)(?=\\)| |&)");
+		Matcher m = p.matcher(goalState);
+		while (m.find()) {
+			String term = m.group(1);
+			if (!constants.contains(term)) {
+				// If the fact is a constant (not a number)
+				if (term.charAt(0) != '?' && !isNumber(term))
+					constants.add(term);
+				// If the fact is a parameterisable goal constant
+				if (term.contains(GOAL_VARIABLE_PREFIX)) {
+					constants.add(term);
+				}
+			}
 		}
 
-		public Collection<String> getChildren() {
-			return children_;
+		return constants;
+	}
+
+	/**
+	 * Forms the list of variable action terms the action expects to be in the
+	 * precondition rule.
+	 * 
+	 * @param action
+	 *            The StringFact definition for the action.
+	 * @return A list of variable terms, from ?X onwards.
+	 */
+	private List<String> formActionTerms(StringFact action) {
+		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
+		for (int i = 0; i < action.getArgTypes().length; i++)
+			terms.add(RuleCreation.getVariableTermString(i).substring(1));
+		return terms;
+	}
+
+	/**
+	 * Forms the goal predicate to link into the definite goal.
+	 * 
+	 * @param constants
+	 *            The goal constants.
+	 * @return The goal predicate to inject the variables.
+	 */
+	private String formGoalPred(Collection<String> constants) {
+		StringBuffer buffer = new StringBuffer("(" + GOALARGS_PRED + " "
+				+ goalName_);
+		for (String constant : constants)
+			buffer.append(" " + constant);
+		buffer.append(")");
+		return buffer.toString();
+	}
+
+	/**
+	 * Forms the non-goals by negating the non-type conditions required for the
+	 * goal to be met.
+	 * 
+	 * @param goalState
+	 *            The goal state.
+	 * @return A negated goal state (except for the type preds).
+	 */
+	private String formNonGoal(String goalState) throws Exception {
+		GuidedRule nonGoalRule = new GuidedRule(goalState_);
+		SortedSet<StringFact> conds = nonGoalRule.getConditions(false);
+
+		// Split the conds up into 2 sets: types and normal
+		Collection<StringFact> types = new TreeSet<StringFact>(
+				conds.comparator());
+		Collection<StringFact> normal = new TreeSet<StringFact>(
+				conds.comparator());
+		Collection<StringFact> inequalities = new TreeSet<StringFact>(
+				conds.comparator());
+		for (StringFact cond : conds) {
+			if (isTypePredicate(cond.getFactName()))
+				types.add(cond);
+			else if (cond.getFactName().equals("test"))
+				inequalities.add(cond);
+			else
+				normal.add(cond);
+		}
+		// If there are no normal conds, negate the types instead (otherwise
+		// there would be an infinite number of goals)
+		if (normal.isEmpty()) {
+			throw new Exception("Goal is only type conditions! Cannot negate.");
 		}
 
-		public void addChild(String child) {
-			if (children_ == null)
-				children_ = new HashSet<String>();
-			children_.add(child);
+		// Build the string
+		StringBuffer nonGoalStr = new StringBuffer();
+		// Types first
+		for (StringFact type : types)
+			nonGoalStr.append(type + " ");
+		// Then Inequalities
+		for (StringFact ineq : inequalities)
+			nonGoalStr.append(ineq + " ");
+		// Then normals
+		nonGoalStr.append("(not");
+		if (normal.size() > 1)
+			nonGoalStr.append(" (and");
+		for (StringFact norm : normal)
+			nonGoalStr.append(" " + norm);
+		nonGoalStr.append(")");
+		if (normal.size() > 1)
+			nonGoalStr.append(")");
+
+		return nonGoalStr.toString();
+	}
+
+	/**
+	 * Forms the unnecessaries regexp replacement string to only replace
+	 * unnecessary type facts that are present in the action.
+	 * 
+	 * @param terms
+	 *            The action terms of the rule.
+	 * @return A regexp modified to match the rule.
+	 */
+	private String formRuleSpecificRegexp(String[] terms) {
+		StringBuffer actionRepl = new StringBuffer("(");
+		boolean first = true;
+		for (String term : terms) {
+			if (!first)
+				actionRepl.append("|");
+			actionRepl.append("(" + Pattern.quote(term) + ")");
+			first = false;
 		}
+		actionRepl.append(")");
+		return unnecessaries_.replace(ACTION_TERM_REPL, actionRepl.toString());
+	}
+
+	/**
+	 * Forms the unnecessary facts regexp string.
+	 * 
+	 * @param types
+	 *            The types that need not be in rules.
+	 * @return The regexp string.
+	 */
+	private String formUnnecessaryString(Collection<String> types) {
+		StringBuffer buffer = new StringBuffer("((\\(test \\(<> .+?\\)\\))");
+		for (String type : types)
+			buffer.append("|(\\(" + type + " " + ACTION_TERM_REPL + "\\))");
+		buffer.append(")( |$)");
+		return buffer.toString();
+	}
+
+	/**
+	 * Generates the valid actions for the state into the state for the agent to
+	 * use. Actions are given in string format of just the arguments.
+	 * 
+	 * @param state
+	 *            The state from which the actions are generated.
+	 * @return A multimap with each valid action predicate as the key and the
+	 *         values as the arguments.
+	 */
+	public final MultiMap<String, String[]> generateValidActions(Rete state) {
+		MultiMap<String, String[]> validActions = MultiMap
+				.createSortedSetMultiMap(ArgumentComparator.getInstance());
+
+		for (String action : actions_.keySet()) {
+			try {
+				QueryResult result = state.runQueryStar(action
+						+ ACTION_PRECOND_SUFFIX, new ValueVector());
+				while (result.next()) {
+					List<String> actionTerms = actionPreconditions_
+							.getList(action);
+					String[] arguments = new String[actionTerms.size()];
+					for (int i = 0; i < arguments.length; i++) {
+						arguments[i] = result.getSymbol(actionTerms.get(i));
+					}
+					validActions.put(action, arguments);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		return validActions;
+	}
+
+	public Map<String, StringFact> getActions() {
+		return actions_;
+	}
+
+	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
+		return backgroundRules_.values();
+	}
+
+	public Collection<String> getConstants() {
+		return constants_;
+	}
+
+	public String getEnvironmentName() {
+		return environment_;
+	}
+
+	/**
+	 * Gets the goal name defined by the experiment. May not necessarily be the
+	 * goal the agent is pursuing.
+	 * 
+	 * @return The name of the goal.
+	 */
+	public String getGoalName() {
+		return goalName_;
+	}
+
+	public String getGoalState() {
+		return goalState_;
+	}
+
+	/**
+	 * Gets the optimal policy for the problem. Or at least gets a good policy.
+	 * 
+	 * @return The policy that is optimal.
+	 */
+	public Policy getHandCodedPolicy() {
+		return handCodedPolicy_;
+	}
+
+	public int getNumReturnedActions() {
+		return actionNum_;
+	}
+
+	public Map<String, StringFact> getPredicates() {
+		return predicates_;
+	}
+
+	public Rete getRete() {
+		return rete_;
+	}
+
+	/**
+	 * Gets or creates a rule query for a guided rule.
+	 * 
+	 * @param gr
+	 *            The guided rule associated with a query.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(GuidedRule gr) {
+		String result = queryNames_.get(gr);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				// If the rule has parameters, declare them as variables.
+				if (gr.getQueryParameters() == null) {
+					rete_.eval("(defquery " + result + " "
+							+ gr.getStringConditions() + ")");
+				} else {
+					StringBuffer declares = new StringBuffer(
+							"(declare (variables");
+
+					for (String param : gr.getQueryParameters()) {
+						declares.append(" " + param);
+					}
+					declares.append("))");
+
+					rete_.eval("(defquery " + result + " "
+							+ declares.toString() + " "
+							+ gr.getStringConditions() + ")");
+				}
+				queryNames_.put(gr, result);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets or creates a rule query for a fact (an anonymous fact which only
+	 * matches the existence of the fact).
+	 * 
+	 * @param fact
+	 *            The anonymous fact.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(StringFact fact) {
+		String result = queryNames_.get(fact);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				// Create the query
+				rete_.eval("(defquery " + result + " " + fact + ")");
+				queryNames_.put(fact, result);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		return result;
+	}
+
+	/**
+	 * Gets a string fact by the fact name.
+	 * 
+	 * @param factName
+	 *            The fact name.
+	 * @return The StringFact corresponding to the fact name, or null if
+	 *         non-existant.
+	 */
+	public StringFact getStringFact(String factName) {
+		if (predicates_.containsKey(factName))
+			return predicates_.get(factName);
+		if (actions_.containsKey(factName))
+			return actions_.get(factName);
+		if (typePredicates_.containsKey(factName))
+			return typePredicates_.get(factName);
+		if (factName.equals("test"))
+			return TEST_DEFINITION;
+		if (factName.equals(GOALARGS_PRED))
+			return goalStringFactDef_;
+		return null;
+	}
+
+	/**
+	 * Gets the parent, child, and itself types of this given type, so unless
+	 * this type is alone, the returned collection will be greater than size 1.
+	 * 
+	 * @param type
+	 *            The type to get the lineage for, from parent to child (not
+	 *            necessarily in order).
+	 * @param lineage
+	 *            A to-be-filled collection of all types that are in the type
+	 *            lineage, be they parent, grandparent or child, grandchild,
+	 *            etc.
+	 */
+	public void getTypeLineage(String type, Collection<String> lineage) {
+		// Add itself
+		lineage.add(type);
+
+		ParentChildren typePC = typeHierarchy_.get(type);
+		if (typePC != null) {
+			// Add children
+			recurseChildrenTypes(typePC, lineage);
+
+			// Add parents
+			recurseParentTypes(typePC, lineage);
+		}
+	}
+
+	public Map<String, StringFact> getTypePredicates() {
+		return typePredicates_;
+	}
+
+	/**
+	 * The constructor for a state specification.
+	 */
+	private final void initialise() {
+		try {
+			rete_ = new Rete();
+
+			environment_ = this.getClass().getPackage().getName();
+
+			// Type predicates and their hierarchy background rules.
+			typePredicates_ = new HashMap<String, StringFact>();
+			Map<String, String> typeAssertions = new HashMap<String, String>();
+			Map<String, String> typeParents = initialiseTypePredicateTemplates();
+			typeHierarchy_ = new HashMap<String, ParentChildren>();
+			for (String type : typeParents.keySet()) {
+				typePredicates_.put(type, new StringFact(type,
+						new String[] { type }));
+				defineTemplate(type, rete_);
+
+				// Define background knowledge rule
+				if (typeParents.get(type) != null) {
+					String assertion = "(" + type + " ?X) " + INFERS_ACTION
+							+ " (assert (" + typeParents.get(type) + " ?X))";
+					typeAssertions.put(type + "ParentRule", assertion);
+
+					// Record the parent children relationship
+					ParentChildren thisPC = (typeHierarchy_.containsKey(type)) ? typeHierarchy_
+							.get(type) : new ParentChildren();
+					String parentType = typeParents.get(type);
+					thisPC.setParent(parentType);
+					typeHierarchy_.put(type, thisPC);
+
+					ParentChildren parentPC = (typeHierarchy_
+							.containsKey(parentType)) ? typeHierarchy_
+							.get(parentType) : new ParentChildren();
+					parentPC.addChild(type);
+					typeHierarchy_.put(parentType, parentPC);
+				}
+			}
+			unnecessaries_ = formUnnecessaryString(typePredicates_.keySet());
+
+			// Main predicates
+			predicates_ = new HashMap<String, StringFact>();
+			for (StringFact pred : initialisePredicateTemplates()) {
+				predicates_.put(pred.getFactName(), pred);
+				defineTemplate(pred.getFactName(), rete_);
+			}
+
+			// Set up the valid actions template
+			StringBuffer actBuf = new StringBuffer("(deftemplate "
+					+ VALID_ACTIONS);
+			// Actions
+			actions_ = new HashMap<String, StringFact>();
+			for (StringFact action : initialiseActionTemplates()) {
+				actions_.put(action.getFactName(), action);
+				defineTemplate(action.getFactName(), rete_);
+				actBuf.append(" (multislot " + action.getFactName() + ")");
+			}
+			actBuf.append(")");
+			rete_.eval(actBuf.toString());
+			actionNum_ = initialiseActionsPerStep();
+
+			// Initialise the background knowledge rules
+
+			// Type hierarchy rules
+			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
+			for (String name : typeAssertions.keySet())
+				backgroundRules_.put(name, new BackgroundKnowledge(
+						typeAssertions.get(name), true));
+
+			// State Spec rules
+			backgroundRules_.putAll(initialiseBackgroundKnowledge());
+			for (String ruleNames : backgroundRules_.keySet()) {
+				if (backgroundRules_.get(ruleNames).assertInJess())
+					rete_.eval("(defrule " + ruleNames + " "
+							+ backgroundRules_.get(ruleNames) + ")");
+			}
+
+			// Initialise the betweenRange and outsideRange functions
+			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
+					+ "(if (and (>= ?val ?low) (<= ?val ?high)) then "
+					+ "return TRUE))");
+			rete_.eval("(deffunction " + OUTSIDE_RANGE + " (?val ?low ?high) "
+					+ "(if (or (< ?val ?low) (> ?val ?high)) then "
+					+ "return TRUE))");
+
+			// Initialise the goal state rules
+			String[] goal = initialiseGoalState();
+			goalName_ = goal[0];
+			goalState_ = goal[1];
+			constants_ = extractConstants(goalState_);
+			String[] factTypes = new String[constants_.size() + 1];
+			factTypes[0] = "goalPred";
+			for (int i = 1; i < factTypes.length; i++)
+				factTypes[i] = "arg" + (i - 1);
+			goalStringFactDef_ = new StringFact(GOALARGS_PRED, factTypes);
+			rete_.eval("(deftemplate goal (slot goalMet))");
+			String goalPred = formGoalPred(constants_);
+			String goalRule = "(defrule goalState " + goalPred + " "
+					+ goalState_ + " => (assert (goal (goalMet TRUE))))";
+			rete_.eval(goalRule);
+			// Initialise the goal checking query
+			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
+			// Only need a non-goal if the goal is parameterisable
+			if (!constants_.isEmpty())
+				rete_.eval("(defquery " + NON_GOALS + " "
+						+ formNonGoal(goalState_) + ")");
+
+			// Initialise the queries for determining action preconditions
+			Map<String, String> purePreConds = initialiseActionPreconditions();
+			actionPreconditions_ = MultiMap.createListMultiMap();
+			for (String action : purePreConds.keySet()) {
+				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
+						+ " " + purePreConds.get(action) + ")";
+				rete_.eval(query);
+				actionPreconditions_.putCollection(action,
+						formActionTerms(actions_.get(action)));
+			}
+
+			// Initialise the optimal policy
+			handCodedPolicy_ = initialiseOptimalPolicy();
+
+			queryNames_ = new HashMap<Object, String>();
+			queryCount_ = 0;
+
+			Unification.getInstance().resetRangeIndex();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Initialises the rules for finding valid actions.
+	 * 
+	 * @return A map of actions and the pure preconditions to be valid.
+	 */
+	protected abstract Map<String, String> initialiseActionPreconditions();
+
+	/**
+	 * Initialises the number of actions to take per time step.
+	 * 
+	 * @return The number of actions to take per step.
+	 */
+	protected abstract int initialiseActionsPerStep();
+
+	/**
+	 * Initialises the state actions.
+	 * 
+	 * @return The list of guided actions.
+	 */
+	protected abstract Collection<StringFact> initialiseActionTemplates();
+
+	/**
+	 * Initialises the background knowledge.
+	 * 
+	 * @return A mapping of rule names to the pure rules themselves (just pre =>
+	 *         post).
+	 */
+	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
+
+	/**
+	 * Initialises the goal state.
+	 * 
+	 * @return The name of the goal and the minimal state that is true when the
+	 *         goal is satisfied.
+	 */
+	protected abstract String[] initialiseGoalState();
+
+	/**
+	 * Initialises the optimal policy for the goal.
+	 * 
+	 * @param factory
+	 *            The factory for creating rules.
+	 * 
+	 * @return The policy that solves the goal in optimal time.
+	 */
+	protected abstract Policy initialiseOptimalPolicy();
+
+	/**
+	 * Initialises the state predicates.
+	 * 
+	 * @return The list of guided predicate names.
+	 */
+	protected abstract Collection<StringFact> initialisePredicateTemplates();
+
+	/**
+	 * Initialises the state type predicates.
+	 * 
+	 * @param rete
+	 *            The rete object.
+	 * @return A map of types, where the possibly null value corresponds to the
+	 *         keys parent in the type hierarchy.
+	 */
+	protected abstract Map<String, String> initialiseTypePredicateTemplates();
+
+	/**
+	 * Checks if the current state is a goal state by looking for the terminal
+	 * fact.
+	 * 
+	 * @param rete
+	 *            The state.
+	 * @return True if we're in the goal state, false otherwise.
+	 */
+	public boolean isGoal(Rete rete) {
+		try {
+			QueryResult result = rete.runQueryStar(StateSpec.GOAL_QUERY,
+					new ValueVector());
+			if (result.next())
+				return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
+	public boolean isTypePredicate(String predicate) {
+		if (typePredicates_.containsKey(predicate))
+			return true;
+		return false;
+	}
+
+	/**
+	 * Checks if the predicate is useful (not action or inequal).
+	 * 
+	 * @param predicate
+	 *            The predicate being checked.
+	 * @return True if the predicate is useful, false if it is action, inequal
+	 *         or otherwise.
+	 */
+	public boolean isUsefulPredicate(String predicate) {
+		if (predicate.equals("test"))
+			return false;
+		if (predicate.equals(VALID_ACTIONS))
+			return false;
+		if (predicate.equals("initial-fact"))
+			return false;
+		if (predicate.equals(GOALARGS_PRED))
+			return false;
+		return true;
+	}
+
+	/**
+	 * Recurse through the parent types.
+	 * 
+	 * @param typePC
+	 *            The type Parent-Child relationship.
+	 * @param lineage
+	 *            The lineage to add to.
+	 */
+	private void recurseChildrenTypes(ParentChildren typePC,
+			Collection<String> lineage) {
+		if (typePC != null) {
+			Collection<String> children = typePC.getChildren();
+			if (children != null) {
+				for (String child : children) {
+					lineage.add(child);
+					recurseChildrenTypes(typeHierarchy_.get(child), lineage);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Recurse through the parent types.
+	 * 
+	 * @param typePC
+	 *            The type Parent-Child relationship.
+	 * @param lineage
+	 *            The lineage to add to.
+	 */
+	private void recurseParentTypes(ParentChildren typePC,
+			Collection<String> lineage) {
+		if (typePC != null) {
+			String parent = typePC.getParent();
+			if (parent != null) {
+				lineage.add(parent);
+				recurseParentTypes(typeHierarchy_.get(parent), lineage);
+			}
+		}
+	}
+
+	/**
+	 * This should really only be used by the test class.
+	 * 
+	 * @param constants
+	 *            The constants set in the state.
+	 */
+	public void setConstants(List<String> constants) {
+		constants_ = constants;
+	}
+
+	@Override
+	public String toString() {
+		return "StateSpec";
 	}
 }

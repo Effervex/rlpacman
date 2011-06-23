@@ -1,13 +1,11 @@
 package relationalFramework;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
 import java.util.TreeSet;
 
 import jess.Fact;
@@ -15,11 +13,14 @@ import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
 
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.GoalArg;
 import relationalFramework.util.ArgumentComparator;
 import relationalFramework.util.MultiMap;
 
@@ -52,24 +53,18 @@ public class PolicyActor implements AgentInterface {
 	/** If this agent is the hand-coded agent. */
 	private boolean handCoded_;
 
+	/** The current goal arguments. (e.g. a -> ?G_0) */
+	private BidiMap goalArgs_;
+
 	// ////////////// MODULAR MEMBERS //////////////////
-	/** An agent's internal goal to attempt to achieve. */
-	private SortedSet<StringFact> goalPredicates_;
-
-	/** The number of arguments the goal takes. */
-	private int goalNumArgs_;
-
-	/** The agent's internal goal to chase, if learning modules. */
-	private String[] internalGoal_;
+	/** The goal condition the agent is following. */
+	private GoalCondition goalCondition_;
 
 	/** The internal reward the agent perceives when performing module learning. */
 	private double internalReward_;
 
 	/** If the agent's internal goal has been met. */
 	private boolean internalGoalMet_;
-
-	/** A collection of possible goals for the agent to pursue. */
-	private Collection<GoalArg> possibleGoals_;
 
 	/** The goal arguments from the previous state. */
 	private Collection<GoalArg> prevGoalArgs_;
@@ -105,15 +100,12 @@ public class PolicyActor implements AgentInterface {
 	public void agent_init(String arg0) {
 		prevState_ = null;
 		handCoded_ = false;
-		possibleGoals_ = new ArrayList<GoalArg>();
 		totalReward_ = 0;
 		totalSteps_ = 0;
 		totalEpisodes_ = -1;
-		AgentObservations.loadAgentObservations();
 	}
 
 	// @Override
-	@SuppressWarnings("unchecked")
 	public String agent_message(String arg0) {
 		// Receive a policy
 		if (arg0.equals("GetPolicy")) {
@@ -127,13 +119,10 @@ public class PolicyActor implements AgentInterface {
 			policy_ = null;
 			bestPolicy_ = null;
 			mostSteps_ = Integer.MIN_VALUE;
-		} else if (arg0.equals("SetPolicy")) {
-			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
-			if ((goalPredicates_ != null) && (internalGoal_ != null)) {
-				policy_.parameterArgs(internalGoal_);
-			}
 		} else if (arg0.equals("Optimal")) {
 			handCoded_ = true;
+		} else if (arg0.equals("SetPolicy")) {
+			policy_ = (Policy) ObjectObservations.getInstance().objectArray[0];
 		} else if (arg0.equals("internalReward")) {
 			// Return the reward if the internal goal was met, else return a
 			// large negative value.
@@ -141,31 +130,40 @@ public class PolicyActor implements AgentInterface {
 				return internalReward_ + "";
 			else
 				return -Math.abs(internalReward_ * 100) + "";
-		} else if (arg0.equals(LearningController.INTERNAL_PREFIX)) {
-			// Setting an internal goal
-			SortedSet<StringFact> oldGoal = null;
-			int oldNumArgs = -1;
-			if (goalPredicates_ != null) {
-				oldGoal = goalPredicates_;
-				oldNumArgs = goalNumArgs_;
-			}
-			goalPredicates_ = (SortedSet<StringFact>) ObjectObservations
-					.getInstance().objectArray[0];
-			goalNumArgs_ = (Integer) ObjectObservations.getInstance().objectArray[1];
-
-			internalGoal_ = null;
-			possibleGoals_.clear();
-			ObjectObservations.getInstance().objectArray[0] = oldGoal;
-			ObjectObservations.getInstance().objectArray[1] = oldNumArgs;
 		}
 		return null;
 	}
 
 	// @Override
+	@SuppressWarnings("unchecked")
 	public Action agent_start(Observation arg0) {
+		goalArgs_ = new DualHashBidiMap(
+				ObjectObservations.getInstance().goalReplacements);
+
+		// If the policy generator is modular, set the internal goal up
+		if (PolicyGenerator.getInstance().isModuleGenerator())
+			goalCondition_ = PolicyGenerator.getInstance().getModuleGoal();
+		// else
+		// AgentObservations.getInstance().noteGoalArgs(new GoalArg(goalArgs_,
+		// goalCondition_));
+
+		// Scanning the observations
+		Rete rete = ObjectObservations.getInstance().predicateKB;
+		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
+		if (!handCoded_)
+			setInternalGoal(rete);
+
 		// Initialise the policy
 		if (policy_ == null) {
 			generatePolicy(false);
+		}
+		// Apply the goal parameters to the goal conditions.
+		if (goalArgs_ != null) {
+			AgentObservations.getInstance().setNumGoalArgs(goalArgs_.size());
+			policy_.parameterArgs(goalArgs_.inverseBidiMap());
+
+			if (PolicyGenerator.debugMode_ && !handCoded_)
+				System.out.println("Goal: " + goalArgs_);
 		}
 
 		prevState_ = null;
@@ -174,13 +172,9 @@ public class PolicyActor implements AgentInterface {
 		// Initialising the actions
 		prevActions_ = new ActionChoice();
 
+		// Choosing an action
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		// Choosing an action
-		Rete rete = ObjectObservations.getInstance().predicateKB;
-		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
-		setInternalGoal(rete);
-
 		prevActions_ = chooseAction(
 				ObjectObservations.getInstance().predicateKB, stateFacts, null);
 		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
@@ -199,8 +193,10 @@ public class PolicyActor implements AgentInterface {
 		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
 
 		// Check the internal goal here
-		if (!handCoded_ && (goalPredicates_ != null)) {
-			processInternalGoal(rete, prevGoalArgs_);
+		if (!handCoded_ && (goalCondition_ != null)) {
+			processInternalGoal(rete);
+			if (internalGoalMet_)
+				return action;
 		}
 
 		// Randomly resample the policy if the agent has been performing the
@@ -214,7 +210,7 @@ public class PolicyActor implements AgentInterface {
 		policySteps_++;
 		prevActions_ = chooseAction(rete, stateFacts, arg0);
 		ObjectObservations.getInstance().objectArray = new ActionChoice[] { prevActions_ };
-		if (goalPredicates_ != null && internalGoalMet_)
+		if (goalCondition_ != null && internalGoalMet_)
 			ObjectObservations.getInstance().earlyExit = true;
 
 		return action;
@@ -226,10 +222,10 @@ public class PolicyActor implements AgentInterface {
 			noteInternalFigures(arg0);
 
 		// Save the pre-goal state and goal action
-		if (goalPredicates_ != null) {
+		if (goalCondition_ != null) {
 			if (!handCoded_) {
 				Rete rete = ObjectObservations.getInstance().predicateKB;
-				processInternalGoal(rete, prevGoalArgs_);
+				processInternalGoal(rete);
 			}
 		}
 
@@ -243,6 +239,7 @@ public class PolicyActor implements AgentInterface {
 	 * @param isResampled
 	 *            If this policy was a result of resampling.
 	 */
+	@SuppressWarnings("unchecked")
 	private void generatePolicy(boolean isResampled) {
 		// Note the previous policy and its reward, if applicable
 		if (policySteps_ > mostSteps_ && policy_ != null) {
@@ -250,16 +247,17 @@ public class PolicyActor implements AgentInterface {
 			mostSteps_ = policySteps_;
 		}
 
-		policy_ = PolicyGenerator.getInstance().generatePolicy(true);
+		policy_ = PolicyGenerator.getInstance().generatePolicy(false);
 		if (PolicyGenerator.debugMode_) {
 			if (isResampled)
 				System.out.println("RESAMPLED POLICY: " + policy_);
 			else
 				System.out.println(policy_);
 		}
-		if ((goalPredicates_ != null) && (internalGoal_ != null)) {
-			policy_.parameterArgs(internalGoal_);
-		}
+
+		// Apply the goal parameters to the goal conditions.
+		if (goalArgs_ != null)
+			policy_.parameterArgs(goalArgs_.inverseBidiMap());
 
 		// Reset the state observations
 		resampleProb_ = 0;
@@ -293,21 +291,21 @@ public class PolicyActor implements AgentInterface {
 	 *            The reward received this step.
 	 * @return A relational action.
 	 */
+	@SuppressWarnings("unchecked")
 	private ActionChoice chooseAction(Rete state, Collection<Fact> stateFacts,
 			Double reward) {
 		ActionChoice actions = new ActionChoice();
 
 		boolean noteTriggered = true;
-		if ((internalGoal_ != null) && (internalGoalMet_))
+		if (internalGoalMet_)
 			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
 		MultiMap<String, String[]> validActions = ObjectObservations
 				.getInstance().validActions;
 
-		actions = policy_.evaluatePolicy(state, validActions,
-				ObjectObservations.getInstance().goalReplacements, actions, StateSpec
-						.getInstance().getNumReturnedActions(), handCoded_,
-				false, noteTriggered);
+		actions = policy_.evaluatePolicy(state, validActions, goalArgs_,
+				actions, StateSpec.getInstance().getNumReturnedActions(),
+				handCoded_, false, noteTriggered);
 
 		// This allows action covering to catch variant action conditions.
 		// This problem is caused by hierarchical RLGG rules, which cover
@@ -348,6 +346,7 @@ public class PolicyActor implements AgentInterface {
 	 * @param validActions
 	 *            The state valid actions.
 	 */
+	@SuppressWarnings("unchecked")
 	private void checkForUnseenPreds(Rete state,
 			MultiMap<String, String[]> validActions) {
 		try {
@@ -372,9 +371,7 @@ public class PolicyActor implements AgentInterface {
 						.createSortedSetMultiMap(ArgumentComparator
 								.getInstance());
 				PolicyGenerator.getInstance().triggerRLGGCovering(state,
-						validActions,
-						ObjectObservations.getInstance().goalReplacements,
-						emptyActions, false);
+						validActions, goalArgs_, emptyActions, false);
 				AgentObservations.getInstance().removeUnseenPredicates(
 						removables);
 			}
@@ -393,51 +390,48 @@ public class PolicyActor implements AgentInterface {
 	 */
 	private void setInternalGoal(Rete state) {
 		// If there is a modular goal
-		if (goalPredicates_ != null) {
+		if (goalCondition_ != null) {
 			// Scan the state for any met goals (noting the previous state goal
 			// args).
 			Collection<GoalArg> currentGoalArgs = extractPossibleGoals(state,
 					null);
+			Collection<GoalArg> possibleGoals = AgentObservations.getInstance()
+					.getPossibleGoalArgs();
+
 			// If there are possible unobtained goals
-			if (possibleGoals_.size() > currentGoalArgs.size()) {
+			if (possibleGoals.size() > currentGoalArgs.size()) {
 				internalReward_ = 0;
 				internalGoalMet_ = false;
 
 				List<GoalArg> untrueGoals = new ArrayList<GoalArg>(
-						possibleGoals_);
+						possibleGoals);
 				untrueGoals.removeAll(currentGoalArgs);
 				if (!untrueGoals.isEmpty()) {
 					// Select a random goal
-					internalGoal_ = untrueGoals
-							.get(
-									PolicyGenerator.random_.nextInt(untrueGoals
-											.size())).getGoalArgs();
-					policy_.parameterArgs(internalGoal_);
-
+					goalArgs_ = new DualHashBidiMap(untrueGoals
+							.get(PolicyGenerator.random_.nextInt(untrueGoals
+									.size())).getGoalArgs());
 					if (PolicyGenerator.debugMode_) {
-						System.out.println("Internal goal: "
-								+ Arrays.toString(internalGoal_));
-						System.out.println(policy_);
+						System.out.println("Internal goal: " + goalArgs_);
 					}
+					// Need to reverse it for the policy evaluation process
+					goalArgs_ = goalArgs_.inverseBidiMap();
 				}
-			}
+			} else
+				goalArgs_ = null;
 		}
 	}
 
 	/**
-	 * Deals with operations concerning the internal goal such as forming
-	 * pre-goal states, checking if the internal goal has been met (if one
-	 * exists), and accumulating reward (unless goal has been met).
+	 * Deals with internal goal checking, as well as collecting possible
+	 * internal goals.
 	 * 
 	 * @param stateFacts
 	 *            The current state facts.
-	 * @param prevStateArgs
-	 *            The goal args from the previous state.
 	 */
-	private void processInternalGoal(Rete rete,
-			Collection<GoalArg> prevStateArgs) {
+	private void processInternalGoal(Rete rete) {
 		// Check if the goal has been met
-		Collection<GoalArg> goalArgs = extractPossibleGoals(rete, internalGoal_);
+		extractPossibleGoals(rete, goalArgs_);
 
 		// (Negative) reward per step if the goal is not achieved.
 		if (!internalGoalMet_) {
@@ -447,26 +441,40 @@ public class PolicyActor implements AgentInterface {
 
 	/**
 	 * Extracts the possible goals from a state. Also checks if the internal
-	 * goal is met.
+	 * goal is met. Includes an inactivity meter which only checks the possible
+	 * goals at exponentially increasing intervals (if inactive).
 	 * 
 	 * @param state
 	 *            The Rete state.
 	 * @param goalParams
-	 *            TODO Not being used yet. Will need to be to speed things up.
-	 *            Insert as a ValueVector parameter.
-	 * @return True if the goal is (or has been) met, false otherwise.
+	 *            The goal to check for.
+	 * @return The possible goals that may have been achieved this state.
 	 */
+	@SuppressWarnings("unchecked")
 	private Collection<GoalArg> extractPossibleGoals(Rete state,
-			String[] goalParams) {
-		Collection<GoalArg> unseenGoals = new HashSet<GoalArg>();
+			BidiMap goalParams) {
+		Collection<GoalArg> stateGoals = new TreeSet<GoalArg>();
 		prevGoalArgs_ = new HashSet<GoalArg>();
+
+		// Check if searching all goals this step
+		boolean searchAll = goalParams == null || goalParams.isEmpty()
+				|| AgentObservations.getInstance().searchAllGoalArgs();
+
 		try {
-			GuidedRule gr = new GuidedRule(new TreeSet<StringFact>(
-					goalPredicates_), null, null);
+			Collection<StringFact> fact = new ArrayList<StringFact>(1);
+			fact.add(goalCondition_.getFact());
+			GuidedRule gr = new GuidedRule(new TreeSet<StringFact>(fact), null,
+					null);
 			gr.expandConditions();
-			String query = StateSpec.getInstance().getRuleQuery(gr);
-			// Set the goal parameters
 			ValueVector vv = new ValueVector();
+			// If not searching all, set up the query parameters
+			if (!searchAll) {
+				gr.setParameters(goalParams.inverseBidiMap());
+				for (String param : gr.getParameters())
+					vv.add(param);
+			}
+
+			String query = StateSpec.getInstance().getRuleQuery(gr);
 			QueryResult results = state.runQueryStar(query, vv);
 			Collection<StringFact> invariants = AgentObservations.getInstance()
 					.getSpecificInvariants();
@@ -475,144 +483,34 @@ public class PolicyActor implements AgentInterface {
 			// possible goals here)
 			if (results.next()) {
 				do {
-					String[] arguments = new String[goalNumArgs_];
-					for (int i = 0; i < goalNumArgs_; i++)
-						arguments[i] = results.getSymbol(Module
-								.createModuleParameter(i).substring(1));
-
-					// Check the goal arg doesn't include an invariant
-					GoalArg ga = new GoalArg(arguments);
-					if (Arrays.equals(internalGoal_, arguments)) {
-						internalGoalMet_ = true;
-						// Add the actual goal to the achieved goals
-						unseenGoals.add(ga);
+					Map<String, String> goalReplacements = new HashMap<String, String>();
+					// Run through the arguments, checking if the goal has been
+					// met.
+					boolean isGoal = (goalArgs_ == null) ? false : true;
+					for (int i = 0; i < goalCondition_.getNumArgs(); i++) {
+						String goalTerm = StateSpec.createGoalTerm(i);
+						String term = results.getSymbol(goalTerm.substring(1));
+						goalReplacements.put(goalTerm, term);
+						// Check if these are the goal args
+						if (isGoal && !term.equals(goalArgs_.getKey(goalTerm)))
+							isGoal = false;
 					}
+
+					if (isGoal)
+						internalGoalMet_ = true;
+					GoalArg ga = new GoalArg(goalReplacements, goalCondition_);
+					// If the goal isn't using an invariant
 					if (!ga.includesInvariants(invariants)) {
-						if (!possibleGoals_.contains(ga)) {
-							possibleGoals_.add(ga);
-							// If the goal has never been evaluated, note it
-							// down
-							unseenGoals.add(ga);
-						}
+						stateGoals.add(ga);
 						prevGoalArgs_.add(ga);
 					}
 				} while (results.next());
+				AgentObservations.getInstance().noteGoalArgs(stateGoals);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
-		return unseenGoals;
-	}
-
-	/**
-	 * A class for representing a possible goal state to use (i.e. one that has
-	 * occurred).
-	 * 
-	 * @author Sam Sarjant
-	 */
-	private class GoalArg {
-		/** The facts present in the state. */
-		private String[] args_;
-
-		/** The goal facts defined by the arguments. */
-		private SortedSet<StringFact> goalFacts_;
-
-		/**
-		 * Constructor for a new GoalState.
-		 * 
-		 * @param facts
-		 *            The facts of the goal state, sorted by predicate.
-		 */
-		public GoalArg(String[] args) {
-			args_ = args;
-			formGoalFacts(args);
-		}
-
-		/**
-		 * Forms the goal facts from the given arguments.
-		 * 
-		 * @param args
-		 *            The goal fact arguments.
-		 */
-		private void formGoalFacts(String[] args) {
-			// Create the replacement map.
-			Map<String, String> replacements = new HashMap<String, String>();
-			for (int i = 0; i < goalNumArgs_; i++)
-				replacements.put(Module.createModuleParameter(i), args[i]);
-
-			// Replace the arguments and set the goal.
-			goalFacts_ = new TreeSet<StringFact>();
-			for (StringFact fact : goalPredicates_) {
-				fact = new StringFact(fact);
-				fact.replaceArguments(replacements, true);
-				goalFacts_.add(fact);
-			}
-		}
-
-		/**
-		 * If this goal instantiation contains any of the parameterised
-		 * invariants.
-		 * 
-		 * @param invariants
-		 *            The invaiants to check against.
-		 * @return True if the goal arguments contains the invariants.
-		 */
-		public boolean includesInvariants(Collection<StringFact> invariants) {
-			if (invariants.isEmpty())
-				return false;
-
-			for (StringFact goalFact : goalFacts_) {
-				// Don't check type preds, as they are generally always true.
-				if (!StateSpec.getInstance().isTypePredicate(
-						goalFact.getFactName())
-						&& invariants.contains(goalFact))
-					return true;
-			}
-			return false;
-		}
-
-		/**
-		 * Gets the facts.
-		 * 
-		 * @return The arguments for the goal.
-		 */
-		public String[] getGoalArgs() {
-			return args_;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + getOuterType().hashCode();
-			result = prime * result + Arrays.hashCode(args_);
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			GoalArg other = (GoalArg) obj;
-			if (!getOuterType().equals(other.getOuterType()))
-				return false;
-			if (!Arrays.equals(args_, other.args_))
-				return false;
-			return true;
-		}
-
-		private PolicyActor getOuterType() {
-			return PolicyActor.this;
-		}
-
-		@Override
-		public String toString() {
-			return Arrays.toString(args_);
-		}
+		return stateGoals;
 	}
 }

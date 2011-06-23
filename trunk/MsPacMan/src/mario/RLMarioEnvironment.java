@@ -337,7 +337,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			rete.assertString("(canJumpOn goal)");
 			rete.assertString("(heightDiff goal 0)");
 
-			StateSpec.getInstance().generateAddGoal(new ArrayList<String>(), rete);
+			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
+			rete_.run();
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
