@@ -25,11 +25,11 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
+	private static final long serialVersionUID = 4327985487131940550L;
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
 	/** The final character for variables. */
 	private static final char MODULO_LETTERS = 26;
-	private static final long serialVersionUID = 5933775044794142265L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
 
@@ -256,8 +256,8 @@ public class RuleCreation implements Serializable {
 	 *            The state of the environment, containing the valid actions.
 	 * @param validActions
 	 *            The set of valid actions to choose from.
-	 * @param goalTerms
-	 *            The goal predicates.
+	 * @param goalReplacements
+	 *            The goal replacements.
 	 * @param coveredRules
 	 *            A starting point for the rules, if any exist.
 	 * @return A list of guided rules, one for each action type.
@@ -289,7 +289,15 @@ public class RuleCreation implements Serializable {
 
 		// Get the RLGG from the invariant conditions from the action
 		// conditions.
-		return AgentObservations.getInstance().getRLGGActionRules();
+		int numGoalArgs = 0;
+		if (goalReplacements == null)
+			numGoalArgs = PolicyGenerator.getInstance().getModuleGoal().getNumArgs();
+		else
+			numGoalArgs = goalReplacements.size();
+		List<String> queryTerms = new ArrayList<String>(numGoalArgs);
+		for (int i = 0; i < numGoalArgs; i++)
+			queryTerms.add(StateSpec.createGoalTerm(i));
+		return AgentObservations.getInstance().getRLGGActionRules(queryTerms);
 	}
 
 	/**
@@ -502,10 +510,6 @@ public class RuleCreation implements Serializable {
 
 		// Don't swap number variables
 		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
-			return -1;
-
-		// Don't swap modular variables
-		if (variable.contains(Module.MOD_VARIABLE_PREFIX))
 			return -1;
 
 		if (variable.contains(StateSpec.GOAL_VARIABLE_PREFIX))

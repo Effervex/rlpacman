@@ -30,14 +30,17 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class BlocksWorldEnvironment implements EnvironmentInterface {
-	/** The constant for multiplying the number of steps the agent can take. */
-	public static final int STEP_CONSTANT = 2;
-
 	/** The minimal reward the agent can receive. */
 	private static final float MINIMAL_REWARD = -10;
 
 	/** The number of blocks. Default 5. */
 	private int numBlocks_ = 5;
+
+	/** The probability of an action succeeding (assuming it is legal). */
+	private double actionSuccess_ = 1.0;
+
+	/** The maximum number of steps the agent is allocated. */
+	private int maxSteps_;
 
 	/** The state of the blocks world. */
 	private BlocksState state_;
@@ -76,8 +79,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public String env_message(String arg0) {
-		if (arg0.equals("maxSteps"))
-			return (numBlocks_ * STEP_CONSTANT + 1) + "";
+		if (arg0.equals("maxSteps")) {
+			maxSteps_ = (int) (numBlocks_ / actionSuccess_);
+			return maxSteps_ + "";
+		}
 		if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
 			return null;
@@ -86,17 +91,20 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			PolicyGenerator.getInstance().freeze(false);
 			return null;
 		}
-		if ((arg0.length() > 4) && (arg0.substring(0, 4).equals("goal"))) {
+		if ((arg0.startsWith("goal"))) {
 			StateSpec.reinitInstance(arg0.substring(5));
-		}
-		if (arg0.equals("-e"))
+		} else if (arg0.startsWith("nonDet")) {
+			actionSuccess_ = Double.parseDouble(arg0.substring(6));
+		} else if (arg0.equals("-e"))
 			viewingMode_ = true;
-		try {
-			numBlocks_ = Integer.parseInt(arg0);
-			optimalMap_ = new HashMap<BlocksState, Integer>();
-			return null;
-		} catch (Exception e) {
+		else {
+			try {
+				numBlocks_ = Integer.parseInt(arg0);
+				optimalMap_ = new HashMap<BlocksState, Integer>();
+				return null;
+			} catch (Exception e) {
 
+			}
 		}
 		return null;
 	}
@@ -105,8 +113,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public Observation env_start() {
 		rete_ = StateSpec.getInstance().getRete();
 		// Generate a random blocks world
-		state_ = initialiseWorld(numBlocks_, StateSpec.getInstance()
-				.getGoalState());
+		state_ = initialiseWorld(numBlocks_);
 		optimalSteps_ = optimalSteps();
 		if (PolicyGenerator.debugMode_ || viewingMode_) {
 			System.out.println("\tAgent:\n" + state_);
@@ -132,6 +139,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
+		Observation obs = new Observation();
+		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+		// Check for an early exit
+		if (ObjectObservations.getInstance().earlyExit) {
+			return new Reward_observation_terminal(0, obs, true);
+		}
+		
 		RuleAction ruleAction = ((ActionChoice) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
 		StringFact action = null;
@@ -143,7 +157,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 					.get(PolicyGenerator.random_.nextInt(actions.size()));
 		}
 
-		BlocksState newState = actOnAction(action, state_);
+		// Action can fail
+		BlocksState newState = state_;
+		boolean actionFailed = false;
+		if (PolicyGenerator.random_.nextDouble() < actionSuccess_)
+			newState = actOnAction(action, state_);
+		else
+			actionFailed = true;
+
 		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
 			if (action != null)
 				System.out.println("\t" + action + " ->\n" + newState);
@@ -151,14 +172,14 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				System.out.println("\t\t\tNo action chosen.");
 		}
 
-		double nonOptimalSteps = numBlocks_ * STEP_CONSTANT - optimalSteps_;
-		Observation obs = new Observation();
-		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+		double nonOptimalSteps = Math.max(maxSteps_ - optimalSteps_, 1);
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
 			formState(state_.getState());
-		} else {
+		} else if (!actionFailed) {
+			// If the agent caused the state to remain the same, exit the
+			// episode with max negative reward.
 			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
 					: 0;
 			ObjectObservations.getInstance().setNoPreGoal();
@@ -229,16 +250,17 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * 
 	 * @param numBlocks
 	 *            The number of blocks in the world.
-	 * @param goalState
-	 *            The goal state.
+	 * @param goalName
+	 *            The goal name.
 	 * @return The newly initialised blocks world state.
 	 */
-	private BlocksState initialiseWorld(int numBlocks, String goalState) {
+	private BlocksState initialiseWorld(int numBlocks) {
 		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
 		contourState.add(0d);
 		List<Integer> blocksLeft = new ArrayList<Integer>();
+		goalArgs_ = null;
 		for (int i = 1; i <= numBlocks; i++) {
 			blocksLeft.add(i);
 		}
@@ -259,12 +281,44 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			}
 		}
 
+		// Set the goal
+		int[] params = null;
+		String goalName = StateSpec.getInstance().getGoalName();
+		if (goalName.equals("onAB")) {
+			boolean valid = false;
+			while (!valid) {
+				params = new int[2];
+				params[0] = PolicyGenerator.random_.nextInt(numBlocks) + 1;
+				params[1] = PolicyGenerator.random_.nextInt(numBlocks) + 1;
+				// Cannot be the same block, and cannot already be achieved.
+				valid = (params[0] != params[1])
+						&& (worldState[params[0] - 1] != params[1]);
+			}
+		} else if (goalName.equals("clearA")) {
+			params = new int[1];
+			List<Integer> unclears = new ArrayList<Integer>();
+			for (int block : worldState)
+				if (block != 0)
+					unclears.add(block);
+			if (unclears.isEmpty())
+				return initialiseWorld(numBlocks);
+
+			params[0] = unclears.get(PolicyGenerator.random_.nextInt(unclears
+					.size()));
+		}
+
+		if (params != null) {
+			goalArgs_ = new ArrayList<String>(params.length);
+			for (int param : params)
+				goalArgs_.add((char) ('a' + (param - 1)) + "");
+		}
+
 		// Check this isn't the goal state
-		formState(worldState);
-		if (StateSpec.getInstance().isGoal(rete_))
-			return initialiseWorld(numBlocks, goalState);
-		else
-			return new BlocksState(worldState);
+		boolean validWorld = formState(worldState);
+		if (!validWorld)
+			return initialiseWorld(numBlocks);
+
+		return new BlocksState(worldState);
 	}
 
 	/**
@@ -273,7 +327,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @param worldState
 	 *            The state of the world in int form.
 	 */
-	private void formState(Integer[] worldState) {
+	private boolean formState(Integer[] worldState) {
 		try {
 			// Clear the old state
 			rete_.reset();
@@ -284,7 +338,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			// Scanning through, making predicates (On, OnFloor, and Highest)
 			int[] heightMap = new int[worldState.length];
 			int maxHeight = 0;
-			List<Character> highestBlocks = new ArrayList<Character>();
+			List<Integer> highestBlocks = new ArrayList<Integer>();
+			List<Integer> allBlocks = new ArrayList<Integer>();
 			for (int i = 0; i < worldState.length; i++) {
 				// On the floor
 				if (worldState[i] == 0) {
@@ -294,6 +349,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 					rete_.assertString("(on " + (char) ('a' + i) + " "
 							+ (char) ('a' + worldState[i] - 1) + "))");
 				}
+				allBlocks.add(i);
 
 				// Finding the heights
 				int blockHeight = heightMap[i];
@@ -305,7 +361,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 					highestBlocks.clear();
 				}
 				if (blockHeight == maxHeight) {
-					highestBlocks.add((char) ('a' + i));
+					highestBlocks.add(i);
 				}
 
 				// Assert the blocks
@@ -313,15 +369,28 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			}
 
 			// Add the highest block/s
-			for (Character block : highestBlocks) {
-				rete_.assertString("(highest " + block + "))");
+			for (Integer block : highestBlocks) {
+				rete_.assertString("(highest " + (char) ('a' + block) + "))");
 			}
 
-			rete_.run();
+			// Asserting the highest goal
+			if (goalArgs_ == null) {
+				if (StateSpec.getInstance().getGoalName().equals("highestA")) {
+					goalArgs_ = new ArrayList<String>(1);
+					allBlocks.removeAll(highestBlocks);
+					if (allBlocks.isEmpty())
+						return false;
+					goalArgs_.add((char) ('a' + allBlocks
+							.get(PolicyGenerator.random_.nextInt(allBlocks
+									.size())))
+							+ "");
+				} else
+					goalArgs_ = new ArrayList<String>();
+			}
 
 			// Add the goal
-			goalArgs_ = StateSpec.getInstance().generateAddGoal(goalArgs_,
-					rete_);
+			StateSpec.getInstance().assertGoalPred(goalArgs_, rete_);
+			rete_.run();
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
@@ -329,6 +398,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return true;
 	}
 
 	/**
@@ -378,6 +448,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
 		optimalAgent.agent_message("SetPolicy");
+		double oldActionSuccess = actionSuccess_;
+		actionSuccess_ = 1.0;
 		Action act = optimalAgent.agent_start(formObs_Start());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = env_step(act);
@@ -393,6 +465,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Return the state to normal
 		state_ = initialState;
+		actionSuccess_ = oldActionSuccess;
 		formState(state_.getState());
 		optimalMap_.put(state_, steps_);
 		optimal_ = false;

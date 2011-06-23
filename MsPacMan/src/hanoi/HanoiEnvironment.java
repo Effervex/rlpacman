@@ -1,7 +1,6 @@
 package hanoi;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
 
@@ -20,7 +19,6 @@ import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleAction;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
-import relationalFramework.agentObservations.AgentObservations;
 
 /**
  * The environment for the blocks world interface.
@@ -315,7 +313,6 @@ public class HanoiEnvironment implements EnvironmentInterface {
 		private Stack<Character>[] tileState_;
 
 		public HanoiState(int numTiles) {
-			// TODO Could just have random start state
 			tileState_ = new Stack[NUM_TOWERS];
 			for (int i = 0; i < NUM_TOWERS; i++) {
 				tileState_[i] = new Stack<Character>();

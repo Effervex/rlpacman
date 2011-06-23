@@ -8,13 +8,14 @@ import java.util.Iterator;
 import java.util.Map;
 
 public class SelectableSet<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = -6025101660944005158L;
+	private static final long serialVersionUID = 4202933829639914279L;
 	private Map<T, T> slots_ = new HashMap<T, T>();
 
 	/**
 	 * Adds all the items only if they aren't already in the collection.
 	 * 
-	 * @param values The things to add.
+	 * @param values
+	 *            The things to add.
 	 */
 	public boolean addContainsAll(Collection<T> values) {
 		boolean changed = false;
@@ -117,5 +118,10 @@ public class SelectableSet<T> implements Collection<T>, Serializable {
 	@Override
 	public <T> T[] toArray(T[] a) {
 		return slots_.keySet().toArray(a);
+	}
+
+	@Override
+	public String toString() {
+		return slots_.keySet().toString();
 	}
 }

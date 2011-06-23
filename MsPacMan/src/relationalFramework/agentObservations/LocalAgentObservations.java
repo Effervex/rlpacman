@@ -7,9 +7,13 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.Module;
+import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
 import relationalFramework.util.MultiMap;
@@ -22,15 +26,17 @@ import relationalFramework.util.MultiMap;
  * @author Sam Sarjant
  */
 public class LocalAgentObservations implements Serializable {
-	private static final long serialVersionUID = 5224766802305732980L;
+	private static final long serialVersionUID = 4807210696657653846L;
 
 	private static final String SERIALISATION_FILE = "localObservations.ser";
+
+	public static final String LOCAL_GOAL_COND_FILE = "observedGoalFacts.txt";
 
 	/** The local goal for this particular AgentObservations object. */
 	private String localGoal_;
 
-	/** The general goal args pred to add to rules. */
-	private StringFact goalArgsPred_;
+	/** The number of arguments this goal takes. */
+	private int numGoalArgs_;
 
 	/** The action conditions orientated towards the goal. */
 	private MultiMap<String, StringFact> invariantGoalActionConditions_;
@@ -40,6 +46,24 @@ public class LocalAgentObservations implements Serializable {
 
 	/** The observed predicates mentioning goal terms that have been true. */
 	private MultiMap<String, StringFact> observedGoalPredicates_;
+
+	/** The goal arguments that have been observed. */
+	private Collection<GoalArg> observedGoalArgs_;
+
+	/** The inactivity of the goal arguments collection. */
+	private int goalArgsInactivity_ = 0;
+
+	/** The last time the goal args were noted. */
+	private int lastGoalArgsAdd_ = 0;
+
+	/** The invariants relating to goal observations. */
+	private InvariantObservations localInvariants_;
+
+	/** The goal conditions tied to the observed goal predicates. */
+	private Collection<GoalCondition> specificGoalConds_;
+
+	/** A flag which denotes if these observations were loaded. */
+	private boolean loaded_;
 
 	/**
 	 * The constructor for a new local goal object.
@@ -52,28 +76,9 @@ public class LocalAgentObservations implements Serializable {
 		invariantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		variantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		observedGoalPredicates_ = MultiMap.createSortedSetMultiMap();
-	}
-
-	/**
-	 * Notes down the goal predicate structure if necessary.
-	 * 
-	 * @param goalFact
-	 *            The goal fact.
-	 * @param goalReplacements
-	 *            The replacements for the goal terms.
-	 */
-	public void noteGoalPred(StringFact strFact,
-			Map<String, String> goalReplacements) {
-		if (goalArgsPred_ == null
-				|| !strFact.getArguments()[0].equals(goalArgsPred_
-						.getArguments()[0])) {
-			goalArgsPred_ = new StringFact(strFact);
-			goalArgsPred_.replaceArguments(goalReplacements, true);
-			// Add it to the observed goal predicates for
-			// unification purposes
-			for (String term : goalReplacements.values())
-				observedGoalPredicates_.put(term, goalArgsPred_);
-		}
+		observedGoalArgs_ = new TreeSet<GoalArg>();
+		localInvariants_ = new InvariantObservations();
+		loaded_ = false;
 	}
 
 	/**
@@ -105,7 +110,11 @@ public class LocalAgentObservations implements Serializable {
 	 * @return True if the fact was added, false if it was already there.
 	 */
 	public boolean addGoalFact(String goalTerm, StringFact goalFact) {
-		return observedGoalPredicates_.putContains(goalTerm, goalFact);
+		boolean result = observedGoalPredicates_
+				.putContains(goalTerm, goalFact);
+		if (result)
+			specificGoalConds_ = null;
+		return result;
 	}
 
 	public void saveLocalObservations(File environmentDir) throws Exception {
@@ -122,12 +131,66 @@ public class LocalAgentObservations implements Serializable {
 		fos.close();
 	}
 
-	public StringFact getGoalArgsPred() {
-		return goalArgsPred_;
-	}
-
 	public MultiMap<String, StringFact> getGoalPredicateMap() {
 		return observedGoalPredicates_;
+	}
+
+	/**
+	 * Notes the goal arguments down.
+	 * 
+	 * @param stateGoals
+	 *            The goal arguments for the state to note.
+	 */
+	public boolean noteGoalArgs(Collection<GoalArg> stateGoals) {
+		if (observedGoalArgs_.addAll(stateGoals)) {
+			lastGoalArgsAdd_ = 0;
+			goalArgsInactivity_ = 0;
+			return true;
+		} else {
+			goalArgsInactivity_++;
+			return false;
+		}
+	}
+
+	public Collection<GoalArg> getObservedGoalArgs() {
+		return observedGoalArgs_;
+	}
+
+	/**
+	 * Checks if the agent should search all goal args this step based on local
+	 * inactivity.
+	 * 
+	 * @return True if the agent should check all goal arguments.
+	 */
+	public boolean searchAllGoalArgs() {
+		boolean result = lastGoalArgsAdd_ >= (Math.pow(2, goalArgsInactivity_) - 1);
+		lastGoalArgsAdd_++;
+		if (result)
+			lastGoalArgsAdd_ = 0;
+		return result;
+	}
+
+	/**
+	 * Gets a collection of goal conditions formulated from the goal predicates
+	 * which can be possible goals to achieve.
+	 * 
+	 * @return A collection of goal conditions.
+	 */
+	public Collection<GoalCondition> getSpecificGoalConditions() {
+		if (specificGoalConds_ == null) {
+			specificGoalConds_ = new HashSet<GoalCondition>();
+			for (StringFact gc : observedGoalPredicates_.values()) {
+				// If the fact isn't an invariant, isn't negated, and isn't the
+				// goal args predicate, add it.
+				if (!localInvariants_.getSpecificInvariants().contains(gc)
+						&& !gc.isNegated()
+						&& !gc.getFactName().equals(StateSpec.GOALARGS_PRED)
+						&& gc.isFullyNotAnonymous()
+						&& !Module.formName(gc).equals(localGoal_))
+					specificGoalConds_.add(new GoalCondition(gc));
+			}
+		}
+		return specificGoalConds_;
 	}
 
 	public Collection<StringFact> getInvariantGoalActionConditions(String action) {
@@ -138,24 +201,50 @@ public class LocalAgentObservations implements Serializable {
 		return variantGoalActionConditions_.get(action);
 	}
 
-	public boolean invariantsContains(String action, StringFact fact) {
+	public boolean invariantActionsContains(String action, StringFact fact) {
 		if (invariantGoalActionConditions_.containsKey(action))
 			return invariantGoalActionConditions_.get(action).contains(fact);
 		return false;
 	}
 
-	public boolean variantsContains(String action, StringFact fact) {
+	public boolean variantActionsContains(String action, StringFact fact) {
 		if (variantGoalActionConditions_.containsKey(action))
 			return variantGoalActionConditions_.get(action).contains(fact);
 		return false;
+	}
+
+	public boolean noteInvariantConditions(Collection<StringFact> stateFacts,
+			Map<String, String> goalReplacements) {
+		if (goalReplacements != null)
+			return localInvariants_
+					.noteInvariants(stateFacts, goalReplacements);
+		return false;
+	}
+
+	public InvariantObservations getConditionInvariants() {
+		return localInvariants_;
+	}
+
+	public String getLocalGoalName() {
+		return localGoal_;
+	}
+
+	public int getNumGoalArgs() {
+		return numGoalArgs_;
+	}
+
+	public void setNumGoalArgs(int num) {
+		numGoalArgs_ = num;
+	}
+
+	public boolean isLoaded() {
+		return loaded_;
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result
-				+ ((goalArgsPred_ == null) ? 0 : goalArgsPred_.hashCode());
 		result = prime
 				* result
 				+ ((invariantGoalActionConditions_ == null) ? 0
@@ -182,11 +271,6 @@ public class LocalAgentObservations implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		LocalAgentObservations other = (LocalAgentObservations) obj;
-		if (goalArgsPred_ == null) {
-			if (other.goalArgsPred_ != null)
-				return false;
-		} else if (!goalArgsPred_.equals(other.goalArgsPred_))
-			return false;
 		if (invariantGoalActionConditions_ == null) {
 			if (other.invariantGoalActionConditions_ != null)
 				return false;
@@ -220,21 +304,18 @@ public class LocalAgentObservations implements Serializable {
 	 * @return The local agent observations object (loaded or new).
 	 */
 	public static LocalAgentObservations loadAgentObservations() {
-		String localGoal = StateSpec.getInstance().getGoalName();
+		String localGoal = PolicyGenerator.getInstance().getLocalGoal();
 		try {
-			File localObsFile = new File(
-					AgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
-							.getInstance().getEnvironmentName()
-							+ File.separatorChar
-							+ localGoal
-							+ File.separatorChar + SERIALISATION_FILE);
+			File localObsFile = getLocalFile(localGoal);
 			if (localObsFile.exists()) {
 				FileInputStream fis = new FileInputStream(localObsFile);
 				ObjectInputStream ois = new ObjectInputStream(fis);
 				LocalAgentObservations lao = (LocalAgentObservations) ois
 						.readObject();
-				if (lao != null)
+				if (lao != null) {
+					lao.loaded_ = true;
 					return lao;
+				}
 			}
 		} catch (Exception e) {
 		}
@@ -242,7 +323,26 @@ public class LocalAgentObservations implements Serializable {
 		return new LocalAgentObservations(localGoal);
 	}
 
+	private static File getLocalFile(String localGoal) {
+		return new File(AgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
+				.getInstance().getEnvironmentName()
+				+ File.separatorChar
+				+ localGoal + File.separatorChar + SERIALISATION_FILE);
+	}
+
 	public static LocalAgentObservations newAgentObservations() {
-		return new LocalAgentObservations(StateSpec.getInstance().getGoalName());
+		return new LocalAgentObservations(PolicyGenerator.getInstance()
+				.getLocalGoal());
+	}
+
+	/**
+	 * Checks if local observations exist for a given goal.
+	 * 
+	 * @param goalName
+	 *            The name of the goal to check for.
+	 * @return True if there are local agent observations for the given goal.
+	 */
+	public static boolean observationsExist(String goalName) {
+		return getLocalFile(goalName).exists();
 	}
 }

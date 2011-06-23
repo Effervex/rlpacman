@@ -2,8 +2,11 @@ package test;
 
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import jess.Rete;
 
@@ -62,8 +65,11 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
+		Map<String, String> goalReplacements = new HashMap<String, String>();
+		goalReplacements.put("z", "?G_0");
+		goalReplacements.put("x", "?G_1");
 		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, null, activatedActions, true);
+				validActions, goalReplacements, activatedActions, true);
 
 		// [e]
 		// [b][d]
@@ -91,8 +97,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions, true);
+		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+				goalReplacements, activatedActions, true);
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -117,12 +123,17 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions, true);
+		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+				goalReplacements, activatedActions, true);
 		GuidedRule rlggRule = new GuidedRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
+		List<String> queryParameters = new ArrayList<String>();
+		queryParameters.add("?G_0");
+		queryParameters.add("?G_1");
+		rlggRule.setQueryParams(queryParameters);
 		assertTrue(rlggRules.contains(rlggRule));
 		rlggRule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rlggRule.setQueryParams(queryParameters);
 		assertTrue(rlggRules.contains(rlggRule));
 		assertEquals(rlggRules.size(), 2);
 

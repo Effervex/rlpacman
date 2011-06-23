@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
-
 /**
  * A class representing a probability distribution of values. These values are
  * sampled randomly according to their probabilities.
@@ -20,7 +19,8 @@ import java.util.Set;
  * 
  */
 public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
-	private static final long serialVersionUID = 3187745593570014645L;
+	private static final long serialVersionUID = 297675144227949310L;
+	public static final int MAX_RULES_STRING = 5;
 	/** The instances in the distribution with associated weights. */
 	private Map<T, Double> itemProbs_;
 	/** The random number generator. */
@@ -502,7 +502,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public double klSize() {
 		double klSum = 0;
 		int size = size();
-		if (size == 1)
+		if (size <= 1)
 			return 1;
 		double uniform = 1.0 / size;
 		for (Double prob : itemProbs_.values()) {
@@ -611,11 +611,23 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		ArrayList<T> ordered = getOrderedElements();
 		StringBuffer buffer = new StringBuffer("{");
 		boolean first = true;
+		int count = 0;
+		double sum = 0;
 		for (T element : ordered) {
+			if (count >= MAX_RULES_STRING) {
+				int remaining = ordered.size() - MAX_RULES_STRING;
+				double remSum = (1 - sum);
+				buffer.append(" + " + remaining
+						+ " OTHERS:~" + remSum / remaining + " EACH");
+				break;
+			}
 			if (!first)
 				buffer.append(", ");
-			buffer.append("(" + element + ":" + itemProbs_.get(element) + ")");
+			double itemProb = itemProbs_.get(element);
+			buffer.append("(" + element + ":" + itemProb + ")");
+			sum += itemProb;
 			first = false;
+			count++;
 		}
 		buffer.append("}");
 		return buffer.toString();

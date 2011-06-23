@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import java.util.Collection;
 import java.util.SortedSet;
 
 import jess.Rete;
@@ -11,7 +12,7 @@ import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.ConstantPred;
+import relationalFramework.GoalCondition;
 import relationalFramework.GuidedRule;
 import relationalFramework.StateSpec;
 import relationalFramework.StringFact;
@@ -53,7 +54,7 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor ?X)"));
-		ConstantPred constants = rule.getConstantConditions();
+		Collection<GoalCondition> constants = rule.getConstantConditions();
 		assertNull(constants);
 
 		// Test for a constant
@@ -69,11 +70,11 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
 		constants = rule.getConstantConditions();
-		StringFact strFact = StateSpec.getInstance().getPredicates().get(
-				"clear");
-		assertTrue(constants.getFacts().contains(
-				new StringFact(strFact, new String[] { "a" })));
-		assertEquals(constants.getFacts().size(), 1);
+		StringFact strFact = StateSpec.getInstance().getPredicates()
+				.get("clear");
+		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+				new String[] { "a" }))));
+		assertEquals(constants.size(), 1);
 
 		// Test for constants (no inequals)
 		rule = new GuidedRule("(clear a) (clear b) => (moveFloor a)");
@@ -93,11 +94,11 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
 		constants = rule.getConstantConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.getFacts().contains(
-				new StringFact(strFact, new String[] { "a" })));
-		assertTrue(constants.getFacts().contains(
-				new StringFact(strFact, new String[] { "b" })));
-		assertEquals(constants.getFacts().size(), 2);
+		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+				new String[] { "a" }))));
+		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+				new String[] { "b" }))));
+		assertEquals(constants.size(), 2);
 
 		// Multiple conditions, one term
 		rule = new GuidedRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
@@ -285,21 +286,21 @@ public class BlocksWorldStateSpecTest {
 
 		// Testing module constants
 		rule = new GuidedRule(
-				"(clear ?_MOD_a) (on ?_MOD_a ?) => (moveFloor ?_MOD_a)");
+				"(clear ?G_0) (on ?G_0 ?) => (moveFloor ?G_0)");
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(block ?_MOD_a)")));
+				StateSpec.toStringFact("(block ?G_0)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(on ?_MOD_a ?)")));
+				StateSpec.toStringFact("(on ?G_0 ?)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(clear ?_MOD_a)")));
-		assertEquals(rule.getAction(), StateSpec
-				.toStringFact("(moveFloor ?_MOD_a)"));
+				StateSpec.toStringFact("(clear ?G_0)")));
+		assertEquals(rule.getAction(),
+				StateSpec.toStringFact("(moveFloor ?G_0)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getConstantConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.getFacts().contains(
-				new StringFact(strFact, new String[] { "?_MOD_a" })));
-		assertEquals(constants.getFacts().size(), 1);
+		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+				new String[] { "?G_0" }))));
+		assertEquals(constants.size(), 1);
 
 		// Testing negation
 		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");

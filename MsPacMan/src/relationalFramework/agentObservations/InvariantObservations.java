@@ -2,6 +2,7 @@ package relationalFramework.agentObservations;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Map;
 import java.util.TreeSet;
 
 import relationalFramework.StringFact;
@@ -13,7 +14,7 @@ import relationalFramework.StringFact;
  * @author Sam Sarjant
  */
 public class InvariantObservations implements Serializable {
-	private static final long serialVersionUID = -3315975123179700215L;
+	private static final long serialVersionUID = 6532453706652428545L;
 
 	/** The specific predicates (fully fleshed out preds). */
 	private Collection<StringFact> specificInvariants_;
@@ -48,6 +49,42 @@ public class InvariantObservations implements Serializable {
 		boolean result = specificInvariants_.retainAll(stateFacts);
 		result |= generalInvariants_.retainAll(generalStateFacts);
 		return result;
+	}
+
+	/**
+	 * Note the goal terms in the state down using the given replacements and
+	 * renew the invariants.
+	 * 
+	 * @param stateFacts
+	 *            The state facts (to be replaced).
+	 * @param goalReplacements
+	 *            The goal replacement terms.
+	 * @return True if the invariants collection changed at all.
+	 */
+	public boolean noteInvariants(Collection<StringFact> stateFacts,
+			Map<String, String> goalReplacements) {
+		counter_++;
+		if (specificInvariants_ == null) {
+			specificInvariants_ = new TreeSet<StringFact>();
+		}
+
+		// Run through each fact, only noting it down if the replacement applies
+		// to it.
+		Collection<StringFact> goalFacts = new TreeSet<StringFact>();
+		for (StringFact stateFact : stateFacts) {
+			StringFact checkFact = new StringFact(stateFact);
+			if (checkFact.replaceArguments(goalReplacements, false)) {
+				StringFact replFact = new StringFact(stateFact);
+				replFact.replaceArguments(goalReplacements, true);
+				if (counter_ == 1)
+					specificInvariants_.add(replFact);
+				goalFacts.add(replFact);
+			}
+		}
+
+		if (counter_ == 1)
+			return true;
+		return specificInvariants_.retainAll(goalFacts);
 	}
 
 	@Override
@@ -95,9 +132,10 @@ public class InvariantObservations implements Serializable {
 			buffer.append("NONE RECORDED");
 			return buffer.toString();
 		}
-			
-		buffer.append("Specific: " + specificInvariants_.toString() + "\n");
-		buffer.append("General: " + generalInvariants_.toString());
+
+		buffer.append("Specific: " + specificInvariants_.toString());
+		if (generalInvariants_ != null)
+			buffer.append("\n" + "General: " + generalInvariants_.toString());
 		return buffer.toString();
 	}
 

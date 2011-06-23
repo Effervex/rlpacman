@@ -434,18 +434,29 @@ public class Slot implements Serializable, Comparable<Slot> {
 	@Override
 	public int compareTo(Slot other) {
 		int result = action_.compareTo(other.action_);
-		if (result == 0) {
-			result = Double.compare(slotSplitFacts_.hashCode(),
-					other.slotSplitFacts_.hashCode());
-			if (result == 0) {
-				if (fixed_ && !other.fixed_)
-					return -1;
-				else if (!fixed_ && other.fixed_)
-					return 1;
-				else if (fixed_ && other.fixed_)
-					return fixedRule_.compareTo(other.fixedRule_);
-			}
+		if (result != 0)
+			return result;
+
+		if (slotSplitFacts_ == null) {
+			if (other.slotSplitFacts_ != null)
+				return -1;
+		} else {
+			if (other.slotSplitFacts_ == null)
+				return 1;
+			else
+				result = Double.compare(slotSplitFacts_.hashCode(),
+						other.slotSplitFacts_.hashCode());
 		}
+		if (result != 0)
+			return result;
+
+		if (fixed_ && !other.fixed_)
+			return -1;
+		else if (!fixed_ && other.fixed_)
+			return 1;
+		else if (fixed_ && other.fixed_)
+			return fixedRule_.compareTo(other.fixedRule_);
+
 		return result;
 	}
 
@@ -464,11 +475,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
+		buffer.append(" [MU:" + selectionProb_ + "\u00b1" + selectionSD_ + ";ORD:" + ordering_ + "]");
 		if (fixed_)
 			buffer.append(" " + fixedRule_.toString());
 		else
 			buffer.append(" " + ruleGenerator_.toString());
-		buffer.append("," + selectionProb_ + "\u00b1" + selectionSD_);
 		return buffer.toString();
 	}
 

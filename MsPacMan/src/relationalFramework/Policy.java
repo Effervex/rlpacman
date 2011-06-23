@@ -3,15 +3,13 @@ package relationalFramework;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import org.apache.commons.collections.BidiMap;
 
 import relationalFramework.util.ArgumentComparator;
 import relationalFramework.util.MultiMap;
@@ -26,7 +24,7 @@ import jess.ValueVector;
  * @author Samuel J. Sarjant
  */
 public class Policy implements Serializable {
-	private static final long serialVersionUID = -8362692831702469438L;
+	private static final long serialVersionUID = 2507211169328391223L;
 	public static final String PREFIX = "Policy";
 	public static final char DELIMITER = '#';
 	/** The rules of this policy, organised in a deterministic list format. */
@@ -92,36 +90,42 @@ public class Policy implements Serializable {
 	 *            The rule being checked.
 	 */
 	private void checkModular(GuidedRule rule) {
-		ConstantPred constantConditions = rule.getConstantConditions();
+		Collection<GoalCondition> constantConditions = rule
+				.getConstantConditions();
 		if (constantConditions == null)
 			return;
-		String modName = constantConditions.toString();
-
-		Module module = Module.loadModule(StateSpec.getInstance()
-				.getEnvironmentName(), modName);
-		// If the module exists
-		if (module != null) {
-			// Put the parameters into an arraylist
-			ArrayList<String> parameters = new ArrayList<String>();
-			for (StringFact cond : constantConditions.getFacts()) {
+		// Load every necessary module
+		for (GoalCondition constantCondition : constantConditions) {
+			Module module = Module.loadModule(StateSpec.getInstance()
+					.getEnvironmentName(), constantCondition.toString());
+			// If the module exists
+			if (module != null) {
+				// Put the parameters into an arraylist
+				ArrayList<String> parameters = new ArrayList<String>();
+				StringFact cond = constantCondition.getFact();
 				// Extract the parameters used in the constant
 				// conditions
 				for (String arg : cond.getArguments()) {
-					// May need to replace parameters if modular is
-					// recursive
-					if (rule.getParameters() != null) {
-						parameters.add(rule.getReplacementParameter(arg));
-					} else {
+					// If modules are recursive, set up the parameters
+					// accordingly.
+					if (!rule.isLoadedModuleRule())
 						parameters.add(arg);
+					else {
+						int index = rule.getQueryParameters().indexOf(arg);
+						if (index != -1)
+							parameters.add(rule.getModuleParameters()
+									.get(index));
+						else
+							parameters.add(arg);
 					}
 				}
-			}
 
-			// Add the module rules.
-			for (GuidedRule gr : module.getModuleRules()) {
-				gr.setParameters(parameters);
-				checkModular(gr);
-				policyRules_.add(gr);
+				// Add the module rules.
+				for (GuidedRule gr : module.getModuleRules()) {
+					gr.setModularParameters(parameters);
+					checkModular(gr);
+					policyRules_.add(gr);
+				}
 			}
 		}
 	}
@@ -180,17 +184,25 @@ public class Policy implements Serializable {
 	 * @param goalState
 	 *            The arguments to apply to the parameters.
 	 */
-	public void parameterArgs(String[] goalArgs) {
+	public void parameterArgs(Map<String, String> goalArgs) {
 		List<String> params = null;
 		if (goalArgs != null) {
 			params = new ArrayList<String>();
-			for (String arg : goalArgs)
-				params.add(arg);
+			for (int i = 0; i < goalArgs.size(); i++)
+				params.add(goalArgs.get(StateSpec.createGoalTerm(i)));
 		}
 
 		// Set the parameters for the policy rules.
 		for (GuidedRule gr : policyRules_) {
-			gr.setParameters(params);
+			// Special case for loaded module rules - they have their parameter
+			// args swapped.
+			if (gr.isLoadedModuleRule()) {
+				List<String> modParams = new ArrayList<String>();
+				for (String modParam : gr.getModuleParameters())
+					modParams.add(goalArgs.get(modParam));
+				gr.setParameters(modParams);
+			} else
+				gr.setParameters(params);
 		}
 	}
 
@@ -239,10 +251,6 @@ public class Policy implements Serializable {
 			return "<EMPTY POLICY>";
 
 		StringBuffer buffer = new StringBuffer("Policy");
-		if (PolicyGenerator.debugMode_) {
-			buffer.append(" (Goal: " + StateSpec.getInstance().formGoalString()
-					+ ")");
-		}
 		buffer.append(":\n");
 
 		for (GuidedRule rule : policyRules_) {
@@ -297,11 +305,11 @@ public class Policy implements Serializable {
 	 *            If this policy is noting the rules fired as triggered. Usually
 	 *            deactivated after agent has found internal goal.
 	 */
-	@SuppressWarnings("unchecked")
 	public ActionChoice evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
-			ActionChoice actionSwitch, int actionsReturned, boolean optimal,
-			boolean alreadyCovered, boolean noteTriggered) {
+			MultiMap<String, String[]> validActions,
+			Map<String, String> goalReplacements, ActionChoice actionSwitch,
+			int actionsReturned, boolean optimal, boolean alreadyCovered,
+			boolean noteTriggered) {
 		noteTriggered_ = noteTriggered;
 		actionSwitch.switchOffAll();
 		MultiMap<String, String[]> activatedActions = MultiMap

@@ -23,6 +23,7 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Fact;
+import relationalFramework.GoalCondition;
 import relationalFramework.GuidedRule;
 import relationalFramework.PolicyGenerator;
 import relationalFramework.RuleCreation;
@@ -39,7 +40,7 @@ import relationalFramework.util.MultiMap;
  * @author Sam Sarjant
  */
 public final class AgentObservations implements Serializable {
-	private static final long serialVersionUID = 8554988415899784500L;
+	private static final long serialVersionUID = -3707261549494747211L;
 
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -63,7 +64,7 @@ public final class AgentObservations implements Serializable {
 	/** A hash code to track when an observation changes. */
 	private transient Integer observationHash_ = null;
 
-	/** The amount of inactivity the observations has accrued. */
+	/** The amount of (2^) inactivity the observations has accrued. */
 	private transient int inactivity_ = 0;
 
 	/** The number of steps since last covering the state. */
@@ -158,7 +159,7 @@ public final class AgentObservations implements Serializable {
 
 		// Also, cover every X episodes, checking more and more
 		// infrequently if no changes occur.
-		if (lastCover_ >= Math.pow(2, inactivity_) - 1) {
+		if (lastCover_ >= (Math.pow(2, inactivity_) - 1)) {
 			lastCover_ = 0;
 			return true;
 		}
@@ -244,12 +245,15 @@ public final class AgentObservations implements Serializable {
 	 * Gets the RLGG rules found through the action observations. This is found
 	 * by observing the invariants in the actions.
 	 * 
+	 * @param queryParams
+	 *            The query parameters for the current goal (if any).
 	 * @return The RLGGs for every action.
 	 */
-	public List<GuidedRule> getRLGGActionRules() {
+	public List<GuidedRule> getRLGGActionRules(List<String> queryParams) {
 		List<GuidedRule> rlggRules = new ArrayList<GuidedRule>();
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			GuidedRule rlggRule = abo.getRLGGRule();
+			rlggRule.setQueryParams(queryParams);
 			rlggRules.add(rlggRule);
 		}
 		return rlggRules;
@@ -292,6 +296,22 @@ public final class AgentObservations implements Serializable {
 		return conditionObservations_.unseenPreds_;
 	}
 
+	public Collection<GoalCondition> getLocalSpecificGoalConditions() {
+		return localAgentObservations_.getSpecificGoalConditions();
+	}
+
+	public int getNumGoalArgs() {
+		return localAgentObservations_.getNumGoalArgs();
+	}
+
+	public void setNumGoalArgs(int num) {
+		localAgentObservations_.setNumGoalArgs(num);
+	}
+
+	public String getLocalGoalName() {
+		return localAgentObservations_.getLocalGoalName();
+	}
+
 	public boolean removeUnseenPredicates(Collection<StringFact> removables) {
 		return conditionObservations_.unseenPreds_.removeAll(removables);
 	}
@@ -308,6 +328,42 @@ public final class AgentObservations implements Serializable {
 	}
 
 	/**
+	 * Notes the arguments given for the goal.
+	 * 
+	 * @param stateGoals
+	 *            The goal arguments for the state.
+	 */
+	public void noteGoalArgs(Collection<GoalArg> stateGoals) {
+		localAgentObservations_.noteGoalArgs(stateGoals);
+	}
+
+	/**
+	 * Notes a single argument for the goal.
+	 * 
+	 * @param goalArg
+	 *            The goal argument.
+	 */
+	public void noteGoalArgs(GoalArg goalArg) {
+		Collection<GoalArg> singleArg = new ArrayList<GoalArg>(1);
+		singleArg.add(goalArg);
+		localAgentObservations_.noteGoalArgs(singleArg);
+	}
+
+	/**
+	 * Checks if the agent should search all goal args this step based on local
+	 * inactivity.
+	 * 
+	 * @return True if the agent should check all goal arguments.
+	 */
+	public boolean searchAllGoalArgs() {
+		return localAgentObservations_.searchAllGoalArgs();
+	}
+
+	public Collection<GoalArg> getPossibleGoalArgs() {
+		return localAgentObservations_.getObservedGoalArgs();
+	}
+
+	/**
 	 * Saves agent observations to file in the agent observations directory.
 	 */
 	public void saveAgentObservations() {
@@ -316,8 +372,8 @@ public final class AgentObservations implements Serializable {
 			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
 					.getInstance().getEnvironmentName() + File.separatorChar);
 			environmentDir.mkdir();
-			File localEnvironmentDir = new File(environmentDir, StateSpec
-					.getInstance().getGoalName() + File.separatorChar);
+			File localEnvironmentDir = new File(environmentDir, PolicyGenerator
+					.getInstance().getLocalGoal() + File.separatorChar);
 			localEnvironmentDir.mkdir();
 
 			// Condition beliefs
@@ -340,8 +396,28 @@ public final class AgentObservations implements Serializable {
 			}
 
 			buf.write("\n");
-			buf.write("Invariants\n");
+			buf.write("Global Invariants\n");
 			buf.write(conditionObservations_.invariants_.toString());
+
+			buf.close();
+			wr.close();
+
+			// Local condition beliefs
+			File localGoalConds = new File(localEnvironmentDir,
+					LocalAgentObservations.LOCAL_GOAL_COND_FILE);
+			wr = new FileWriter(localGoalConds);
+			buf = new BufferedWriter(wr);
+
+			MultiMap<String, StringFact> goalFacts = localAgentObservations_
+					.getGoalPredicateMap();
+			for (String term : goalFacts.keySet()) {
+				buf.write(term + ":\n  " + goalFacts.get(term) + "\n");
+			}
+
+			buf.write("\n");
+			buf.write("Local Invariants\n");
+			buf.write(localAgentObservations_.getConditionInvariants()
+					.toString());
 
 			buf.close();
 			wr.close();
@@ -439,12 +515,6 @@ public final class AgentObservations implements Serializable {
 						if (!StateSpec.isNumber(arguments[i]))
 							termMappedFacts_.putContains(arguments[i], strFact);
 					}
-				} else if (strFact.getFactName()
-						.equals(StateSpec.GOALARGS_PRED)) {
-					// Note down the goal predicate structure to include it in
-					// rules.
-					localAgentObservations_.noteGoalPred(strFact,
-							goalReplacements);
 				}
 			}
 		}
@@ -500,7 +570,7 @@ public final class AgentObservations implements Serializable {
 					instance_.localAgentObservations_ = LocalAgentObservations
 							.loadAgentObservations();
 
-					return instance_.localAgentObservations_.getGoalArgsPred() != null;
+					return instance_.localAgentObservations_.isLoaded();
 				}
 			}
 		} catch (Exception e) {
@@ -686,11 +756,11 @@ public final class AgentObservations implements Serializable {
 				// If the condition is not in the invariants and if it's not
 				// negated, IS in the variants, keep it.
 				if (!invariantActionConditions_.contains(simplify)
-						&& !localAgentObservations_.invariantsContains(
+						&& !localAgentObservations_.invariantActionsContains(
 								action_.getFactName(), simplify)) {
 					if (simplify.isNegated()
 							|| variantActionConditions_.contains(simplify)
-							|| localAgentObservations_.variantsContains(
+							|| localAgentObservations_.variantActionsContains(
 									action_.getFactName(), simplify))
 						return simplify;
 				}
@@ -812,12 +882,6 @@ public final class AgentObservations implements Serializable {
 					ruleConds.add(modFact);
 				}
 
-				// Add the goal condition
-				StringFact localGoalArgsPred = localAgentObservations_
-						.getGoalArgsPred();
-				if (localGoalArgsPred != null)
-					ruleConds.add(localGoalArgsPred);
-
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false);
 				if (rlggRule_ == null)
@@ -826,6 +890,7 @@ public final class AgentObservations implements Serializable {
 					rlggRule_.setConditions(ruleConds, false);
 					rlggRule_.setActionTerms(action_.getArguments());
 				}
+
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
 			}
@@ -986,6 +1051,16 @@ public final class AgentObservations implements Serializable {
 					changed |= conditions.remove(invariant);
 				}
 			}
+			// Also remove local invariants
+			for (StringFact invariant : localAgentObservations_
+					.getConditionInvariants().getSpecificInvariants()) {
+				// Only remove non-type invariants, as type invariants are
+				// either needed, or will be added back anyway.
+				if (!StateSpec.getInstance().isTypePredicate(
+						invariant.getFactName())) {
+					changed |= conditions.remove(invariant);
+				}
+			}
 			return changed;
 		}
 
@@ -1007,6 +1082,8 @@ public final class AgentObservations implements Serializable {
 			// Note the invariants
 			changed |= invariants_
 					.noteInvariants(stateFacts, generalStateFacts);
+			changed |= localAgentObservations_.noteInvariantConditions(
+					stateFacts, goalReplacements);
 
 			// Use the term mapped facts to generate collections of true facts.
 			changed |= recordConditionAssociations(stateFacts, goalReplacements);
