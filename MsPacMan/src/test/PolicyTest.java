@@ -8,10 +8,11 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Module;
-import relationalFramework.Policy;
-import relationalFramework.PolicyGenerator;
+import cerrla.Module;
+import cerrla.PolicyGenerator;
+
+import relationalFramework.RelationalRule;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
 
 public class PolicyTest {
@@ -25,16 +26,16 @@ public class PolicyTest {
 	@Test
 	public void testAddRule() {
 		// Basic rule adding
-		Policy pol = new Policy();
-		GuidedRule rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
+		RelationalPolicy pol = new RelationalPolicy();
+		RelationalRule rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		pol.addRule(rule, false, false);
 		assertEquals(pol.getPolicyRules(false).size(), 1);
 		assertTrue(pol.getPolicyRules(false).contains(rule));
 		assertTrue(pol.getFiringRules().isEmpty());
 
 		// Rule adding with modular check (but no module defined)
-		pol = new Policy();
-		rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
+		pol = new RelationalPolicy();
+		rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		pol.addRule(rule, true, false);
 		assertEquals(pol.getPolicyRules(false).size(), 1);
 		assertTrue(pol.getPolicyRules(false).contains(rule));
@@ -46,15 +47,15 @@ public class PolicyTest {
 				.getModuleRules().size();
 
 		// Rule adding with modular check (module fires)
-		pol = new Policy();
-		rule = new GuidedRule("(clear a) => (moveFloor a)");
+		pol = new RelationalPolicy();
+		rule = new RelationalRule("(clear a) => (moveFloor a)");
 		pol.addRule(rule, true, false);
 
 		assertEquals(pol.getPolicyRules(false).size(), clearRulesNum + 1);
 		assertTrue(pol.getPolicyRules(false).contains(rule));
 		List<String> queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
-		GuidedRule modRule = new GuidedRule(
+		RelationalRule modRule = new RelationalRule(
 				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
 		List<String> params = new ArrayList<String>();
 		params.add("a");
@@ -65,13 +66,13 @@ public class PolicyTest {
 			fail("'clear&clear' module doesn't exist!");
 
 		// Rule adding with multiple modular check
-		pol = new Policy();
-		rule = new GuidedRule("(clear a) (clear b) => (moveFloor a)");
+		pol = new RelationalPolicy();
+		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
 		pol.addRule(rule, true, false);
 		assertEquals(pol.getPolicyRules(false).size(), clearRulesNum * 2 + 1);
 		assertTrue(pol.getPolicyRules(false).contains(rule));
 		int i = 0;
-		for (GuidedRule gr : pol.getPolicyRules(false)) {
+		for (RelationalRule gr : pol.getPolicyRules(false)) {
 			if (i < clearRulesNum) {
 				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("a"));
@@ -91,8 +92,8 @@ public class PolicyTest {
 
 		// Rule adding with modular check (recursive modular firing where on
 		// module calls clear module)
-		pol = new Policy();
-		rule = new GuidedRule("(on a b) => (moveFloor a)");
+		pol = new RelationalPolicy();
+		rule = new RelationalRule("(on a b) => (moveFloor a)");
 		pol.addRule(rule, true, false);
 		assertEquals(pol.getPolicyRules(false).size(), 6);
 		assertTrue(pol.getPolicyRules(false).contains(rule));
@@ -100,14 +101,14 @@ public class PolicyTest {
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
 		queryParams.add("?_MOD_b");
-		modRule = new GuidedRule(
+		modRule = new RelationalRule(
 				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
 		params = new ArrayList<String>();
 		params.add("a");
 		params.add("b");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules(false).contains(modRule));
-		modRule = new GuidedRule(
+		modRule = new RelationalRule(
 				"(above ?X ?_MOD_b) (clear ?X) => (moveFloor ?X)", queryParams);
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules(false).contains(modRule));
@@ -115,7 +116,7 @@ public class PolicyTest {
 		queryParams = new ArrayList<String>();
 		queryParams.add("?_MOD_a");
 		queryParams.add("?_MOD_b");
-		modRule = new GuidedRule(
+		modRule = new RelationalRule(
 				"(clear ?_MOD_a) (clear ?_MOD_b) => (move ?_MOD_a ?_MOD_b)",
 				queryParams);
 		params = new ArrayList<String>();

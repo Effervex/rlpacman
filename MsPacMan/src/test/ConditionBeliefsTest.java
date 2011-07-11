@@ -9,7 +9,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.ConditionBeliefs;
 
 public class ConditionBeliefsTest {
@@ -35,8 +35,8 @@ public class ConditionBeliefsTest {
 	public void testNoteRelativeFactsEmpty() {
 		// Adding no true facts (all never used)
 		ConditionBeliefs cb = new ConditionBeliefs("clear");
-		Collection<StringFact> untrueFacts = new ArrayList<StringFact>();
-		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
+		Collection<RelationalPredicate> untrueFacts = new ArrayList<RelationalPredicate>();
+		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<RelationalPredicate>(),
 				untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
@@ -77,7 +77,7 @@ public class ConditionBeliefsTest {
 
 		cb = new ConditionBeliefs("on");
 		untrueFacts.clear();
-		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
+		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<RelationalPredicate>(),
 				untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
@@ -164,8 +164,8 @@ public class ConditionBeliefsTest {
 		StateSpec.initInstance("rlPacMan.PacMan");
 
 		ConditionBeliefs cb = new ConditionBeliefs("edible");
-		Collection<StringFact> untrueFacts = new ArrayList<StringFact>();
-		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
+		Collection<RelationalPredicate> untrueFacts = new ArrayList<RelationalPredicate>();
+		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<RelationalPredicate>(),
 				untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
@@ -189,7 +189,7 @@ public class ConditionBeliefsTest {
 
 		cb = new ConditionBeliefs("distanceGhost");
 		untrueFacts.clear();
-		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<StringFact>(),
+		assertTrue(cb.noteTrueRelativeFacts(new ArrayList<RelationalPredicate>(),
 				untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(
@@ -237,11 +237,11 @@ public class ConditionBeliefsTest {
 	public void testNoteTrueRelativeFacts() {
 		// Testing adding of never facts with already added true facts
 		ConditionBeliefs cb = new ConditionBeliefs("clear");
-		Collection<StringFact> trueFacts = new ArrayList<StringFact>();
+		Collection<RelationalPredicate> trueFacts = new ArrayList<RelationalPredicate>();
 		trueFacts.add(StateSpec.toStringFact("on ?X ?)"));
 		trueFacts.add(StateSpec.toStringFact("above ?X ?)"));
 		trueFacts.add(StateSpec.toStringFact("highest ?X)"));
-		Collection<StringFact> untrueFacts = new ArrayList<StringFact>();
+		Collection<RelationalPredicate> untrueFacts = new ArrayList<RelationalPredicate>();
 		assertTrue(cb.noteTrueRelativeFacts(trueFacts, untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue().isEmpty());
 		assertTrue(cb.getAlwaysTrue().contains(

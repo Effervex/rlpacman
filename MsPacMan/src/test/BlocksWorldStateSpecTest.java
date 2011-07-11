@@ -13,9 +13,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.GoalCondition;
-import relationalFramework.GuidedRule;
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.util.MultiMap;
 
 public class BlocksWorldStateSpecTest {
@@ -44,7 +44,7 @@ public class BlocksWorldStateSpecTest {
 	@Test
 	public void testRuleCreation() {
 		// Basic variable test
-		GuidedRule rule = new GuidedRule("(clear ?X) => (moveFloor ?X)");
+		RelationalRule rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		// 2 assertions in the body: clear, and block
 		assertEquals(rule.getConditions(false).size(), 2);
 		assertTrue(rule.getConditions(false).contains(
@@ -58,7 +58,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test for a constant
-		rule = new GuidedRule("(clear a) => (moveFloor a)");
+		rule = new RelationalRule("(clear a) => (moveFloor a)");
 		// 2 assertions in the body: clear, and block, with a constant
 		// variable
 		assertEquals(rule.getConditions(false).size(), 2);
@@ -70,14 +70,14 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
 		constants = rule.getConstantConditions();
-		StringFact strFact = StateSpec.getInstance().getPredicates()
+		RelationalPredicate strFact = StateSpec.getInstance().getPredicates()
 				.get("clear");
-		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
 				new String[] { "a" }))));
 		assertEquals(constants.size(), 1);
 
 		// Test for constants (no inequals)
-		rule = new GuidedRule("(clear a) (clear b) => (moveFloor a)");
+		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
 		// 4 assertions in the body: 2 clears, and 2 blocks, without an
 		// inequality test
 		assertEquals(rule.getConditions(false).size(), 4);
@@ -94,14 +94,14 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(), StateSpec.toStringFact("(moveFloor a)"));
 		constants = rule.getConstantConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
 				new String[] { "a" }))));
-		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
 				new String[] { "b" }))));
 		assertEquals(constants.size(), 2);
 
 		// Multiple conditions, one term
-		rule = new GuidedRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
 		// 3 assertions in the body: clear, highest, and a single block
 		assertEquals(rule.getConditions(false).size(), 3);
 		assertTrue(rule.getConditions(false).contains(
@@ -117,7 +117,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Multiple conditions, two terms
-		rule = new GuidedRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
 		assertEquals(rule.getConditions(false).size(), 5);
@@ -140,7 +140,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Variables and constants
-		rule = new GuidedRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
+		rule = new RelationalRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, highest, two blocks, and an
 		// inequals test
 		assertEquals(rule.getConditions(false).size(), 8);
@@ -169,7 +169,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test anonymous variable
-		rule = new GuidedRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
 		assertEquals(rule.getConditions(false).size(), 3);
@@ -186,7 +186,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test anonymous variables
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(clear ?X) (on ?X ?) (on ?Y ?) => (moveFloor ?X)");
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
@@ -213,7 +213,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test type predicate
-		rule = new GuidedRule("(block ?X) => (moveFloor ?X)");
+		rule = new RelationalRule("(block ?X) => (moveFloor ?X)");
 		assertEquals(rule.getConditions(false).size(), 1);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
@@ -222,7 +222,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test inequal type predicates
-		rule = new GuidedRule("(block ?X) (block ?Y) => (move ?X ?Y)");
+		rule = new RelationalRule("(block ?X) (block ?Y) => (move ?X ?Y)");
 		assertEquals(rule.getConditions(false).size(), 3);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
@@ -235,7 +235,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test existing type predicate
-		rule = new GuidedRule("(clear ?X) (block ?X) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (block ?X) => (moveFloor ?X)");
 		assertEquals(rule.getConditions(false).size(), 2);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
@@ -246,7 +246,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Test inequals parsing
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(clear ?X) (clear ?Y) (test (<> ?Y ?X)) (block ?X) (block ?Y) => (move ?X ?Y)");
 		assertEquals(rule.getConditions(false).size(), 5);
 		assertTrue(rule.getConditions(false).contains(
@@ -268,7 +268,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Testing module syntax
-		rule = new GuidedRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
+		rule = new RelationalRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
@@ -285,7 +285,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Testing module constants
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(clear ?G_0) (on ?G_0 ?) => (moveFloor ?G_0)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?G_0)")));
@@ -298,12 +298,12 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getConstantConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.contains(new GoalCondition(new StringFact(strFact,
+		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
 				new String[] { "?G_0" }))));
 		assertEquals(constants.size(), 1);
 
 		// Testing negation
-		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
@@ -316,7 +316,7 @@ public class BlocksWorldStateSpecTest {
 		assertNull(constants);
 
 		// Testing negation (with extra terms)
-		rule = new GuidedRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toStringFact("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(

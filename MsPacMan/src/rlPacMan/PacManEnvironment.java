@@ -4,26 +4,35 @@ import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import jess.JessException;
 import jess.Rete;
+
+import msPacMan.Dot;
+import msPacMan.GameModel;
+import msPacMan.Ghost;
+import msPacMan.GhostCentre;
+import msPacMan.Junction;
+import msPacMan.PacMan;
+import msPacMan.PacPoint;
+import msPacMan.Player;
+import msPacMan.PowerDot;
+import msPacMan.Thing;
 
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.ActionChoice;
-import relationalFramework.LearningController;
+import cerrla.LearningController;
+import cerrla.PolicyActor;
+import cerrla.PolicyGenerator;
+
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
 import relationalFramework.ObjectObservations;
-import relationalFramework.Policy;
-import relationalFramework.PolicyActor;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleAction;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
-import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.util.MultiMap;
 import rlPacManGeneral.PacManLowAction;
 
@@ -134,7 +143,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Applying the action (up down left right or nothing)
-		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
+		PolicyActions actions = (PolicyActions) ObjectObservations.getInstance().objectArray[0];
 		environment_.simulateKeyPress(chooseLowAction(actions.getActions())
 				.getKey());
 
@@ -174,7 +183,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * Runs the hand-coded policy until a pre-goal is obtained.
 	 */
 	private void handCodedPolicy() {
-		Policy handCodedPolicy = StateSpec.getInstance().getHandCodedPolicy();
+		RelationalPolicy handCodedPolicy = StateSpec.getInstance().getHandCodedPolicy();
 
 		// A special case for testing the policy for score
 		if (testHandCodedPolicy_)
@@ -183,7 +192,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Run the policy through the environment until goal is satisfied.
 
 		PolicyActor handCodedAgent = new PolicyActor();
-		ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
+		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 		handCodedAgent.agent_message("Optimal");
 		handCodedAgent.agent_message("SetPolicy");
 		Action act = handCodedAgent.agent_start(formObservations(rete_));
@@ -206,13 +215,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * @param handCodedPolicy
 	 *            The optimal policy.
 	 */
-	private void testHandCodedPolicy(Policy handCodedPolicy) {
+	private void testHandCodedPolicy(RelationalPolicy handCodedPolicy) {
 		int repetitions = LearningController.AVERAGE_ITERATIONS
 				* LearningController.TEST_ITERATIONS;
 		double score = 0;
 		for (int i = 0; i < repetitions; i++) {
 			PolicyActor handCodedAgent = new PolicyActor();
-			ObjectObservations.getInstance().objectArray = new Policy[] { handCodedPolicy };
+			ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
 			handCodedAgent.agent_message("SetPolicy");
 			Action act = handCodedAgent.agent_start(formObservations(rete_));
@@ -282,10 +291,12 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The agent's current actions. Should always be the same size
 	 *            with possible null elements.
 	 */
-	private void drawActions(ArrayList<RuleAction> actions) {
+	private void drawActions(ArrayList<Collection<FiredAction>> actions) {
 		if (!experimentMode_) {
-			environment_.m_bottomCanvas.setActionsList(actions
-					.toArray(new RuleAction[actions.size()]));
+			FiredAction[] firedArray = new FiredAction[actions.size()];
+			for (int i = 0; i < actions.size(); i++)
+				firedArray[i] = actions.get(i).iterator().next();
+			environment_.m_bottomCanvas.setActionsList(firedArray);
 		}
 	}
 
@@ -297,7 +308,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            into a weighted singular direction to take.
 	 * @return The low action to use.
 	 */
-	private PacManLowAction chooseLowAction(ArrayList<RuleAction> actions) {
+	private PacManLowAction chooseLowAction(ArrayList<Collection<FiredAction>> actions) {
 		// Find the valid directions
 		ArrayList<PacManLowAction> directions = new ArrayList<PacManLowAction>();
 		int x = model_.m_player.m_locX;
@@ -325,27 +336,26 @@ public class PacManEnvironment implements EnvironmentInterface {
 		int i = 0;
 		double[] globalDirectionVote = new double[PacManLowAction.values().length];
 		double globalBest = 0;
-		MultiMap<Byte, RuleAction> actionDirections = MultiMap
+		MultiMap<Byte, FiredAction> actionDirections = MultiMap
 				.createListMultiMap();
-		for (RuleAction ruleAction : actions) {
+		for (Collection<FiredAction> firedActions : actions) {
 			double[] directionVote = new double[PacManLowAction.values().length];
 			double worst = 0;
 			double bestWeight = 0;
-			Collection<StringFact> actionStrings = ruleAction.getActions();
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList.
-			for (StringFact action : actionStrings) {
+			for (FiredAction firedAction : firedActions) {
 				// For each rule, a list of actions are returned
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
-						.getInstance()).applyAction(action, state);
+						.getInstance()).applyAction(firedAction.getAction(), state);
 
 				if (weightedDir != null) {
 					// Use a linearly decreasing weight and the object proximity
 					double weighting = weightedDir.getWeight();
 					bestWeight = Math.max(bestWeight, Math.abs(weighting));
 					byte dir = (byte) Math.abs(weightedDir.getDirection());
-					actionDirections.putContains(dir, ruleAction);
+					actionDirections.putContains(dir, firedAction);
 					if (weightedDir.getDirection() > 0) {
 						directionVote[dir] += weighting;
 					} else if (weightedDir.getDirection() < 0) {
@@ -413,9 +423,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 		// Trigger the rules leading to this direction
 		if (actionDirections.containsKey((byte) lastDirection_.ordinal())) {
-			for (RuleAction ra : actionDirections.get((byte) lastDirection_
+			for (FiredAction fa : actionDirections.get((byte) lastDirection_
 					.ordinal()))
-				ra.triggerRule();
+				fa.triggerRule();
 		}
 		return lastDirection_;
 	}

@@ -10,11 +10,12 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleCreation;
-import relationalFramework.GuidedRule;
+import cerrla.PolicyGenerator;
+import cerrla.RuleCreation;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManRuleCreationTest {
@@ -135,30 +136,30 @@ public class PacManRuleCreationTest {
 
 	@Test
 	public void testSpecialiseRangedPreGoal() throws Exception {
-		GuidedRule rule = new GuidedRule(
+		RelationalRule rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -10.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
-		Set<GuidedRule> specialisedRules = sut_.specialiseRuleMinor(rule);
+		Set<RelationalRule> specialisedRules = sut_.specialiseRuleMinor(rule);
 
 		// Ranges should be 5 basic sets: those under 0 and those over 0, and 3
 		// overlapping equal ranges.
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -10.0 7.5))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 7.5 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -1.25 16.25))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -10.0 0.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 0.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
@@ -168,15 +169,15 @@ public class PacManRuleCreationTest {
 		specialisedRules = sut_.specialiseRuleMinor(rule);
 
 		// Another split, this time with 3 overlapping ranges
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 0.0 12.5))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 6.25 18.75))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 12.5 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
@@ -186,15 +187,15 @@ public class PacManRuleCreationTest {
 		specialisedRules = sut_.specialiseRuleMinor(rule);
 
 		// Another split, this time with 3 overlapping ranges
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 12.5 18.75))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 15.625 21.875))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 18.75 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
@@ -204,7 +205,7 @@ public class PacManRuleCreationTest {
 	@Test
 	public void testSpecialiseRule() {
 		// Set up the allowable conditions
-		Collection<StringFact> conditions = new HashSet<StringFact>();
+		Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>();
 		conditions.add(StateSpec.toStringFact("(edible ?X)"));
 		conditions.add(StateSpec.toStringFact("(blinking ?X)"));
 		conditions.add(StateSpec.toStringFact("(not (edible ?X))"));
@@ -212,13 +213,13 @@ public class PacManRuleCreationTest {
 		AgentObservations.getInstance().setActionConditions("toGhost",
 				conditions);
 
-		GuidedRule rule = new GuidedRule(
+		RelationalRule rule = new RelationalRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (pacman player) => (toGhost ?X ?__Num6)");
-		Set<GuidedRule> specialisations = sut_.specialiseRule(rule);
-		GuidedRule mutant = new GuidedRule(
+		Set<RelationalRule> specialisations = sut_.specialiseRule(rule);
+		RelationalRule mutant = new RelationalRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (blinking ?X) (pacman player) => (toGhost ?X ?__Num6)");
 		assertTrue(specialisations.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (not (blinking ?X)) (pacman player) => (toGhost ?X ?__Num6)");
 		assertTrue(specialisations.contains(mutant));
 		assertEquals(specialisations.size(), 2);

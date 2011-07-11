@@ -503,7 +503,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		double klSum = 0;
 		int size = size();
 		if (size <= 1)
-			return 1;
+			return 0;
 		double uniform = 1.0 / size;
 		for (Double prob : itemProbs_.values()) {
 			klSum += klDivergence(prob, uniform);

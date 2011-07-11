@@ -11,11 +11,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
 
+import cerrla.Module;
+import cerrla.PolicyGenerator;
+
 import relationalFramework.GoalCondition;
-import relationalFramework.Module;
-import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.util.MultiMap;
 
 /**
@@ -39,13 +40,13 @@ public class LocalAgentObservations implements Serializable {
 	private int numGoalArgs_;
 
 	/** The action conditions orientated towards the goal. */
-	private MultiMap<String, StringFact> invariantGoalActionConditions_;
+	private MultiMap<String, RelationalPredicate> invariantGoalActionConditions_;
 
 	/** The action conditions orientated towards the goal. */
-	private MultiMap<String, StringFact> variantGoalActionConditions_;
+	private MultiMap<String, RelationalPredicate> variantGoalActionConditions_;
 
 	/** The observed predicates mentioning goal terms that have been true. */
-	private MultiMap<String, StringFact> observedGoalPredicates_;
+	private MultiMap<String, RelationalPredicate> observedGoalPredicates_;
 
 	/** The goal arguments that have been observed. */
 	private Collection<GoalArg> observedGoalArgs_;
@@ -89,12 +90,12 @@ public class LocalAgentObservations implements Serializable {
 	 * @return True if the collections were initialised.
 	 */
 	public boolean initLocalActionConds(String action,
-			Collection<StringFact> goalActionConds) {
+			Collection<RelationalPredicate> goalActionConds) {
 		if (!invariantGoalActionConditions_.containsKey(action)) {
 			invariantGoalActionConditions_.putCollection(action,
 					goalActionConds);
 			variantGoalActionConditions_.putCollection(action,
-					new TreeSet<StringFact>());
+					new TreeSet<RelationalPredicate>());
 			return true;
 		}
 		return false;
@@ -109,7 +110,7 @@ public class LocalAgentObservations implements Serializable {
 	 *            The goal fact to add (it may be negated).
 	 * @return True if the fact was added, false if it was already there.
 	 */
-	public boolean addGoalFact(String goalTerm, StringFact goalFact) {
+	public boolean addGoalFact(String goalTerm, RelationalPredicate goalFact) {
 		boolean result = observedGoalPredicates_
 				.putContains(goalTerm, goalFact);
 		if (result)
@@ -131,7 +132,7 @@ public class LocalAgentObservations implements Serializable {
 		fos.close();
 	}
 
-	public MultiMap<String, StringFact> getGoalPredicateMap() {
+	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
 		return observedGoalPredicates_;
 	}
 
@@ -179,7 +180,7 @@ public class LocalAgentObservations implements Serializable {
 	public Collection<GoalCondition> getSpecificGoalConditions() {
 		if (specificGoalConds_ == null) {
 			specificGoalConds_ = new HashSet<GoalCondition>();
-			for (StringFact gc : observedGoalPredicates_.values()) {
+			for (RelationalPredicate gc : observedGoalPredicates_.values()) {
 				// If the fact isn't an invariant, isn't negated, and isn't the
 				// goal args predicate, add it.
 				if (!localInvariants_.getSpecificInvariants().contains(gc)
@@ -193,27 +194,27 @@ public class LocalAgentObservations implements Serializable {
 		return specificGoalConds_;
 	}
 
-	public Collection<StringFact> getInvariantGoalActionConditions(String action) {
+	public Collection<RelationalPredicate> getInvariantGoalActionConditions(String action) {
 		return invariantGoalActionConditions_.get(action);
 	}
 
-	public Collection<StringFact> getVariantGoalActionConditions(String action) {
+	public Collection<RelationalPredicate> getVariantGoalActionConditions(String action) {
 		return variantGoalActionConditions_.get(action);
 	}
 
-	public boolean invariantActionsContains(String action, StringFact fact) {
+	public boolean invariantActionsContains(String action, RelationalPredicate fact) {
 		if (invariantGoalActionConditions_.containsKey(action))
 			return invariantGoalActionConditions_.get(action).contains(fact);
 		return false;
 	}
 
-	public boolean variantActionsContains(String action, StringFact fact) {
+	public boolean variantActionsContains(String action, RelationalPredicate fact) {
 		if (variantGoalActionConditions_.containsKey(action))
 			return variantGoalActionConditions_.get(action).contains(fact);
 		return false;
 	}
 
-	public boolean noteInvariantConditions(Collection<StringFact> stateFacts,
+	public boolean noteInvariantConditions(Collection<RelationalPredicate> stateFacts,
 			Map<String, String> goalReplacements) {
 		if (goalReplacements != null)
 			return localInvariants_

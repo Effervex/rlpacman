@@ -7,8 +7,9 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.RuleCreation;
-import relationalFramework.GuidedRule;
+import cerrla.RuleCreation;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 
@@ -97,31 +98,31 @@ public class PacManGeneralRuleCreationTest {
 	public void testSpecialiseRule() {
 		// Checking that no specialisations are created (edible and blinking
 		// aren't added)
-		GuidedRule rule = new GuidedRule(
+		RelationalRule rule = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(dot ?X) => (moveTo ?X ?__Num0)");
-		Set<GuidedRule> specialisations = sut_.specialiseRule(rule);
+		Set<RelationalRule> specialisations = sut_.specialiseRule(rule);
 		assertTrue(specialisations.toString(), specialisations.isEmpty());
 
 		// They should be added here
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(ghost ?X) => (moveTo ?X ?__Num0)");
 		specialisations = sut_.specialiseRule(rule);
 		assertFalse(specialisations.toString(), specialisations.isEmpty());
-		GuidedRule mutant = new GuidedRule(
+		RelationalRule mutant = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(ghost ?X) (edible ?X) => (moveTo ?X ?__Num0)");
 		assertTrue(specialisations.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(ghost ?X) (blinking ?X) => (moveTo ?X ?__Num0)");
 		assertTrue(specialisations.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(ghost ?X) (not (edible ?X)) => (moveTo ?X ?__Num0)");
 		assertTrue(specialisations.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) "
 						+ "(ghost ?X) (not (blinking ?X)) => (moveTo ?X ?__Num0)");
 		assertTrue(specialisations.contains(mutant));

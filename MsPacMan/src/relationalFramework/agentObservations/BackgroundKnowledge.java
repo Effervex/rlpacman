@@ -9,10 +9,11 @@ import java.util.SortedSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import relationalFramework.GuidedRule;
+import cerrla.Unification;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
-import relationalFramework.Unification;
+import relationalFramework.RelationalPredicate;
 
 /**
  * A class representing background knowledge assertions
@@ -29,10 +30,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	private boolean jessAssert_;
 
 	/** The preconditions for the background knowledge. */
-	private Collection<StringFact> preConds_;
+	private Collection<RelationalPredicate> preConds_;
 
 	/** The postcondition (asserted value) for the background knowledge. */
-	private StringFact postCondition_;
+	private RelationalPredicate postCondition_;
 
 	/** If this background knowledge is equivalent or just inferred. */
 	private boolean equivalentRule_;
@@ -55,7 +56,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			splitter = StateSpec.EQUIVALENT_RULE;
 		}
 		String[] split = assertion.split(splitter);
-		preConds_ = GuidedRule.splitConditions(split[0]);
+		preConds_ = RelationalRule.splitConditions(split[0]);
 
 		split[1] = split[1].trim();
 		String assertStr = "(assert ";
@@ -72,8 +73,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * 
 	 * @return A collection of all conditions shown in the background rule.
 	 */
-	private Collection<StringFact> getAllConditions() {
-		Collection<StringFact> backgroundConditions = new ArrayList<StringFact>(
+	private Collection<RelationalPredicate> getAllConditions() {
+		Collection<RelationalPredicate> backgroundConditions = new ArrayList<RelationalPredicate>(
 				preConds_);
 		backgroundConditions.add(postCondition_);
 		return backgroundConditions;
@@ -84,10 +85,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * 
 	 * @return A collection of all conditions with the postcondition negated.
 	 */
-	private Collection<StringFact> getConjugatedConditions() {
-		Collection<StringFact> backgroundConditions = new ArrayList<StringFact>(
+	private Collection<RelationalPredicate> getConjugatedConditions() {
+		Collection<RelationalPredicate> backgroundConditions = new ArrayList<RelationalPredicate>(
 				preConds_);
-		StringFact negated = new StringFact(postCondition_);
+		RelationalPredicate negated = new RelationalPredicate(postCondition_);
 		negated.swapNegated();
 		backgroundConditions.add(negated);
 
@@ -102,14 +103,14 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            The replacement map, or null.
 	 * @return The preconditions of the background knowledge.
 	 */
-	private Collection<StringFact> getPreConds(BidiMap replacementTerms) {
-		Collection<StringFact> preConds = new ArrayList<StringFact>(preConds_
+	private Collection<RelationalPredicate> getPreConds(BidiMap replacementTerms) {
+		Collection<RelationalPredicate> preConds = new ArrayList<RelationalPredicate>(preConds_
 				.size());
-		for (StringFact preCond : preConds_) {
-			StringFact replacedFact = new StringFact(preCond);
+		for (RelationalPredicate preCond : preConds_) {
+			RelationalPredicate replacedFact = new RelationalPredicate(preCond);
 			if (replacementTerms != null)
 				replacedFact.replaceArguments(
-						replacementTerms.inverseBidiMap(), true);
+						replacementTerms.inverseBidiMap(), true, false);
 			if (!replacedFact.isFullyAnonymous())
 				preConds.add(replacedFact);
 			else
@@ -126,11 +127,11 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param replacementTerms
 	 *            The replacement terms to swap the terms with.
 	 */
-	private StringFact getPostCond(BidiMap replacementTerms) {
-		StringFact replacedFact = new StringFact(postCondition_);
+	private RelationalPredicate getPostCond(BidiMap replacementTerms) {
+		RelationalPredicate replacedFact = new RelationalPredicate(postCondition_);
 		if (replacementTerms != null)
 			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
-					true);
+					true, false);
 		return replacedFact;
 	}
 
@@ -142,7 +143,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 */
 	public Collection<String> getRelevantPreds() {
 		Collection<String> relevantPreds = new HashSet<String>();
-		for (StringFact lhs : preConds_) {
+		for (RelationalPredicate lhs : preConds_) {
 			relevantPreds.add(lhs.getFactName());
 		}
 		if (equivalentRule_)
@@ -159,17 +160,17 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            If the conditions are being tested for illegal conditions too.
 	 * @return True if the conditions were simplified, false otherwise.
 	 */
-	public boolean simplify(SortedSet<StringFact> ruleConds,
+	public boolean simplify(SortedSet<RelationalPredicate> ruleConds,
 			boolean testForIllegalRule) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
-		Collection<StringFact> bckConditions = getAllConditions();
+		Collection<RelationalPredicate> bckConditions = getAllConditions();
 		int result = Unification.getInstance().unifyStates(bckConditions,
 				ruleConds, replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
 		if (result == 0) {
-			StringFact cond = getPostCond(replacementTerms);
+			RelationalPredicate cond = getPostCond(replacementTerms);
 			if (ruleConds.remove(cond))
 				changed = true;
 		}
@@ -178,7 +179,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_) {
 			replacementTerms.clear();
 
-			StringFact unifiedEquiv = Unification.getInstance().unifyFact(
+			RelationalPredicate unifiedEquiv = Unification.getInstance().unifyFact(
 					getPostCond(null), ruleConds, new DualHashBidiMap(),
 					replacementTerms, new String[0], true, false, false);
 			// Remove any replacements which specialise anonymous terms
@@ -187,13 +188,13 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			// If there is a unification, attempt to remove the right side
 			if (unifiedEquiv != null) {
 				unifiedEquiv.replaceArguments(
-						replacementTerms.inverseBidiMap(), true);
+						replacementTerms.inverseBidiMap(), true, false);
 
 				// Swap variable
-				Collection<StringFact> equivFacts = getPreConds(replacementTerms);
+				Collection<RelationalPredicate> equivFacts = getPreConds(replacementTerms);
 				if (equivFacts != null && ruleConds.remove(unifiedEquiv)) {
 					// Add all equivalent facts.
-					for (StringFact equivFact : equivFacts) {
+					for (RelationalPredicate equivFact : equivFacts) {
 						if (!ruleConds.contains(equivFact)) {
 							ruleConds.add(equivFact);
 							changed = true;
@@ -210,7 +211,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			// If the rule is found to be illegal using the conjugated
 			// conditions, remove the illegal condition
 			if (result == 0) {
-				StringFact cond = getPostCond(replacementTerms);
+				RelationalPredicate cond = getPostCond(replacementTerms);
 				cond.swapNegated();
 				if (ruleConds.remove(cond))
 					changed = true;
@@ -288,8 +289,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		}
 
 		// Compare by pre conds
-		Iterator<StringFact> thisIter = preConds_.iterator();
-		Iterator<StringFact> otherIter = other.preConds_.iterator();
+		Iterator<RelationalPredicate> thisIter = preConds_.iterator();
+		Iterator<RelationalPredicate> otherIter = other.preConds_.iterator();
 		// Iterate through the rules, until all matched, or a mismatch
 		while (thisIter.hasNext() || otherIter.hasNext()) {
 			// If either ruleset is smaller, return that as the smaller one.

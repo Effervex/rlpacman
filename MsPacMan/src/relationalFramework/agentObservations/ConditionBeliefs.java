@@ -9,9 +9,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import relationalFramework.RuleCreation;
+import cerrla.RuleCreation;
+
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.util.MultiMap;
 
 /**
@@ -27,10 +28,10 @@ public class ConditionBeliefs implements Serializable {
 	private String condition_;
 
 	/** The set of conditions that are always true when this condition is true. */
-	private Collection<StringFact> alwaysTrue_;
+	private Collection<RelationalPredicate> alwaysTrue_;
 
 	/** The set of conditions that are never true when this condition is true. */
-	private Collection<StringFact> neverTrue_;
+	private Collection<RelationalPredicate> neverTrue_;
 
 	/** A flag to note if the never true values have been initialised yet. */
 	private boolean firstState = true;
@@ -39,16 +40,16 @@ public class ConditionBeliefs implements Serializable {
 	 * The set of conditions that are occasionally true when this condition is
 	 * true.
 	 */
-	private Collection<StringFact> occasionallyTrue_;
+	private Collection<RelationalPredicate> occasionallyTrue_;
 
 	/**
 	 * The set of conditions with predicate condition that are more general
 	 * version of this condition.
 	 */
-	private Collection<StringFact> disallowed_;
+	private Collection<RelationalPredicate> disallowed_;
 
 	/** More general (and same) versions of this rule. */
-	private Collection<StringFact> generalities_;
+	private Collection<RelationalPredicate> generalities_;
 
 	/**
 	 * The argument index for the condition belief. Only used for negated
@@ -65,10 +66,10 @@ public class ConditionBeliefs implements Serializable {
 	 */
 	public ConditionBeliefs(String condition) {
 		condition_ = condition;
-		alwaysTrue_ = new TreeSet<StringFact>();
-		neverTrue_ = new TreeSet<StringFact>();
-		occasionallyTrue_ = new TreeSet<StringFact>();
-		disallowed_ = new TreeSet<StringFact>();
+		alwaysTrue_ = new TreeSet<RelationalPredicate>();
+		neverTrue_ = new TreeSet<RelationalPredicate>();
+		occasionallyTrue_ = new TreeSet<RelationalPredicate>();
+		disallowed_ = new TreeSet<RelationalPredicate>();
 	}
 
 	/**
@@ -99,8 +100,8 @@ public class ConditionBeliefs implements Serializable {
 	 *            added.
 	 * @return True if the condition beliefs changed at all.
 	 */
-	public boolean noteTrueRelativeFacts(Collection<StringFact> trueFacts,
-			Collection<StringFact> untrueFacts, boolean addGeneralities) {
+	public boolean noteTrueRelativeFacts(Collection<RelationalPredicate> trueFacts,
+			Collection<RelationalPredicate> untrueFacts, boolean addGeneralities) {
 		// If this is our first state, all true facts are always true, and all
 		// others are always false.
 		if (firstState) {
@@ -120,7 +121,7 @@ public class ConditionBeliefs implements Serializable {
 			return false;
 
 		// Clone the collection so no changes are made.
-		trueFacts = new HashSet<StringFact>(trueFacts);
+		trueFacts = new HashSet<RelationalPredicate>(trueFacts);
 
 		// Expand the true facts first
 		trueFacts.addAll(generateGenerals(trueFacts));
@@ -139,7 +140,7 @@ public class ConditionBeliefs implements Serializable {
 
 		// Otherwise, perform a number of intersections to determine the sets.
 		// Find any predicates present in this trueFacts not in alwaysTrue
-		Collection<StringFact> union = new HashSet<StringFact>(trueFacts);
+		Collection<RelationalPredicate> union = new HashSet<RelationalPredicate>(trueFacts);
 		union.addAll(alwaysTrue_);
 		alwaysTrue_.retainAll(trueFacts);
 		union.removeAll(alwaysTrue_);
@@ -162,11 +163,11 @@ public class ConditionBeliefs implements Serializable {
 	 * 
 	 * @return A collection of all generalities of this rule.
 	 */
-	private Collection<StringFact> createGeneralities() {
-		Collection<StringFact> generalities = new TreeSet<StringFact>();
+	private Collection<RelationalPredicate> createGeneralities() {
+		Collection<RelationalPredicate> generalities = new TreeSet<RelationalPredicate>();
 
 		// Add general rules to always true (on ?X ?Y) => (on ?X ?), (on ? ?Y)
-		StringFact thisFact = StateSpec.getInstance().getStringFact(condition_);
+		RelationalPredicate thisFact = StateSpec.getInstance().getStringFact(condition_);
 		int permutations = (int) Math.pow(2, thisFact.getArgTypes().length);
 		// Create all generalisations of this fact
 		for (int p = 1; p < permutations; p++) {
@@ -180,7 +181,7 @@ public class ConditionBeliefs implements Serializable {
 					genArguments[i] = StateSpec.ANONYMOUS;
 			}
 
-			generalities.add(new StringFact(thisFact, genArguments));
+			generalities.add(new RelationalPredicate(thisFact, genArguments));
 		}
 
 		return generalities;
@@ -203,9 +204,9 @@ public class ConditionBeliefs implements Serializable {
 	 * @param occasionalFacts
 	 *            The facts that are sometimes true, sometimes false.
 	 */
-	public boolean noteFacts(Collection<StringFact> trueFacts,
-			Collection<StringFact> untrueFacts,
-			Collection<StringFact> occasionalFacts) {
+	public boolean noteFacts(Collection<RelationalPredicate> trueFacts,
+			Collection<RelationalPredicate> untrueFacts,
+			Collection<RelationalPredicate> occasionalFacts) {
 		if (firstState) {
 			alwaysTrue_.addAll(trueFacts);
 			neverTrue_.addAll(untrueFacts);
@@ -223,7 +224,7 @@ public class ConditionBeliefs implements Serializable {
 		changed |= neverTrue_.removeAll(occasionalFacts);
 		changed |= occasionallyTrue_.addAll(occasionalFacts);
 
-		for (StringFact trueFact : trueFacts) {
+		for (RelationalPredicate trueFact : trueFacts) {
 			// If always doesn't contain the fact
 			if (!alwaysTrue_.contains(trueFact)) {
 				if (neverTrue_.contains(trueFact)) {
@@ -240,7 +241,7 @@ public class ConditionBeliefs implements Serializable {
 			}
 		}
 
-		for (StringFact untrueFact : untrueFacts) {
+		for (RelationalPredicate untrueFact : untrueFacts) {
 			// If always doesn't contain the fact
 			if (!neverTrue_.contains(untrueFact)) {
 				if (alwaysTrue_.contains(untrueFact)) {
@@ -268,12 +269,12 @@ public class ConditionBeliefs implements Serializable {
 	 * this condition to the always true set of rules.
 	 */
 	private void rearrangeGeneralRules() {
-		Collection<StringFact> generals = generateGenerals(alwaysTrue_);
+		Collection<RelationalPredicate> generals = generateGenerals(alwaysTrue_);
 		occasionallyTrue_.removeAll(generals);
 		neverTrue_.removeAll(generals);
 		alwaysTrue_.addAll(generals);
 
-		for (StringFact general : generalities_) {
+		for (RelationalPredicate general : generalities_) {
 			occasionallyTrue_.remove(general);
 			neverTrue_.remove(general);
 			alwaysTrue_.add(general);
@@ -288,15 +289,15 @@ public class ConditionBeliefs implements Serializable {
 	 *            The set of base facts to generalise.
 	 * @return The collection of more general facts for the facts from base set.
 	 */
-	private Collection<StringFact> generateGenerals(
-			Collection<StringFact> baseSet) {
-		Collection<StringFact> addedGeneralisations = new HashSet<StringFact>();
+	private Collection<RelationalPredicate> generateGenerals(
+			Collection<RelationalPredicate> baseSet) {
+		Collection<RelationalPredicate> addedGeneralisations = new HashSet<RelationalPredicate>();
 		// Run through each fact in the base set.
-		for (StringFact baseFact : baseSet) {
+		for (RelationalPredicate baseFact : baseSet) {
 			// Run through each possible binary implementation of the arguments,
 			// adding to the added args. (ignoring first and last case)
 			for (int b = 1; b < Math.pow(2, baseFact.getArguments().length) - 1; b++) {
-				StringFact general = new StringFact(baseFact);
+				RelationalPredicate general = new RelationalPredicate(baseFact);
 				String[] factArgs = general.getArguments();
 				// Change each argument based on the binary representation.
 				boolean changed = false;
@@ -342,7 +343,7 @@ public class ConditionBeliefs implements Serializable {
 		predicates.addAll(StateSpec.getInstance().getPredicates().keySet());
 		for (String pred : predicates) {
 			// Run by the possible combinations within the predicates.
-			for (StringFact fact : createPossibleFacts(pred, possibleTerms)) {
+			for (RelationalPredicate fact : createPossibleFacts(pred, possibleTerms)) {
 				if (!alwaysTrue_.contains(fact)
 						&& !occasionallyTrue_.contains(fact))
 					neverTrue_.add(fact);
@@ -370,17 +371,17 @@ public class ConditionBeliefs implements Serializable {
 	 * @return A collection of facts representing the possible paired
 	 *         predicates.
 	 */
-	private Collection<StringFact> createPossibleFacts(String pred,
+	private Collection<RelationalPredicate> createPossibleFacts(String pred,
 			MultiMap<String, String> possibleTerms) {
-		Collection<StringFact> shapedFacts = new HashSet<StringFact>();
+		Collection<RelationalPredicate> shapedFacts = new HashSet<RelationalPredicate>();
 
 		// Run through each base fact, shaping as it goes.
-		StringFact predFact = StateSpec.getInstance().getStringFact(pred);
+		RelationalPredicate predFact = StateSpec.getInstance().getStringFact(pred);
 		// Special case - if this condition is a type and the fact is a type add
 		// it simply.
 		if (StateSpec.getInstance().isTypePredicate(condition_)
 				&& StateSpec.getInstance().isTypePredicate(pred)) {
-			predFact = new StringFact(predFact, new String[] { possibleTerms
+			predFact = new RelationalPredicate(predFact, new String[] { possibleTerms
 					.values().iterator().next() });
 			shapedFacts.add(predFact);
 		} else {
@@ -393,7 +394,7 @@ public class ConditionBeliefs implements Serializable {
 			String[] baseArgs = new String[predFact.getArguments().length];
 			for (int i = 0; i < baseArgs.length; i++)
 				baseArgs[i] = RuleCreation.getVariableTermString(i);
-			shapedFacts.remove(new StringFact(predFact, baseArgs));
+			shapedFacts.remove(new RelationalPredicate(predFact, baseArgs));
 		}
 
 		return shapedFacts;
@@ -408,7 +409,7 @@ public class ConditionBeliefs implements Serializable {
 	 *            The predicate to form action term map from.
 	 * @return The mapping of argument type classes to argument variables.
 	 */
-	private MultiMap<String, String> createActionTerms(StringFact predicate) {
+	private MultiMap<String, String> createActionTerms(RelationalPredicate predicate) {
 		MultiMap<String, String> actionTerms = MultiMap.createListMultiMap();
 
 		String[] argTypes = predicate.getArgTypes();
@@ -450,8 +451,8 @@ public class ConditionBeliefs implements Serializable {
 	 *            The list of facts to fill.
 	 */
 	private void formPossibleFact(String[] arguments, int index,
-			MultiMap<String, String> possibleTerms, StringFact baseFact,
-			Collection<StringFact> possibleFacts) {
+			MultiMap<String, String> possibleTerms, RelationalPredicate baseFact,
+			Collection<RelationalPredicate> possibleFacts) {
 		// Base case, if index is outside arguments, build the fact
 		String[] argTypes = baseFact.getArgTypes();
 		if (index >= argTypes.length) {
@@ -466,7 +467,7 @@ public class ConditionBeliefs implements Serializable {
 			}
 
 			// If not anonymous, form the fact
-			StringFact possible = new StringFact(baseFact, Arrays.copyOf(
+			RelationalPredicate possible = new RelationalPredicate(baseFact, Arrays.copyOf(
 					arguments, arguments.length));
 			if (keepRule) {
 				possibleFacts.add(possible);
@@ -497,15 +498,15 @@ public class ConditionBeliefs implements Serializable {
 		return condition_;
 	}
 
-	public Collection<StringFact> getAlwaysTrue() {
+	public Collection<RelationalPredicate> getAlwaysTrue() {
 		return alwaysTrue_;
 	}
 
-	public Collection<StringFact> getNeverTrue() {
+	public Collection<RelationalPredicate> getNeverTrue() {
 		return neverTrue_;
 	}
 
-	public Collection<StringFact> getOccasionallyTrue() {
+	public Collection<RelationalPredicate> getOccasionallyTrue() {
 		return occasionallyTrue_;
 	}
 
@@ -514,8 +515,8 @@ public class ConditionBeliefs implements Serializable {
 	 * 
 	 * @return A condition fact with the correct arguments and negation.
 	 */
-	public StringFact getConditionFact() {
-		StringFact cbFact = StateSpec.getInstance().getStringFact(condition_);
+	public RelationalPredicate getConditionFact() {
+		RelationalPredicate cbFact = StateSpec.getInstance().getStringFact(condition_);
 		String[] arguments = new String[cbFact.getArguments().length];
 		for (int i = 0; i < arguments.length; i++) {
 			if (args_ == null)
@@ -524,7 +525,7 @@ public class ConditionBeliefs implements Serializable {
 				arguments[i] = args_[i];
 		}
 
-		cbFact = new StringFact(cbFact, arguments);
+		cbFact = new RelationalPredicate(cbFact, arguments);
 		if (args_ != null)
 			cbFact.swapNegated();
 		return cbFact;

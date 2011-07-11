@@ -3,7 +3,8 @@ package relationalFramework.util;
 import java.io.Serializable;
 import java.util.Comparator;
 
-import relationalFramework.Slot;
+import cerrla.Slot;
+
 
 public class SlotOrderComparator implements Comparator<Slot>, Serializable {
 	private static final long serialVersionUID = 3925398461164725398L;

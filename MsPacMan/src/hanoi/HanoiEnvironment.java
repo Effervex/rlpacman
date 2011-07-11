@@ -1,6 +1,7 @@
 package hanoi;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
 
@@ -11,14 +12,15 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.ActionChoice;
+import cerrla.PolicyActor;
+import cerrla.PolicyGenerator;
+
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
 import relationalFramework.ObjectObservations;
-import relationalFramework.Policy;
-import relationalFramework.PolicyActor;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleAction;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 /**
  * The environment for the blocks world interface.
@@ -124,15 +126,15 @@ public class HanoiEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
-		RuleAction ruleAction = ((ActionChoice) ObjectObservations
+		Collection<FiredAction> firedActions = ((PolicyActions) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		StringFact action = null;
-		if (ruleAction != null) {
-			List<StringFact> actions = new ArrayList<StringFact>(
-					ruleAction.getActions());
-			ruleAction.triggerRule();
-			action = actions
-					.get(PolicyGenerator.random_.nextInt(actions.size()));
+		RelationalPredicate action = null;
+		if (firedActions != null) {
+			List<FiredAction> actions = new ArrayList<FiredAction>(firedActions);
+			FiredAction selectedAction = actions.get(PolicyGenerator.random_
+					.nextInt(actions.size()));
+			selectedAction.triggerRule();
+			action = selectedAction.getAction();
 		}
 
 		HanoiState newState = actOnAction(action, state_);
@@ -242,7 +244,7 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private HanoiState actOnAction(StringFact action, HanoiState worldState) {
+	private HanoiState actOnAction(RelationalPredicate action, HanoiState worldState) {
 		if (action == null)
 			return worldState;
 
@@ -280,13 +282,13 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	 * @return The minimal number of steps to take for solving.
 	 */
 	private int optimalSteps() {
-		Policy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
+		RelationalPolicy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
 		steps_ = 0;
 		optimal_ = true;
 
 		// Run the policy through the environment until goal is satisfied.
 		PolicyActor optimalAgent = new PolicyActor();
-		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
+		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
 		optimalAgent.agent_message("SetPolicy");
 		Action act = optimalAgent.agent_start(formObservation());

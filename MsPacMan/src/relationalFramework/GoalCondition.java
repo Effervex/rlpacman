@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import cerrla.Module;
+
 /**
  * A small class representing a possible goal condition for the agent to pursue.
  * 
@@ -15,7 +17,7 @@ public class GoalCondition implements Serializable {
 	private static final long serialVersionUID = 578463340574407596L;
 
 	/** A sorted list of facts using only constant terms */
-	private StringFact fact_;
+	private RelationalPredicate fact_;
 
 	/** The number of arguments the goal condition has. */
 	private int numArgs_;
@@ -29,8 +31,8 @@ public class GoalCondition implements Serializable {
 	 * @param fact
 	 *            The single fact.
 	 */
-	public GoalCondition(StringFact fact) {
-		fact_ = new StringFact(fact);
+	public GoalCondition(RelationalPredicate fact) {
+		fact_ = new RelationalPredicate(fact);
 		Set<String> seenArgs = new HashSet<String>();
 		for (String arg : fact.getArguments())
 			seenArgs.add(arg);
@@ -38,7 +40,7 @@ public class GoalCondition implements Serializable {
 		goalName_ = Module.formName(fact_);
 	}
 
-	public StringFact getFact() {
+	public RelationalPredicate getFact() {
 		return fact_;
 	}
 
@@ -57,7 +59,7 @@ public class GoalCondition implements Serializable {
 			if (!replacements.containsKey(arg))
 				replacements.put(arg, StateSpec.createGoalTerm(i++));
 		}
-		fact_.replaceArguments(replacements, false);
+		fact_.replaceArguments(replacements, false, false);
 	}
 
 	@Override

@@ -11,9 +11,10 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
+import cerrla.Unification;
+
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
-import relationalFramework.Unification;
+import relationalFramework.RelationalPredicate;
 
 public class UnificationTest {
 	private Unification sut_;
@@ -27,9 +28,9 @@ public class UnificationTest {
 	@Test
 	public void testUnifyStates() {
 		// No change unification
-		List<StringFact> oldState = new ArrayList<StringFact>();
+		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
 		oldState.add(StateSpec.toStringFact("(clear ?X)"));
-		List<StringFact> newState = new ArrayList<StringFact>();
+		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
 		newState.add(StateSpec.toStringFact("(clear x)"));
 		String[] oldTerms = new String[1];
 		oldTerms[0] = "?X";
@@ -532,9 +533,9 @@ public class UnificationTest {
 	@Test
 	public void testTermlessUnifyStates() {
 		// Basic unification
-		List<StringFact> oldState = new ArrayList<StringFact>();
+		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
 		oldState.add(StateSpec.toStringFact("(clear ?X)"));
-		List<StringFact> newState = new ArrayList<StringFact>();
+		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
 		newState.add(StateSpec.toStringFact("(clear ?X)"));
 		BidiMap replacementMap = new DualHashBidiMap();
 		int result = sut_.unifyStates(oldState, newState, replacementMap);

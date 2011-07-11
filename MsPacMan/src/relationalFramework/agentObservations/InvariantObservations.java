@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.TreeSet;
 
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -17,7 +17,7 @@ public class InvariantObservations implements Serializable {
 	private static final long serialVersionUID = 6532453706652428545L;
 
 	/** The specific predicates (fully fleshed out preds). */
-	private Collection<StringFact> specificInvariants_;
+	private Collection<RelationalPredicate> specificInvariants_;
 
 	/**
 	 * The generalised 'existence' invariants (only noting if a predicate is
@@ -35,12 +35,12 @@ public class InvariantObservations implements Serializable {
 	 *            The facts of the state.
 	 * @return True if the invariants collections changed at all.
 	 */
-	public boolean noteInvariants(Collection<StringFact> stateFacts,
+	public boolean noteInvariants(Collection<RelationalPredicate> stateFacts,
 			Collection<String> generalStateFacts) {
 		// If the first pass, invariants are just the state.
 		counter_++;
 		if (specificInvariants_ == null) {
-			specificInvariants_ = new TreeSet<StringFact>(stateFacts);
+			specificInvariants_ = new TreeSet<RelationalPredicate>(stateFacts);
 			generalInvariants_ = new TreeSet<String>(generalStateFacts);
 			return true;
 		}
@@ -61,21 +61,21 @@ public class InvariantObservations implements Serializable {
 	 *            The goal replacement terms.
 	 * @return True if the invariants collection changed at all.
 	 */
-	public boolean noteInvariants(Collection<StringFact> stateFacts,
+	public boolean noteInvariants(Collection<RelationalPredicate> stateFacts,
 			Map<String, String> goalReplacements) {
 		counter_++;
 		if (specificInvariants_ == null) {
-			specificInvariants_ = new TreeSet<StringFact>();
+			specificInvariants_ = new TreeSet<RelationalPredicate>();
 		}
 
 		// Run through each fact, only noting it down if the replacement applies
 		// to it.
-		Collection<StringFact> goalFacts = new TreeSet<StringFact>();
-		for (StringFact stateFact : stateFacts) {
-			StringFact checkFact = new StringFact(stateFact);
-			if (checkFact.replaceArguments(goalReplacements, false)) {
-				StringFact replFact = new StringFact(stateFact);
-				replFact.replaceArguments(goalReplacements, true);
+		Collection<RelationalPredicate> goalFacts = new TreeSet<RelationalPredicate>();
+		for (RelationalPredicate stateFact : stateFacts) {
+			RelationalPredicate checkFact = new RelationalPredicate(stateFact);
+			if (checkFact.replaceArguments(goalReplacements, false, false)) {
+				RelationalPredicate replFact = new RelationalPredicate(stateFact);
+				replFact.replaceArguments(goalReplacements, true, false);
 				if (counter_ == 1)
 					specificInvariants_.add(replFact);
 				goalFacts.add(replFact);
@@ -139,9 +139,9 @@ public class InvariantObservations implements Serializable {
 		return buffer.toString();
 	}
 
-	public Collection<StringFact> getSpecificInvariants() {
+	public Collection<RelationalPredicate> getSpecificInvariants() {
 		if (specificInvariants_ == null)
-			return new TreeSet<StringFact>();
+			return new TreeSet<RelationalPredicate>();
 		return specificInvariants_;
 	}
 }

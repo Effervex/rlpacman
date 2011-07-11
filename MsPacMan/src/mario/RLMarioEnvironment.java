@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 import jess.JessException;
 import jess.Rete;
@@ -14,18 +15,20 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
+import cerrla.PolicyActor;
+import cerrla.PolicyGenerator;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
 import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.MarioAIOptions;
 
-import relationalFramework.ActionChoice;
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
 import relationalFramework.ObjectObservations;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleAction;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 public class RLMarioEnvironment implements EnvironmentInterface {
 	private Rete rete_;
@@ -61,8 +64,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		cmdLineOptions_.setVisualization(!experimentMode_);
 		staticObjectFacts_ = new HashSet<String>();
 		// cmdLineOptions_.setEnemies("off");
-//		 cmdLineOptions_.setFPS(100);
-		// cmdLineOptions_.setTimeLimit(50);
+		// cmdLineOptions_.setFPS(5);
+//		cmdLineOptions_.setTimeLimit(50);
 		// GlobalOptions.isShowReceptiveField = true;
 
 		return null;
@@ -87,8 +90,18 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 
 	@Override
 	public Observation env_start() {
-		levelDifficulty_ = 0;
+		levelDifficulty_ = 1;
 		resetEnvironment();
+		
+//		int sum = 0;
+//		for (int i = 0; i < 100; i++) {
+//			int score = handCodedPolicy();
+//			System.out.println(score);
+//			sum += score;
+//		}
+//		System.out.println("Hand-Coded Sum: " + (sum / 100));
+//		System.exit(-1);
+		
 		environment_.tick();
 
 		while (GlobalOptions.isGameplayStopped) {
@@ -99,13 +112,37 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		return formObservations(rete_);
 	}
 
+	/**
+	 * Runs the hand-coded policy.
+	 */
+	private int handCodedPolicy() {
+		RelationalPolicy handCodedPolicy = StateSpec.getInstance().getHandCodedPolicy();
+
+		// Run the policy through the environment until goal is satisfied.
+		PolicyActor handCodedAgent = new PolicyActor();
+		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
+		handCodedAgent.agent_message("Optimal");
+		handCodedAgent.agent_message("SetPolicy");
+		Action act = handCodedAgent.agent_start(formObservations(rete_));
+		// Loop until the task is complete
+		Reward_observation_terminal rot = env_step(act);
+		while ((rot == null) || !rot.isTerminal()) {
+			handCodedAgent.agent_step(rot.r, rot.o);
+			rot = env_step(act);
+		}
+		int score = environment_.getEvaluationInfo().computeWeightedFitness();
+
+		// Return the state to normal
+		resetEnvironment();
+		return score;
+	}
+
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		// Applying the action (up down left right or nothing)
-		ActionChoice actions = (ActionChoice) ObjectObservations.getInstance().objectArray[0];
+		PolicyActions actions = (PolicyActions) ObjectObservations.getInstance().objectArray[0];
 		float[] marioPos = Arrays.copyOf(environment_.getMarioFloatPos(), 2);
-		environment_.performAction(chooseLowAction(actions.getActions(),
-				marioGroundPos_));
+		environment_.performAction(chooseLowAction(actions.getActions()));
 		environment_.tick();
 
 		while (GlobalOptions.isGameplayStopped) {
@@ -164,6 +201,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		isMarioInAir_ = false;
 		prevBoolAction_ = new boolean[Environment.numberOfKeys];
 		marioDirection_ = Environment.MARIO_KEY_RIGHT;
+		marioGroundPos_ = new float[2];
 		prevReward_ = environment_.getIntermediateReward();
 		sumReward_ = 0;
 	}
@@ -175,12 +213,9 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 *            The actions the agent will take. May be multiple versions of
 	 *            the same action with different arguments, based on what
 	 *            matched the action conditions.
-	 * @param startPos
-	 *            The starting position of Mario in the case of jumping.
 	 * @return The low action to use.
 	 */
-	private boolean[] chooseLowAction(ArrayList<RuleAction> ruleActions,
-			float[] startPos) {
+	private boolean[] chooseLowAction(ArrayList<Collection<FiredAction>> policyActions) {
 		byte[][] basicLevelObservation = environment_
 				.getLevelSceneObservationZ(2);
 		float[] marioFloatPos = environment_.getMarioFloatPos();
@@ -189,14 +224,15 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		// An array which determines which actions are pressed {dir, jump?,
 		// run?} A non-zero value means the action has been selected (-1
 		// left/false, +1 right/true)
-		boolean[] selectedAction = null;
-		for (RuleAction ruleAction : ruleActions) {
-			Collection<StringFact> actionStrings = ruleAction.getActions();
+		RelationalPredicate bestAction = null;
+		List<boolean[]> selectedActions = new ArrayList<boolean[]>();
+		for (Collection<FiredAction> firedActions : policyActions) {
 			double bestWeight = Integer.MIN_VALUE;
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList
-			for (StringFact action : actionStrings) {
+			for (FiredAction firedAction : firedActions) {
+				RelationalPredicate action = firedAction.getAction();
 				boolean[] actionArray = ((RLMarioStateSpec) StateSpec
 						.getInstance()).applyAction(action, marioGroundPos_,
 						marioFloatPos, basicLevelObservation, prevBoolAction_,
@@ -207,31 +243,36 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 				// If a closer object has been found, act on that.
 				if (actionWeight > bestWeight) {
 					bestWeight = actionWeight;
-					selectedAction = actionArray;
-				} else if (actionWeight == bestWeight
-						&& !Arrays.equals(selectedAction, actionArray)) {
+					selectedActions.clear();	
+					bestAction = action;
+				} if (actionWeight == bestWeight) {
 					// If two objects are of the same distance, and they're not
 					// the same boolean[] action, skip this action and move onto
 					// the next to decide.
-					selectedAction = null;
+					selectedActions.add(actionArray);
+					firedAction.triggerRule();
 					break;
 				}
 			}
 
-			if (selectedAction != null) {
-				ruleAction.triggerRule();
-				// System.out.println(bestAction);
+			if (!selectedActions.isEmpty()) {
+				if (PolicyGenerator.debugMode_)
+					System.out.println(bestAction);
 				break;
 			}
 		}
 
 		// If the selected action isn't null, reset the previous bool action.
-		if (selectedAction != null)
-			prevBoolAction_ = selectedAction;
+		if (!selectedActions.isEmpty())
+			prevBoolAction_ = selectedActions.get(PolicyGenerator.random_
+					.nextInt(selectedActions.size()));
 
 		// If Mario is on the ground and cannot jump, allow him time to breathe
-		if (environment_.isMarioOnGround() && !environment_.isMarioAbleToJump())
+		if (environment_.isMarioOnGround() && !environment_.isMarioAbleToJump()) {
 			prevBoolAction_[Environment.MARIO_KEY_JUMP] = false;
+			prevBoolAction_[Environment.MARIO_KEY_LEFT] = false;
+			prevBoolAction_[Environment.MARIO_KEY_RIGHT] = false;
+		}
 
 		if (prevBoolAction_[Environment.MARIO_KEY_RIGHT]
 				&& !prevBoolAction_[Environment.MARIO_KEY_LEFT])
@@ -252,8 +293,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		if (environment_.isLevelFinished()) {
 			if (environment_.getMarioStatus() == Environment.MARIO_STATUS_DEAD
 					|| environment_.getMarioFloatPos()[1] > environment_
-							.getLevelHeight()
-							* LevelScene.cellSize) {
+							.getLevelHeight() * LevelScene.cellSize) {
 				ObjectObservations.getInstance().setNoPreGoal();
 				return 1;
 			}
@@ -337,7 +377,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			rete.assertString("(canJumpOn goal)");
 			rete.assertString("(heightDiff goal 0)");
 
-			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
+			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(),
+					rete);
 			rete_.run();
 
 			// Adding the valid actions
@@ -705,8 +746,8 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		Point2D.Float p = RLMarioStateSpec.relativeToGlobal(relX, relY,
 				environment_);
 		assertFloatThing(rete, condition, thingPrefix, (int) p.x, (int) p.y,
-				relX, relY, jumpInto, levelObs, width, !condition
-						.equals("mushroom"));
+				relX, relY, jumpInto, levelObs, width,
+				!condition.equals("mushroom"));
 	}
 
 	/**

@@ -7,8 +7,9 @@ import java.util.ArrayList;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Module;
+import cerrla.Module;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
 public class ModuleTest {
@@ -26,8 +27,8 @@ public class ModuleTest {
 		ArrayList<String> params = new ArrayList<String>();
 		params.add("?_MOD_a");
 		assertEquals(params, result.getParameterTerms());
-		ArrayList<GuidedRule> rules = new ArrayList<GuidedRule>();
-		rules.add(new GuidedRule(
+		ArrayList<RelationalRule> rules = new ArrayList<RelationalRule>();
+		rules.add(new RelationalRule(
 				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", params));
 		assertEquals(rules, result.getModuleRules());
 
