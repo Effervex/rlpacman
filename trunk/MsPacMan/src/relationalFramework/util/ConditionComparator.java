@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.Comparator;
 
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 /**
  * A comparator for comparing conditions within a rule. The comparator performs
@@ -13,10 +13,10 @@ import relationalFramework.StringFact;
  * 
  * @author Sam Sarjant
  */
-public class ConditionComparator implements Comparator<StringFact>,
+public class ConditionComparator implements Comparator<RelationalPredicate>,
 		Serializable {
 	private static final long serialVersionUID = 2187893240541148300L;
-	private static Comparator<StringFact> instance_;
+	private static Comparator<RelationalPredicate> instance_;
 	private final int GOAL = -1;
 	private final int BASE = 0;
 	private final int INEQ = 2;
@@ -27,7 +27,7 @@ public class ConditionComparator implements Comparator<StringFact>,
 	}
 
 	@Override
-	public int compare(StringFact arg0, StringFact arg1) {
+	public int compare(RelationalPredicate arg0, RelationalPredicate arg1) {
 		if (arg0 == null) {
 			if (arg1 == null)
 				return 0;
@@ -38,8 +38,8 @@ public class ConditionComparator implements Comparator<StringFact>,
 		}
 
 		// Determine the type of condition
-		StringFact str0 = (StringFact) arg0;
-		StringFact str1 = (StringFact) arg1;
+		RelationalPredicate str0 = (RelationalPredicate) arg0;
+		RelationalPredicate str1 = (RelationalPredicate) arg1;
 		int condType0 = BASE;
 		int condType1 = BASE;
 
@@ -66,7 +66,7 @@ public class ConditionComparator implements Comparator<StringFact>,
 		return str0.compareTo(str1);
 	}
 
-	public static Comparator<StringFact> getInstance() {
+	public static Comparator<RelationalPredicate> getInstance() {
 		if (instance_ == null)
 			instance_ = new ConditionComparator();
 		return instance_;

@@ -2,8 +2,9 @@ package blocksWorld;
 
 import org.rlcommunity.rlglue.codec.*;
 
-import relationalFramework.LearningController;
-import relationalFramework.PolicyActor;
+import cerrla.LearningController;
+import cerrla.PolicyActor;
+
 
 
 public class RunBlocksWorldExperiment {

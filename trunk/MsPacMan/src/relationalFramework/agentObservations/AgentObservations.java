@@ -22,14 +22,15 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
+import cerrla.PolicyGenerator;
+import cerrla.RuleCreation;
+import cerrla.Unification;
+
 import jess.Fact;
 import relationalFramework.GoalCondition;
-import relationalFramework.GuidedRule;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleCreation;
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
-import relationalFramework.Unification;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.util.ConditionComparator;
 import relationalFramework.util.MultiMap;
 
@@ -71,7 +72,7 @@ public final class AgentObservations implements Serializable {
 	private transient int lastCover_ = 0;
 
 	/** A transient group of facts indexed by terms used within. */
-	private transient MultiMap<String, StringFact> termMappedFacts_;
+	private transient MultiMap<String, RelationalPredicate> termMappedFacts_;
 
 	/** The local, goal-orientated observations to serialise separately. */
 	private transient LocalAgentObservations localAgentObservations_;
@@ -185,7 +186,7 @@ public final class AgentObservations implements Serializable {
 	 *            The terms present in the goal.
 	 * @return The relevant facts pertaining to the action.
 	 */
-	public Collection<StringFact> gatherActionFacts(StringFact action,
+	public Collection<RelationalPredicate> gatherActionFacts(RelationalPredicate action,
 			Map<String, String> goalReplacements) {
 		// Note down action conditions if still unsettled.
 		Map<String, String> replacementMap = action
@@ -195,30 +196,30 @@ public final class AgentObservations implements Serializable {
 			goalReplacements.putAll(replacementMap);
 		}
 
-		Collection<StringFact> actionFacts = new HashSet<StringFact>();
-		Set<StringFact> actionConds = new HashSet<StringFact>();
-		Set<StringFact> goalActionConds = new HashSet<StringFact>();
+		Collection<RelationalPredicate> actionFacts = new HashSet<RelationalPredicate>();
+		Set<RelationalPredicate> actionConds = new HashSet<RelationalPredicate>();
+		Set<RelationalPredicate> goalActionConds = new HashSet<RelationalPredicate>();
 		// Gather facts for each (non-number) action argument
 		for (String argument : action.getArguments()) {
 			if (!StateSpec.isNumber(argument)) {
-				Collection<StringFact> termFacts = termMappedFacts_
+				Collection<RelationalPredicate> termFacts = termMappedFacts_
 						.get(argument);
 				// Modify the term facts, retaining constants, replacing terms
-				for (StringFact termFact : termFacts) {
-					StringFact notedFact = new StringFact(termFact);
+				for (RelationalPredicate termFact : termFacts) {
+					RelationalPredicate notedFact = new RelationalPredicate(termFact);
 
 					if (!actionFacts.contains(notedFact))
 						actionFacts.add(notedFact);
 
 					// Note the action condition
-					StringFact actionCond = new StringFact(termFact);
-					actionCond.replaceArguments(replacementMap, false);
+					RelationalPredicate actionCond = new RelationalPredicate(termFact);
+					actionCond.replaceArguments(replacementMap, false, true);
 					actionConds.add(actionCond);
 
 					// Note the goal action condition
 					if (goalReplacements != null) {
-						StringFact goalCond = new StringFact(termFact);
-						goalCond.replaceArguments(goalReplacements, false);
+						RelationalPredicate goalCond = new RelationalPredicate(termFact);
+						goalCond.replaceArguments(goalReplacements, false, true);
 						if (!actionConds.contains(goalCond))
 							goalActionConds.add(goalCond);
 					}
@@ -249,17 +250,17 @@ public final class AgentObservations implements Serializable {
 	 *            The query parameters for the current goal (if any).
 	 * @return The RLGGs for every action.
 	 */
-	public List<GuidedRule> getRLGGActionRules(List<String> queryParams) {
-		List<GuidedRule> rlggRules = new ArrayList<GuidedRule>();
+	public List<RelationalRule> getRLGGActionRules(List<String> queryParams) {
+		List<RelationalRule> rlggRules = new ArrayList<RelationalRule>();
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
-			GuidedRule rlggRule = abo.getRLGGRule();
+			RelationalRule rlggRule = abo.getRLGGRule();
 			rlggRule.setQueryParams(queryParams);
 			rlggRules.add(rlggRule);
 		}
 		return rlggRules;
 	}
 
-	public Collection<StringFact> getSpecialisationConditions(String actionPred) {
+	public Collection<RelationalPredicate> getSpecialisationConditions(String actionPred) {
 		if (!actionBasedObservations_.containsKey(actionPred))
 			return null;
 		return actionBasedObservations_.get(actionPred)
@@ -274,7 +275,7 @@ public final class AgentObservations implements Serializable {
 	 * @return The total possible number of specialisations the action can make.
 	 */
 	public int getNumSpecialisations(String action) {
-		Collection<StringFact> specConditions = getSpecialisationConditions(action);
+		Collection<RelationalPredicate> specConditions = getSpecialisationConditions(action);
 		int num = 0;
 		if (specConditions != null)
 			num = specConditions.size();
@@ -288,11 +289,11 @@ public final class AgentObservations implements Serializable {
 		return num;
 	}
 
-	public Collection<StringFact> getSpecificInvariants() {
+	public Collection<RelationalPredicate> getSpecificInvariants() {
 		return conditionObservations_.invariants_.getSpecificInvariants();
 	}
 
-	public Collection<StringFact> getUnseenPredicates() {
+	public Collection<RelationalPredicate> getUnseenPredicates() {
 		return conditionObservations_.unseenPreds_;
 	}
 
@@ -312,7 +313,7 @@ public final class AgentObservations implements Serializable {
 		return localAgentObservations_.getLocalGoalName();
 	}
 
-	public boolean removeUnseenPredicates(Collection<StringFact> removables) {
+	public boolean removeUnseenPredicates(Collection<RelationalPredicate> removables) {
 		return conditionObservations_.unseenPreds_.removeAll(removables);
 	}
 
@@ -323,7 +324,7 @@ public final class AgentObservations implements Serializable {
 		}
 	}
 
-	public MultiMap<String, StringFact> getGoalPredicateMap() {
+	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
 		return localAgentObservations_.getGoalPredicateMap();
 	}
 
@@ -408,7 +409,7 @@ public final class AgentObservations implements Serializable {
 			wr = new FileWriter(localGoalConds);
 			buf = new BufferedWriter(wr);
 
-			MultiMap<String, StringFact> goalFacts = localAgentObservations_
+			MultiMap<String, RelationalPredicate> goalFacts = localAgentObservations_
 					.getGoalPredicateMap();
 			for (String term : goalFacts.keySet()) {
 				buf.write(term + ":\n  " + goalFacts.get(term) + "\n");
@@ -496,11 +497,11 @@ public final class AgentObservations implements Serializable {
 			Map<String, String> goalReplacements) {
 		// Run through the facts, adding to term mapped facts and adding the raw
 		// facts for condition belief scanning.
-		Collection<StringFact> stateFacts = new ArrayList<StringFact>();
+		Collection<RelationalPredicate> stateFacts = new ArrayList<RelationalPredicate>();
 		Collection<String> generalStateFacts = new HashSet<String>();
 		termMappedFacts_ = MultiMap.createSortedSetMultiMap();
 		for (Fact stateFact : state) {
-			StringFact strFact = StateSpec.toStringFact(stateFact.toString());
+			RelationalPredicate strFact = StateSpec.toStringFact(stateFact.toString());
 			// Ignore the type, goal, inequal and actions pred
 			if (strFact != null) {
 				if (StateSpec.getInstance().isUsefulPredicate(
@@ -540,7 +541,7 @@ public final class AgentObservations implements Serializable {
 	 *            If only equivalent rules should be tested.
 	 * @return True if the condition was simplified.
 	 */
-	public boolean simplifyRule(SortedSet<StringFact> simplified,
+	public boolean simplifyRule(SortedSet<RelationalPredicate> simplified,
 			boolean testForIllegalRule, boolean onlyEquivalencies) {
 		return conditionObservations_.simplifyRule(simplified,
 				testForIllegalRule, onlyEquivalencies);
@@ -614,10 +615,10 @@ public final class AgentObservations implements Serializable {
 		 * The action itself, usually expressed in variables, but possibly
 		 * constants if the action always takes a constant.
 		 */
-		private StringFact action_;
+		private RelationalPredicate action_;
 
 		/** The conditions observed to always be true for the action. */
-		private Collection<StringFact> invariantActionConditions_;
+		private Collection<RelationalPredicate> invariantActionConditions_;
 
 		/** If the RLGG rule needs to be recreated. */
 		private boolean recreateRLGG_ = true;
@@ -626,17 +627,17 @@ public final class AgentObservations implements Serializable {
 		 * The learned RLGG rule from the action observations. Can be recreated
 		 * upon deserialisation so it is placed in the correct slot.
 		 */
-		private transient GuidedRule rlggRule_;
+		private transient RelationalRule rlggRule_;
 
 		/**
 		 * The conditions that can be added to rules for specialisation.
 		 * Essentially the variant action conditions both negated and normal,
 		 * then simplified.
 		 */
-		private transient Collection<StringFact> specialisationConditions_;
+		private transient Collection<RelationalPredicate> specialisationConditions_;
 
 		/** The conditions observed to sometimes be true for the action. */
-		private Collection<StringFact> variantActionConditions_;
+		private Collection<RelationalPredicate> variantActionConditions_;
 
 		private AgentObservations getOuterType() {
 			return AgentObservations.this;
@@ -657,16 +658,16 @@ public final class AgentObservations implements Serializable {
 		 * @return True if the action conditions changed, false otherwise.
 		 */
 		private boolean intersectActionConditions(
-				Collection<StringFact> actionConds, String[] actionArgs,
-				Collection<StringFact> invariants,
-				Collection<StringFact> variants) {
+				Collection<RelationalPredicate> actionConds, String[] actionArgs,
+				Collection<RelationalPredicate> invariants,
+				Collection<RelationalPredicate> variants) {
 			boolean changed = false;
-			Collection<StringFact> newInvariantConditions = new HashSet<StringFact>();
+			Collection<RelationalPredicate> newInvariantConditions = new HashSet<RelationalPredicate>();
 
 			// Run through each invariant fact
-			for (StringFact invFact : invariants) {
+			for (RelationalPredicate invFact : invariants) {
 				// Merge any numerical ranges
-				StringFact mergedFact = Unification.getInstance().unifyFact(
+				RelationalPredicate mergedFact = Unification.getInstance().unifyFact(
 						invFact, actionConds, new DualHashBidiMap(),
 						new DualHashBidiMap(), actionArgs, false, true, true);
 				if (mergedFact != null) {
@@ -679,7 +680,21 @@ public final class AgentObservations implements Serializable {
 			invariants.clear();
 			invariants.addAll(newInvariantConditions);
 
-			// Add any remaining action conds to the variants
+			// Add any remaining action conds to the variants, merging any
+			// numerical ranges together
+			Collection<RelationalPredicate> newVariantConditions = new HashSet<RelationalPredicate>();
+			for (RelationalPredicate variant : variants) {
+				RelationalPredicate mergedFact = Unification.getInstance().unifyFact(
+						variant, actionConds, new DualHashBidiMap(),
+						new DualHashBidiMap(), actionArgs, false, true, true);
+				if (mergedFact != null) {
+					changed |= !variant.equals(mergedFact);
+					newVariantConditions.add(mergedFact);
+				} else
+					newVariantConditions.add(variant);
+			}
+			variants.clear();
+			variants.addAll(newVariantConditions);
 			changed |= variants.addAll(actionConds);
 
 			return changed;
@@ -714,11 +729,11 @@ public final class AgentObservations implements Serializable {
 		 *         any conditions in the invariants, and not containing any
 		 *         conditions not in either invariants or variants.
 		 */
-		private Collection<StringFact> recreateSpecialisations(
-				Collection<StringFact> variants, boolean checkNegated) {
-			SortedSet<StringFact> specialisations = new TreeSet<StringFact>(
+		private Collection<RelationalPredicate> recreateSpecialisations(
+				Collection<RelationalPredicate> variants, boolean checkNegated) {
+			SortedSet<RelationalPredicate> specialisations = new TreeSet<RelationalPredicate>(
 					ConditionComparator.getInstance());
-			for (StringFact condition : variants) {
+			for (RelationalPredicate condition : variants) {
 				// Check the non-negated version
 				condition = simplifyCondition(condition);
 				if (condition != null) {
@@ -728,7 +743,19 @@ public final class AgentObservations implements Serializable {
 					if (checkNegated
 							&& !StateSpec.getInstance().isTypePredicate(
 									condition.getFactName())) {
-						StringFact negCondition = new StringFact(condition);
+						String[] negArgs = new String[condition.getArgTypes().length];
+						// Special case for numerical values - negated
+						// numericals are made anonymous
+						for (int i = 0; i < condition.getArgTypes().length; i++) {
+							if (StateSpec
+									.isNumberType(condition.getArgTypes()[i]))
+								negArgs[i] = "?";
+							else
+								negArgs[i] = condition.getArguments()[i];
+						}
+
+						RelationalPredicate negCondition = new RelationalPredicate(condition,
+								negArgs);
 						negCondition.swapNegated();
 						negCondition = simplifyCondition(negCondition);
 						if (negCondition != null)
@@ -747,12 +774,12 @@ public final class AgentObservations implements Serializable {
 		 *            The condition to simplify.
 		 * @return The simplified condition (or the condition itself).
 		 */
-		private StringFact simplifyCondition(StringFact condition) {
-			SortedSet<StringFact> set = new TreeSet<StringFact>(
+		private RelationalPredicate simplifyCondition(RelationalPredicate condition) {
+			SortedSet<RelationalPredicate> set = new TreeSet<RelationalPredicate>(
 					ConditionComparator.getInstance());
 			set.add(condition);
 			if (simplifyRule(set, false, true)) {
-				StringFact simplify = set.first();
+				RelationalPredicate simplify = set.first();
 				// If the condition is not in the invariants and if it's not
 				// negated, IS in the variants, keep it.
 				if (!invariantActionConditions_.contains(simplify)
@@ -781,8 +808,8 @@ public final class AgentObservations implements Serializable {
 		 * @return True if the set of action conditions changed because of the
 		 *         addition.
 		 */
-		public boolean addActionConditions(Collection<StringFact> actionConds,
-				Collection<StringFact> goalActionConds, StringFact action) {
+		public boolean addActionConditions(Collection<RelationalPredicate> actionConds,
+				Collection<RelationalPredicate> goalActionConds, RelationalPredicate action) {
 			boolean changed = false;
 
 			// If the goal conditions haven't been initialised, they start as
@@ -793,11 +820,11 @@ public final class AgentObservations implements Serializable {
 			// If this is the first action condition, then all the actions are
 			// considered invariant.
 			if (invariantActionConditions_ == null) {
-				invariantActionConditions_ = new HashSet<StringFact>(
+				invariantActionConditions_ = new HashSet<RelationalPredicate>(
 						actionConds);
-				variantActionConditions_ = new HashSet<StringFact>();
-				specialisationConditions_ = new HashSet<StringFact>();
-				action_ = new StringFact(action);
+				variantActionConditions_ = new HashSet<RelationalPredicate>();
+				specialisationConditions_ = new HashSet<RelationalPredicate>();
+				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
 				return true;
 			}
@@ -807,9 +834,9 @@ public final class AgentObservations implements Serializable {
 			String[] actionArgs = action_.getArguments();
 			changed |= intersectActionConditions(actionConds, actionArgs,
 					invariantActionConditions_, variantActionConditions_);
-			Collection<StringFact> localInvariants = localAgentObservations_
+			Collection<RelationalPredicate> localInvariants = localAgentObservations_
 					.getInvariantGoalActionConditions(action.getFactName());
-			Collection<StringFact> localVariants = localAgentObservations_
+			Collection<RelationalPredicate> localVariants = localAgentObservations_
 					.getVariantGoalActionConditions(action.getFactName());
 			changed |= intersectActionConditions(goalActionConds, actionArgs,
 					localInvariants, localVariants);
@@ -861,10 +888,10 @@ public final class AgentObservations implements Serializable {
 		 * 
 		 * @return The RLGG rule created using the invariants observed.
 		 */
-		public GuidedRule getRLGGRule() {
+		public RelationalRule getRLGGRule() {
 			// No need to recreate the rule if nothing has changed.
 			if (recreateRLGG_ || rlggRule_ == null) {
-				SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+				SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
 						ConditionComparator.getInstance());
 				// Form the replacements if the action is non-variable
 				String[] replacements = null;
@@ -875,8 +902,8 @@ public final class AgentObservations implements Serializable {
 					}
 				}
 
-				for (StringFact invariant : invariantActionConditions_) {
-					StringFact modFact = new StringFact(invariant);
+				for (RelationalPredicate invariant : invariantActionConditions_) {
+					RelationalPredicate modFact = new RelationalPredicate(invariant);
 					if (replacements != null)
 						modFact.replaceArguments(replacements);
 					ruleConds.add(modFact);
@@ -885,7 +912,7 @@ public final class AgentObservations implements Serializable {
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false);
 				if (rlggRule_ == null)
-					rlggRule_ = new GuidedRule(ruleConds, action_, null);
+					rlggRule_ = new RelationalRule(ruleConds, action_, null);
 				else {
 					rlggRule_.setConditions(ruleConds, false);
 					rlggRule_.setActionTerms(action_.getArguments());
@@ -899,7 +926,7 @@ public final class AgentObservations implements Serializable {
 			return rlggRule_;
 		}
 
-		public Collection<StringFact> getSpecialisationConditions() {
+		public Collection<RelationalPredicate> getSpecialisationConditions() {
 			if (specialisationConditions_ == null)
 				recreateAllSpecialisations(action_.getFactName());
 			return specialisationConditions_;
@@ -917,8 +944,8 @@ public final class AgentObservations implements Serializable {
 			return result;
 		}
 
-		public void setActionConditions(Collection<StringFact> conditions) {
-			specialisationConditions_ = new HashSet<StringFact>(conditions);
+		public void setActionConditions(Collection<RelationalPredicate> conditions) {
+			specialisationConditions_ = new HashSet<RelationalPredicate>(conditions);
 		}
 	}
 
@@ -955,7 +982,7 @@ public final class AgentObservations implements Serializable {
 		private Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs_;
 
 		/** The collection of unseen predicates. */
-		private Collection<StringFact> unseenPreds_;
+		private Collection<RelationalPredicate> unseenPreds_;
 
 		public ConditionObservations() {
 			conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
@@ -963,7 +990,7 @@ public final class AgentObservations implements Serializable {
 			learnedEnvironmentRules_ = formBackgroundKnowledge();
 			invariants_ = new InvariantObservations();
 
-			unseenPreds_ = new HashSet<StringFact>();
+			unseenPreds_ = new HashSet<RelationalPredicate>();
 			unseenPreds_.addAll(StateSpec.getInstance().getPredicates()
 					.values());
 			unseenPreds_.addAll(StateSpec.getInstance().getTypePredicates()
@@ -982,12 +1009,12 @@ public final class AgentObservations implements Serializable {
 		 *            If the simplification only looks at equivalencies.
 		 * @return True if the rule is simplified/altered.
 		 */
-		public boolean simplifyRule(SortedSet<StringFact> simplified,
+		public boolean simplifyRule(SortedSet<RelationalPredicate> simplified,
 				boolean testForIllegalRule, boolean onlyEquivalencies) {
 			boolean changedOverall = false;
 			// Note which facts have already been tested, so changes don't
 			// restart the process.
-			SortedSet<StringFact> testedFacts = new TreeSet<StringFact>(
+			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>(
 					simplified.comparator());
 			boolean changedThisIter = true;
 
@@ -1000,7 +1027,7 @@ public final class AgentObservations implements Serializable {
 				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
 				changedThisIter = false;
 				// Iterate through the facts in the conditions
-				for (StringFact fact : new TreeSet<StringFact>(simplified)) {
+				for (RelationalPredicate fact : new TreeSet<RelationalPredicate>(simplified)) {
 					// Only test untested facts, facts still present in
 					// simplified and facts associated with rules.
 					if (!testedFacts.contains(fact)
@@ -1041,9 +1068,9 @@ public final class AgentObservations implements Serializable {
 		 *            The conditions to remove invariants from.
 		 * @return If invariants were removed.
 		 */
-		private boolean removeInvariants(SortedSet<StringFact> conditions) {
+		private boolean removeInvariants(SortedSet<RelationalPredicate> conditions) {
 			boolean changed = false;
-			for (StringFact invariant : invariants_.getSpecificInvariants()) {
+			for (RelationalPredicate invariant : invariants_.getSpecificInvariants()) {
 				// Only remove non-type invariants, as type invariants are
 				// either needed, or will be added back anyway.
 				if (!StateSpec.getInstance().isTypePredicate(
@@ -1052,7 +1079,7 @@ public final class AgentObservations implements Serializable {
 				}
 			}
 			// Also remove local invariants
-			for (StringFact invariant : localAgentObservations_
+			for (RelationalPredicate invariant : localAgentObservations_
 					.getConditionInvariants().getSpecificInvariants()) {
 				// Only remove non-type invariants, as type invariants are
 				// either needed, or will be added back anyway.
@@ -1075,7 +1102,7 @@ public final class AgentObservations implements Serializable {
 		 *            The variable replacements for the goal terms.
 		 * @return True if an observations change as a result.
 		 */
-		public boolean noteObservations(Collection<StringFact> stateFacts,
+		public boolean noteObservations(Collection<RelationalPredicate> stateFacts,
 				Collection<String> generalStateFacts,
 				Map<String, String> goalReplacements) {
 			boolean changed = false;
@@ -1111,10 +1138,10 @@ public final class AgentObservations implements Serializable {
 			// Form equivalence (<=>) relations wherever possible
 			for (String cond : conditionBeliefs_.keySet()) {
 				ConditionBeliefs cb = conditionBeliefs_.get(cond);
-				StringFact cbFact = cb.getConditionFact();
+				RelationalPredicate cbFact = cb.getConditionFact();
 
 				// Assert the true facts
-				for (StringFact alwaysTrue : cb.getAlwaysTrue()) {
+				for (RelationalPredicate alwaysTrue : cb.getAlwaysTrue()) {
 					// Only create the relation if it is useful (not an obvious
 					// type relation)
 					if (shouldCreateRelation(cbFact, alwaysTrue))
@@ -1123,7 +1150,7 @@ public final class AgentObservations implements Serializable {
 				}
 
 				// Assert the false facts
-				for (StringFact neverTrue : cb.getNeverTrue()) {
+				for (RelationalPredicate neverTrue : cb.getNeverTrue()) {
 					// Don't note obvious type rules.
 					createRelation(cbFact, neverTrue, false,
 							backgroundKnowledge, true);
@@ -1135,10 +1162,10 @@ public final class AgentObservations implements Serializable {
 			for (String cond : negatedConditionBeliefs_.keySet()) {
 				for (ConditionBeliefs negCB : negatedConditionBeliefs_
 						.get(cond).values()) {
-					StringFact negCBFact = negCB.getConditionFact();
+					RelationalPredicate negCBFact = negCB.getConditionFact();
 					// Only assert the !A => B assertions. The rest aren't
 					// accurate.
-					for (StringFact alwaysTrue : negCB.getAlwaysTrue()) {
+					for (RelationalPredicate alwaysTrue : negCB.getAlwaysTrue()) {
 						if (shouldCreateRelation(negCBFact, alwaysTrue))
 							createRelation(negCBFact, alwaysTrue, true,
 									backgroundKnowledge, false);
@@ -1158,8 +1185,8 @@ public final class AgentObservations implements Serializable {
 		 *            The related fact.
 		 * @return True if the relation should be created, false otherwise.
 		 */
-		private boolean shouldCreateRelation(StringFact cbFact,
-				StringFact relatedFact) {
+		private boolean shouldCreateRelation(RelationalPredicate cbFact,
+				RelationalPredicate relatedFact) {
 			// Don't make rules to itself.
 			if (cbFact.equals(relatedFact))
 				return false;
@@ -1201,11 +1228,11 @@ public final class AgentObservations implements Serializable {
 		 *            If the method should check for an equivalence.
 		 */
 		@SuppressWarnings("unchecked")
-		private void createRelation(StringFact cond, StringFact otherCond,
+		private void createRelation(RelationalPredicate cond, RelationalPredicate otherCond,
 				boolean negationType, SortedSet<BackgroundKnowledge> relations,
 				boolean checkEquivalence) {
-			StringFact left = cond;
-			StringFact right = otherCond;
+			RelationalPredicate left = cond;
+			RelationalPredicate right = otherCond;
 			if (left.equals(right))
 				return;
 			String relation = " => ";
@@ -1227,7 +1254,7 @@ public final class AgentObservations implements Serializable {
 
 			// Create an equivalence relation if possible.
 			// Get the relations to use for equivalency comparisons
-			Collection<StringFact> otherRelations = getOtherConditionRelations(
+			Collection<RelationalPredicate> otherRelations = getOtherConditionRelations(
 					otherCond, negationType);
 
 			// Don't bother with self-condition relations
@@ -1243,14 +1270,14 @@ public final class AgentObservations implements Serializable {
 								RuleCreation.getVariableTermString(i));
 				}
 
-				StringFact modCond = new StringFact(cond);
-				modCond.replaceArguments(replacementMap, false);
+				RelationalPredicate modCond = new RelationalPredicate(cond);
+				modCond.replaceArguments(replacementMap, false, false);
 				// If the fact is present, then there is an equivalency!
 				if (otherRelations.contains(modCond)) {
 					// Change the modArg back to its original arguments (though
 					// not changing anonymous values)
 					modCond.replaceArguments(replacementMap.inverseBidiMap(),
-							false);
+							false, false);
 
 					left = modCond;
 					// Order the two facts with the simplest fact on the LHS
@@ -1286,8 +1313,8 @@ public final class AgentObservations implements Serializable {
 		 *            negated.
 		 * @return The set of facts used for comparing with equivalence.
 		 */
-		private Collection<StringFact> getOtherConditionRelations(
-				StringFact otherCond, boolean negationType) {
+		private Collection<RelationalPredicate> getOtherConditionRelations(
+				RelationalPredicate otherCond, boolean negationType) {
 			String factName = otherCond.getFactName();
 			if (negationType) {
 				// No negation - simply return the set given by the fact name
@@ -1318,10 +1345,10 @@ public final class AgentObservations implements Serializable {
 		 * @return True if the condition beliefs changed at all.
 		 */
 		private boolean recordConditionAssociations(
-				Collection<StringFact> stateFacts,
+				Collection<RelationalPredicate> stateFacts,
 				Map<String, String> goalReplacements) {
 			boolean changed = false;
-			for (StringFact baseFact : stateFacts) {
+			for (RelationalPredicate baseFact : stateFacts) {
 				// Getting the ConditionBeliefs object
 				ConditionBeliefs cb = conditionBeliefs_.get(baseFact
 						.getFactName());
@@ -1337,15 +1364,15 @@ public final class AgentObservations implements Serializable {
 
 				// Replace facts for all relevant facts and store as condition
 				// beliefs.
-				Collection<StringFact> relativeFacts = new HashSet<StringFact>();
+				Collection<RelationalPredicate> relativeFacts = new HashSet<RelationalPredicate>();
 				for (String term : baseFact.getArguments()) {
-					Collection<StringFact> termFacts = termMappedFacts_
+					Collection<RelationalPredicate> termFacts = termMappedFacts_
 							.get(term);
 					if (termFacts != null) {
-						for (StringFact termFact : termFacts) {
-							StringFact relativeFact = new StringFact(termFact);
-							relativeFact
-									.replaceArguments(replacementMap, false);
+						for (RelationalPredicate termFact : termFacts) {
+							RelationalPredicate relativeFact = new RelationalPredicate(termFact);
+							relativeFact.replaceArguments(replacementMap,
+									false, false);
 							relativeFacts.add(relativeFact);
 						}
 					}
@@ -1355,12 +1382,13 @@ public final class AgentObservations implements Serializable {
 							&& goalReplacements.containsKey(term)) {
 						// Probably need to replace the term here for a
 						// parameterisable goal term
-						StringFact goalFact = new StringFact(baseFact);
-						goalFact.replaceArguments(goalReplacements, false);
+						RelationalPredicate goalFact = new RelationalPredicate(baseFact);
+						goalFact.replaceArguments(goalReplacements, false,
+								false);
 						changed |= localAgentObservations_.addGoalFact(
 								goalReplacements.get(term), goalFact);
 						// Negated fact too
-						StringFact negFact = new StringFact(goalFact);
+						RelationalPredicate negFact = new RelationalPredicate(goalFact);
 						negFact.swapNegated();
 						changed |= localAgentObservations_.addGoalFact(
 								goalReplacements.get(term), negFact);
@@ -1374,7 +1402,7 @@ public final class AgentObservations implements Serializable {
 
 				// Note the relative facts for the main pred and for every
 				// negated pred not present
-				Collection<StringFact> notRelativeFacts = new HashSet<StringFact>();
+				Collection<RelationalPredicate> notRelativeFacts = new HashSet<RelationalPredicate>();
 				if (cb.noteTrueRelativeFacts(relativeFacts, notRelativeFacts,
 						true)) {
 					changed = true;
@@ -1405,11 +1433,11 @@ public final class AgentObservations implements Serializable {
 		 * @return True if the condition beliefs changed.
 		 */
 		private boolean recordUntrueConditionAssociations(
-				Collection<StringFact> trueRelativeFacts,
-				Collection<StringFact> falseRelativeFacts) {
+				Collection<RelationalPredicate> trueRelativeFacts,
+				Collection<RelationalPredicate> falseRelativeFacts) {
 			boolean changed = false;
-			for (StringFact untrueFact : falseRelativeFacts) {
-				untrueFact = new StringFact(untrueFact);
+			for (RelationalPredicate untrueFact : falseRelativeFacts) {
+				untrueFact = new RelationalPredicate(untrueFact);
 				String factName = untrueFact.getFactName();
 
 				// Getting the ConditionBeliefs object
@@ -1444,10 +1472,11 @@ public final class AgentObservations implements Serializable {
 					observationHash_ = null;
 				}
 
-				Collection<StringFact> modTrueRelativeFacts = new HashSet<StringFact>();
-				for (StringFact trueFact : trueRelativeFacts) {
-					StringFact modTrueFact = new StringFact(trueFact);
-					if (modTrueFact.replaceArguments(replacementMap, false))
+				Collection<RelationalPredicate> modTrueRelativeFacts = new HashSet<RelationalPredicate>();
+				for (RelationalPredicate trueFact : trueRelativeFacts) {
+					RelationalPredicate modTrueFact = new RelationalPredicate(trueFact);
+					if (modTrueFact.replaceArguments(replacementMap, false,
+							false))
 						modTrueRelativeFacts.add(modTrueFact);
 				}
 
@@ -1470,7 +1499,7 @@ public final class AgentObservations implements Serializable {
 		 *            The fact to convert.
 		 * @return An IntegerArray representing the structure of the fact.
 		 */
-		private IntegerArray determineArgState(StringFact fact) {
+		private IntegerArray determineArgState(RelationalPredicate fact) {
 			String[] args = fact.getArguments();
 			int[] structure = new int[args.length];
 			Map<String, Integer> seenArgs = new HashMap<String, Integer>();
@@ -1534,7 +1563,7 @@ public final class AgentObservations implements Serializable {
 	}
 
 	public void setActionConditions(String action,
-			Collection<StringFact> conditions) {
+			Collection<RelationalPredicate> conditions) {
 		getActionBasedObservation(action).setActionConditions(conditions);
 		observationHash_ = null;
 		inactivity_ = 0;

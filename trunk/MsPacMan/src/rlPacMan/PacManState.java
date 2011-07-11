@@ -1,5 +1,8 @@
 package rlPacMan;
 
+import msPacMan.Fruit;
+import msPacMan.Ghost;
+import msPacMan.Player;
 import relationalFramework.State;
 
 /**

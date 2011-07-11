@@ -13,9 +13,10 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.Slot;
+import cerrla.PolicyGenerator;
+import cerrla.Slot;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.util.ArgumentComparator;
@@ -68,8 +69,8 @@ public class PolicyGeneratorTest {
 		Map<String, String> goalReplacements = new HashMap<String, String>();
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
-		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, goalReplacements, activatedActions, true);
+		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(state,
+				validActions, goalReplacements, activatedActions);
 
 		// [e]
 		// [b][d]
@@ -98,7 +99,7 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
 		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				goalReplacements, activatedActions, true);
+				goalReplacements, activatedActions);
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -124,15 +125,15 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
 		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				goalReplacements, activatedActions, true);
-		GuidedRule rlggRule = new GuidedRule(
+				goalReplacements, activatedActions);
+		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
 		List<String> queryParameters = new ArrayList<String>();
 		queryParameters.add("?G_0");
 		queryParameters.add("?G_1");
 		rlggRule.setQueryParams(queryParameters);
 		assertTrue(rlggRules.contains(rlggRule));
-		rlggRule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rlggRule = new RelationalRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		rlggRule.setQueryParams(queryParameters);
 		assertTrue(rlggRules.contains(rlggRule));
 		assertEquals(rlggRules.size(), 2);
@@ -165,8 +166,8 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<GuidedRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, null, activatedActions, true);
+		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(state,
+				validActions, null, activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -182,7 +183,7 @@ public class PolicyGeneratorTest {
 		activatedActions.clear();
 
 		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions, true);
+				activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -197,12 +198,12 @@ public class PolicyGeneratorTest {
 		activatedActions.clear();
 
 		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions, true);
-		GuidedRule rlggRule = new GuidedRule(
+				activatedActions);
+		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(rlggRules.toString(), rlggRules.contains(rlggRule));
-		rlggRule = new GuidedRule(
+		rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num1&:(betweenRange ?__Num1 4.0 25.0))"
 						+ " => (fromGhost ?X ?__Num1)");
 		assertTrue(rlggRules.toString(), rlggRules.contains(rlggRule));

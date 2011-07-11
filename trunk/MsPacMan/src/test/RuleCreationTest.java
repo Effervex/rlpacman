@@ -10,11 +10,12 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleCreation;
-import relationalFramework.GuidedRule;
+import cerrla.PolicyGenerator;
+import cerrla.RuleCreation;
+
+import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.util.ConditionComparator;
@@ -33,12 +34,12 @@ public class RuleCreationTest {
 
 	@Test
 	public void testTest() throws Exception {
-		StringFact strFactA = StateSpec.toStringFact("(clear ?X)");
-		StringFact strFactB = StateSpec.toStringFact("(clear ?Y)");
+		RelationalPredicate strFactA = StateSpec.toStringFact("(clear ?X)");
+		RelationalPredicate strFactB = StateSpec.toStringFact("(clear ?Y)");
 		assertFalse(strFactA.equals(strFactB));
 		assertFalse(strFactA.hashCode() == strFactB.hashCode());
 
-		GuidedRule gr = new GuidedRule("(clear a) (block a) => (moveFloor a)");
+		RelationalRule gr = new RelationalRule("(clear a) (block a) => (moveFloor a)");
 		assertTrue(gr.getConditions(false).contains(
 				StateSpec.toStringFact("(clear a)")));
 		assertTrue(gr.getConditions(false).contains(
@@ -48,217 +49,229 @@ public class RuleCreationTest {
 	@Test
 	public void testSpecialiseRule() {
 		// Basic single action specialisation
-		GuidedRule rule = new GuidedRule(
+		RelationalRule rule = new RelationalRule(
 				"(clear ?X) (above ?X ?) => (moveFloor ?X)");
-		Collection<GuidedRule> results = sut_.specialiseRule(rule);
+		Collection<RelationalRule> results = sut_.specialiseRule(rule);
 
-		GuidedRule mutant = new GuidedRule(
+		RelationalRule mutant = new RelationalRule(
 				"(above ?X ?) (highest ?X) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		// No onFloor rules for moveFloor
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?) (onFloor ?X) => (moveFloor ?X)");
 		assertFalse(results.contains(mutant));
 		// Local specialisations
-		mutant = new GuidedRule("(clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
 		// Constant term in action
-		rule = new GuidedRule("(clear a) (above a ?) => (moveFloor a)");
+		rule = new RelationalRule("(clear a) (above a ?) => (moveFloor a)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new GuidedRule("(highest a) (above a ?) => (moveFloor a)");
+		mutant = new RelationalRule("(highest a) (above a ?) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (not (highest a)) (above a ?) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (above a ?G_0) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (above a ?G_1) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (on a ?G_0) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (on a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (on a ?G_1) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (on a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
 		// Constant term in rule
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(clear a) (above ?X ?) (clear ?X) => (moveFloor ?X)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (above ?X ?) (highest ?X) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
 		// Harder action
-		rule = new GuidedRule("(clear a) (clear ?Y) => (move a ?Y)");
+		rule = new RelationalRule("(clear a) (clear ?Y) => (move a ?Y)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above a ?) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above ?Y ?) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?Y) (highest a) => (move a ?Y)");
+		mutant = new RelationalRule("(clear ?Y) (highest a) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear a) (highest ?Y) => (move a ?Y)");
+		mutant = new RelationalRule("(clear a) (highest ?Y) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (onFloor a) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (onFloor ?Y) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (highest a)) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (highest ?Y)) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		// Local specialisations
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above a ?G_0) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (on a ?G_0) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above ?Y ?G_0) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (on ?Y ?G_0) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above a ?G_1) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (on a ?G_1) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (above ?Y ?G_1) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (on ?Y ?G_1) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		// Due to equality background knowledge, can remove these negated rules.
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (onFloor a)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (onFloor ?Y)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (above a ?)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear a) (clear ?Y) (not (above ?Y ?)) => (move a ?Y)");
 		assertFalse(results.contains(mutant));
 		assertEquals(results.size(), 16);
 
 		// Avoiding impossible specialisations
-		rule = new GuidedRule(
+		rule = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseRule(rule);
 
 		// Should not be there
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) (on ?X ?) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) (not (on ?X ?)) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
 		// Using background knowledge to disallow pointless and illegal
 		// mutations
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) (onFloor ?X) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) (not (onFloor ?X)) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
 
 		// Adding to the right term
-		rule = new GuidedRule("(clear ?X) (block ?Y) => (move ?X ?Y)");
+		rule = new RelationalRule("(clear ?X) (block ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new GuidedRule("(highest ?X) (block ?Y) => (move ?X ?Y)");
+		mutant = new RelationalRule("(highest ?X) (block ?Y) => (move ?X ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (highest ?Y) => (move ?X ?Y)");
+		mutant = new RelationalRule("(clear ?X) (highest ?Y) => (move ?X ?Y)");
 		assertTrue(results.contains(mutant));
+		
+		rule = new RelationalRule(
+				"(clear ?G_0) (highest ?Y) (block ?G_0) (block ?Y) => (move ?G_0 ?Y)");
+		results = sut_.specialiseRule(rule);
+		
+		assertFalse(results.toString().contains("(on ?G_0 ?G_1)"));
 	}
 
 	@Test
 	public void testSpecialiseRuleMinor() {
 		// Basic moveFloor variable swapping
-		GuidedRule rule = new GuidedRule(
+		RelationalRule rule = new RelationalRule(
 				"(above ?X ?) (highest ?X) => (moveFloor ?X)");
-		Collection<GuidedRule> results = sut_.specialiseRuleMinor(rule);
+		Collection<RelationalRule> results = sut_.specialiseRuleMinor(rule);
 
-		GuidedRule mutant = new GuidedRule(
+		RelationalRule mutant = new RelationalRule(
 				"(above ?G_0 ?) (highest ?G_0) => (moveFloor ?G_0)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule(
+		mutant = new RelationalRule(
 				"(above ?G_1 ?) (highest ?G_1) => (moveFloor ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 2);
 
 		// Move variable swapping
-		rule = new GuidedRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rule = new RelationalRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseRuleMinor(rule);
 
-		mutant = new GuidedRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
+		mutant = new RelationalRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (clear ?G_0) => (move ?X ?G_0)");
+		mutant = new RelationalRule("(clear ?X) (clear ?G_0) => (move ?X ?G_0)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?G_1) (clear ?Y) => (move ?G_1 ?Y)");
+		mutant = new RelationalRule("(clear ?G_1) (clear ?Y) => (move ?G_1 ?Y)");
 		assertTrue(results.contains(mutant));
-		mutant = new GuidedRule("(clear ?X) (clear ?G_1) => (move ?X ?G_1)");
+		mutant = new RelationalRule("(clear ?X) (clear ?G_1) => (move ?X ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 4);
 
 		// Second level specialisation
-		rule = new GuidedRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
+		rule = new RelationalRule("(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
 		results = sut_.specialiseRuleMinor(rule);
 
-		mutant = new GuidedRule("(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
+		mutant = new RelationalRule("(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 1);
+
+		rule = new RelationalRule(
+				"(clear ?G_0) (highest ?Y) (block ?G_0) (block ?Y) => (move ?G_0 ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+		
+		assertFalse(results.toString().contains("(on ?G_0 ?G_1)"));
 	}
 
 	@Test
 	public void testSimplifyRule() {
 		// Simple no-effect test
-		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
 				ConditionComparator.getInstance());
 		ruleConds.add(StateSpec.toStringFact("(clear a)"));
-		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds, null,
 				false, true);
 		assertNull(results);
 
@@ -454,12 +467,12 @@ public class RuleCreationTest {
 				AgentObservations.loadAgentObservations());
 
 		// Strange issue:
-		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
 				ConditionComparator.getInstance());
 		ruleConds.add(StateSpec.toStringFact("(highest ?Y)"));
 		ruleConds.add(StateSpec.toStringFact("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toStringFact("(block ?Y)"));
-		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds, null,
 				false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(highest ?Y)")));
@@ -513,21 +526,22 @@ public class RuleCreationTest {
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(clear ?X)")));
 		assertTrue(results.contains(StateSpec.toStringFact("(clear ?Y)")));
-		assertTrue(results.contains(StateSpec.toStringFact("(not (above ?X ?Y))")));
+		assertTrue(results.contains(StateSpec
+				.toStringFact("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
 	}
 
 	@Test
 	public void testEquivalenceRules() {
 		// Set up the allowable conditions
-		Collection<StringFact> conditions = new HashSet<StringFact>();
+		Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>();
 		conditions.add(StateSpec.toStringFact("(on ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(above ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(highest ?X)"));
 		conditions.add(StateSpec.toStringFact("(clear ?X)"));
 		AgentObservations.getInstance().setActionConditions("moveFloor",
 				conditions);
-		conditions = new HashSet<StringFact>();
+		conditions = new HashSet<RelationalPredicate>();
 		conditions.add(StateSpec.toStringFact("(on ?X ?)"));
 		conditions.add(StateSpec.toStringFact("(on ?Y ?)"));
 		conditions.add(StateSpec.toStringFact("(above ?X ?)"));
@@ -582,11 +596,11 @@ public class RuleCreationTest {
 		AgentObservations.getInstance().setBackgroundKnowledge(backKnow);
 
 		// Basic implication test
-		SortedSet<StringFact> ruleConds = new TreeSet<StringFact>(
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
 				ConditionComparator.getInstance());
 		ruleConds.add(StateSpec.toStringFact("(clear ?X)"));
 		ruleConds.add(StateSpec.toStringFact("(highest ?X)"));
-		SortedSet<StringFact> results = sut_.simplifyRule(ruleConds, null,
+		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds, null,
 				false, true);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec.toStringFact("(highest ?X)")));

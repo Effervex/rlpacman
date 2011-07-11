@@ -6,7 +6,7 @@ import java.util.Map;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 /**
  * A class for representing a possible goal state to use (i.e. one that has
@@ -21,7 +21,7 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 	private Map<String, String> args_;
 
 	/** The goal facts defined by the arguments. */
-	private StringFact goalFact_;
+	private RelationalPredicate goalFact_;
 
 	/**
 	 * Constructor for a new GoalState.
@@ -35,8 +35,8 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 		args_ = args;
 
 		// Replace the arguments and set the goal.
-		goalFact_ = new StringFact(currentGoal.getFact());
-		goalFact_.replaceArguments(args, true);
+		goalFact_ = new RelationalPredicate(currentGoal.getFact());
+		goalFact_.replaceArguments(args, true, false);
 	}
 
 	/**
@@ -46,7 +46,7 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 	 *            The invariants to check against.
 	 * @return True if the goal arguments contains the invariants.
 	 */
-	public boolean includesInvariants(Collection<StringFact> invariants) {
+	public boolean includesInvariants(Collection<RelationalPredicate> invariants) {
 		if (invariants.isEmpty())
 			return false;
 

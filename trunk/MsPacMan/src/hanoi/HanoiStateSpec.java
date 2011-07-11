@@ -5,10 +5,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Policy;
+import relationalFramework.RelationalRule;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class HanoiStateSpec extends StateSpec {
@@ -31,12 +31,12 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseActionTemplates() {
-		Collection<StringFact> actions = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialiseActionTemplates() {
+		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
 
 		// Move action
 		String[] structure = { "tile", "tower", "tile", "tower" };
-		actions.add(new StringFact("move", structure));
+		actions.add(new RelationalPredicate("move", structure));
 
 		return actions;
 	}
@@ -83,8 +83,8 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Policy initialiseOptimalPolicy() {
-		Policy optimal = null;
+	protected RelationalPolicy initialiseOptimalPolicy() {
+		RelationalPolicy optimal = null;
 
 		// Defining the optimal policy (has to be split for even/odd)
 		String[] rules = new String[3];
@@ -98,64 +98,64 @@ public class HanoiStateSpec extends StateSpec {
 				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
 				+ "=> (move ?X ?Ta ?Y ?Tb)";
 
-		optimal = new Policy();
+		optimal = new RelationalPolicy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new GuidedRule(rules[i]), false, false);
+			optimal.addRule(new RelationalRule(rules[i]), false, false);
 
 		return optimal;
 	}
 
 	@Override
-	protected Collection<StringFact> initialisePredicateTemplates() {
-		Collection<StringFact> predicates = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
+		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
 		// On predicate
 		String[] structure = new String[3];
 		structure[0] = "tile";
 		structure[1] = "tile";
 		structure[2] = "tower";
-		predicates.add(new StringFact("on", structure));
+		predicates.add(new RelationalPredicate("on", structure));
 
 		// Clear predicate
 		structure = new String[2];
 		structure[0] = "tile";
 		structure[1] = "tower";
-		predicates.add(new StringFact("clear", structure));
+		predicates.add(new RelationalPredicate("clear", structure));
 
 		// Above predicate
 		structure = new String[3];
 		structure[0] = "tile";
 		structure[1] = "tile";
 		structure[2] = "tower";
-		predicates.add(new StringFact("above", structure));
+		predicates.add(new RelationalPredicate("above", structure));
 
 		// Smaller predicate
 		structure = new String[2];
 		structure[0] = "tile";
 		structure[1] = "tile";
-		predicates.add(new StringFact("smaller", structure));
+		predicates.add(new RelationalPredicate("smaller", structure));
 
 		// NumTiles predicate
 		structure = new String[1];
 		structure[0] = "evenOdd";
-		predicates.add(new StringFact("numTiles", structure));
+		predicates.add(new RelationalPredicate("numTiles", structure));
 
 		// LastMoved predicate
 		structure = new String[1];
 		structure[0] = "tile";
-		predicates.add(new StringFact("lastMoved", structure));
+		predicates.add(new RelationalPredicate("lastMoved", structure));
 
 		// NextTower predicate
 		structure = new String[2];
 		structure[0] = "tower";
 		structure[1] = "tower";
-		predicates.add(new StringFact("nextTower", structure));
+		predicates.add(new RelationalPredicate("nextTower", structure));
 
 		// PrevTower predicate
 		structure = new String[2];
 		structure[0] = "tower";
 		structure[1] = "tower";
-		predicates.add(new StringFact("prevTower", structure));
+		predicates.add(new RelationalPredicate("prevTower", structure));
 
 		return predicates;
 	}

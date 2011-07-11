@@ -11,9 +11,9 @@ import jess.Fact;
  */
 public class StateAction {
 	private Collection<Fact> stateFacts_;
-	private ActionChoice action_;
+	private PolicyActions action_;
 	
-	public StateAction(Collection<Fact> state, ActionChoice action) {
+	public StateAction(Collection<Fact> state, PolicyActions action) {
 		stateFacts_ = state;
 		action_ = action;
 	}

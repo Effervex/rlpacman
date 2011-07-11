@@ -7,16 +7,16 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import cerrla.NumberEnum;
 import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Number;
-import relationalFramework.Policy;
+import relationalFramework.RelationalRule;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 /**
@@ -35,7 +35,6 @@ public class RLMarioStateSpec extends StateSpec {
 	private int negModifier_;
 	private int oppDirection_;
 	private float[] startEndDiffs_ = new float[2];
-	private float startCurrentDiffX_;
 	private float[] currentEndDiffs_ = new float[2];
 
 	@Override
@@ -47,16 +46,14 @@ public class RLMarioStateSpec extends StateSpec {
 				+ "(distance ?X ?Y&:(outsideRange ?Y -16 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
-		preconds
-				.put(
-						"search",
-						"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
-								+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
+		preconds.put(
+				"search",
+				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
+						+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
-		preconds
-				.put("jumpOnto",
-						"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(betweenRange ?Y -160 160))");
+		preconds.put("jumpOnto",
+				"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(betweenRange ?Y -160 160))");
 		// Jump over entails jumping over a specific thing, moving towards it if
 		// necessary.
 		preconds.put("jumpOver", "(canJumpOver ?X) (thing ?X) "
@@ -80,57 +77,57 @@ public class RLMarioStateSpec extends StateSpec {
 
 	@Override
 	protected int initialiseActionsPerStep() {
-		return -1;
+		return 1;
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseActionTemplates() {
-		Collection<StringFact> actions = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialiseActionTemplates() {
+		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
 
 		// Jump onto something
 		String[] structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOnto", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("jumpOnto", structure));
 
 		// Jump over something
 		structure = new String[3];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		structure[2] = Number.Integer.toString();
-		actions.add(new StringFact("jumpOver", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		structure[2] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("jumpOver", structure));
 
 		// Move towards something
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("move", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("move", structure));
 
 		// Search a brick
 		structure = new String[2];
 		structure[0] = "brick";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("search", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("search", structure));
 
 		// Pickup a shell
 		structure = new String[2];
 		structure[0] = "shell";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("pickup", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("pickup", structure));
 
 		// Shoot an enemy with a fireball
 		structure = new String[3];
 		structure[0] = "enemy";
-		structure[1] = Number.Integer.toString();
+		structure[1] = NumberEnum.Integer.toString();
 		structure[2] = "marioPower";
-		actions.add(new StringFact("shootFireball", structure));
+		actions.add(new RelationalPredicate("shootFireball", structure));
 
 		// Shoot an enemy with a held shell
 		structure = new String[3];
 		structure[0] = "enemy";
-		structure[1] = Number.Integer.toString();
+		structure[1] = NumberEnum.Integer.toString();
 		structure[2] = "shell";
-		actions.add(new StringFact("shootShell", structure));
+		actions.add(new RelationalPredicate("shootShell", structure));
 
 		return actions;
 	}
@@ -162,76 +159,97 @@ public class RLMarioStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Policy initialiseOptimalPolicy() {
-		Policy goodPolicy = new Policy();
+	protected RelationalPolicy initialiseOptimalPolicy() {
+		RelationalPolicy goodPolicy = new RelationalPolicy();
 
 		// Defining a good policy (basic at the moment)
 		ArrayList<String> rules = new ArrayList<String>();
 
-		rules.add("(distance goal ?Y) (flag goal) => (move goal ?Y)");
+		// Jump pit
+		rules.add("(pit ?X) (distance ?X ?Y&:(> ?Y 0))"
+				+ " (width ?X ?Z) => (jumpOver ?X ?Y ?Z)");
+		// Shoot enemies
+		rules.add("(blastable ?X) (distance ?X ?Y&:(betweenRange ?Y -32 100))"
+				+ " (heightDiff ?X ?Z&:(betweenRange ?Z -10 32))"
+				+ " (marioPower fire) => (shootFireball ?X ?Y fire)");
+		// Pickup shell
+		rules.add("(passive ?X) (distance ?X ?Y) (carrying ?X) (shell ?X)"
+				+ "=> (shootShell ?X ?Y)");
+		// Shoot shell
+		rules.add("(enemy ?X) (distance ?X ?Y&:(betweenRange ?Y -32 64))"
+				+ " => (shootShell ?X ?Y fire)");
+		// Stomp enemies
+		rules.add("(canJumpOn ?X) (squashable ?X) (distance ?X ?Y&:(betweenRange ?Y -32 64))"
+				+ " (heightDiff ?X ?Z&:(< ?Z 32)) => (jumpOnto ?X ?Y)");
+		// Collect powerups
+		rules.add("(canJumpOn ?X) (powerup ?X) (distance ?X ?Y) => (jumpOnto ?X ?Y)");
+		// Search bricks
+		rules.add("(brick ?X) (heightDiff ?X ?Y) => (search ?X ?Y)");
+		// To the goal
+		rules.add("(flag ?X) (distance ?X ?Y) => (move ?X ?Y)");
 
 		for (String rule : rules)
-			goodPolicy.addRule(new GuidedRule(rule), false, false);
+			goodPolicy.addRule(new RelationalRule(rule), false, false);
 
 		return goodPolicy;
 	}
 
 	@Override
-	protected Collection<StringFact> initialisePredicateTemplates() {
-		Collection<StringFact> predicates = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
+		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
 		// Distance
 		String[] structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		predicates.add(new StringFact("distance", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("distance", structure));
 
 		// Height diff
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		predicates.add(new StringFact("heightDiff", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("heightDiff", structure));
 
 		// Width (usually 1, except for pits)
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		predicates.add(new StringFact("width", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("width", structure));
 
 		// Can Jump On
 		structure = new String[1];
 		structure[0] = "thing";
-		predicates.add(new StringFact("canJumpOn", structure));
+		predicates.add(new RelationalPredicate("canJumpOn", structure));
 
 		// Can Jump On
 		structure = new String[1];
 		structure[0] = "thing";
-		predicates.add(new StringFact("canJumpOver", structure));
+		predicates.add(new RelationalPredicate("canJumpOver", structure));
 
 		// Flying (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new StringFact("flying", structure));
+		predicates.add(new RelationalPredicate("flying", structure));
 
 		// Squashable (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new StringFact("squashable", structure));
+		predicates.add(new RelationalPredicate("squashable", structure));
 
 		// Blastable (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new StringFact("blastable", structure));
+		predicates.add(new RelationalPredicate("blastable", structure));
 
 		// Holding a shell
 		structure = new String[1];
 		structure[0] = "shell";
-		predicates.add(new StringFact("carrying", structure));
+		predicates.add(new RelationalPredicate("carrying", structure));
 
 		// Shell is passive (not moving)
 		structure = new String[1];
 		structure[0] = "shell";
-		predicates.add(new StringFact("passive", structure));
+		predicates.add(new RelationalPredicate("passive", structure));
 
 		return predicates;
 	}
@@ -248,8 +266,10 @@ public class RLMarioStateSpec extends StateSpec {
 		// Items
 		types.put("item", "thing");
 		types.put("coin", "item");
-		types.put("mushroom", "item");
-		types.put("fireFlower", "item");
+		// Powerups
+		types.put("powerup", "item");
+		types.put("mushroom", "powerup");
+		types.put("fireFlower", "powerup");
 
 		// Solid objects (Brick)
 		types.put("brick", "thing");
@@ -302,14 +322,15 @@ public class RLMarioStateSpec extends StateSpec {
 
 		float[] diffs = { Math.abs(marioPos[0] - x), marioPos[1] - y };
 		// If the x difference is on the same column
-		if (diffs[0] <= cellSize) {
+		if (diffs[0] <= cellSize / 2) {
 			if (jumpInto) {
 				// If the y difference is less than the jump height (+ extra)
 				// AND the thing is not under Mario, return true.
-				if (diffs[1] <= MAX_JUMP_HEIGHT + extra && diffs[1] >= 0)
+				if (diffs[1] <= MAX_JUMP_HEIGHT + extra)
 					canJumpOnOver[0] = true;
 			} else if (isMarioInAir)
 				canJumpOnOver[0] = true;
+			canJumpOnOver[1] = true;
 		} else {
 			// If not in the same axis, 'reduce' the height of the thing being
 			// jumped into if jumping into something
@@ -373,7 +394,7 @@ public class RLMarioStateSpec extends StateSpec {
 	 *            If Mario is currently big.
 	 * @return A boolean array of keystroke actions to take at the time.
 	 */
-	public boolean[] applyAction(StringFact action, float[] startPos,
+	public boolean[] applyAction(RelationalPredicate action, float[] startPos,
 			float[] marioPos, byte[][] basicLevelObs, boolean[] prevAction,
 			int marioDirection, boolean bigMario) {
 		basicLevelObs_ = basicLevelObs;
@@ -392,24 +413,10 @@ public class RLMarioStateSpec extends StateSpec {
 			x = Float.parseFloat(argSplit[1]);
 			y = Float.parseFloat(argSplit[2]);
 		}
-		startEndDiffs_[0] = Math.abs(x - startPos[0]);
-		startEndDiffs_[1] = startPos[1] - y;
-		startCurrentDiffX_ = Math.abs(marioPos[0] - startPos[0]);
-		currentEndDiffs_[0] = Math.abs(x - marioPos[0]);
-		currentEndDiffs_[1] = marioPos[1] - y;
 
 		// Direction specific variables
-		if (x > marioPos[0]) {
-			direction_ = Environment.MARIO_KEY_RIGHT;
-			oppDirection_ = Environment.MARIO_KEY_LEFT;
-			directedCellSize_ = cellSize;
-			negModifier_ = 1;
-		} else {
-			direction_ = Environment.MARIO_KEY_LEFT;
-			oppDirection_ = Environment.MARIO_KEY_RIGHT;
-			directedCellSize_ = -cellSize;
-			negModifier_ = -1;
-		}
+		calculateDirectionVariables(startPos[0], startPos[1], marioPos[0],
+				marioPos[1], x, y);
 
 		// Determine the actions
 		if (action.getFactName().equals("move"))
@@ -430,6 +437,41 @@ public class RLMarioStateSpec extends StateSpec {
 		}
 
 		return actionArray;
+	}
+
+	/**
+	 * Calculates the direction variables for Mario.
+	 * 
+	 * @param startX
+	 *            Mario's starting x jump point.
+	 * @param startY
+	 *            Mario's starting y jump point.
+	 * @param marioX
+	 *            Mario's current x point.
+	 * @param marioY
+	 *            Mario's current y point.
+	 * @param x
+	 *            Mario's goal x point.
+	 * @param y
+	 *            Mario's goal y point.
+	 */
+	private void calculateDirectionVariables(float startX, float startY,
+			float marioX, float marioY, float x, float y) {
+		startEndDiffs_[0] = Math.abs(x - startX);
+		startEndDiffs_[1] = startY - y;
+		currentEndDiffs_[0] = Math.abs(x - marioX);
+		currentEndDiffs_[1] = marioY - y;
+		if (x > startX) {
+			direction_ = Environment.MARIO_KEY_RIGHT;
+			oppDirection_ = Environment.MARIO_KEY_LEFT;
+			directedCellSize_ = cellSize;
+			negModifier_ = 1;
+		} else {
+			direction_ = Environment.MARIO_KEY_LEFT;
+			oppDirection_ = Environment.MARIO_KEY_RIGHT;
+			directedCellSize_ = -cellSize;
+			negModifier_ = -1;
+		}
 	}
 
 	/**
@@ -626,6 +668,7 @@ public class RLMarioStateSpec extends StateSpec {
 		if (actionArray[Mario.KEY_SPEED])
 			nearEndX = endX - directedCellSize_ / 1.5f;
 		float farEndX = endX + directedCellSize_ / 2;
+		
 		// Check for special case when Mario is below object and next to
 		if (currentEndDiffs_[1] > 0 && currentEndDiffs_[0] <= cellSize) {
 			// Move from the object so as not to get caught under it
@@ -685,8 +728,8 @@ public class RLMarioStateSpec extends StateSpec {
 				endX = endX + jumpPoint;
 			else
 				endX = endX - 1.5f * cellSize;
-			startEndDiffs_[0] = Math.abs(endX - startX);
-			currentEndDiffs_[0] = Math.abs(endX - currentX);
+			calculateDirectionVariables(startX, startY, currentX, currentY,
+					endX, endY);
 			return jumpOnto(startX, startY, currentX, currentY, endX, endY);
 		} else
 			return move(startX, startY, currentX, currentY, endX, endY,

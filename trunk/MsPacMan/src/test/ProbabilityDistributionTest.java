@@ -95,7 +95,7 @@ public class ProbabilityDistributionTest {
 
 	@Test
 	public void testKlSize() {
-		assertEquals(sut_.klSize(), 4.44429164, 0.001); 
+		assertEquals(sut_.klSize(), 4.44429164, 0.001);
 		
 		sut_.set("d", 0.7);
 		sut_.normaliseProbs();

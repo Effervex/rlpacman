@@ -29,6 +29,8 @@ public class TestTest {
 		assertEquals(p.inverseCumulativeProbability(0) + 1, 0);
 		assertEquals(p.inverseCumulativeProbability(0.5) + 1, 1);
 		assertEquals(p.inverseCumulativeProbability(0.75) + 1, 2);
+		
+		System.out.println("processors: " + Runtime.getRuntime().availableProcessors());
 	}
 
 	@Test
@@ -135,17 +137,6 @@ public class TestTest {
 					/ maxVals[2] + '\t' + normal001[i] / maxVals[3] + '\n');
 
 		write.close();
-	}
-
-	@Test
-	public void testBitOperators() {
-		assertTrue((2 & 1) == 0);
-		assertTrue((2 & 2) != 0);
-		assertTrue((3 & 1) != 0);
-		assertTrue((2 & 2) != 0);
-		assertTrue((4 & 4) != 0);
-		assertTrue((4 & 2) == 0);
-		assertTrue((4 & 1) == 0);
 	}
 
 	@Test

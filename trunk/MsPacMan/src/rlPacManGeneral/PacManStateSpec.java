@@ -5,11 +5,14 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Number;
-import relationalFramework.Policy;
+import msPacMan.Ghost;
+
+import cerrla.NumberEnum;
+
+import relationalFramework.RelationalRule;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 /**
@@ -35,24 +38,24 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseActionTemplates() {
-		Collection<StringFact> actions = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialiseActionTemplates() {
+		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
 
 		// Actions have a type and a distance
 		String[] structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("moveTo", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("moveTo", structure));
 
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("moveFrom", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("moveFrom", structure));
 
 		structure = new String[2];
 		structure[0] = "junction";
-		structure[1] = Number.Integer.toString();
-		actions.add(new StringFact("toJunction", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		actions.add(new RelationalPredicate("toJunction", structure));
 
 		return actions;
 	}
@@ -108,8 +111,8 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Policy initialiseOptimalPolicy() {
-		Policy goodPolicy = new Policy();
+	protected RelationalPolicy initialiseOptimalPolicy() {
+		RelationalPolicy goodPolicy = new RelationalPolicy();
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
@@ -150,7 +153,7 @@ public class PacManStateSpec extends StateSpec {
 			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
 					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
 					+ "=> (moveFrom ?Ghost ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
+			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 30)) "
 					+ "(edible ?Ghost) (not (blinking ?Ghost)) "
 					+ "(ghost ?Ghost) => (moveTo ?Ghost ?Dist0)");
 			rules
@@ -173,55 +176,55 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		for (String rule : rules)
-			goodPolicy.addRule(new GuidedRule(rule), false, false);
+			goodPolicy.addRule(new RelationalRule(rule), false, false);
 
 		return goodPolicy;
 	}
 
 	@Override
-	protected Collection<StringFact> initialisePredicateTemplates() {
-		Collection<StringFact> predicates = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
+		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
 		// Score
 		String[] structure = new String[1];
-		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("score", structure));
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("score", structure));
 
 		// High Score
 		structure = new String[1];
-		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("highScore", structure));
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("highScore", structure));
 
 		// Lives
 		structure = new String[1];
-		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("lives", structure));
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("lives", structure));
 
 		// Level
 		structure = new String[1];
-		structure[0] = Number.Integer.toString();
-		predicates.add(new StringFact("level", structure));
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("level", structure));
 
 		// Edible
 		structure = new String[1];
 		structure[0] = "ghost";
-		predicates.add(new StringFact("edible", structure));
+		predicates.add(new RelationalPredicate("edible", structure));
 
 		// Blinking
 		structure = new String[1];
 		structure[0] = "ghost";
-		predicates.add(new StringFact("blinking", structure));
+		predicates.add(new RelationalPredicate("blinking", structure));
 
 		// Distance Metrics
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = Number.Double.toString();
-		predicates.add(new StringFact("distance", structure));
+		structure[1] = NumberEnum.Double.toString();
+		predicates.add(new RelationalPredicate("distance", structure));
 
 		structure = new String[2];
 		structure[0] = "junction";
-		structure[1] = Number.Integer.toString();
-		predicates.add(new StringFact("junctionSafety", structure));
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("junctionSafety", structure));
 
 		return predicates;
 	}
@@ -248,7 +251,7 @@ public class PacManStateSpec extends StateSpec {
 	 *            The action to apply.
 	 * @return A Byte direction to move towards/from.
 	 */
-	public WeightedDirection applyAction(StringFact action, PacManState state) {
+	public WeightedDirection applyAction(RelationalPredicate action, PacManState state) {
 		String[] arguments = action.getArguments();
 		double weight = determineWeight(Integer.parseInt(arguments[1]));
 

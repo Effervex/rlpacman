@@ -14,11 +14,12 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
+import cerrla.PolicyGenerator;
+
 import blocksWorld.BlocksWorldStateSpec;
 
-import relationalFramework.PolicyGenerator;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
@@ -44,7 +45,7 @@ public class AgentObservationsTest {
 	}
 
 	private void assertBeliefs2(Collection<String> beliefs,
-			Collection<StringFact> agentBeliefs) {
+			Collection<RelationalPredicate> agentBeliefs) {
 		for (String fact : beliefs) {
 			assertTrue(beliefs + " did not match " + agentBeliefs,
 					agentBeliefs.contains(StateSpec.toStringFact(fact)));
@@ -486,9 +487,9 @@ public class AgentObservationsTest {
 		goalReplacements.put("a", StateSpec.createGoalTerm(0));
 		goalReplacements.put("b", StateSpec.createGoalTerm(1));
 		sut_.scanState(facts, goalReplacements);
-		MultiMap<String, StringFact> goalPredicates = sut_
+		MultiMap<String, RelationalPredicate> goalPredicates = sut_
 				.getGoalPredicateMap();
-		Collection<StringFact> goalTermPreds = goalPredicates.get(StateSpec
+		Collection<RelationalPredicate> goalTermPreds = goalPredicates.get(StateSpec
 				.createGoalTerm(0));
 		assertTrue(goalTermPreds
 				.contains(StateSpec.toStringFact("(on ? ?G_0)")));
@@ -1053,7 +1054,7 @@ public class AgentObservationsTest {
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 		sut_.scanState(facts, null);
 
-		Collection<StringFact> relevantFacts = sut_.gatherActionFacts(
+		Collection<RelationalPredicate> relevantFacts = sut_.gatherActionFacts(
 				StateSpec.toStringFact("(move c e)"), null);
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
 		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
@@ -1086,7 +1087,7 @@ public class AgentObservationsTest {
 				.contains(StateSpec.toStringFact("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 7);
 		// Testing the action conditions
-		Collection<StringFact> specialisationConditions = sut_
+		Collection<RelationalPredicate> specialisationConditions = sut_
 				.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toStringFact("(highest ?Y)")));

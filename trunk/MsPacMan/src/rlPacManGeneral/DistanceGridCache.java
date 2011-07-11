@@ -11,6 +11,10 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import msPacMan.GameModel;
+import msPacMan.Junction;
+import msPacMan.Thing;
+
 /**
  * A cache of precalculated distance grids for each and every valid position in
  * all of Ms. PacMan's levels.

@@ -9,10 +9,10 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.RuleCreation;
+import cerrla.Unification;
+
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
-import relationalFramework.Unification;
+import relationalFramework.RelationalPredicate;
 
 public class PacManUnificationTest {
 	private Unification sut_;
@@ -26,9 +26,9 @@ public class PacManUnificationTest {
 	@Test
 	public void testNumericalUnifyStates() {
 		// No change unification
-		List<StringFact> oldState = new ArrayList<StringFact>();
+		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
 		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
-		List<StringFact> newState = new ArrayList<StringFact>();
+		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
 		newState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
 		String[] oldTerms = new String[2];
 		oldTerms[0] = "a";

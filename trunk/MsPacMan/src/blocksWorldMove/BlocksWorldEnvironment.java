@@ -3,6 +3,7 @@ package blocksWorldMove;
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,14 +16,15 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.ActionChoice;
+import cerrla.PolicyActor;
+import cerrla.PolicyGenerator;
+
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
 import relationalFramework.ObjectObservations;
-import relationalFramework.Policy;
-import relationalFramework.PolicyActor;
-import relationalFramework.PolicyGenerator;
-import relationalFramework.RuleAction;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 
 /**
  * The environment for the blocks world interface.
@@ -81,7 +83,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
 			maxSteps_ = (int) (numBlocks_ / actionSuccess_);
-			return maxSteps_ + "";
+			return (maxSteps_ + 1) + "";
 		}
 		if (arg0.equals("freeze")) {
 			PolicyGenerator.getInstance().freeze(true);
@@ -145,16 +147,16 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		if (ObjectObservations.getInstance().earlyExit) {
 			return new Reward_observation_terminal(0, obs, true);
 		}
-		
-		RuleAction ruleAction = ((ActionChoice) ObjectObservations
+
+		Collection<FiredAction> firedActions = ((PolicyActions) ObjectObservations
 				.getInstance().objectArray[0]).getFirstActionList();
-		StringFact action = null;
-		if (ruleAction != null) {
-			List<StringFact> actions = new ArrayList<StringFact>(
-					ruleAction.getActions());
-			ruleAction.triggerRule();
-			action = actions
-					.get(PolicyGenerator.random_.nextInt(actions.size()));
+		RelationalPredicate action = null;
+		if (firedActions != null) {
+			List<FiredAction> actions = new ArrayList<FiredAction>(firedActions);
+			FiredAction selectedAction = actions.get(PolicyGenerator.random_
+					.nextInt(actions.size()));
+			selectedAction.triggerRule();
+			action = selectedAction.getAction();
 		}
 
 		// Action can fail
@@ -172,7 +174,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				System.out.println("\t\t\tNo action chosen.");
 		}
 
-		double nonOptimalSteps = Math.max(maxSteps_ - optimalSteps_, 1);
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
@@ -180,21 +181,24 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		} else if (!actionFailed) {
 			// If the agent caused the state to remain the same, exit the
 			// episode with max negative reward.
-			double excess = (steps_ > optimalSteps_) ? steps_ - optimalSteps_
-					: 0;
 			ObjectObservations.getInstance().setNoPreGoal();
-			return new Reward_observation_terminal(MINIMAL_REWARD
-					+ (excess * -MINIMAL_REWARD) / nonOptimalSteps,
+			return new Reward_observation_terminal(MINIMAL_REWARD,
 					new Observation(), true);
 		}
 
 		steps_++;
 		ObjectObservations.getInstance().predicateKB = rete_;
 
-		double reward = (steps_ <= optimalSteps_) ? 0 : MINIMAL_REWARD
-				/ nonOptimalSteps;
+		double reward = 0;
 		boolean isGoal = StateSpec.getInstance().isGoal(rete_)
 				|| ObjectObservations.getInstance().earlyExit;
+		if (isGoal || steps_ == maxSteps_) {
+			if (optimalSteps_ == maxSteps_)
+				reward = 0;
+			else
+				reward = MINIMAL_REWARD * (steps_ - optimalSteps_)
+						/ (maxSteps_ - optimalSteps_);
+		}
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isGoal);
 
@@ -210,7 +214,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private BlocksState actOnAction(StringFact action, BlocksState worldState) {
+	private BlocksState actOnAction(RelationalPredicate action, BlocksState worldState) {
 		if (action == null)
 			return worldState;
 
@@ -431,7 +435,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The minimal number of steps to take for solving.
 	 */
 	private int optimalSteps() {
-		Policy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
+		RelationalPolicy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
 		steps_ = 0;
 
 		// Check it hasn't already solved the state
@@ -445,7 +449,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		BlocksState initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
 		PolicyActor optimalAgent = new PolicyActor();
-		ObjectObservations.getInstance().objectArray = new Policy[] { optimalPolicy };
+		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { optimalPolicy };
 		optimalAgent.agent_message("Optimal");
 		optimalAgent.agent_message("SetPolicy");
 		double oldActionSuccess = actionSuccess_;

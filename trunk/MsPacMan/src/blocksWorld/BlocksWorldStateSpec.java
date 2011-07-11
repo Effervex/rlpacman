@@ -5,10 +5,10 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.GuidedRule;
-import relationalFramework.Policy;
+import relationalFramework.RelationalRule;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
-import relationalFramework.StringFact;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class BlocksWorldStateSpec extends StateSpec {
@@ -31,19 +31,19 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Collection<StringFact> initialiseActionTemplates() {
-		Collection<StringFact> actions = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialiseActionTemplates() {
+		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
 
 		// Move action
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		actions.add(new StringFact("move", structure));
+		actions.add(new RelationalPredicate("move", structure));
 
 		// MoveFloor action
 		structure = new String[1];
 		structure[0] = "block";
-		actions.add(new StringFact("moveFloor", structure));
+		actions.add(new RelationalPredicate("moveFloor", structure));
 
 		return actions;
 	}
@@ -112,8 +112,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected Policy initialiseOptimalPolicy() {
-		Policy optimal = null;
+	protected RelationalPolicy initialiseOptimalPolicy() {
+		RelationalPolicy optimal = null;
 
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
@@ -143,43 +143,43 @@ public class BlocksWorldStateSpec extends StateSpec {
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
 
-		optimal = new Policy();
+		optimal = new RelationalPolicy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new GuidedRule(rules[i]), false, false);
+			optimal.addRule(new RelationalRule(rules[i]), false, false);
 
 		return optimal;
 	}
 
 	@Override
-	protected Collection<StringFact> initialisePredicateTemplates() {
-		Collection<StringFact> predicates = new ArrayList<StringFact>();
+	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
+		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
 		// On predicate
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		predicates.add(new StringFact("on", structure));
+		predicates.add(new RelationalPredicate("on", structure));
 
 		// OnFloor predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new StringFact("onFloor", structure));
+		predicates.add(new RelationalPredicate("onFloor", structure));
 
 		// Clear predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new StringFact("clear", structure));
+		predicates.add(new RelationalPredicate("clear", structure));
 
 		// Above predicate
 		structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		predicates.add(new StringFact("above", structure));
+		predicates.add(new RelationalPredicate("above", structure));
 
 		// Highest predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new StringFact("highest", structure));
+		predicates.add(new RelationalPredicate("highest", structure));
 
 		return predicates;
 	}

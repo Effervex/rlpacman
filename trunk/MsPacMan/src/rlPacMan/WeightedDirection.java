@@ -1,5 +1,7 @@
 package rlPacMan;
 
+import msPacMan.Thing;
+
 /**
  * A simple class combining weight and direction.
  * 
