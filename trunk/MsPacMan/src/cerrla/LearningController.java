@@ -1151,7 +1151,7 @@ public class LearningController {
 
 		// System output
 		System.out.println();
-		if (ensembleEvaluation_)
+		if (!ensembleEvaluation_)
 			System.out.println("Beginning testing for episode " + t + ".");
 		else
 			System.out.println("Beginning ensemble testing for episode " + t

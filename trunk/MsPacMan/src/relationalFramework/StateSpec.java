@@ -546,7 +546,7 @@ public abstract class StateSpec {
 	public Collection<RelationalPredicate> createTypeConds(RelationalPredicate fact) {
 		Collection<RelationalPredicate> typeConds = new HashSet<RelationalPredicate>();
 		// If the term itself is a type pred, return.
-		if (isTypePredicate(fact.getFactName())) {
+		if (isTypePredicate(fact.getFactName()) || fact.isNegated()) {
 			return typeConds;
 		}
 
@@ -1106,7 +1106,7 @@ public abstract class StateSpec {
 	 *            The String fact.
 	 * @return A StringFact version of the fact.
 	 */
-	public static RelationalPredicate toStringFact(String fact) {
+	public static RelationalPredicate toRelationalPredicate(String fact) {
 		String[] condSplit = StateSpec.splitFact(fact);
 		if (condSplit[0].equals("initial-fact"))
 			return null;

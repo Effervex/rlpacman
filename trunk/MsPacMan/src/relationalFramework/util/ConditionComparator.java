@@ -19,8 +19,9 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 	private static Comparator<RelationalPredicate> instance_;
 	private final int GOAL = -1;
 	private final int BASE = 0;
-	private final int INEQ = 2;
 	private final int TYPE = 1;
+	private final int NEG = 2;
+	private final int INEQ = 3;
 
 	private ConditionComparator() {
 
@@ -38,32 +39,34 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 		}
 
 		// Determine the type of condition
-		RelationalPredicate str0 = (RelationalPredicate) arg0;
-		RelationalPredicate str1 = (RelationalPredicate) arg1;
 		int condType0 = BASE;
 		int condType1 = BASE;
 
 		// Checking str0
-		if (str0.getFactName().equals(StateSpec.GOALARGS_PRED))
+		if (arg0.getFactName().equals(StateSpec.GOALARGS_PRED))
 			condType0 = GOAL;
-		else if (StateSpec.getInstance().isTypePredicate(str0.getFactName()))
+		else if (StateSpec.getInstance().isTypePredicate(arg0.getFactName()))
 			condType0 = TYPE;
-		else if (str0.getFactName().equals("test"))
+		else if (arg0.getFactName().equals("test"))
 			condType0 = INEQ;
+		if (arg0.isNegated())
+			condType0 = NEG;
 
 		// Checking str1
-		if (str1.getFactName().equals(StateSpec.GOALARGS_PRED))
+		if (arg1.getFactName().equals(StateSpec.GOALARGS_PRED))
 			condType1 = GOAL;
-		else if (StateSpec.getInstance().isTypePredicate(str1.getFactName()))
+		else if (StateSpec.getInstance().isTypePredicate(arg1.getFactName()))
 			condType1 = TYPE;
-		else if (str1.getFactName().equals("test"))
+		else if (arg1.getFactName().equals("test"))
 			condType1 = INEQ;
+		if (arg1.isNegated())
+			condType1 = NEG;
 
 		if (condType0 < condType1)
 			return -1;
 		if (condType0 > condType1)
 			return 1;
-		return str0.compareTo(str1);
+		return arg0.compareTo(arg1);
 	}
 
 	public static Comparator<RelationalPredicate> getInstance() {

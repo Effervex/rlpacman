@@ -22,8 +22,6 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import javax.management.relation.Relation;
-
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
@@ -97,7 +95,7 @@ public final class PolicyGenerator implements Serializable {
 	public static final int NUM_NUMERICAL_SPLITS = 3;
 
 	/** The random number generator. */
-	public static Random random_ = new Random();
+	public static Random random_ = new Random(0);
 
 	/**
 	 * The resampling bound. If an agent completes that many * the average
@@ -308,7 +306,6 @@ public final class PolicyGenerator implements Serializable {
 	private void mutateRule(RelationalRule baseRule, Slot ruleSlot, int mutationUses) {
 		int preGoalHash = AgentObservations.getInstance().getObservationHash();
 		// If the rule can mutate.
-		// TODO An onAB rule is being created with the goal as a condition.
 		if (ruleCanMutate(baseRule, mutationUses, preGoalHash)) {
 			boolean needToPause = false;
 			// Remove old rules if this rule is an LGG rule.

@@ -61,10 +61,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		split[1] = split[1].trim();
 		String assertStr = "(assert ";
 		if (split[1].contains(assertStr))
-			postCondition_ = StateSpec.toStringFact(split[1].substring(
+			postCondition_ = StateSpec.toRelationalPredicate(split[1].substring(
 					assertStr.length(), split[1].length() - 1));
 		else
-			postCondition_ = StateSpec.toStringFact(split[1].trim());
+			postCondition_ = StateSpec.toRelationalPredicate(split[1].trim());
 	}
 
 	/**

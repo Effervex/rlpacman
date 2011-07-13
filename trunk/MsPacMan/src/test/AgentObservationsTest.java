@@ -39,16 +39,16 @@ public class AgentObservationsTest {
 	private void assertBeliefs(ConditionBeliefs cb,
 			Collection<String> alwaysTrue, Collection<String> occasionallyTrue,
 			Collection<String> neverTrue) {
-		assertBeliefs2(alwaysTrue, cb.getAlwaysTrue());
-		assertBeliefs2(occasionallyTrue, cb.getOccasionallyTrue());
-		assertBeliefs2(neverTrue, cb.getNeverTrue());
+		assertBeliefs2(alwaysTrue, cb.getAlwaysTrue(null));
+		assertBeliefs2(occasionallyTrue, cb.getOccasionallyTrue(null));
+		assertBeliefs2(neverTrue, cb.getNeverTrue(null));
 	}
 
 	private void assertBeliefs2(Collection<String> beliefs,
 			Collection<RelationalPredicate> agentBeliefs) {
 		for (String fact : beliefs) {
 			assertTrue(beliefs + " did not match " + agentBeliefs,
-					agentBeliefs.contains(StateSpec.toStringFact(fact)));
+					agentBeliefs.contains(StateSpec.toRelationalPredicate(fact)));
 		}
 		assertEquals(beliefs + " did not match " + agentBeliefs,
 				agentBeliefs.size(), beliefs.size());
@@ -72,8 +72,8 @@ public class AgentObservationsTest {
 				&& negatedCondBeliefs.get(condition).containsKey(argState)) {
 			ConditionBeliefs cb = negatedCondBeliefs.get(condition).get(
 					argState);
-			assertTrue(alwaysTrue + " not present in " + cb, cb.getAlwaysTrue()
-					.contains(StateSpec.toStringFact(alwaysTrue)));
+			assertTrue(alwaysTrue + " not present in " + cb, cb.getAlwaysTrue(null)
+					.contains(StateSpec.toRelationalPredicate(alwaysTrue)));
 		}
 	}
 
@@ -492,45 +492,45 @@ public class AgentObservationsTest {
 		Collection<RelationalPredicate> goalTermPreds = goalPredicates.get(StateSpec
 				.createGoalTerm(0));
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ? ?G_0)")));
+				.contains(StateSpec.toRelationalPredicate("(on ? ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ? ?G_0)")));
+				.toRelationalPredicate("(above ? ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(onFloor ?G_0)")));
+				.toRelationalPredicate("(onFloor ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(block ?G_0)")));
+				.toRelationalPredicate("(block ?G_0)")));
 		// Negated facts too
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (on ? ?G_0))")));
+				.toRelationalPredicate("(not (on ? ?G_0))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (above ? ?G_0))")));
+				.toRelationalPredicate("(not (above ? ?G_0))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (onFloor ?G_0))")));
+				.toRelationalPredicate("(not (onFloor ?G_0))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (block ?G_0))")));
+				.toRelationalPredicate("(not (block ?G_0))")));
 		assertEquals(goalTermPreds.size(), 8);
 
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ? ?G_1)")));
+				.contains(StateSpec.toRelationalPredicate("(on ? ?G_1)")));
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ?G_1 ?)")));
+				.contains(StateSpec.toRelationalPredicate("(on ?G_1 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ? ?G_1)")));
+				.toRelationalPredicate("(above ? ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ?G_1 ?)")));
+				.toRelationalPredicate("(above ?G_1 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(block ?G_1)")));
+				.toRelationalPredicate("(block ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (on ? ?G_1))")));
+				.toRelationalPredicate("(not (on ? ?G_1))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (on ?G_1 ?))")));
+				.toRelationalPredicate("(not (on ?G_1 ?))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (above ? ?G_1))")));
+				.toRelationalPredicate("(not (above ? ?G_1))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (above ?G_1 ?))")));
+				.toRelationalPredicate("(not (above ?G_1 ?))")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(not (block ?G_1))")));
+				.toRelationalPredicate("(not (block ?G_1))")));
 		assertEquals(goalTermPreds.size(), 10);
 
 		// Different goal terms
@@ -542,42 +542,42 @@ public class AgentObservationsTest {
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(0));
 		// OLD ONES
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ? ?G_0)")));
+				.contains(StateSpec.toRelationalPredicate("(on ? ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ? ?G_0)")));
+				.toRelationalPredicate("(above ? ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(onFloor ?G_0)")));
+				.toRelationalPredicate("(onFloor ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(block ?G_0)")));
+				.toRelationalPredicate("(block ?G_0)")));
 		// NEW ONES
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ?G_0 ?)")));
+				.contains(StateSpec.toRelationalPredicate("(on ?G_0 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ?G_0 ?)")));
+				.toRelationalPredicate("(above ?G_0 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(clear ?G_0)")));
+				.toRelationalPredicate("(clear ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(highest ?G_0)")));
+				.toRelationalPredicate("(highest ?G_0)")));
 		// Include negated too
 		assertEquals(goalTermPreds.size(), 16);
 
 		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
 		// OLD ONES
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ? ?G_1)")));
+				.contains(StateSpec.toRelationalPredicate("(on ? ?G_1)")));
 		assertTrue(goalTermPreds
-				.contains(StateSpec.toStringFact("(on ?G_1 ?)")));
+				.contains(StateSpec.toRelationalPredicate("(on ?G_1 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ? ?G_1)")));
+				.toRelationalPredicate("(above ? ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(above ?G_1 ?)")));
+				.toRelationalPredicate("(above ?G_1 ?)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(block ?G_1)")));
+				.toRelationalPredicate("(block ?G_1)")));
 		// NEW ONES
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(onFloor ?G_1)")));
+				.toRelationalPredicate("(onFloor ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
-				.toStringFact("(clear ?G_1)")));
+				.toRelationalPredicate("(clear ?G_1)")));
 		// Include negated too
 		assertEquals(goalTermPreds.size(), 14);
 	}
@@ -1055,98 +1055,98 @@ public class AgentObservationsTest {
 		sut_.scanState(facts, null);
 
 		Collection<RelationalPredicate> relevantFacts = sut_.gatherActionFacts(
-				StateSpec.toStringFact("(move c e)"), null);
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block c)")));
+				StateSpec.toRelationalPredicate("(move c e)"), null);
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block c)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(highest e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(on e b)")));
+				.contains(StateSpec.toRelationalPredicate("(highest e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(on e b)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(above e b)")));
+				.contains(StateSpec.toRelationalPredicate("(above e b)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(above e f)")));
+				.contains(StateSpec.toRelationalPredicate("(above e f)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(onFloor c)")));
+				.contains(StateSpec.toRelationalPredicate("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 9);
 		// Testing the action conditions (empty as we have only one action)
 		assertTrue(sut_.getSpecialisationConditions("move").isEmpty());
 
 		// A different move action
 		relevantFacts = sut_.gatherActionFacts(
-				StateSpec.toStringFact("(move d c)"), null);
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear d)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block d)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(on d a)")));
+				StateSpec.toRelationalPredicate("(move d c)"), null);
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear d)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block d)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(on d a)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(above d a)")));
+				.contains(StateSpec.toRelationalPredicate("(above d a)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(onFloor c)")));
+				.contains(StateSpec.toRelationalPredicate("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 7);
 		// Testing the action conditions
 		Collection<RelationalPredicate> specialisationConditions = sut_
 				.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?Y)")));
+				.toRelationalPredicate("(highest ?Y)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?Y))")));
+				.toRelationalPredicate("(not (highest ?Y))")));
 		// These two are equivalent to above
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?X ?)")));
+				.toRelationalPredicate("(on ?X ?)")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?Y ?)")));
+				.toRelationalPredicate("(on ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?X ?)")));
+				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?Y ?)")));
+				.toRelationalPredicate("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?X)")));
+				.toRelationalPredicate("(onFloor ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?Y)")));
+				.toRelationalPredicate("(onFloor ?Y)")));
 		assertEquals(specialisationConditions.size(), 6);
 
 		// And another
 		relevantFacts = sut_.gatherActionFacts(
-				StateSpec.toStringFact("(move e c)"), null);
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(clear c)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(block c)")));
+				StateSpec.toRelationalPredicate("(move e c)"), null);
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(clear c)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(block c)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(highest e)")));
-		assertTrue(relevantFacts.contains(StateSpec.toStringFact("(on e b)")));
+				.contains(StateSpec.toRelationalPredicate("(highest e)")));
+		assertTrue(relevantFacts.contains(StateSpec.toRelationalPredicate("(on e b)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(above e b)")));
+				.contains(StateSpec.toRelationalPredicate("(above e b)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(above e f)")));
+				.contains(StateSpec.toRelationalPredicate("(above e f)")));
 		assertTrue(relevantFacts
-				.contains(StateSpec.toStringFact("(onFloor c)")));
+				.contains(StateSpec.toRelationalPredicate("(onFloor c)")));
 		assertEquals(relevantFacts.size(), 9);
 		// Testing the action conditions
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?X)")));
+				.toRelationalPredicate("(highest ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?Y)")));
+				.toRelationalPredicate("(highest ?Y)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?X))")));
+				.toRelationalPredicate("(not (highest ?X))")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?Y))")));
+				.toRelationalPredicate("(not (highest ?Y))")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?X ?)")));
+				.toRelationalPredicate("(on ?X ?)")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?Y ?)")));
+				.toRelationalPredicate("(on ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?X ?)")));
+				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?Y ?)")));
+				.toRelationalPredicate("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?X)")));
+				.toRelationalPredicate("(onFloor ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?Y)")));
+				.toRelationalPredicate("(onFloor ?Y)")));
 		assertEquals(specialisationConditions.size(), 8);
 
 		// [e]
@@ -1157,31 +1157,31 @@ public class AgentObservationsTest {
 		goalReplacements.put("f", StateSpec.createGoalTerm(0));
 		goalReplacements.put("c", StateSpec.createGoalTerm(1));
 		relevantFacts = sut_.gatherActionFacts(
-				StateSpec.toStringFact("(move e c)"), goalReplacements);
+				StateSpec.toRelationalPredicate("(move e c)"), goalReplacements);
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?X)")));
+				.toRelationalPredicate("(highest ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?Y)")));
+				.toRelationalPredicate("(highest ?Y)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?X))")));
+				.toRelationalPredicate("(not (highest ?X))")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?Y))")));
+				.toRelationalPredicate("(not (highest ?Y))")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?X ?)")));
+				.toRelationalPredicate("(on ?X ?)")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?Y ?)")));
+				.toRelationalPredicate("(on ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?X ?)")));
+				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions
-				.contains(StateSpec.toStringFact("(above ?X "
+				.contains(StateSpec.toRelationalPredicate("(above ?X "
 						+ StateSpec.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?Y ?)")));
+				.toRelationalPredicate("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?X)")));
+				.toRelationalPredicate("(onFloor ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?Y)")));
+				.toRelationalPredicate("(onFloor ?Y)")));
 		assertEquals(specialisationConditions.size(), 9);
 
 		// [e]
@@ -1192,33 +1192,33 @@ public class AgentObservationsTest {
 		goalReplacements.put("b", StateSpec.createGoalTerm(0));
 		goalReplacements.put("d", StateSpec.createGoalTerm(1));
 		relevantFacts = sut_.gatherActionFacts(
-				StateSpec.toStringFact("(move e c)"), goalReplacements);
+				StateSpec.toRelationalPredicate("(move e c)"), goalReplacements);
 		specialisationConditions = sut_.getSpecialisationConditions("move");
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?X)")));
+				.toRelationalPredicate("(highest ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(highest ?Y)")));
+				.toRelationalPredicate("(highest ?Y)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?X))")));
+				.toRelationalPredicate("(not (highest ?X))")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(not (highest ?Y))")));
+				.toRelationalPredicate("(not (highest ?Y))")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?X ?)")));
+				.toRelationalPredicate("(on ?X ?)")));
 		assertFalse(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?Y ?)")));
+				.toRelationalPredicate("(on ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?X ?)")));
+				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions
-				.contains(StateSpec.toStringFact("(above ?X "
+				.contains(StateSpec.toRelationalPredicate("(above ?X "
 						+ StateSpec.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(on ?X " + StateSpec.createGoalTerm(0) + ")")));
+				.toRelationalPredicate("(on ?X " + StateSpec.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(above ?Y ?)")));
+				.toRelationalPredicate("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?X)")));
+				.toRelationalPredicate("(onFloor ?X)")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toStringFact("(onFloor ?Y)")));
+				.toRelationalPredicate("(onFloor ?Y)")));
 		assertEquals(specialisationConditions.size(), 10);
 	}
 }

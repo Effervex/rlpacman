@@ -315,49 +315,6 @@ public class Unification {
 						unification[i] = StateSpec.ANONYMOUS;
 						thisGeneralness++;
 					}
-
-					// // Check generality incrementation
-					// if (unityTerm != null
-					// && !unityTerm.equals(StateSpec.ANONYMOUS)
-					// && unityArguments[i].equals(StateSpec.ANONYMOUS)) {
-					// thisGeneralness++;
-					// if (noGeneralisations) {
-					// validFact = false;
-					// break;
-					// }
-					// }
-					//
-					// // If either are anonymous, the unification must be
-					// // anonymous
-					// if (factTerm.equals(unityTerm)) {
-					// // If the two are the same term (not anonymous) and
-					// // their replacements match up, use that
-					// unification[i] = factTerm;
-					// validFact = true;
-					// } else if (factTerm.equals(StateSpec.ANONYMOUS)
-					// && unityTerm != null
-					// || ((unityTerm != null) && (unityTerm
-					// .equals(StateSpec.ANONYMOUS)))) {
-					// unification[i] = StateSpec.ANONYMOUS;
-					// // thisGeneralness++;
-					// // if (noGeneralisations) {
-					// // validFact = false;
-					// // break;
-					// // }
-					// } else if (!numericalValueCheck(factArguments[i],
-					// unityArguments[i], unification, i, factTerms)) {
-					// // Failing that simply use an anonymous variable (if not
-					// // negated)
-					// if (!fact.isNegated()) {
-					// unification[i] = StateSpec.ANONYMOUS;
-					// thisGeneralness++;
-					// if (noGeneralisations) {
-					// validFact = false;
-					// break;
-					// }
-					// } else
-					// return null;
-					// }
 				}
 
 				// Store if:
