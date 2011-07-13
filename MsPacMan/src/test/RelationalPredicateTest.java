@@ -13,7 +13,7 @@ import org.junit.Test;
 import relationalFramework.StateSpec;
 import relationalFramework.RelationalPredicate;
 
-public class StringFactTest {
+public class RelationalPredicateTest {
 
 	@Before
 	public void setUp() throws Exception {

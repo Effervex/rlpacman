@@ -35,20 +35,20 @@ public class PacManStateSpecTest {
 		RelationalRule rule = new RelationalRule(
 				"(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(distanceGhost ?Player ?Ghost 4)")));
+				StateSpec.toRelationalPredicate("(distanceGhost ?Player ?Ghost 4)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
+				StateSpec.toRelationalPredicate("(test (<> ?Player ?Ghost))")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(pacman ?Player)")));
+				StateSpec.toRelationalPredicate("(pacman ?Player)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(ghost ?Ghost)")));
+				StateSpec.toRelationalPredicate("(ghost ?Ghost)")));
 		assertEquals(rule.getConditions(false).size(), 4);
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), StateSpec
-				.toStringFact("(fromGhost ?Ghost)"));
+				.toRelationalPredicate("(fromGhost ?Ghost)"));
 
 		// Testing conditional &:elements
 		rule = new RelationalRule(
@@ -59,19 +59,19 @@ public class PacManStateSpecTest {
 				.getConditions(false)
 				.contains(
 						StateSpec
-								.toStringFact("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))")));
+								.toRelationalPredicate("(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(test (<> ?Player ?Ghost))")));
+				StateSpec.toRelationalPredicate("(test (<> ?Player ?Ghost))")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(pacman ?Player)")));
+				StateSpec.toRelationalPredicate("(pacman ?Player)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toStringFact("(ghost ?Ghost)")));
+				StateSpec.toRelationalPredicate("(ghost ?Ghost)")));
 		assertTrue(rule.getStringConditions().indexOf("distanceGhost") < rule
 				.getStringConditions().indexOf("pacman"));
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), StateSpec
-				.toStringFact("(fromGhost ?Ghost)"));
+				.toRelationalPredicate("(fromGhost ?Ghost)"));
 	}
 
 	@Test

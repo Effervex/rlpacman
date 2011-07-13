@@ -27,9 +27,9 @@ public class PacManUnificationTest {
 	public void testNumericalUnifyStates() {
 		// No change unification
 		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
 		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
 		String[] oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "1";
@@ -40,15 +40,15 @@ public class PacManUnificationTest {
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b 1)")));
+				.toRelationalPredicate("(distanceDot a b 1)")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "1");
 
 		// Range addition
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "1";
@@ -61,7 +61,7 @@ public class PacManUnificationTest {
 		int index = 0;
 		assertTrue(oldState
 				.contains(StateSpec
-						.toStringFact("(distanceDot a b ?"
+						.toRelationalPredicate("(distanceDot a b ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -71,9 +71,9 @@ public class PacManUnificationTest {
 
 		// Range addition (reversed)
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "2";
@@ -86,7 +86,7 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState
 				.contains(StateSpec
-						.toStringFact("(distanceDot a b ?"
+						.toRelationalPredicate("(distanceDot a b ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -96,9 +96,9 @@ public class PacManUnificationTest {
 
 		// Negative range addition
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b -1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b -1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "-1";
@@ -110,7 +110,7 @@ public class PacManUnificationTest {
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -120,9 +120,9 @@ public class PacManUnificationTest {
 
 		// Tiny value range addition
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b -1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b -1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 2.567483E-64)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2.567483E-64)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "-1";
@@ -134,7 +134,7 @@ public class PacManUnificationTest {
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -144,9 +144,9 @@ public class PacManUnificationTest {
 
 		// Regular variable unification with numerical values too
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot x y -1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot x y -1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "x";
 		oldTerms[1] = "-1";
@@ -158,7 +158,7 @@ public class PacManUnificationTest {
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot ?X ? ?"
+				.toRelationalPredicate("(distanceDot ?X ? ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -168,12 +168,12 @@ public class PacManUnificationTest {
 
 		// Unification under an existing range term
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "?" + Unification.RANGE_VARIABLE_PREFIX + "0";
@@ -184,7 +184,7 @@ public class PacManUnificationTest {
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
@@ -193,12 +193,12 @@ public class PacManUnificationTest {
 
 		// Unification under an existing range term (extension)
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "?" + Unification.RANGE_VARIABLE_PREFIX + "0";
@@ -209,7 +209,7 @@ public class PacManUnificationTest {
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
@@ -218,11 +218,11 @@ public class PacManUnificationTest {
 
 		// Multiple numerical terms
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b 1)"));
-		oldState.add(StateSpec.toStringFact("(level a 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(level a 1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
-		newState.add(StateSpec.toStringFact("(level a 3)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
+		newState.add(StateSpec.toRelationalPredicate("(level a 3)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "1";
@@ -234,7 +234,7 @@ public class PacManUnificationTest {
 		assertEquals(2, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + index
@@ -242,21 +242,21 @@ public class PacManUnificationTest {
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Unification.RANGE_VARIABLE_PREFIX + index);
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(level a ?"
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(level a ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
 
 		// Multiple numerical terms with existing range term
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot a b ?"
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
-		oldState.add(StateSpec.toStringFact("(level a 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(level a 1)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceDot a b -2)"));
-		newState.add(StateSpec.toStringFact("(level a 3)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
+		newState.add(StateSpec.toRelationalPredicate("(level a 3)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
 		oldTerms[1] = "?" + Unification.RANGE_VARIABLE_PREFIX + "0";
@@ -267,27 +267,27 @@ public class PacManUnificationTest {
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
 		assertTrue(oldState.contains(StateSpec
-				.toStringFact("(distanceDot a b ?"
+				.toRelationalPredicate("(distanceDot a b ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
 						+ Unification.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?" + Unification.RANGE_VARIABLE_PREFIX + "0");
 		index++;
-		assertTrue(oldState.contains(StateSpec.toStringFact("(level a ?"
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(level a ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
 				+ Unification.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
 
 		// Variables and numerical unification (differing distance)
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
-		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(dot ?X)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 2)"));
-		newState.add(StateSpec.toStringFact("(ghost blinky)"));
-		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
-		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceGhost player blinky 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(ghost blinky)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toRelationalPredicate("(dot dot_1)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "?X";
 		oldTerms[1] = "1";
@@ -300,25 +300,25 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState
 				.contains(StateSpec
-						.toStringFact("(distanceDot ? ?X ?"
+						.toRelationalPredicate("(distanceDot ? ?X ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
-		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Unification.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (out-of-range distance)
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
-		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(dot ?X)"));
 		newState.clear();
 		newState
-				.add(StateSpec.toStringFact("(distanceGhost player blinky 10)"));
-		newState.add(StateSpec.toStringFact("(ghost blinky)"));
-		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
-		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+				.add(StateSpec.toRelationalPredicate("(distanceGhost player blinky 10)"));
+		newState.add(StateSpec.toRelationalPredicate("(ghost blinky)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toRelationalPredicate("(dot dot_1)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "?X";
 		oldTerms[1] = "1";
@@ -331,24 +331,24 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState
 				.contains(StateSpec
-						.toStringFact("(distanceDot ? ?X ?"
+						.toRelationalPredicate("(distanceDot ? ?X ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
-		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Unification.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (same distance)
 		oldState.clear();
-		oldState.add(StateSpec.toStringFact("(distanceDot ? ?X 1)"));
-		oldState.add(StateSpec.toStringFact("(dot ?X)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distanceDot ? ?X 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(dot ?X)"));
 		newState.clear();
-		newState.add(StateSpec.toStringFact("(distanceGhost player blinky 1)"));
-		newState.add(StateSpec.toStringFact("(ghost blinky)"));
-		newState.add(StateSpec.toStringFact("(distanceDot player dot_1 5)"));
-		newState.add(StateSpec.toStringFact("(dot dot_1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceGhost player blinky 1)"));
+		newState.add(StateSpec.toRelationalPredicate("(ghost blinky)"));
+		newState.add(StateSpec.toRelationalPredicate("(distanceDot player dot_1 5)"));
+		newState.add(StateSpec.toRelationalPredicate("(dot dot_1)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "?X";
 		oldTerms[1] = "1";
@@ -361,12 +361,12 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState
 				.contains(StateSpec
-						.toStringFact("(distanceDot ? ?X ?"
+						.toRelationalPredicate("(distanceDot ? ?X ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
 								+ Unification.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
-		assertTrue(oldState.contains(StateSpec.toStringFact("(dot ?X)")));
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?" + Unification.RANGE_VARIABLE_PREFIX + index);
 	}

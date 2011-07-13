@@ -46,7 +46,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(conditionString);
 		while (m.find()) {
-			RelationalPredicate cond = StateSpec.toStringFact(m.group());
+			RelationalPredicate cond = StateSpec.toRelationalPredicate(m.group());
 			conds.add(cond);
 		}
 		return conds;
@@ -158,7 +158,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
 		ruleConditions_ = splitConditions(split[0]);
 		if (split.length == 2)
-			ruleAction_ = StateSpec.toStringFact(split[1].trim());
+			ruleAction_ = StateSpec.toRelationalPredicate(split[1].trim());
 		slot_ = null;
 		ancestryCount_ = 0;
 		expandConditions();

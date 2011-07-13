@@ -210,8 +210,10 @@ public class PolicyActor implements AgentInterface {
 		// Check the internal goal here
 		if (!handCoded_ && (goalCondition_ != null)) {
 			processInternalGoal(rete);
-			if (internalGoalMet_)
+			if (internalGoalMet_) {
+				ObjectObservations.getInstance().earlyExit = true;
 				return action;
+			}
 		}
 
 		// Randomly resample the policy if the agent has been performing the
@@ -225,8 +227,6 @@ public class PolicyActor implements AgentInterface {
 		policySteps_++;
 		prevActions_ = chooseAction(rete, stateFacts, arg0);
 		ObjectObservations.getInstance().objectArray = new PolicyActions[] { prevActions_ };
-		if (goalCondition_ != null && internalGoalMet_)
-			ObjectObservations.getInstance().earlyExit = true;
 
 		return action;
 	}

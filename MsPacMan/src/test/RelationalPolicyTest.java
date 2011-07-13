@@ -15,7 +15,7 @@ import relationalFramework.RelationalRule;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
 
-public class PolicyTest {
+public class RelationalPolicyTest {
 
 	@Before
 	public void setUp() throws Exception {

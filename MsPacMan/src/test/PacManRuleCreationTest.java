@@ -206,10 +206,10 @@ public class PacManRuleCreationTest {
 	public void testSpecialiseRule() {
 		// Set up the allowable conditions
 		Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>();
-		conditions.add(StateSpec.toStringFact("(edible ?X)"));
-		conditions.add(StateSpec.toStringFact("(blinking ?X)"));
-		conditions.add(StateSpec.toStringFact("(not (edible ?X))"));
-		conditions.add(StateSpec.toStringFact("(not (blinking ?X))"));
+		conditions.add(StateSpec.toRelationalPredicate("(edible ?X)"));
+		conditions.add(StateSpec.toRelationalPredicate("(blinking ?X)"));
+		conditions.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
+		conditions.add(StateSpec.toRelationalPredicate("(not (blinking ?X))"));
 		AgentObservations.getInstance().setActionConditions("toGhost",
 				conditions);
 
