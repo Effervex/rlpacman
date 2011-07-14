@@ -46,7 +46,8 @@ public class RuleCreation implements Serializable {
 	 *            The condition to be added.
 	 * @return False if the condition conflicts, true otherwise.
 	 */
-	private boolean checkConditionTypes(SortedSet<RelationalPredicate> ruleConds,
+	private boolean checkConditionTypes(
+			SortedSet<RelationalPredicate> ruleConds,
 			RelationalPredicate condition) {
 		// Run through the rule conditions.
 		for (RelationalPredicate ruleCond : ruleConds) {
@@ -90,8 +91,8 @@ public class RuleCreation implements Serializable {
 	 *         smaller range.
 	 */
 	private RelationalRule createRangedSpecialisation(RelationalRule baseRule,
-			RelationalPredicate condition, int condArgIndex, String rangeVariable,
-			double lowerBound, double upperBound) {
+			RelationalPredicate condition, int condArgIndex,
+			String rangeVariable, double lowerBound, double upperBound) {
 		// Create the replacement term.
 		String replacementTerm;
 		// If a range, make a range, otherwise make a point.
@@ -104,12 +105,13 @@ public class RuleCreation implements Serializable {
 
 		RelationalPredicate mutantFact = new RelationalPredicate(condition);
 		mutantFact.getArguments()[condArgIndex] = replacementTerm;
-		SortedSet<RelationalPredicate> cloneConds = baseRule.getConditions(false);
+		SortedSet<RelationalPredicate> cloneConds = baseRule
+				.getConditions(false);
 		cloneConds.remove(condition);
 		cloneConds.add(mutantFact);
 
-		RelationalRule mutant = new RelationalRule(cloneConds, baseRule.getAction(),
-				baseRule);
+		RelationalRule mutant = new RelationalRule(cloneConds,
+				baseRule.getAction(), baseRule);
 		// If just a point, change the action.
 		if (lowerBound == upperBound)
 			mutant.getAction().replaceArguments(rangeVariable, lowerBound + "",
@@ -146,8 +148,8 @@ public class RuleCreation implements Serializable {
 	 */
 	private void createRangeSpecialisations(RelationalRule baseRule,
 			RelationalPredicate preGoalFact, int preGoalIndex,
-			Set<RelationalRule> subranges, RelationalPredicate condition, int condArgIndex,
-			String rangeVariable, double min, double max) {
+			Set<RelationalRule> subranges, RelationalPredicate condition,
+			int condArgIndex, String rangeVariable, double min, double max) {
 		if (min != max) {
 			// Create 3 ranges, the min and max split in two and a range
 			// overlapping each centred about the middle.
@@ -224,7 +226,8 @@ public class RuleCreation implements Serializable {
 	 * @return A collection of any sub-ranged mutants created from the rule.
 	 */
 	private Set<RelationalRule> splitRanges(RelationalRule baseRule,
-			RelationalPredicate preGoalFact, int preGoalIndex, boolean isRuleMutant) {
+			RelationalPredicate preGoalFact, int preGoalIndex,
+			boolean isRuleMutant) {
 		Set<RelationalRule> subranges = new HashSet<RelationalRule>();
 
 		// Run through each condition
@@ -281,10 +284,11 @@ public class RuleCreation implements Serializable {
 				previousRules = new ArrayList<RelationalRule>();
 
 			// Gather the action facts for each valid action
-			RelationalPredicate baseAction = StateSpec.getInstance().getStringFact(
-					action);
+			RelationalPredicate baseAction = StateSpec.getInstance()
+					.getStringFact(action);
 			for (String[] actionArgs : validActions.get(action)) {
-				RelationalPredicate actionFact = new RelationalPredicate(baseAction, actionArgs);
+				RelationalPredicate actionFact = new RelationalPredicate(
+						baseAction, actionArgs);
 				AgentObservations.getInstance().gatherActionFacts(actionFact,
 						goalReplacements);
 			}
@@ -323,28 +327,30 @@ public class RuleCreation implements Serializable {
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
-	public SortedSet<RelationalPredicate> simplifyRule(SortedSet<RelationalPredicate> ruleConds,
+	public SortedSet<RelationalPredicate> simplifyRule(
+			SortedSet<RelationalPredicate> ruleConds,
 			RelationalPredicate condition, boolean testForIllegalRule,
 			boolean checkConditionUnification) {
-		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(ruleConds);
+		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(
+				ruleConds);
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
 			if (checkConditionUnification) {
-				RelationalPredicate unification = Unification.getInstance().unifyFact(
-						condition, ruleConds, new DualHashBidiMap(),
-						new DualHashBidiMap(), new String[0], false, false,
-						false);
-				if (unification != null)
+				Collection<UnifiedFact> unification = Unification.getInstance()
+						.unifyFact(condition, ruleConds, new DualHashBidiMap(),
+								new DualHashBidiMap(), new String[0], false,
+								false);
+				if (!unification.isEmpty())
 					return null;
 			}
 
 			condition.swapNegated();
-			RelationalPredicate negUnification = Unification.getInstance().unifyFact(
-					condition, ruleConds, new DualHashBidiMap(),
-					new DualHashBidiMap(), new String[0], false, false, false);
+			Collection<UnifiedFact> negUnification = Unification.getInstance()
+					.unifyFact(condition, ruleConds, new DualHashBidiMap(),
+							new DualHashBidiMap(), new String[0], false, false);
 			condition.swapNegated();
-			if (negUnification != null)
+			if (!negUnification.isEmpty())
 				return null;
 
 			// Need to check type conditions
@@ -403,11 +409,11 @@ public class RuleCreation implements Serializable {
 			condition.replaceArguments(actionTerms);
 
 			// Check for the regular condition
-			SortedSet<RelationalPredicate> specConditions = simplifyRule(conditions,
-					condition, true, false);
+			SortedSet<RelationalPredicate> specConditions = simplifyRule(
+					conditions, condition, true, false);
 			if (specConditions != null) {
-				RelationalRule specialisation = new RelationalRule(specConditions,
-						action, rule);
+				RelationalRule specialisation = new RelationalRule(
+						specConditions, action, rule);
 				specialisation.setQueryParams(rule.getQueryParameters());
 				specialisation.expandConditions();
 				if (!specialisations.contains(specialisation))
@@ -463,11 +469,12 @@ public class RuleCreation implements Serializable {
 	}
 
 	private void swapRuleTerm(RelationalRule rule, Set<RelationalRule> mutants,
-			MultiMap<String, RelationalPredicate> goalPredicates, String[] oldTerms,
-			int i, String goalTerm) {
+			MultiMap<String, RelationalPredicate> goalPredicates,
+			String[] oldTerms, int i, String goalTerm) {
 		String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
 		newTerms[i] = goalTerm;
-		SortedSet<RelationalPredicate> ruleConditions = rule.getConditions(true);
+		SortedSet<RelationalPredicate> ruleConditions = rule
+				.getConditions(true);
 		Collection<RelationalPredicate> specConditions = new TreeSet<RelationalPredicate>(
 				ruleConditions.comparator());
 		// Form the replacement map
@@ -497,8 +504,8 @@ public class RuleCreation implements Serializable {
 
 		if (validRule) {
 			// Create the mutant
-			RelationalRule mutant = new RelationalRule(specConditions, new RelationalPredicate(
-					rule.getAction(), newTerms), rule);
+			RelationalRule mutant = new RelationalRule(specConditions,
+					new RelationalPredicate(rule.getAction(), newTerms), rule);
 			mutant.setQueryParams(rule.getQueryParameters());
 			mutant.expandConditions();
 			mutants.add(mutant);

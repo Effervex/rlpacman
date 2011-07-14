@@ -39,7 +39,8 @@ public class UnificationTest {
 		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// No change with constants
@@ -54,7 +55,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear a)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear a)")));
 		assertEquals(oldTerms[0], "a");
 
 		// Basic removal of preds unification
@@ -73,7 +75,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Simple unification
@@ -94,8 +97,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -111,7 +116,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Generalisation
@@ -126,7 +132,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Mutual generalisation
@@ -141,7 +148,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Two terms
@@ -158,7 +166,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -176,7 +185,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on a b)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on a b)")));
 
 		// Two terms with two aligned preds
 		oldState.clear();
@@ -194,8 +204,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?Y)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Two terms with two misaligned preds
@@ -214,7 +226,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -230,7 +243,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 
 		// Constant and variable case
 		oldState.clear();
@@ -244,7 +258,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? ?X)")));
 		assertEquals(oldTerms[0], "?X");
 
 		// Tough case
@@ -261,7 +276,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? ?Y)")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -279,7 +295,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -297,7 +314,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on a ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on a ?)")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -316,7 +334,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on a ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on a ?Y)")));
 		assertEquals(oldTerms[0], "a");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -334,7 +353,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -353,8 +373,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? ?Y)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -376,9 +398,12 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(3, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? b)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? b)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
 		assertEquals(oldTerms[0], "?X");
 		assertEquals(oldTerms[1], "?Y");
 
@@ -394,7 +419,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(-1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 
 		// Interesting case
 		oldState.clear();
@@ -426,12 +452,18 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(6, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?Y c)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on c ?)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(onFloor e)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(highest ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?Y c)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(onFloor e)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(highest ?Y)")));
 
 		// Action precedence
 		oldState.clear();
@@ -451,9 +483,12 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(3, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on a ?)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on c ?)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on b ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on a ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on b ?)")));
 
 		// Double unification
 		oldState.clear();
@@ -470,8 +505,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on c ?)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? g)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on c ?)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? g)")));
 
 		// Double unification
 		oldState.clear();
@@ -488,7 +525,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ? g)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ? g)"))
+				|| oldState.contains(StateSpec
+						.toRelationalPredicate("(on c ?)")));
 
 		// Unifying with an inequality test present
 		oldState.clear();
@@ -507,8 +547,69 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
+	}
+
+	@Test
+	public void testUnifyNumerical() {
+		StateSpec.initInstance("rlPacManGeneral.PacMan");
+		sut_ = Unification.getInstance();
+		
+		// Basic unification
+		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
+		oldState.add(StateSpec.toRelationalPredicate("(distance blinky 5)"));
+		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
+		newState.add(StateSpec.toRelationalPredicate("(distance blinky 5)"));
+		String[] oldTerms = new String[2];
+		oldTerms[0] = "blinky";
+		oldTerms[1] = "5";
+		String[] newTerms = new String[2];
+		newTerms[0] = "blinky";
+		newTerms[1] = "5";
+		int result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(0, result);
+		assertEquals(1, oldState.size());
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(distance blinky 5)")));
+		assertEquals(oldTerms[0], "blinky");
+		assertEquals(oldTerms[1], "5");
+		assertEquals(newTerms[0], "blinky");
+		assertEquals(newTerms[1], "5");
+		
+		// Unification with non-numeric variable
+		oldState.clear();
+		oldState.add(StateSpec.toRelationalPredicate("(distance blinky 5)"));
+		newState.clear();
+		newState.add(StateSpec.toRelationalPredicate("(distance pinky 5)"));
+		oldTerms[0] = "blinky";
+		oldTerms[1] = "5";
+		newTerms[0] = "pinky";
+		newTerms[1] = "5";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(distance ?X 5)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "5");
+		
+		// Numerical unification
+		oldState.clear();
+		oldState.add(StateSpec.toRelationalPredicate("(distance blinky 10)"));
+		newState.clear();
+		newState.add(StateSpec.toRelationalPredicate("(distance pinky 5)"));
+		oldTerms[0] = "blinky";
+		oldTerms[1] = "10";
+		newTerms[0] = "pinky";
+		newTerms[1] = "5";
+		result = sut_.unifyStates(oldState, newState, oldTerms, newTerms);
+		assertEquals(1, result);
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(distance ?X ?__Num0&:(betweenRange ?__Num0 5.0 10.0)")));
+		assertEquals(oldTerms[0], "?X");
+		assertEquals(oldTerms[1], "?__Num0");
 	}
 
 	@Test
@@ -522,7 +623,8 @@ public class UnificationTest {
 		int result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?X"));
 		assertEquals(replacementMap.get("?X"), "?X");
 
@@ -535,8 +637,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState
-				.contains(StateSpec.toRelationalPredicate("(not (clear ?X))")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(not (clear ?X))")));
 		assertTrue(replacementMap.containsKey("?X"));
 		assertEquals(replacementMap.get("?X"), "?X");
 
@@ -549,7 +651,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
@@ -564,8 +667,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(highest ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(highest ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
@@ -580,7 +685,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
 		assertTrue(replacementMap.containsKey("?Y"));
 		assertEquals(replacementMap.get("?Y"), "?X");
 
@@ -597,7 +703,8 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(block ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(block ?X)")));
 
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(block ?X)"));
@@ -611,8 +718,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(block ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(block ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
 
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(block ?X)"));
@@ -626,8 +735,10 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(2, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(block ?X)")));
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(block ?X)")));
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
 
 		// Problem with generalisation unification
 		oldState.clear();
@@ -641,8 +752,9 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
 		assertEquals(1, oldState.size());
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(on ?X ?)")));
-		
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?)")));
+
 		// Negated generalised unification (ILLEGAL)
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(not (above ?X ?))"));
@@ -651,7 +763,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(-1, result);
-		
+
 		// Mirrored case
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(not (above ?X ?Y))"));
@@ -660,7 +772,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(-1, result);
-		
+
 		// Same negation is fine
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(not (above ?X ?))"));
@@ -669,7 +781,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
-		
+
 		// Same negation term-swapped
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(not (above ?X ?))"));
@@ -678,7 +790,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
-		
+
 		// Un-negated case is fine
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
@@ -687,7 +799,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
-		
+
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
 		newState.clear();
@@ -695,8 +807,9 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
-		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(above ?X ?)")));
-		
+		assertTrue(oldState.contains(StateSpec
+				.toRelationalPredicate("(above ?X ?)")));
+
 		// Unification order bug
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(highest ?X)"));
@@ -708,7 +821,7 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
-		
+
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(highest ?X)"));
 		oldState.add(StateSpec.toRelationalPredicate("(clear ?X)"));
@@ -720,5 +833,4 @@ public class UnificationTest {
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(0, result);
 	}
-
 }
