@@ -10,6 +10,7 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.Unification;
+import cerrla.UnifiedFact;
 
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -61,8 +62,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		split[1] = split[1].trim();
 		String assertStr = "(assert ";
 		if (split[1].contains(assertStr))
-			postCondition_ = StateSpec.toRelationalPredicate(split[1].substring(
-					assertStr.length(), split[1].length() - 1));
+			postCondition_ = StateSpec.toRelationalPredicate(split[1]
+					.substring(assertStr.length(), split[1].length() - 1));
 		else
 			postCondition_ = StateSpec.toRelationalPredicate(split[1].trim());
 	}
@@ -103,9 +104,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            The replacement map, or null.
 	 * @return The preconditions of the background knowledge.
 	 */
+	@SuppressWarnings("unchecked")
 	private Collection<RelationalPredicate> getPreConds(BidiMap replacementTerms) {
-		Collection<RelationalPredicate> preConds = new ArrayList<RelationalPredicate>(preConds_
-				.size());
+		Collection<RelationalPredicate> preConds = new ArrayList<RelationalPredicate>(
+				preConds_.size());
 		for (RelationalPredicate preCond : preConds_) {
 			RelationalPredicate replacedFact = new RelationalPredicate(preCond);
 			if (replacementTerms != null)
@@ -127,8 +129,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param replacementTerms
 	 *            The replacement terms to swap the terms with.
 	 */
+	@SuppressWarnings("unchecked")
 	private RelationalPredicate getPostCond(BidiMap replacementTerms) {
-		RelationalPredicate replacedFact = new RelationalPredicate(postCondition_);
+		RelationalPredicate replacedFact = new RelationalPredicate(
+				postCondition_);
 		if (replacementTerms != null)
 			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
 					true, false);
@@ -160,6 +164,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            If the conditions are being tested for illegal conditions too.
 	 * @return True if the conditions were simplified, false otherwise.
 	 */
+	@SuppressWarnings("unchecked")
 	public boolean simplify(SortedSet<RelationalPredicate> ruleConds,
 			boolean testForIllegalRule) {
 		boolean changed = false;
@@ -179,25 +184,30 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_) {
 			replacementTerms.clear();
 
-			RelationalPredicate unifiedEquiv = Unification.getInstance().unifyFact(
-					getPostCond(null), ruleConds, new DualHashBidiMap(),
-					replacementTerms, new String[0], true, false, false);
-			// Remove any replacements which specialise anonymous terms
-			replacementTerms.removeValue("?");
+			Collection<UnifiedFact> unifiedEquivs = Unification.getInstance()
+					.unifyFact(getPostCond(null), ruleConds,
+							new DualHashBidiMap(), replacementTerms,
+							new String[0], true, false);
+			for (UnifiedFact unified : unifiedEquivs) {
+				replacementTerms = unified.getResultReplacements();
+				// Remove any replacements which specialise anonymous terms
+				replacementTerms.removeValue("?");
+				RelationalPredicate unifiedFact = unified.getResultFact();
 
-			// If there is a unification, attempt to remove the right side
-			if (unifiedEquiv != null) {
-				unifiedEquiv.replaceArguments(
-						replacementTerms.inverseBidiMap(), true, false);
+				// If there is a unification, attempt to remove the right side
+				if (!unifiedEquivs.isEmpty()) {
+					unifiedFact.replaceArguments(
+							replacementTerms.inverseBidiMap(), true, false);
 
-				// Swap variable
-				Collection<RelationalPredicate> equivFacts = getPreConds(replacementTerms);
-				if (equivFacts != null && ruleConds.remove(unifiedEquiv)) {
-					// Add all equivalent facts.
-					for (RelationalPredicate equivFact : equivFacts) {
-						if (!ruleConds.contains(equivFact)) {
-							ruleConds.add(equivFact);
-							changed = true;
+					// Swap variable
+					Collection<RelationalPredicate> equivFacts = getPreConds(replacementTerms);
+					if (equivFacts != null && ruleConds.remove(unifiedFact)) {
+						// Add all equivalent facts.
+						for (RelationalPredicate equivFact : equivFacts) {
+							if (!ruleConds.contains(equivFact)) {
+								ruleConds.add(equivFact);
+								changed = true;
+							}
 						}
 					}
 				}

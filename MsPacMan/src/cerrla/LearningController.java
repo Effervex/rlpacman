@@ -673,9 +673,6 @@ public class LearningController {
 					episodeSDs.put(numEpisodes, sd.evaluate(vals));
 
 					DecimalFormat formatter = new DecimalFormat("#0.00");
-					// int sdKey = episodePerformances.tailMap(
-					// numEpisodes - PERFORMANCE_EPISODE_GAP_SIZE
-					// * AVERAGE_ITERATIONS).firstKey();
 					System.out
 							.println(formatter.format(convergedCount_ * 100.0
 									/ (population * 3.0))
@@ -713,8 +710,9 @@ public class LearningController {
 		}
 
 		// Perform a final test
-		testRecordAgent(localPolicy, run, episodeMeans, episodeSDs, pvs,
-				finiteNum, policiesEvaled, numEpisodes);
+		if (!prelimRun)
+			testRecordAgent(localPolicy, run, episodeMeans, episodeSDs, pvs,
+					finiteNum, policiesEvaled, numEpisodes);
 		if (testing_)
 			return null;
 
@@ -1101,18 +1099,18 @@ public class LearningController {
 
 		// Writing the raw performance
 		File rawNumbers = new File(perfFile.getAbsoluteFile() + "raw");
-		
+
 		wr = new FileWriter(rawNumbers);
 		buf = new BufferedWriter(wr);
 
 		System.out.println("Average episode scores:");
 		for (Integer episode : episodeMeans.keySet()) {
-			buf.write(episode + "\t" + episodeMeans.get(episode)
-					+ "\t" + episodeSDs.get(episode) + "\n");
+			buf.write(episode + "\t" + episodeMeans.get(episode) + "\t"
+					+ episodeSDs.get(episode) + "\n");
 			System.out.println(episode + "\t" + episodeMeans.get(episode)
 					+ "\t\u00b1\t" + episodeSDs.get(episode));
 		}
-		
+
 		buf.close();
 		wr.close();
 	}
