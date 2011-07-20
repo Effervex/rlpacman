@@ -23,6 +23,7 @@ import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.LocalAgentObservations;
+import relationalFramework.util.Pair;
 
 /**
  * The cross entropy algorithm implementation.
@@ -53,6 +54,11 @@ public class LearningController {
 	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 100;
 	/** The number of test episodes to run for performance measures. */
 	public static final int TEST_ITERATIONS = 100;
+	/**
+	 * The number of iterations of performance checks needed before considering
+	 * a distribution converged.
+	 */
+	private static final int NUM_ITERS_CONVERGED = 3;
 	/**
 	 * An optional comment to append to the beginning of performance and elite
 	 * files.
@@ -563,10 +569,11 @@ public class LearningController {
 		convergedCount_ = 0;
 		convergedMean_ = Double.MAX_VALUE;
 
-		// The outer loop, for refinement episode by episode
+		// The performance and convergence measures.
 		SortedMap<Integer, Double> episodeMeans = new TreeMap<Integer, Double>();
 		SortedMap<Integer, Double> episodeSDs = new TreeMap<Integer, Double>();
 		Queue<Double> valueQueue = new LinkedList<Double>();
+		Queue<Double> averageValues = new LinkedList<Double>();
 
 		// Forming a population of solutions
 		SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
@@ -606,6 +613,8 @@ public class LearningController {
 			// Test the policy against the environment a number of times.
 			boolean restart = false;
 			float score = 0;
+			double minScore = Double.MAX_VALUE;
+			double[] scores = new double[AVERAGE_ITERATIONS];
 			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
 				double scoreThisIter = 0;
 				numEpisodes++;
@@ -620,6 +629,9 @@ public class LearningController {
 				minReward = (scoreThisIter < minReward) ? scoreThisIter
 						: minReward;
 				score += scoreThisIter;
+				scores[j] = scoreThisIter;
+				minScore = (scoreThisIter < minScore) ? scoreThisIter
+						: minScore;
 
 				// Check for a restart
 				if (localPolicy.shouldRestart()) {
@@ -631,12 +643,16 @@ public class LearningController {
 			if (!restart) {
 				// Storing the policy value.
 				RLGlue.RL_agent_message("GetPolicy");
-				RelationalPolicy policy = (RelationalPolicy) ObjectObservations
+				@SuppressWarnings("unchecked")
+				Pair<RelationalPolicy, Double> policy = (Pair<RelationalPolicy, Double>) ObjectObservations
 						.getInstance().objectArray[0];
 				score /= AVERAGE_ITERATIONS;
-				System.out.println(policy);
+				System.out.println();
+				System.out.println(policy.objA_);
+				if (ensembleSize_ > 1)
+					System.out.println("Policy consistency: " + policy.objB_);
 				System.out.println(numEpisodes + ": " + score);
-				PolicyValue thisPolicy = new PolicyValue(policy, score,
+				PolicyValue thisPolicy = new PolicyValue(policy.objA_, score,
 						policiesEvaled);
 				pvs.add(thisPolicy);
 				policiesEvaled++;
@@ -652,33 +668,17 @@ public class LearningController {
 				if (valueQueue.size() == PERFORMANCE_EPISODE_GAP_SIZE)
 					valueQueue.poll();
 				valueQueue.offer((double) score);
-				if (valueQueue.size() == PERFORMANCE_EPISODE_GAP_SIZE) {
-					double[] vals = new double[PERFORMANCE_EPISODE_GAP_SIZE];
-					int i = 0;
-					for (Double val : valueQueue)
-						vals[i++] = val.doubleValue();
-					Mean m = new Mean();
-					double mean = m.evaluate(vals);
 
-					if (Math.abs(mean - convergedMean_) > (maxReward - minReward) * 0.1) {
-						convergedMean_ = mean;
-						convergedCount_ = -1;
-					}
-					convergedCount_++;
-					if (convergedCount_ > population * 3) {
-						isConverged = true;
-					}
-					episodeMeans.put(numEpisodes, mean);
-					StandardDeviation sd = new StandardDeviation();
-					episodeSDs.put(numEpisodes, sd.evaluate(vals));
-
-					DecimalFormat formatter = new DecimalFormat("#0.00");
-					System.out
-							.println(formatter.format(convergedCount_ * 100.0
-									/ (population * 3.0))
-									+ "% converged at value: "
-									+ formatter.format(mean));
+				// Noting average score (for environment SD)
+				for (int i = 0; i < AVERAGE_ITERATIONS; i++) {
+					if (averageValues.size() == PERFORMANCE_EPISODE_GAP_SIZE
+							* AVERAGE_ITERATIONS)
+						averageValues.poll();
+					averageValues.add(scores[i] - minScore);
 				}
+				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,
+						valueQueue, averageValues, numEpisodes, population);
+
 				if (policiesEvaled >= 2 * numElites) {
 					// Update the distributions
 					updateDistributions(localPolicy, pvs, population,
@@ -746,6 +746,66 @@ public class LearningController {
 					.getLocalGoalName(), AgentObservations.getInstance()
 					.getNumGoalArgs(), bestPolicy.getPolicy());
 		return bestPolicy;
+	}
+
+	/**
+	 * Checks if the algorithm has converged in regards to the average
+	 * performance.
+	 * 
+	 * @param episodeMeans
+	 *            The episode means for the run.
+	 * @param episodeSDs
+	 *            The episode standard deviations for the run.
+	 * @param valueQueue
+	 *            The mean scores for the last N policies.
+	 * @param averageValues
+	 *            The adjusted-to-0 scores for the last N policies.
+	 * @param numEpisodes
+	 *            The number of episodes passed.
+	 * @param population TODO
+	 * @return True if the algorithm is considered converged.
+	 */
+	private boolean checkConvergenceValues(
+			SortedMap<Integer, Double> episodeMeans,
+			SortedMap<Integer, Double> episodeSDs, Queue<Double> valueQueue,
+			Queue<Double> averageValues, int numEpisodes, int population) {
+		if (valueQueue.size() == PERFORMANCE_EPISODE_GAP_SIZE) {
+			// Transform the queues into arrays
+			double[] vals = new double[PERFORMANCE_EPISODE_GAP_SIZE];
+			int i = 0;
+			for (Double val : valueQueue)
+				vals[i++] = val.doubleValue();
+			double[] envSDs = new double[averageValues.size()];
+			i = 0;
+			for (Double envSD : averageValues)
+				envSDs[i++] = envSD.doubleValue();
+
+			Mean m = new Mean();
+			StandardDeviation sd = new StandardDeviation();
+			double mean = m.evaluate(vals);
+			double meanDeviation = sd.evaluate(envSDs) * 3;
+			// double meanDeviation = (maxReward - minReward) * 0.1;
+
+			if (Math.abs(mean - convergedMean_) > meanDeviation) {
+				convergedMean_ = mean;
+				convergedCount_ = -1;
+			}
+			convergedCount_++;
+			int convergedSteps = population * NUM_ITERS_CONVERGED;
+			if (convergedCount_ > convergedSteps) {
+				return true;
+			}
+			episodeMeans.put(numEpisodes, mean);
+			episodeSDs.put(numEpisodes, sd.evaluate(vals));
+
+			DecimalFormat formatter = new DecimalFormat("#0.00");
+			System.out.println(formatter.format(convergedCount_ * 100.0
+					/ convergedSteps)
+					+ "% converged at value: "
+					+ formatter.format(mean)
+					+ " \u00b1 " + meanDeviation);
+		}
+		return false;
 	}
 
 	/**
@@ -1175,10 +1235,11 @@ public class LearningController {
 			scores[i] /= AVERAGE_ITERATIONS;
 
 			RLGlue.RL_agent_message("GetPolicy");
-			RelationalPolicy pol = (RelationalPolicy) ObjectObservations
+			Pair<RelationalPolicy, Double> pol = (Pair<RelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
-			// pol.parameterArgs(null);
-			System.out.println(pol);
+			System.out.println(pol.objA_);
+			if (ensembleSize_ > 1)
+				System.out.println("Policy consistency: " + pol.objB_);
 			System.out.println(numEpisodes + ": " + scores[i] + "\n");
 		}
 
@@ -1363,8 +1424,8 @@ public class LearningController {
 
 		localPolicy.updateDistributions(elites, alphaUpdate);
 		// Negative updates:
-		localPolicy.updateDistributionsWithNegative(elites, alphaUpdate
-				/ elites.size(), removed, minReward);
+		// localPolicy.updateDistributionsWithNegative(elites, alphaUpdate
+		// / elites.size(), removed, minReward);
 
 		postUpdateModification(elites, iteration, population, localPolicy);
 

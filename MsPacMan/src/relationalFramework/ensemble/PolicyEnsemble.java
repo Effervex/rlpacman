@@ -13,6 +13,7 @@ import org.apache.commons.collections.BidiMap;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.util.MultiMap;
+import relationalFramework.util.Pair;
 
 /**
  * A class for possibly holding multiple policies.
@@ -27,6 +28,12 @@ public class PolicyEnsemble {
 	/** The policy weights (number of policy duplicates) */
 	private Map<RelationalPolicy, Integer> duplicateCount_;
 
+	/** The policy consistencies (number of times the policy is correct). */
+	private Map<RelationalPolicy, Double> policyConsistency_;
+
+	/** The number of evaluations the ensemble has encountered. */
+	private Integer numEvaluations_;
+
 	/**
 	 * Initialise the ensemble with just one policy.
 	 * 
@@ -38,6 +45,8 @@ public class PolicyEnsemble {
 		policies_.add(singlePolicy);
 		duplicateCount_ = new HashMap<RelationalPolicy, Integer>();
 		duplicateCount_.put(singlePolicy, 1);
+		policyConsistency_ = new HashMap<RelationalPolicy, Double>();
+		numEvaluations_ = 0;
 	}
 
 	/**
@@ -51,6 +60,8 @@ public class PolicyEnsemble {
 		duplicateCount_ = new HashMap<RelationalPolicy, Integer>();
 		for (RelationalPolicy pol : policies)
 			add(pol);
+		policyConsistency_ = new HashMap<RelationalPolicy, Double>();
+		numEvaluations_ = 0;
 	}
 
 	/**
@@ -92,15 +103,24 @@ public class PolicyEnsemble {
 			int numReturnedActions, boolean handCoded, boolean noteTriggered) {
 		ActionChoiceEnsemble ace = new ActionChoiceEnsemble();
 		for (RelationalPolicy pol : policies_) {
-			PolicyActions actions = pol.evaluatePolicy(state, validActions, goalArgs,
-					numReturnedActions, handCoded, false, noteTriggered);
+			PolicyActions actions = pol.evaluatePolicy(state, validActions,
+					goalArgs, numReturnedActions, handCoded, noteTriggered);
 			// If we only have one policy, just use that.
 			if (policies_.size() == 1)
-				return actions;	
+				return actions;
 			ace.addActionChoice(actions, duplicateCount_.get(pol));
 		}
 
-		return ace.getVotedActionChoice();
+		PolicyActions result = ace.getVotedActionChoice();
+		Set<RelationalPolicy> votedPolicies = ace.getPolicyConsistency();
+		for (RelationalPolicy rp : votedPolicies) {
+			Double count = policyConsistency_.get(rp);
+			if (count == null)
+				count = 0d;
+			policyConsistency_.put(rp, count + 1);
+		}
+		numEvaluations_++;
+		return result;
 	}
 
 	/**
@@ -121,21 +141,22 @@ public class PolicyEnsemble {
 	 * 
 	 * @return The policy which is the most significant in the ensemble.
 	 */
-	public RelationalPolicy getMajorPolicy() {
+	public Pair<RelationalPolicy, Double> getMajorPolicy() {
 		if (policies_.size() == 1)
-			return policies_.iterator().next();
-		
-		// Just use the policy with the most weight
+			return new Pair<RelationalPolicy, Double>(policies_.iterator()
+					.next(), 1d);
+
+		// Use the policy with the greatest consistency
+		double bestWeight = 0;
 		RelationalPolicy bestPolicy = null;
-		int bestCount = 0;
-		for (RelationalPolicy pol : policies_) {
-			int count = duplicateCount_.get(pol);
-			if (count > bestCount) {
-				bestCount = count;
-				bestPolicy = pol;
+		for (RelationalPolicy rp : policyConsistency_.keySet()) {
+			double weight = policyConsistency_.get(rp) / numEvaluations_;
+			if (weight > bestWeight) {
+				bestWeight = weight;
+				bestPolicy = rp;
 			}
 		}
-		return bestPolicy;
+		return new Pair<RelationalPolicy, Double>(bestPolicy, bestWeight);
 	}
 
 	@Override
@@ -180,5 +201,9 @@ public class PolicyEnsemble {
 		}
 
 		return buffer.toString();
+	}
+
+	public int numPolicies() {
+		return policies_.size();
 	}
 }

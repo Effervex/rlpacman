@@ -3,11 +3,14 @@ package relationalFramework.ensemble;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 
 /**
@@ -20,10 +23,17 @@ public class ActionChoiceEnsemble {
 	private ArrayList<Map<RelationalPredicate, AggregateAction>> actionsEnsemble_;
 
 	/**
+	 * The voted policies from this action choice ensemble. Only the first rule
+	 * is counted.
+	 */
+	private Set<RelationalPolicy> votedPolicies_;
+
+	/**
 	 * Basic constructor.
 	 */
 	public ActionChoiceEnsemble() {
 		actionsEnsemble_ = new ArrayList<Map<RelationalPredicate, AggregateAction>>();
+		votedPolicies_ = new HashSet<RelationalPolicy>();
 	}
 
 	/**
@@ -49,8 +59,8 @@ public class ActionChoiceEnsemble {
 			for (FiredAction action : firedActions) {
 				AggregateAction aa = aggregateActions.get(action.getAction());
 				if (aa == null)
-					aggregateActions.put(action.getAction(), new AggregateAction(action,
-							weight));
+					aggregateActions.put(action.getAction(),
+							new AggregateAction(action, weight));
 				else
 					aa.addAction(action, weight);
 			}
@@ -67,6 +77,7 @@ public class ActionChoiceEnsemble {
 	 */
 	public PolicyActions getVotedActionChoice() {
 		PolicyActions votedActions = new PolicyActions();
+		boolean firstRule = true;
 		for (Map<RelationalPredicate, AggregateAction> actionLevel : actionsEnsemble_) {
 			Collection<FiredAction> bestActions = new TreeSet<FiredAction>();
 			int bestCount = 0;
@@ -81,12 +92,26 @@ public class ActionChoiceEnsemble {
 				}
 			}
 			votedActions.addFiredRule(bestActions);
+			if (firstRule) {
+				for (FiredAction fa : bestActions)
+					votedPolicies_.add(fa.getFiringPolicy());
+			}
+			firstRule = false;
 		}
 		return votedActions;
 	}
-	
+
 	@Override
 	public String toString() {
 		return actionsEnsemble_.toString();
+	}
+
+	/**
+	 * Gets the policies contained within the voted actions
+	 * 
+	 * @return
+	 */
+	public Set<RelationalPolicy> getPolicyConsistency() {
+		return votedPolicies_;
 	}
 }

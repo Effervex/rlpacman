@@ -225,7 +225,8 @@ public final class PolicyGenerator implements Serializable {
 			RelationalPolicy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Collection<RelationalRule> firingRules = eliteSolution.getFiringRules();
+			Collection<RelationalRule> firingRules = eliteSolution
+					.getFiringRules();
 			int firedRuleIndex = 0;
 			for (RelationalRule rule : firingRules) {
 				Slot ruleSlot = rule.getSlot();
@@ -303,7 +304,8 @@ public final class PolicyGenerator implements Serializable {
 	 *            The number of uses the rule must have before mutating. Can be
 	 *            -1 for don't care.
 	 */
-	private void mutateRule(RelationalRule baseRule, Slot ruleSlot, int mutationUses) {
+	private void mutateRule(RelationalRule baseRule, Slot ruleSlot,
+			int mutationUses) {
 		int preGoalHash = AgentObservations.getInstance().getObservationHash();
 		// If the rule can mutate.
 		if (ruleCanMutate(baseRule, mutationUses, preGoalHash)) {
@@ -441,8 +443,8 @@ public final class PolicyGenerator implements Serializable {
 			// If the rule has a worse probability than the average of its
 			// parents
 			double parentsProb = 0;
-			ProbabilityDistribution<RelationalRule> distribution = rule.getSlot()
-					.getGenerator();
+			ProbabilityDistribution<RelationalRule> distribution = rule
+					.getSlot().getGenerator();
 			Collection<RelationalRule> removedParents = new HashSet<RelationalRule>();
 			for (RelationalRule parent : rule.getParentRules()) {
 				Double parentProb = distribution.getProb(parent);
@@ -462,7 +464,7 @@ public final class PolicyGenerator implements Serializable {
 
 		return true;
 	}
-	
+
 	/**
 	 * Splits the slots by mutating the covered rules through the specialiseRule
 	 * method and creating new slots from the mutants.
@@ -493,7 +495,8 @@ public final class PolicyGenerator implements Serializable {
 						.getConditions(false);
 				Slot rlggSlot = rlgg.getSlot();
 				// Split the slots and add them.
-				Set<RelationalRule> splitSeeds = ruleCreation_.specialiseRule(rlgg);
+				Set<RelationalRule> splitSeeds = ruleCreation_
+						.specialiseRule(rlgg);
 				currentRules_.addAll(splitSeeds);
 				for (RelationalRule seedRule : splitSeeds) {
 					// The seed rule becomes parent-less and a non-mutant
@@ -842,13 +845,13 @@ public final class PolicyGenerator implements Serializable {
 				count = 0;
 			count++;
 			policies.put(policy, count);
-			
+
 			if (count > bestCount) {
 				bestCount = count;
 				bestPolicy = policy;
 			}
 		}
-		
+
 		buf.write(bestPolicy.toString());
 	}
 
@@ -1027,20 +1030,23 @@ public final class PolicyGenerator implements Serializable {
 			return;
 
 		// 'Negative' updates
+		float bestVal = elites.first().getValue();
 		float gamma = elites.last().getValue();
-		double denominator = gamma - minReward;
+		double denominator = bestVal - gamma;
 		for (PolicyValue negVal : removed) {
 			// Calculate the dynamic alpha value based on how bad a sample this
 			// was.
-			double negAlpha = stepSize * Math.abs(gamma - negVal.getValue())
-					/ denominator;
+			double negModifier = (denominator == 0) ? 1 : Math.min(
+					(gamma - negVal.getValue()) / denominator, 1);
+			double negAlpha = stepSize * negModifier;
 
 			// Negative update each rule
 			for (RelationalRule gr : negVal.getPolicy().getFiringRules()) {
 				Slot slot = gr.getSlot();
 				// Calculate the update appropriation based on how influential
 				// the rule is within the slot.
-				double ruleProb = slot.getGenerator().getProb(gr);
+				Double nullCheck = slot.getGenerator().getProb(gr);
+				double ruleProb = nullCheck;
 				double ruleRatio = ruleProb * slot.size();
 				ruleRatio /= (ruleRatio + 1);
 

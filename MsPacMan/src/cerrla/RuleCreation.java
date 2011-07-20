@@ -416,8 +416,14 @@ public class RuleCreation implements Serializable {
 						specConditions, action, rule);
 				specialisation.setQueryParams(rule.getQueryParameters());
 				specialisation.expandConditions();
-				if (!specialisations.contains(specialisation))
-					specialisations.add(specialisation);
+				if (!specialisations.contains(specialisation)) {
+					// Only add specialisations if they contain goal conditions
+					// (if there are goal conditions).
+//					if (AgentObservations.getInstance().getNumGoalArgs() == 0
+//							|| specConditions.toString().contains(
+//									StateSpec.GOAL_VARIABLE_PREFIX))
+						specialisations.add(specialisation);
+				}
 			}
 		}
 
