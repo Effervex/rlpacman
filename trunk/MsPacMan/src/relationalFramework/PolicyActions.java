@@ -2,7 +2,6 @@ package relationalFramework;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Map;
 
 /**
  * This class represents the chosen actions the agent returns when making a

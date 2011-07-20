@@ -284,9 +284,6 @@ public class RelationalPolicy implements Serializable {
 	 *            The number of actions to be returned, or if -1, all actions.
 	 * @param handCoded
 	 *            If the policy is a hand-coded test one.
-	 * @param alreadyCovered
-	 *            If the policy has already covered this iteration (due to
-	 *            recursive calls).
 	 * @param noteTriggered
 	 *            If this policy is noting the rules fired as triggered. Usually
 	 *            deactivated after agent has found internal goal.
@@ -294,7 +291,7 @@ public class RelationalPolicy implements Serializable {
 	public PolicyActions evaluatePolicy(Rete state,
 			MultiMap<String, String[]> validActions,
 			Map<String, String> goalReplacements, int actionsReturned,
-			boolean handCoded, boolean alreadyCovered, boolean noteTriggered) {
+			boolean handCoded, boolean noteTriggered) {
 		noteTriggered_ = noteTriggered;
 		PolicyActions actionSwitch = new PolicyActions();
 		MultiMap<String, String[]> activatedActions = MultiMap
@@ -318,6 +315,23 @@ public class RelationalPolicy implements Serializable {
 						rlggActions);
 			}
 
+			// Next trigger covering, storing the rules in the policy if
+			// required
+			if (!handCoded) {
+				List<RelationalRule> coveredRules = PolicyGenerator
+						.getInstance().triggerRLGGCovering(state, validActions,
+								goalReplacements, activatedActions);
+				// If the policy is empty, store the rules in it.
+				if (activatedActions.isKeysEmpty() && coveredRules != null) {
+					Collections.shuffle(coveredRules, PolicyGenerator.random_);
+					// Add any new rules to the policy
+					for (RelationalRule gr : coveredRules) {
+						if (!policyRules_.contains(gr))
+							policyRules_.add(gr);
+					}
+				}
+			}
+
 			// Next, evaluate the rest of the policy until an adequate number of
 			// rules are evaluated (usually 1 or all; may be the entire policy).
 			Iterator<RelationalRule> iter = policyRules_.iterator();
@@ -333,35 +347,6 @@ public class RelationalPolicy implements Serializable {
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
-		}
-
-		// If optimal, just exit
-		if (handCoded)
-			return actionSwitch;
-
-		// If the policy didn't generate enough rules, cover a set of new rules
-		// for each action.
-		if (!alreadyCovered) {
-			if (actionsFound < actionsReturnedModified) {
-				List<RelationalRule> coveredRules = PolicyGenerator
-						.getInstance().triggerRLGGCovering(state, validActions,
-								goalReplacements, activatedActions);
-
-				if (coveredRules != null) {
-					Collections.shuffle(coveredRules, PolicyGenerator.random_);
-					// Add any new rules to the policy
-					for (RelationalRule gr : coveredRules) {
-						if (!policyRules_.contains(gr))
-							policyRules_.add(gr);
-					}
-					actionSwitch = evaluatePolicy(state, validActions,
-							goalReplacements, actionsReturned, handCoded, true,
-							noteTriggered);
-				}
-			} else {
-				PolicyGenerator.getInstance().triggerRLGGCovering(state,
-						validActions, goalReplacements, activatedActions);
-			}
 		}
 
 		return actionSwitch;

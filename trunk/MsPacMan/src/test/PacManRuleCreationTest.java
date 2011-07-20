@@ -28,114 +28,8 @@ public class PacManRuleCreationTest {
 		PolicyGenerator.newInstance(0);
 	}
 
-	// @Test
-	// public void testSpecialiseToPreGoal() {
-	// GuidedRule rule = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)");
-	// Collection<GuidedRule> results = sut_.specialiseToPreGoal(rule);
-	// GuidedRule mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 0.0 18.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 18.0 36.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 9.0 27.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// assertEquals(results.size(), 3);
-	//
-	// // Specialising a range without pregoal, but rule is mutant (failure)
-	// rule = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 9.0 18.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)");
-	// rule.setMutant(rule);
-	// results = sut_.specialiseToPreGoal(rule);
-	// mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 9.0 13.5)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 13.5 18.0)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// mutant = new GuidedRule(
-	// "(distanceGhost player ?X ?__Num0&:(betweenRange ?__Num0 11.25 15.75)) "
-	// + "(ghost ?X) (pacman player) => (toGhost ?X ?__Num0)",
-	// rule);
-	// assertTrue(results.contains(mutant));
-	// assertEquals(results.size(), 3);
-	//
-	// // Specialising a range with a single numerical pregoal
-	// List<StringFact> pregoal = new ArrayList<StringFact>();
-	// pregoal.add(StateSpec.toStringFact("(dot ?X)"));
-	// pregoal.add(StateSpec.toStringFact("(pacman player)"));
-	// pregoal.add(StateSpec.toStringFact("(distanceDot player ?X 14.0)"));
-	// AgentObservations.getInstance().setPreGoal("toDot",
-	// new PreGoalInformation(pregoal, new String[] { "?X", "14.0" }));
-	//
-	// rule = new GuidedRule(
-	// "(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(dot ?X) (pacman player) => (toDot ?X ?__Num3)");
-	// results = sut_.specialiseToPreGoal(rule);
-	//
-	// // The point itself
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distanceDot player ?X 14.0) "
-	// + "(dot ?X) (pacman player) => (toDot ?X 14.0)", rule)));
-	// assertEquals(results.size(), 4);
-	//
-	// // Specialising a range to a ranged pre-goal
-	//
-	// pregoal.clear();
-	// pregoal.add(StateSpec.toStringFact("(dot ?X)"));
-	// pregoal.add(StateSpec.toStringFact("(pacman player)"));
-	// pregoal
-	// .add(StateSpec
-	// .toStringFact("(distanceDot player ?X ?__Num3&:(betweenRange ?__Num3 14.0 23.0))"));
-	// AgentObservations.getInstance().setPreGoal(
-	// "toDot",
-	// new PreGoalInformation(pregoal,
-	// new String[] { "?X", "?__Num3" }));
-	//
-	// rule = new GuidedRule(
-	// "(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 0.0 36.0)) "
-	// + "(dot ?X) (pacman player) => (toDot ?X ?__Num0)");
-	// results = sut_.specialiseToPreGoal(rule);
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distanceDot player ?X ?__Num0&:(betweenRange ?__Num0 14.0 23.0))) "
-	// + "(dot ?X) (pacman player) => (toDot ?X ?__Num0)",
-	// rule)));
-	// assertEquals(results.size(), 4);
-	//
-	// // Special case: Range goes through 0 (no pregoal)
-	// AgentObservations.getInstance().clearPreGoal();
-	//
-	// rule = new GuidedRule(
-	// "(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 -16.0 26.0)) "
-	// + "(junction ?X) => (toJunction ?X ?__Num0)");
-	// results = sut_.specialiseToPreGoal(rule);
-	// mutant = new GuidedRule(
-	// "(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 -16.0 0.0)) "
-	// + "(junction ?X) => (toJunction ?X ?__Num0)", rule);
-	// assertTrue(results.contains(mutant));
-	// mutant = new GuidedRule(
-	// "(junctionSafety ?X ?__Num0&:(betweenRange ?__Num0 0.0 26.0)) "
-	// + "(junction ?X) => (toJunction ?X ?__Num0)", rule);
-	// assertTrue(results.contains(mutant));
-	// assertEquals(results.size(), 5);
-	// }
-
 	@Test
-	public void testSpecialiseRangedPreGoal() throws Exception {
+	public void testSpecialiseRangedConditions() throws Exception {
 		RelationalRule rule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 -10.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
@@ -200,6 +94,50 @@ public class PacManRuleCreationTest {
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
 		assertEquals(specialisedRules.size(), 3);
+	}
+
+	@Test
+	public void testGeneralRangedConditions() {
+		StateSpec.initInstance("rlPacManGeneral.PacMan");
+		sut_ = new RuleCreation();
+		PolicyGenerator.newInstance(0);
+
+		// A split containing multiple ranges
+		RelationalRule rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		Set<RelationalRule> specialisedRules = sut_.specialiseRuleMinor(rule);
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 26.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 26.0 52.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 13.0 39.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 5.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 5.0 10.0)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
+		rule = new RelationalRule(
+				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
+						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 2.5 7.5)) (ghost ?Y)"
+						+ " => (moveTo ?X ?__Num0)");
+		assertEquals(specialisedRules.size(), 6);
 	}
 
 	@Test

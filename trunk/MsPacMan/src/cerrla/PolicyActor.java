@@ -32,6 +32,7 @@ import relationalFramework.agentObservations.GoalArg;
 import relationalFramework.ensemble.PolicyEnsemble;
 import relationalFramework.util.ArgumentComparator;
 import relationalFramework.util.MultiMap;
+import relationalFramework.util.Pair;
 
 /**
  * An agent that chooses its decisions based on a fixed policy, fed in via agent
@@ -96,7 +97,7 @@ public class PolicyActor implements AgentInterface {
 	private double resampleProb_;
 
 	/** The best policy seen so far. */
-	private RelationalPolicy bestPolicy_;
+	private Pair<RelationalPolicy, Double> bestPolicy_;
 
 	/** The best total reward the best policy received. */
 	private int mostSteps_;
@@ -262,9 +263,11 @@ public class PolicyActor implements AgentInterface {
 			mostSteps_ = policySteps_;
 		}
 
-		Collection<RelationalPolicy> policies = new ArrayList<RelationalPolicy>(ensembleSize_);
+		Collection<RelationalPolicy> policies = new ArrayList<RelationalPolicy>(
+				ensembleSize_);
 		for (int i = 0; i < ensembleSize_; i++) {
-			RelationalPolicy pol = PolicyGenerator.getInstance().generatePolicy(false);
+			RelationalPolicy pol = PolicyGenerator.getInstance()
+					.generatePolicy(false);
 
 			// Apply the goal parameters to the goal conditions.
 			if (goalArgs_ != null)
@@ -273,6 +276,8 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		policy_ = new PolicyEnsemble(policies);
+		if (ensembleSize_ > 1)
+			System.out.println("Num policies: " + policy_.numPolicies());
 		if (PolicyGenerator.debugMode_) {
 			if (isResampled)
 				System.out.println("RESAMPLED POLICY: " + policy_);
@@ -372,8 +377,8 @@ public class PolicyActor implements AgentInterface {
 			// Run through the unseen preds, triggering covering if necessary.
 			boolean triggerCovering = false;
 			Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
-			for (RelationalPredicate unseenPred : AgentObservations.getInstance()
-					.getUnseenPredicates()) {
+			for (RelationalPredicate unseenPred : AgentObservations
+					.getInstance().getUnseenPredicates()) {
 				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
 				QueryResult results = state.runQueryStar(query,
 						new ValueVector());
@@ -480,10 +485,11 @@ public class PolicyActor implements AgentInterface {
 				|| AgentObservations.getInstance().searchAllGoalArgs();
 
 		try {
-			Collection<RelationalPredicate> fact = new ArrayList<RelationalPredicate>(1);
+			Collection<RelationalPredicate> fact = new ArrayList<RelationalPredicate>(
+					1);
 			fact.add(goalCondition_.getFact());
-			RelationalRule gr = new RelationalRule(new TreeSet<RelationalPredicate>(fact), null,
-					null);
+			RelationalRule gr = new RelationalRule(
+					new TreeSet<RelationalPredicate>(fact), null, null);
 			gr.expandConditions();
 			ValueVector vv = new ValueVector();
 			// If not searching all, set up the query parameters
@@ -495,8 +501,8 @@ public class PolicyActor implements AgentInterface {
 
 			String query = StateSpec.getInstance().getRuleQuery(gr);
 			QueryResult results = state.runQueryStar(query, vv);
-			Collection<RelationalPredicate> invariants = AgentObservations.getInstance()
-					.getSpecificInvariants();
+			Collection<RelationalPredicate> invariants = AgentObservations
+					.getInstance().getSpecificInvariants();
 
 			// If there are results, then the goal COULD be met (can add
 			// possible goals here)
