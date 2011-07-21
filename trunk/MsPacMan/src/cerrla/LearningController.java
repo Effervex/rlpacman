@@ -1235,6 +1235,7 @@ public class LearningController {
 			scores[i] /= AVERAGE_ITERATIONS;
 
 			RLGlue.RL_agent_message("GetPolicy");
+			@SuppressWarnings("unchecked")
 			Pair<RelationalPolicy, Double> pol = (Pair<RelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
 			System.out.println(pol.objA_);

@@ -161,7 +161,7 @@ public final class PolicyGenerator implements Serializable {
 	private transient boolean restart_ = false;
 
 	/** The set of rlgg rules, some which may be LGG, others not. */
-	private MultiMap<String, RelationalRule> rlggRules_;
+	private Map<String, RelationalRule> rlggRules_;
 
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
@@ -180,7 +180,7 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public PolicyGenerator() {
 		actionSet_ = StateSpec.getInstance().getActions();
-		rlggRules_ = MultiMap.createListMultiMap();
+		rlggRules_ = new HashMap<String, RelationalRule>();
 		ruleCreation_ = new RuleCreation();
 		mutatedRules_ = MultiMap.createListMultiMap();
 		removedRules_ = new HashSet<RelationalRule>();
@@ -570,7 +570,7 @@ public final class PolicyGenerator implements Serializable {
 	 *            The lgg rules (found previously).
 	 */
 	public void addCoveredRules(MultiMap<String, RelationalRule> rlggRules) {
-		rlggRules_ = MultiMap.createListMultiMap();
+		rlggRules_ = new HashMap<String, RelationalRule>();
 		for (String action : rlggRules.keySet()) {
 			// Adding the lgg rules to the slots
 			Slot slot = findSlot(action);
@@ -920,7 +920,7 @@ public final class PolicyGenerator implements Serializable {
 			List<RelationalRule> covered = null;
 			try {
 				covered = ruleCreation_.rlggState(state, validActions,
-						goalReplacements, rlggRules_);
+						goalReplacements);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -941,7 +941,7 @@ public final class PolicyGenerator implements Serializable {
 				}
 
 				// Add to the covered rules
-				rlggRules_.putContains(action.getFactName(), coveredRule);
+				rlggRules_.put(action.getFactName(), coveredRule);
 			}
 
 			// Split the slots
