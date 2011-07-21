@@ -264,25 +264,17 @@ public class RuleCreation implements Serializable {
 	 *            The set of valid actions to choose from.
 	 * @param goalReplacements
 	 *            The goal replacements.
-	 * @param coveredRules
-	 *            A starting point for the rules, if any exist.
 	 * @return A list of guided rules, one for each action type.
 	 */
 	public List<RelationalRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements,
-			MultiMap<String, RelationalRule> coveredRules) throws Exception {
+			Map<String, String> goalReplacements) throws Exception {
 		// The relevant facts which contain the key term
 		AgentObservations.getInstance().scanState(
 				StateSpec.extractFacts(state), goalReplacements);
 
 		// Run through each valid action.
 		for (String action : validActions.keySet()) {
-			// Get the list of previous rules, both LGG and non-LGG.
-			List<RelationalRule> previousRules = coveredRules.getList(action);
-			if (previousRules == null)
-				previousRules = new ArrayList<RelationalRule>();
-
 			// Gather the action facts for each valid action
 			RelationalPredicate baseAction = StateSpec.getInstance()
 					.getStringFact(action);
