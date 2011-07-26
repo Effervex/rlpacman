@@ -1,5 +1,5 @@
 rlPacManGeneral.PacMan
-9
+10
 100
 pacManElites.txt
 pacManTest.txt

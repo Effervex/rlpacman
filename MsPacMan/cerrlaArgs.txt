@@ -1,0 +1,31 @@
+	-----CONVERGENCE-----
+beta=0.01			% If KL sum updates are less than Beta * Alpha
+numPerformancesConverged=3.0			% If the average performance has remained the same for this many iterations
+numUpdatesConverged=10.0			% If KL sum updates remain below Beta for this many updates
+
+	-----EVALUATION-----
+ensembleEvaluation=false			% If using ensemble evaluation
+ensembleSize=100.0			% The size of the ensemble
+performanceEpisodeGap=100.0			% The gap between measuring performances
+policyRepeats=3.0			% Number of times policy is repeated
+policyTestingSize=100.0			% Size of average performance sliding window
+testIterations=100.0			% Number of iterations to test the final testing for
+
+	-----SAMPLING-----
+chi=0.1			% The resampling percentage of average episode steps
+initialSlotMean=1.0			% The initial slot mu probabilities. -1 means use 1/D_S
+initialSlotOrderingSD=0.25			% The SD of the slot order
+useModules=true			% If using/learning modules
+
+	-----SPECIALISATION-----
+dynamicSlots=true			% If the slots grow dynamically
+numNumericalSplits=3.0			% The number of numerical splits
+onlyGoalRules=false			% If the agent should only create rules with the goal condition in it
+slotThreshold=-1.0			% The slot splitting threshold. -1 means use |S|-1 threshold
+
+	-----UPDATING-----
+alpha=0.6			% Step size update
+localAlpha=true			% If updates are performed slot locally
+minWeightedUpdate=0.1			% The minimal update when using weighted updates
+rho=0.05			% N_E's proportion of N
+weightedUpdates=false			% If using weighted updates
