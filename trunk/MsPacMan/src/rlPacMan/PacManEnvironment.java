@@ -27,6 +27,7 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.LearningController;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
+import cerrla.ProgramArgument;
 
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
@@ -216,8 +217,8 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *            The optimal policy.
 	 */
 	private void testHandCodedPolicy(RelationalPolicy handCodedPolicy) {
-		int repetitions = LearningController.AVERAGE_ITERATIONS
-				* LearningController.TEST_ITERATIONS;
+		int repetitions = ProgramArgument.POLICY_REPEATS.intValue()
+				* ProgramArgument.TEST_ITERATIONS.intValue();
 		double score = 0;
 		for (int i = 0; i < repetitions; i++) {
 			PolicyActor handCodedAgent = new PolicyActor();

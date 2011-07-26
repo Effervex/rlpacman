@@ -1,11 +1,8 @@
 package cerrla;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Random;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -19,35 +16,13 @@ import relationalFramework.util.ProbabilityDistribution;
  * @author Samuel J. Sarjant
  */
 public class Slot implements Serializable, Comparable<Slot> {
-	private static final long serialVersionUID = -6398791301712325018L;
-
-	private static final String ELEMENT_DELIMITER = ":";
-
-	public static double INITIAL_SLOT_PROB = 1;
-
-	/** The maximum amount of variance the selection probability can have. */
-	public static final double MAX_SELECTION_VARIANCE = 0.5;
-
-	/** String prefix for fixed. */
-	private static final String FIXED = "FIXED";
-
-	/** The initial ordering SD. */
-	private static final double INITIAL_ORDERING_SD = 0.25;
-
-	/** The rule generator within the slot. */
-	private ProbabilityDistribution<RelationalRule> ruleGenerator_;
-
-	/** The backup generator for the slot. */
-	private ProbabilityDistribution<RelationalRule> backupGenerator_;
+	private static final long serialVersionUID = -8194795456340834012L;
 
 	/** The action which all rules within lead to. */
 	private String action_;
 
-	/** The facts used in this slot split, if it has any. */
-	private Collection<RelationalPredicate> slotSplitFacts_;
-
-	/** The seed (first) rule for the slot. */
-	private RelationalRule seedRule_;
+	/** The backup generator for the slot. */
+	private ProbabilityDistribution<RelationalRule> backupGenerator_;
 
 	/** If this slot is fixed. */
 	private boolean fixed_ = false;
@@ -55,61 +30,66 @@ public class Slot implements Serializable, Comparable<Slot> {
 	/** The fixed rule if this slot is fixed. */
 	private RelationalRule fixedRule_;
 
-	/** The chance of this slot being selected. */
-	private double selectionProb_;
-
-	/** The variance on the chances of the slot being selected. */
-	private double selectionSD_;
+	/** The number of updates this slot has performed. */
+	private int numUpdates_;
 
 	/** The ordering of the slot (0..1) */
 	private double ordering_;
 
+	/** The rule generator within the slot. */
+	private ProbabilityDistribution<RelationalRule> ruleGenerator_;
+
+	/** The seed (first) rule for the slot. */
+	private RelationalRule seedRule_;
+
+	/** The chance of this slot being selected. */
+	private double selectionProb_;
+
+	/** The slot level (number of splits frm RLGG slot). */
+	private int slotLevel_;
+
+	/** The facts used in this slot split, if it has any. */
+	private Collection<RelationalPredicate> slotSplitFacts_;
+
 	/**
-	 * The constructor for a new Slot.
+	 * A constructor for a new slot. The slot may be fixed (only one rule
+	 * allowed) and is initialised with a level (distance of splits from RLGG
+	 * slot).
 	 * 
-	 * @param action
-	 *            The action the slot rules lead to.
+	 * @param seedRule
+	 *            The rule to initialise the slot with.
+	 * @param fixed
+	 *            If this slot is fixed.
+	 * @param level
+	 *            The number of splits this slot is from RLGG slot.
 	 */
-	public Slot(String action) {
-		action_ = action;
-		ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
-				PolicyGenerator.random_);
-		if (INITIAL_SLOT_PROB == -1)
+	public Slot(RelationalRule seedRule, boolean fixed, int level) {
+		action_ = seedRule.getActionPredicate();
+		fixed_ = fixed;
+		seedRule.setSlot(this);
+		seedRule_ = seedRule;
+		if (fixed) {
 			selectionProb_ = 1;
-		else
-			selectionProb_ = INITIAL_SLOT_PROB;
-		selectionSD_ = 0.5;
+			fixedRule_ = seedRule;
+		} else {
+			if (ProgramArgument.INITIAL_SLOT_MEAN.doubleValue() == -1)
+				selectionProb_ = 1;
+			else
+				selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN
+						.doubleValue();
+			ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
+					PolicyGenerator.random_);
+			ruleGenerator_.add(seedRule);
+			slotLevel_ = level;
+			slotSplitFacts_ = seedRule.getConditions(true);
+			RelationalRule rlggRule = PolicyGenerator.getInstance()
+					.getRLGGRules().get(action_);
+			if (rlggRule == null || seedRule == rlggRule)
+				slotSplitFacts_ = null;
+			else
+				slotSplitFacts_.removeAll(rlggRule.getConditions(true));
+		}
 		ordering_ = 0.5;
-	}
-
-	/**
-	 * A constructor for a specialised slot which only contains rules concerning
-	 * the splitFacts facts.
-	 * 
-	 * @param action
-	 *            The action the slot rules lead to.
-	 * @param slotConditions
-	 *            The facts present in all rules in this slot.
-	 */
-	public Slot(String action, Collection<RelationalPredicate> slotConditions) {
-		this(action);
-		slotSplitFacts_ = slotConditions;
-	}
-
-	/**
-	 * A constructor for a new slot of only one fixed rule. The slot's rule will
-	 * never change, but the slot parameters may.
-	 * 
-	 * @param fixedRule
-	 *            The rule this slot is fixed on.
-	 */
-	public Slot(RelationalRule fixedRule) {
-		action_ = fixedRule.getActionPredicate();
-		selectionProb_ = 1;
-		selectionSD_ = 0.5;
-		ordering_ = 0.5;
-		fixed_ = true;
-		fixedRule_ = fixedRule;
 	}
 
 	/**
@@ -135,14 +115,33 @@ public class Slot implements Serializable, Comparable<Slot> {
 		}
 	}
 
-	/**
-	 * Adds a new rule to the slot with an given probability of being selected.
-	 * 
-	 * @param guidedRule
-	 *            The rule being added.
-	 */
-	private void addNewRule(RelationalRule guidedRule, double prob) {
-		ruleGenerator_.add(guidedRule, prob);
+	@Override
+	public int compareTo(Slot other) {
+		int result = action_.compareTo(other.action_);
+		if (result != 0)
+			return result;
+
+		if (slotSplitFacts_ == null) {
+			if (other.slotSplitFacts_ != null)
+				return -1;
+		} else {
+			if (other.slotSplitFacts_ == null)
+				return 1;
+			else
+				result = Double.compare(slotSplitFacts_.hashCode(),
+						other.slotSplitFacts_.hashCode());
+		}
+		if (result != 0)
+			return result;
+
+		if (fixed_ && !other.fixed_)
+			return -1;
+		else if (!fixed_ && other.fixed_)
+			return 1;
+		else if (fixed_ && other.fixed_)
+			return fixedRule_.compareTo(other.fixedRule_);
+
+		return result;
 	}
 
 	/**
@@ -154,6 +153,33 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean contains(RelationalRule gr) {
 		return ruleGenerator_.contains(gr);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Slot other = (Slot) obj;
+		if (action_ == null) {
+			if (other.action_ != null)
+				return false;
+		} else if (!action_.equals(other.action_))
+			return false;
+		if (seedRule_ == null) {
+			if (other.seedRule_ != null)
+				return false;
+		} else if (!seedRule_.equals(other.seedRule_))
+			return false;
+		if (fixed_ != other.fixed_)
+			return false;
+		// Special case for fixed slots
+		if (fixed_ && !fixedRule_.equals(other.fixedRule_))
+			return false;
+		return true;
 	}
 
 	/**
@@ -173,49 +199,16 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Checks if this slot should be used and also if it should stay in the
-	 * distribution. Note that if it is not used, it must be removed.
+	 * Gets the action this slot covers.
 	 * 
-	 * @param random
-	 *            The random number generator used for generating a Gaussian
-	 *            value.
-	 * @return True if the slot should be used, false otherwise.
+	 * @return The action the slot covers.
 	 */
-	public int numSlotUses(Random random) {
-		// Generate the probability of slot use
-		double gauss = random.nextGaussian();
-		double selectionProb = selectionProb_ + selectionSD_ * gauss;
-		int numUses = 0;
-		while (random.nextDouble() < selectionProb) {
-			numUses++;
-			selectionProb--;
-		}
-		return numUses;
+	public String getAction() {
+		return action_;
 	}
 
-	/**
-	 * Updates the selection values of this slot stepwise towards the given
-	 * values.
-	 * 
-	 * @param ordering
-	 *            The (possibly null) average ordering of the slot (0..1)
-	 * @param mean
-	 *            The mean value to step towards.
-	 * @param sd
-	 *            The variance to step towards.
-	 * @param stepSize
-	 *            The amount the value should update by.
-	 */
-	public void updateValues(Double ordering, double mean, double sd,
-			double stepSize) {
-		if (ordering != null)
-			ordering_ = ordering * stepSize + (1 - stepSize) * ordering_;
-		selectionProb_ = mean * stepSize + (1 - stepSize) * selectionProb_;
-		selectionSD_ = sd * stepSize + (1 - stepSize) * selectionSD_;
-
-		// Capping variance at max.
-		if (selectionSD_ > MAX_SELECTION_VARIANCE)
-			selectionSD_ = MAX_SELECTION_VARIANCE;
+	public RelationalRule getFixedRule() {
+		return fixedRule_;
 	}
 
 	/**
@@ -262,45 +255,116 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return influencedDistribution;
 	}
 
+	public int getLevel() {
+		return slotLevel_;
+	}
+
 	/**
-	 * Gets the action this slot covers.
+	 * Gets the local alpha for this slot.
 	 * 
-	 * @return The action the slot covers.
+	 * @param population
+	 *            The size of the population.
+	 * @param numElites
+	 *            The minimum number of elite samples.
+	 * @param policiesEvaluated
+	 *            The number of policies updated.
+	 * @return
 	 */
-	public String getAction() {
-		return action_;
+	public double getLocalAlpha(double alpha, int population, int numElites) {
+		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
+				: PolicyGenerator.getInstance().getPoliciesEvaluated();
+		return alpha
+				/ Math.max(population - numElites - policiesEvaluated,
+						numElites);
 	}
 
-	public double getSelectionProbability() {
-		return selectionProb_;
-	}
-
-	public void setSelectionProb(double prob) {
-		selectionProb_ = prob;
-	}
-
-	public double getSelectionSD() {
-		return selectionSD_;
-	}
-
-	public void setSelectionSD(double sd) {
-		selectionSD_ = sd;
+	/**
+	 * Gets the slot's maximum capacity, based on the number of possible rule
+	 * specialisations.
+	 * 
+	 * @return The maximum capacity. Note that the size CAN be ovr this, but no
+	 *         mutations will be allowed.
+	 */
+	public int getMaximumCapacity() {
+		return AgentObservations.getInstance().getNumSpecialisations(action_) + 1;
 	}
 
 	public double getOrdering() {
 		return ordering_;
 	}
 
-	public void setOrdering(double ordering) {
-		ordering_ = ordering;
+	public double getOrderingSD() {
+		int maxCapacity = getMaximumCapacity();
+		double slotFillLevel = (maxCapacity > 1) ? (1.0 * klSize() - 1)
+				/ (maxCapacity - 1) : 1;
+		slotFillLevel = Math.max(slotFillLevel, 0);
+		slotFillLevel = Math.min(slotFillLevel, 1);
+		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()
+				* slotFillLevel;
+	}
+
+	public RelationalRule getSeedRule() {
+		return seedRule_;
+	}
+
+	public double getSelectionProbability() {
+		return selectionProb_;
 	}
 
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
 		return slotSplitFacts_;
 	}
 
-	public RelationalRule getSeedRule() {
-		return seedRule_;
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
+		result = prime * result + (fixed_ ? 1231 : 1237);
+		result = prime * result
+				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
+		result = prime * result
+				+ ((seedRule_ == null) ? 0 : seedRule_.hashCode());
+		return result;
+	}
+
+	public boolean isEmpty() {
+		if (fixed_)
+			return false;
+		return ruleGenerator_.isEmpty();
+	}
+
+	/**
+	 * If this slot is fixed (not necessarily frozen).
+	 * 
+	 * @return If this slot is fixed.
+	 */
+	public boolean isFixed() {
+		return fixed_;
+	}
+
+	/**
+	 * Checks if this slot is splittable based on its current KL size, the slot
+	 * level and the splitting threshold.
+	 * 
+	 * @return True if the KL size is low enough.
+	 */
+	public boolean isSplittable() {
+		if (fixed_)
+			return false;
+
+		double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
+		if (threshold == -1)
+			threshold = Math.pow(1 - 1.0 / size(), slotLevel_ + 1) * size();
+		if (klSize() < threshold)
+			return true;
+		return false;
+	}
+
+	public double klSize() {
+		if (fixed_)
+			return 1;
+		return ruleGenerator_.klSize();
 	}
 
 	/**
@@ -326,140 +390,26 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The influence boost value.
 	 * @return The sampled rule.
 	 */
-	public RelationalRule sample(double influenceThreshold, double influenceBoost) {
+	public RelationalRule sample(double influenceThreshold,
+			double influenceBoost) {
 		if (fixed_)
 			return fixedRule_;
 		return getInfluencedDistribution(influenceThreshold, influenceBoost)
 				.sample(false);
 	}
 
-	/**
-	 * If this slot is fixed (not necessarily frozen).
-	 * 
-	 * @return If this slot is fixed.
-	 */
-	public boolean isFixed() {
-		return fixed_;
+	public void setOrdering(double ordering) {
+		ordering_ = ordering;
 	}
 
-	public RelationalRule getFixedRule() {
-		return fixedRule_;
+	public void setSelectionProb(double prob) {
+		selectionProb_ = prob;
 	}
 
 	public int size() {
 		if (fixed_)
 			return 1;
 		return ruleGenerator_.size();
-	}
-
-	public double klSize() {
-		if (fixed_)
-			return 1;
-		return ruleGenerator_.klSize();
-	}
-
-	/**
-	 * Gets the slot's maximum capacity, based on the number of possible rule
-	 * specialisations.
-	 * 
-	 * @return The maximum capacity. Note that the size CAN be ovr this, but no
-	 *         mutations will be allowed.
-	 */
-	public int getMaximumCapacity() {
-		return AgentObservations.getInstance().getNumSpecialisations(action_) + 1;
-	}
-
-	/**
-	 * Clones this slot, but does not clone the rules within it.
-	 * 
-	 * @return A cloned version of this slot. This clone clones the
-	 *         distributions within, but no deeper.
-	 */
-	@Override
-	public Slot clone() {
-		Slot clone = new Slot(action_);
-		clone.selectionProb_ = selectionProb_;
-		clone.selectionSD_ = selectionSD_;
-		clone.fixed_ = fixed_;
-		if (!fixed_)
-			clone.ruleGenerator_ = ruleGenerator_.clone();
-		else
-			clone.ruleGenerator_ = null;
-		if (slotSplitFacts_ != null)
-			clone.slotSplitFacts_ = new ArrayList<RelationalPredicate>(slotSplitFacts_);
-		clone.seedRule_ = seedRule_;
-		if (backupGenerator_ != null)
-			clone.backupGenerator_ = backupGenerator_.clone();
-		return clone;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Slot other = (Slot) obj;
-		if (action_ == null) {
-			if (other.action_ != null)
-				return false;
-		} else if (!action_.equals(other.action_))
-			return false;
-		if (slotSplitFacts_ == null) {
-			if (other.slotSplitFacts_ != null)
-				return false;
-		} else if (!slotSplitFacts_.equals(other.slotSplitFacts_))
-			return false;
-		if (fixed_ != other.fixed_)
-			return false;
-		// Special case for fixed slots
-		if (fixed_ && !fixedRule_.equals(other.fixedRule_))
-			return false;
-		return true;
-	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
-		result = prime * result + (fixed_ ? 1231 : 1237);
-		result = prime * result
-				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
-		result = prime * result
-				+ ((slotSplitFacts_ == null) ? 0 : slotSplitFacts_.hashCode());
-		return result;
-	}
-
-	@Override
-	public int compareTo(Slot other) {
-		int result = action_.compareTo(other.action_);
-		if (result != 0)
-			return result;
-
-		if (slotSplitFacts_ == null) {
-			if (other.slotSplitFacts_ != null)
-				return -1;
-		} else {
-			if (other.slotSplitFacts_ == null)
-				return 1;
-			else
-				result = Double.compare(slotSplitFacts_.hashCode(),
-						other.slotSplitFacts_.hashCode());
-		}
-		if (result != 0)
-			return result;
-
-		if (fixed_ && !other.fixed_)
-			return -1;
-		else if (!fixed_ && other.fixed_)
-			return 1;
-		else if (fixed_ && other.fixed_)
-			return fixedRule_.compareTo(other.fixedRule_);
-
-		return result;
 	}
 
 	@Override
@@ -477,7 +427,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
-		buffer.append(" [MU:" + selectionProb_ + "\u00b1" + selectionSD_ + ";ORD:" + ordering_ + "]");
+		buffer.append(" [MU:" + selectionProb_ + ";ORD:" + ordering_
+				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + "]");
 		if (fixed_)
 			buffer.append(" " + fixedRule_.toString());
 		else
@@ -485,52 +436,82 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return buffer.toString();
 	}
 
-	public boolean isEmpty() {
-		if (fixed_)
-			return false;
-		return ruleGenerator_.isEmpty();
+	public void updateLevel(int slotLevel) {
+		if (slotLevel < slotLevel_)
+			slotLevel_ = slotLevel;
 	}
 
 	/**
-	 * Parses a slot from a parsable slot string.
+	 * Updates the selection values of this slot stepwise towards the given
+	 * values.
 	 * 
-	 * @param slotString
-	 *            The string detailing the slot.
-	 * @return A new slot, which can be formatted into the same input string.
+	 * @param ordering
+	 *            The (possibly null) average ordering of the slot (0..1)
+	 * @param mean
+	 *            The mean value to step towards.
+	 * @param alpha
+	 *            The amount the value should update by.
+	 * @param population
+	 *            The size of the population.
+	 * @param numElites
+	 *            The minimum number of elite samples.
+	 * @param totalPoliciesEvaluated
+	 *            The global number of policies evaluated.
+	 * @return A normalised (to alpha) KL divergence of the generators.
 	 */
-	public static Slot parseSlotString(String slotString) {
-		int index = 0;
-		// Checking if slot is fixed
-		int fixIndex = FIXED.length() + ELEMENT_DELIMITER.length();
-		if (slotString.substring(0, fixIndex).equals(FIXED + ELEMENT_DELIMITER)) {
-			index = fixIndex;
+	public double updateProbabilities(ElitesData ed, double alpha,
+			int population, int numElites) {
+		numUpdates_++;
+		// If using local or global
+		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
+				: PolicyGenerator.getInstance().getPoliciesEvaluated();
+
+		if (policiesEvaluated >= 2 * numElites) {
+			double alphaPrime = getLocalAlpha(alpha, population, numElites);
+
+			Double ordering = ed.getSlotPosition(this);
+			if (ordering != null)
+				ordering_ = ordering * alphaPrime + (1 - alphaPrime)
+						* ordering_;
+			selectionProb_ = ed.getSlotNumeracyMean(this) * alphaPrime
+					+ (1 - alphaPrime) * selectionProb_;
+
+			if (!fixed_) {
+				double updateModifier = alpha / alphaPrime;
+				return updateModifier
+						* ruleGenerator_.updateDistribution(
+								ed.getSlotCount(this), ed.getRuleCounts(),
+								alphaPrime);
+			}
 		}
-
-		// Finding the slot action
-		int bracketIndex = slotString.indexOf('{');
-		String action = slotString.substring(index, bracketIndex);
-		Slot slot = new Slot(action);
-
-		// Parsing the rules and adding them
-		// Group 1 is the rule, group 2 is the prob
-		Pattern p = Pattern.compile("\\((.+? => .+?):([0-9.]+)\\)");
-		Matcher m = p.matcher(slotString.substring(bracketIndex + 1));
-		while (m.find()) {
-			RelationalRule guidedRule = new RelationalRule(m.group(1));
-			guidedRule.setSlot(slot);
-			double prob = Double.parseDouble(m.group(2));
-			slot.addNewRule(guidedRule, prob);
-		}
-
-		return slot;
+		return alpha;
 	}
 
-	public double getOrderingSD() {
-		int maxCapacity = getMaximumCapacity();
-		double slotFillLevel = (maxCapacity > 1) ? (1.0 * klSize() - 1)
-				/ (maxCapacity - 1) : 1;
-		slotFillLevel = Math.max(slotFillLevel, 0);
-		slotFillLevel = Math.min(slotFillLevel, 1);
-		return INITIAL_ORDERING_SD * slotFillLevel;
+	/**
+	 * Updates the selection values of this slot stepwise towards the given
+	 * values.
+	 * 
+	 * @param ordering
+	 *            The (possibly null) average ordering of the slot (0..1)
+	 * @param mean
+	 *            The mean value to step towards.
+	 * @param alpha
+	 *            The amount the value should update by.
+	 */
+	public void updateSlotValues(Double ordering, double mean, double alpha) {
+		if (ordering != null)
+			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
+		selectionProb_ = mean * alpha + (1 - alpha) * selectionProb_;
+	}
+
+	/**
+	 * Checks if this slot should be used.
+	 * 
+	 * @param random
+	 *            The random number generator.
+	 * @return True if the slot should be used.
+	 */
+	public boolean useSlot(Random random) {
+		return random.nextDouble() < selectionProb_;
 	}
 }

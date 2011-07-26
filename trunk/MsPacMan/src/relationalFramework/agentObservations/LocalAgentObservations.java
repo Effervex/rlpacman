@@ -27,7 +27,7 @@ import relationalFramework.util.MultiMap;
  * @author Sam Sarjant
  */
 public class LocalAgentObservations implements Serializable {
-	private static final long serialVersionUID = 4807210696657653846L;
+	private static final long serialVersionUID = -7205802892263530446L;
 
 	private static final String SERIALISATION_FILE = "localObservations.ser";
 

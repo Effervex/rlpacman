@@ -343,7 +343,7 @@ public class PolicyActor implements AgentInterface {
 
 		if (!handCoded_ && totalEpisodes_ > 0) {
 			// Put the state action pair in the collection
-			double resampleShiftAmount = 1 / (PolicyGenerator.RESAMPLE_POLICY_BOUND
+			double resampleShiftAmount = 1 / (ProgramArgument.CHI.doubleValue()
 					* totalSteps_ / totalEpisodes_);
 			// If we've seen this state and less than average reward is being
 			// received

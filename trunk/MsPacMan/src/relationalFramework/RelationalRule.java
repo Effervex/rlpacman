@@ -25,7 +25,7 @@ import relationalFramework.util.ConditionComparator;
  * @author Sam Sarjant
  */
 public class RelationalRule implements Serializable, Comparable<RelationalRule> {
-	private static final long serialVersionUID = 751753463085380894L;
+	private static final long serialVersionUID = -591116779683745624L;
 
 	/**
 	 * The rule has to see 5 states without changing to be considered
@@ -76,8 +76,11 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/** If this slot is a mutation. */
 	private boolean mutant_ = false;
 
-	/** If the slot is a mutant, the parent of the mutant. */
+	/** If the rule is a mutant, the parent of the mutant. */
 	private Collection<RelationalRule> mutantParents_;
+	
+	/** TODO If the rule has mutated, the children of the mutation. */
+	private Collection<RelationalRule> mutantChildren_;
 
 	/** The actual parameters given for this rule. */
 	private List<String> parameters_;
@@ -398,6 +401,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 
 	public String[] getActionTerms() {
 		return ruleAction_.getArguments();
+	}
+	
+	public Collection<RelationalRule> getChildrenRules() {
+		return mutantChildren_;
 	}
 
 	/**
@@ -722,6 +729,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		mutantParents_.add(parent);
 		if (parent.ancestryCount_ < ancestryCount_ - 1)
 			ancestryCount_ = parent.ancestryCount_ + 1;
+	}
+	
+	public void setChildren(Collection<RelationalRule> children) {
+		mutantChildren_ = children;
 	}
 
 	/**

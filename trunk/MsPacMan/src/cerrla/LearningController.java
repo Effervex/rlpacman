@@ -31,34 +31,14 @@ import relationalFramework.util.Pair;
  * @author Sam Sarjant
  */
 public class LearningController {
-	/**
-	 * The number of meta-iterations a rule goes without updates before being
-	 * pruned.
-	 */
-	private static final int PRUNING_ITERATIONS = 2;
-	/** The ratio of samples to use as 'elite' samples. */
-	private static final double SELECTION_RATIO = 0.05;
-	/** The base rate at which the weights change. */
-	private static final double STEP_SIZE = 0.6;
 	/** The folder to store the temp files. */
 	private static final File TEMP_FOLDER = new File("temp"
 			+ File.separatorChar);
 
-	/** The number of iterations a policy is repeated to get an average score. */
-	public static final int AVERAGE_ITERATIONS = 3;
 	/** The marker for the end of a successfully completed performance file. */
 	public static final String END_PERFORMANCE = "<--END-->";
 	/** The internal prefix for messages to the agent regarding internal goal. */
 	public static final String INTERNAL_PREFIX = "internal";
-	/** The gap between performance checks per episode. */
-	public static final int PERFORMANCE_EPISODE_GAP_SIZE = 100;
-	/** The number of test episodes to run for performance measures. */
-	public static final int TEST_ITERATIONS = 100;
-	/**
-	 * The number of iterations of performance checks needed before considering
-	 * a distribution converged.
-	 */
-	private static final int NUM_ITERS_CONVERGED = 3;
 	/**
 	 * An optional comment to append to the beginning of performance and elite
 	 * files.
@@ -68,10 +48,6 @@ public class LearningController {
 	private int convergedCount_;
 	/** Current converged value. */
 	private double convergedMean_;
-	/** If the algorithm performs an ensemble evaluation. */
-	private boolean ensembleEvaluation_ = false;
-	/** The ensemble size. */
-	private int ensembleSize_;
 
 	/** The time that the experiment started. */
 	private long experimentStart_;
@@ -166,26 +142,16 @@ public class LearningController {
 				else if (args[i].equals("-e"))
 					// Set the environment to experiment mode
 					RLGlue.RL_env_message("-e");
-				else if (args[i].equals("-g")) {
-					// Load a generator file
-					i++;
-				} else if (args[i].equals("-m")) {
+				else if (args[i].equals("-m")) {
 					Module.saveAtEnd_ = true;
 				} else if (args[i].equals("-s")) {
 					i++;
 					serializedFile_ = new File(args[i]);
-				} else if (args[i].equals("-slotProb")) {
-					i++;
-					if (args[i].equals("dynamic"))
-						Slot.INITIAL_SLOT_PROB = -1;
-					else
-						Slot.INITIAL_SLOT_PROB = Double.parseDouble(args[i]);
-				} else if (args[i].equals("-ensemble")) {
-					ensembleEvaluation_ = true;
-					i++;
-					ensembleSize_ = Integer.parseInt(args[i]);
 				} else if (args[i].equals("-t") || args[i].equals("-test")) {
 					testing_ = true;
+				} else {
+					// Handle the argument
+					i = ProgramArgument.handleArg(i, args);
 				}
 			}
 
@@ -403,7 +369,8 @@ public class LearningController {
 					}
 
 					// To the next increment
-					currentKeyframeEpisode += PERFORMANCE_EPISODE_GAP_SIZE;
+					currentKeyframeEpisode += ProgramArgument.PERFORMANCE_EPISODE_GAP
+							.intValue();
 				} while (currentKeyframeEpisode <= runPerformances.lastKey());
 				thisRunPerformances.add(runPerformances.get(current));
 				System.out.println(thisRunPerformances.get(thisRunPerformances
@@ -456,8 +423,9 @@ public class LearningController {
 			// Find the statistics
 			Mean mean = new Mean();
 			StandardDeviation sd = new StandardDeviation();
-			int episodeNum = (byEpisode) ? index * PERFORMANCE_EPISODE_GAP_SIZE
-					: index + 1;
+			int episodeNum = (int) ((byEpisode) ? index
+					* ProgramArgument.PERFORMANCE_EPISODE_GAP.doubleValue()
+					: index + 1);
 			buf.write(episodeNum + "\t" + mean.evaluate(performanceArray)
 					+ "\t" + sd.evaluate(performanceArray) + "\t" + minVal
 					+ "\t" + maxVal + "\n");
@@ -535,7 +503,7 @@ public class LearningController {
 		// System.out.println("POPOPOPOPOPOPOPOPOPOPOP: " + numElites);
 		// System.out.println("SLOTS: " +
 		// policyGenerator.getGenerator().size());
-		return (int) Math.ceil(numElites / SELECTION_RATIO);
+		return (int) Math.ceil(numElites / ProgramArgument.RHO.doubleValue());
 
 		// N_E = Max(# specialisations)
 		// int maxSpecialisations = 0;
@@ -595,17 +563,16 @@ public class LearningController {
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
 
-			if (PolicyGenerator.getInstance().useModules_ && hasUpdated
+			if (ProgramArgument.USE_MODULES.booleanValue() && hasUpdated
 					&& !PolicyGenerator.getInstance().isModuleGenerator()) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
 			}
 
-			int pvsSizeInitial = pvs.size();
-
 			// Determine the dynamic population, based on rule-base size
 			int population = determinePopulation(localPolicy);
-			int numElites = (int) Math.ceil(SELECTION_RATIO * population);
+			int numElites = (int) Math.ceil(ProgramArgument.RHO.doubleValue()
+					* population);
 			finiteNum = maxEpisodes_ * population;
 			if (maxEpisodes_ < 0)
 				finiteNum = Integer.MAX_VALUE;
@@ -614,8 +581,9 @@ public class LearningController {
 			boolean restart = false;
 			float score = 0;
 			double minScore = Double.MAX_VALUE;
-			double[] scores = new double[AVERAGE_ITERATIONS];
-			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+			double[] scores = new double[ProgramArgument.POLICY_REPEATS
+					.intValue()];
+			for (int j = 0; j < ProgramArgument.POLICY_REPEATS.intValue(); j++) {
 				double scoreThisIter = 0;
 				numEpisodes++;
 				RLGlue.RL_episode(maxSteps_);
@@ -646,63 +614,78 @@ public class LearningController {
 				@SuppressWarnings("unchecked")
 				Pair<RelationalPolicy, Double> policy = (Pair<RelationalPolicy, Double>) ObjectObservations
 						.getInstance().objectArray[0];
-				score /= AVERAGE_ITERATIONS;
+				score /= ProgramArgument.POLICY_REPEATS.doubleValue();
 				System.out.println();
 				System.out.println(policy.objA_);
-				if (ensembleSize_ > 1)
+				if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 					System.out.println("Policy consistency: " + policy.objB_);
 				System.out.println(numEpisodes + ": " + score);
+
+				float worst = (!pvs.isEmpty()) ? pvs.last().getValue()
+						: Float.NaN;
 				PolicyValue thisPolicy = new PolicyValue(policy.objA_, score,
 						policiesEvaled);
 				pvs.add(thisPolicy);
 				policiesEvaled++;
 
+				if (worst == Float.NaN)
+					worst = pvs.first().getValue();
+
 				// Give an ETA
-				int samples = pvs.size() - pvsSizeInitial;
-				int maxSamples = numElites - pvsSizeInitial;
-				estimateETA(samples, maxSamples, policiesEvaled, finiteNum, run
-						- repetitionsStart_, repetitionsEnd_
-						- repetitionsStart_, experimentStart_, true);
+				estimateETA(localPolicy.getKLDivergence(),
+						localPolicy.getConvergenceValue(), run
+								- repetitionsStart_, repetitionsEnd_
+								- repetitionsStart_, experimentStart_, true,
+						numElites, pvs.first().getValue(), worst);
 
 				// Noting averaged performance
-				if (valueQueue.size() == PERFORMANCE_EPISODE_GAP_SIZE)
+				if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
+						.doubleValue())
 					valueQueue.poll();
 				valueQueue.offer((double) score);
 
 				// Noting average score (for environment SD)
-				for (int i = 0; i < AVERAGE_ITERATIONS; i++) {
-					if (averageValues.size() == PERFORMANCE_EPISODE_GAP_SIZE
-							* AVERAGE_ITERATIONS)
+				for (int i = 0; i < ProgramArgument.POLICY_REPEATS
+						.doubleValue(); i++) {
+					if (averageValues.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
+							.doubleValue()
+							* ProgramArgument.POLICY_REPEATS.doubleValue())
 						averageValues.poll();
 					averageValues.add(scores[i] - minScore);
 				}
 				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,
 						valueQueue, averageValues, numEpisodes, population);
 
-				if (policiesEvaled >= 2 * numElites) {
-					// Update the distributions
-					updateDistributions(localPolicy, pvs, population,
-							policiesEvaled, numElites, minReward);
+				// Update the distributions
+				boolean clearElites = updateDistributions(localPolicy, pvs,
+						population, policiesEvaled, numElites, minReward);
 
-					// Write generators
-					if (!hasUpdated
-							|| policiesEvaled % PERFORMANCE_EPISODE_GAP_SIZE == 0) {
-						try {
-							saveFiles(run, episodeMeans, episodeSDs, pvs,
-									!hasUpdated);
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
+				// Write generators
+				if (!hasUpdated
+						|| policiesEvaled
+								% ProgramArgument.PERFORMANCE_TESTING_SIZE
+										.doubleValue() == 0) {
+					try {
+						saveFiles(run, episodeMeans, episodeSDs, pvs,
+								!hasUpdated);
+					} catch (Exception e) {
+						e.printStackTrace();
 					}
-
-					hasUpdated = true;
-
-					if (prelimRun)
-						break;
-
-					isConverged |= localPolicy.isConverged();
-
 				}
+
+				hasUpdated = true;
+
+				if (prelimRun)
+					break;
+
+				isConverged |= localPolicy.isConverged();
+
+				// If the generators have changed (added new rules), remove
+				// the old elites and reset the alpha.
+				// if (clearElites) {
+				// policiesEvaled = 0;
+				// pvs.clear();
+				// }
 			} else {
 				filterPolicyValues(pvs, localPolicy);
 				policiesEvaled = pvs.size();
@@ -762,16 +745,19 @@ public class LearningController {
 	 *            The adjusted-to-0 scores for the last N policies.
 	 * @param numEpisodes
 	 *            The number of episodes passed.
-	 * @param population TODO
+	 * @param population
+	 *            The number of samples.
 	 * @return True if the algorithm is considered converged.
 	 */
 	private boolean checkConvergenceValues(
 			SortedMap<Integer, Double> episodeMeans,
 			SortedMap<Integer, Double> episodeSDs, Queue<Double> valueQueue,
 			Queue<Double> averageValues, int numEpisodes, int population) {
-		if (valueQueue.size() == PERFORMANCE_EPISODE_GAP_SIZE) {
+		if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
+				.intValue()) {
 			// Transform the queues into arrays
-			double[] vals = new double[PERFORMANCE_EPISODE_GAP_SIZE];
+			double[] vals = new double[ProgramArgument.PERFORMANCE_TESTING_SIZE
+					.intValue()];
 			int i = 0;
 			for (Double val : valueQueue)
 				vals[i++] = val.doubleValue();
@@ -783,7 +769,7 @@ public class LearningController {
 			Mean m = new Mean();
 			StandardDeviation sd = new StandardDeviation();
 			double mean = m.evaluate(vals);
-			double meanDeviation = sd.evaluate(envSDs) * 3;
+			double meanDeviation = sd.evaluate(envSDs);
 			// double meanDeviation = (maxReward - minReward) * 0.1;
 
 			if (Math.abs(mean - convergedMean_) > meanDeviation) {
@@ -791,10 +777,8 @@ public class LearningController {
 				convergedCount_ = -1;
 			}
 			convergedCount_++;
-			int convergedSteps = population * NUM_ITERS_CONVERGED;
-			if (convergedCount_ > convergedSteps) {
-				return true;
-			}
+			int convergedSteps = population
+					* ProgramArgument.NUM_PERFORMANCES_CONVERGED.intValue();
 			episodeMeans.put(numEpisodes, mean);
 			episodeSDs.put(numEpisodes, sd.evaluate(vals));
 
@@ -804,6 +788,10 @@ public class LearningController {
 					+ "% converged at value: "
 					+ formatter.format(mean)
 					+ " \u00b1 " + meanDeviation);
+
+			if (convergedCount_ > convergedSteps) {
+				return false;
+			}
 		}
 		return false;
 	}
@@ -812,14 +800,12 @@ public class LearningController {
 	 * Prints out the percentage complete, time elapsed and estimated time
 	 * remaining.
 	 * 
-	 * @param samples
-	 *            The number of samples obtained before updating.
-	 * @param maxSamples
-	 *            The number of samples required for update.
-	 * @param iteration
-	 *            The current learning iteration of the run.
-	 * @param maxIteration
-	 *            The maximum number of iterations per run.
+	 * @param klDivergence
+	 *            The amount of divergence the generators are experiencing in
+	 *            updates.
+	 * @param convergenceValue
+	 *            The amount of divergence required for convergence to be
+	 *            called.
 	 * @param run
 	 *            The run number.
 	 * @param maxRuns
@@ -828,10 +814,17 @@ public class LearningController {
 	 *            The time the experiment was started.
 	 * @param noteLearningTime
 	 *            Whether to note learning time or not.
+	 * @param numElites
+	 *            The minimal size of the elites.
+	 * @param bestElite
+	 *            The best value of the elite samples.
+	 * @param worstElite
+	 *            the worst value of the elite samples.
+	 * 
 	 */
-	private void estimateETA(int samples, int maxSamples, int iteration,
-			int maxIteration, int run, int maxRuns, long startTime,
-			boolean noteLearningTime) {
+	private void estimateETA(double klDivergence, double convergenceValue,
+			int run, int maxRuns, long startTime, boolean noteLearningTime,
+			int numElites, float bestElite, float worstElite) {
 		long currentTime = System.currentTimeMillis();
 		if (noteLearningTime) {
 			learningRunTime_ += currentTime - learningStartTime_;
@@ -844,30 +837,31 @@ public class LearningController {
 				+ toTimeFormat(learningRunTime_);
 		System.out.println(elapsed + ", " + learningElapsed);
 
-		double percentIterComplete = (maxSamples > 0) ? (1.0 * samples)
-				/ maxSamples : 1;
-		double percentRunComplete = (1.0 * iteration + percentIterComplete)
-				/ maxIteration;
-		double totalRunComplete = (1.0 * run + percentRunComplete) / maxRuns;
+		double convergencePercent = Math
+				.min(convergenceValue / klDivergence, 1);
+		double totalRunComplete = (1.0 * run + convergencePercent) / maxRuns;
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
 		String modular = "";
 		if (PolicyGenerator.getInstance().isModuleGenerator())
 			modular = "MODULAR: ["
 					+ PolicyGenerator.getInstance().getLocalGoal() + "] ";
-		String percentStr = formatter.format(100 * percentRunComplete) + "% "
-				+ modular + "experiment run complete.";
-		long runRemainingTime = (long) (elapsedTime / percentRunComplete - elapsedTime);
-		String runRemaining = "Remaining: " + toTimeFormat(runRemainingTime);
-		System.out.println(percentStr + " " + runRemaining);
+		// No updates yet, convergence unknown
+		String percentStr = null;
+		if (convergenceValue == 0) {
+			percentStr = "Unknown convergence; No updates yet.";
+		} else {
+			percentStr = formatter.format(100 * convergencePercent) + "% "
+					+ modular + "converged.";
+		}
+		String eliteString = "N_E: " + numElites + ", E_best: "
+				+ formatter.format(bestElite) + ", E_worst: "
+				+ formatter.format(worstElite);
+		System.out.println(percentStr + " " + eliteString);
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
-		long totalRemainingTime = (long) ((currentTime - experimentStart_)
-				/ totalRunComplete - (currentTime - experimentStart_));
-		String totalRemaining = "Remaining: "
-				+ toTimeFormat(totalRemainingTime);
-		System.out.println(totalPercentStr + " " + totalRemaining);
+		System.out.println(totalPercentStr);
 	}
 
 	/**
@@ -1204,12 +1198,13 @@ public class LearningController {
 		// Pre-testing fixing
 		localPolicy.freeze(true);
 		String oldEnsSize = null;
-		if (ensembleEvaluation_)
-			oldEnsSize = RLGlue.RL_agent_message("ensemble " + ensembleSize_);
+		if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+			oldEnsSize = RLGlue.RL_agent_message("ensemble "
+					+ ProgramArgument.ENSEMBLE_SIZE.intValue());
 
 		// System output
 		System.out.println();
-		if (!ensembleEvaluation_)
+		if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 			System.out.println("Beginning testing for episode " + t + ".");
 		else
 			System.out.println("Beginning ensemble testing for episode " + t
@@ -1220,11 +1215,13 @@ public class LearningController {
 
 		// Run the agent through several test iterations, resampling the
 		// agent at each step
-		double[] scores = new double[TEST_ITERATIONS];
-		for (int i = 0; i < TEST_ITERATIONS; i++) {
-			estimateTestTime((1.0 * i) / TEST_ITERATIONS, expProg, startTime);
+		double[] scores = new double[ProgramArgument.TEST_ITERATIONS.intValue()];
+		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue(); i++) {
+			estimateTestTime(
+					(1.0 * i) / ProgramArgument.TEST_ITERATIONS.intValue(),
+					expProg, startTime);
 
-			for (int j = 0; j < AVERAGE_ITERATIONS; j++) {
+			for (int j = 0; j < ProgramArgument.POLICY_REPEATS.intValue(); j++) {
 				RLGlue.RL_episode(maxSteps_);
 				if (PolicyGenerator.getInstance().isModuleGenerator())
 					scores[i] += Double.parseDouble(RLGlue
@@ -1232,21 +1229,21 @@ public class LearningController {
 				else
 					scores[i] += RLGlue.RL_return();
 			}
-			scores[i] /= AVERAGE_ITERATIONS;
+			scores[i] /= ProgramArgument.POLICY_REPEATS.intValue();
 
 			RLGlue.RL_agent_message("GetPolicy");
 			@SuppressWarnings("unchecked")
 			Pair<RelationalPolicy, Double> pol = (Pair<RelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
 			System.out.println(pol.objA_);
-			if (ensembleSize_ > 1)
+			if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 				System.out.println("Policy consistency: " + pol.objB_);
 			System.out.println(numEpisodes + ": " + scores[i] + "\n");
 		}
 
 		// Post-testing unfixing
 		localPolicy.freeze(false);
-		if (ensembleEvaluation_)
+		if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 			RLGlue.RL_agent_message("ensemble " + oldEnsSize);
 		learningStartTime_ = System.currentTimeMillis();
 
@@ -1326,6 +1323,7 @@ public class LearningController {
 
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();
+			AgentObservations.loadAgentObservations();
 		}
 
 		Module.saveAllModules();
@@ -1408,34 +1406,31 @@ public class LearningController {
 	 *            The population value.
 	 * @param minReward
 	 *            The minimum observed reward.
+	 * @return True if the elites should be cleared and restarted.
 	 */
-	public void updateDistributions(PolicyGenerator localPolicy,
+	public boolean updateDistributions(PolicyGenerator localPolicy,
 			SortedSet<PolicyValue> elites, int population, int iteration,
 			int numElites, double minReward) {
 		// Clean up the policy values
 		SortedSet<PolicyValue> removed = preUpdateModification(elites,
 				numElites);
-		int currentNumElites = elites.size();
 
-		// Increasing alpha, from (~)alpha / N to alpha / p.N
-		double updateModifier = Math.max(population - currentNumElites
-				- iteration, currentNumElites);
-		// double updateModifier = testingStep;
-		double alphaUpdate = STEP_SIZE / updateModifier;
-
-		localPolicy.updateDistributions(elites, alphaUpdate);
+		localPolicy.updateDistributions(elites,
+				ProgramArgument.ALPHA.doubleValue(), population, numElites,
+				iteration);
 		// Negative updates:
-		// localPolicy.updateDistributionsWithNegative(elites, alphaUpdate
-		// / elites.size(), removed, minReward);
+		// localPolicy.updateNegative(elites, STEP_SIZE, removed, minReward);
 
-		postUpdateModification(elites, iteration, population, localPolicy);
+		postUpdateModification(elites, localPolicy.getPoliciesEvaluated(),
+				population, localPolicy);
 
 		// Run the post update operations
-		localPolicy.postUpdateOperations(numElites,
-				Math.pow((1 - STEP_SIZE), PRUNING_ITERATIONS));
+		boolean clearElites = localPolicy.postUpdateOperations(numElites);
 
 		// Clear the restart
 		localPolicy.shouldRestart();
+
+		return clearElites;
 	}
 
 	/**
