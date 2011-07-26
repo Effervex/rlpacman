@@ -5,8 +5,6 @@ import static org.junit.Assert.*;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -17,8 +15,6 @@ public class RelationalPredicateTest {
 
 	@Before
 	public void setUp() throws Exception {
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 	}
 

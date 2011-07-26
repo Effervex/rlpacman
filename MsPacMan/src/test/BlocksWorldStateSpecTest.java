@@ -7,8 +7,6 @@ import java.util.SortedSet;
 
 import jess.Rete;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -24,8 +22,6 @@ public class BlocksWorldStateSpecTest {
 
 	@Before
 	public void setUp() throws Exception {
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		spec_ = StateSpec.initInstance("blocksWorld.BlocksWorld");
 	}
 

@@ -34,7 +34,7 @@ public enum ProgramArgument implements Serializable {
 			+ "this many iterations"),
 	NUM_UPDATES_CONVERGED(10, "numUpdatesConverged", null, "If KL sum "
 			+ "updates remain below Beta for this many updates"),
-	ONLY_GOAL_RULES(true, "onlyGoalRules", "-goalRules", "If the agent should "
+	ONLY_GOAL_RULES(false, "onlyGoalRules", "-goalRules", "If the agent should "
 			+ "only create rules with the goal condition in it"),
 	PERFORMANCE_EPISODE_GAP(100, "performanceEpisodeGap", null, "The gap "
 			+ "between measuring performances"),
@@ -143,10 +143,13 @@ public enum ProgramArgument implements Serializable {
 	 *            The file to load the arguments from.
 	 * @return
 	 */
-	public static void loadArgs(File argFile) {
+	public static void loadArgs() {
+		if (!ARG_FILE.exists())
+			return;
+		
 		Map<String, String> args = new HashMap<String, String>();
 		try {
-			FileReader fr = new FileReader(argFile);
+			FileReader fr = new FileReader(ARG_FILE);
 			BufferedReader br = new BufferedReader(fr);
 
 			String input = null;
@@ -233,6 +236,10 @@ public enum ProgramArgument implements Serializable {
 			ENSEMBLE_EVALUATION.setBooleanValue(true);
 			i++;
 			ENSEMBLE_SIZE.setDoubleValue(Integer.parseInt(args[i]));
+		} else if (args[i].equals("-dynamicSlots")) {
+			i++;
+			DYNAMIC_SLOTS.setValue(args[i]);
+			LOCAL_ALPHA.setBooleanValue(false);
 		} else if (args[i].charAt(0) == '-') {
 			// Check the arg against the rest of the program args
 			for (ProgramArgument pa : ProgramArgument.values()) {
