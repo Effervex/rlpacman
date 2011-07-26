@@ -22,6 +22,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	private static final long serialVersionUID = 297675144227949310L;
 	public static final int MAX_RULES_STRING = 5;
 	/** The instances in the distribution with associated weights. */
+	// TODO Change this to a sorted structure (Ensure to re-sort on update)
 	private Map<T, Double> itemProbs_;
 	/** The random number generator. */
 	protected Random random_;
@@ -302,6 +303,25 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		Collections.sort(ordered, new ProbabilityComparator<T>());
 
 		return ordered;
+	}
+
+	/**
+	 * Gets the best element from this distribution. If two or more elements
+	 * have equal probability, this will return one of them.
+	 * 
+	 * @return The best element (highest probability).
+	 */
+	public T getBestElement() {
+		T bestElement = null;
+		double bestProb = -1;
+		for (T element : itemProbs_.keySet()) {
+			double thisProb = itemProbs_.get(element);
+			if (thisProb > bestProb) {
+				bestProb = thisProb;
+				bestElement = element;
+			}
+		}
+		return bestElement;
 	}
 
 	/**
@@ -617,8 +637,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			if (count >= MAX_RULES_STRING) {
 				int remaining = ordered.size() - MAX_RULES_STRING;
 				double remSum = (1 - sum);
-				buffer.append(" + " + remaining
-						+ " OTHERS:~" + remSum / remaining + " EACH");
+				buffer.append(" + " + remaining + " OTHERS:~" + remSum
+						/ remaining + " EACH");
 				break;
 			}
 			if (!first)

@@ -22,6 +22,7 @@ import java.util.TreeSet;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.PolicyGenerator;
+import cerrla.ProgramArgument;
 import cerrla.RuleCreation;
 import cerrla.Unification;
 import cerrla.UnifiedFact;
@@ -232,7 +233,7 @@ public final class AgentObservations implements Serializable {
 		for (String type : StateSpec.getInstance().getStringFact(action)
 				.getArgTypes()) {
 			if (StateSpec.isNumberType(type))
-				num += PolicyGenerator.NUM_NUMERICAL_SPLITS;
+				num += ProgramArgument.NUM_NUMERICAL_SPLITS.doubleValue();
 		}
 		return num;
 	}

@@ -14,6 +14,7 @@ import java.util.TreeSet;
 
 import cerrla.Module;
 import cerrla.PolicyGenerator;
+import cerrla.ProgramArgument;
 
 import relationalFramework.util.ArgumentComparator;
 import relationalFramework.util.MultiMap;
@@ -208,10 +209,19 @@ public class RelationalPolicy implements Serializable {
 	 *         False if the rule was not allowed to be added.
 	 */
 	protected boolean addTriggeredRule(RelationalRule rule) {
-		// If the rule is a loaded module rule, or the agent isn't noting
-		// triggered rules, return false.
-		if (rule.isLoadedModuleRule() || !noteTriggered_)
+		// If the agent isn't noting triggered rules, return false.
+		if (!noteTriggered_)
 			return false;
+		// If the rule is a loaded module rule trigger the rule that caused the
+		// module to be loaded.
+		if (rule.isLoadedModuleRule()) {
+			int index = policyRules_.indexOf(rule) + 1;
+			rule = policyRules_.get(index);
+			while (rule.isLoadedModuleRule()) {
+				index++;
+				rule = policyRules_.get(index);
+			}
+		}
 
 		triggeredRules_.add(rule);
 		return true;
@@ -233,7 +243,7 @@ public class RelationalPolicy implements Serializable {
 		if (!policyRules_.contains(rule)) {
 			// Check if the rule contains constant facts that could invoke
 			// modular rules.
-			if (checkModular && PolicyGenerator.getInstance().useModules_)
+			if (checkModular && ProgramArgument.USE_MODULES.booleanValue())
 				checkModular(rule);
 			policyRules_.add(rule);
 			policySize_++;
@@ -305,7 +315,7 @@ public class RelationalPolicy implements Serializable {
 			// don't match up to the activated actions, covering will be
 			// required.
 			for (RelationalRule rlgg : PolicyGenerator.getInstance()
-					.getRLGGRules()) {
+					.getRLGGRules().values()) {
 				SortedSet<String[]> rlggActions = new TreeSet<String[]>(
 						ArgumentComparator.getInstance());
 				evaluateRule(rlgg, state,

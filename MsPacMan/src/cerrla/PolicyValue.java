@@ -130,6 +130,6 @@ public class PolicyValue implements Comparable<PolicyValue> {
 
 	@Override
 	public String toString() {
-		return "Policy Value: " + value_;
+		return value_ + ": " + policy_;
 	}
 }

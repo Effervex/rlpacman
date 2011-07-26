@@ -28,7 +28,7 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public class RuleCreation implements Serializable {
-	private static final long serialVersionUID = 4327985487131940550L;
+	private static final long serialVersionUID = -5239359052379344563L;
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
 	/** The final character for variables. */
@@ -411,9 +411,10 @@ public class RuleCreation implements Serializable {
 				if (!specialisations.contains(specialisation)) {
 					// Only add specialisations if they contain goal conditions
 					// (if there are goal conditions).
-//					if (AgentObservations.getInstance().getNumGoalArgs() == 0
-//							|| specConditions.toString().contains(
-//									StateSpec.GOAL_VARIABLE_PREFIX))
+					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
+							|| AgentObservations.getInstance().getNumGoalArgs() == 0
+							|| specConditions.toString().contains(
+									StateSpec.GOAL_VARIABLE_PREFIX))
 						specialisations.add(specialisation);
 				}
 			}

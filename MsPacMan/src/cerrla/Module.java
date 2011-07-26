@@ -195,16 +195,13 @@ public class Module {
 	 *            The best policy in the elites at the end of learning.
 	 */
 	public static void saveModule(String modName, int numArgs, RelationalPolicy bestPolicy) {
-		Module newModule = null;
 		if (!moduleExists(StateSpec.getInstance().getEnvironmentName(), modName)) {
-			newModule = new Module(modName, numArgs, bestPolicy);
+			Module newModule = new Module(modName, numArgs, bestPolicy);
 			nonExistantModules_.remove(modName);
 			loadedModules_.put(modName, newModule);
-		} else
-			newModule = loadedModules_.get(modName);
-
-		if (!saveAtEnd_) {
-			saveModule(newModule);
+			if (!saveAtEnd_) {
+				saveModule(newModule);
+			}
 		}
 	}
 
