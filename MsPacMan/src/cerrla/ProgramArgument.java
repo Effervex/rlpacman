@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,7 +14,7 @@ public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, "Step size update"),
 	BETA(0.01, "beta", null, "If KL sum updates are less than Beta * Alpha"),
 	CHI(0.1, "chi", null, "The resampling percentage of average episode steps"),
-	DYNAMIC_SLOTS(true, "dynamicSlots", "-dynamicSlots", "If the slots "
+	DYNAMIC_SLOTS(true, "dynamicSlots", null, "If the slots "
 			+ "grow dynamically"),
 	ENSEMBLE_EVALUATION(false, "ensembleEvaluation", null, "If using "
 			+ "ensemble evaluation"),
@@ -53,6 +54,7 @@ public enum ProgramArgument implements Serializable {
 	public static final File ARG_FILE = new File("cerrlaArgs.txt");
 	private Boolean booleanValue_;
 	private String comment_;
+	private Object defaultValue_;
 	private Number numberValue_;
 	private String name_;
 	private String shortcut_;
@@ -69,12 +71,15 @@ public enum ProgramArgument implements Serializable {
 	 * @param comment
 	 *            The comment about the argument.
 	 */
-	private ProgramArgument(Object val, String name, String shortcut,
+	private ProgramArgument(Object defaultVal, String name, String shortcut,
 			String comment) {
-		if (val instanceof Number)
-			numberValue_ = (Number) val;
-		else if (val instanceof Boolean)
-			booleanValue_ = (Boolean) val;
+		if (defaultVal instanceof Number) {
+			numberValue_ = (Number) defaultVal;
+			defaultValue_ = numberValue_;
+		} else if (defaultVal instanceof Boolean) {
+			booleanValue_ = (Boolean) defaultVal;
+			defaultValue_ = booleanValue_;
+		}
 		name_ = name;
 		shortcut_ = shortcut;
 		comment_ = comment;
@@ -90,6 +95,10 @@ public enum ProgramArgument implements Serializable {
 
 	public String getComment() {
 		return comment_;
+	}
+
+	public Object getDefaultValue() {
+		return defaultValue_;
 	}
 
 	public String getName() {
@@ -142,7 +151,7 @@ public enum ProgramArgument implements Serializable {
 
 			String input = null;
 			while ((input = br.readLine()) != null) {
-				String[] split = input.split("%")[0].split(" ");
+				String[] split = input.split("%")[0].split("=");
 				args.put(split[0], split[1].trim());
 			}
 
@@ -178,15 +187,29 @@ public enum ProgramArgument implements Serializable {
 			FileWriter fw = new FileWriter(ARG_FILE);
 			BufferedWriter bw = new BufferedWriter(fw);
 
-			for (ProgramArgument pa : ProgramArgument.values()) {
-				bw.write(pa.getName() + " " + pa.getValue() + "\t% "
-						+ pa.getComment() + "\n");
-			}
+			saveArgs(bw);
 
 			bw.close();
 			fw.close();
 		} catch (Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Saves the arguments into a give {@link BufferedWriter}.
+	 * 
+	 * @param bw
+	 *            The buffered writer.
+	 */
+	public static void saveArgs(BufferedWriter bw) throws IOException {
+		for (ProgramArgument pa : ProgramArgument.values()) {
+			if (!pa.getValue().equals(pa.getDefaultValue()))
+				bw.write(pa.getName() + "=" + pa.getValue()
+						+ "\t\t\t% -----MODIFIED----- % " + pa.getComment() + "\n");
+			else
+				bw.write(pa.getName() + "=" + pa.getValue() + "\t\t\t% "
+						+ pa.getComment() + "\n");
 		}
 	}
 
@@ -213,7 +236,10 @@ public enum ProgramArgument implements Serializable {
 		} else if (args[i].charAt(0) == '-') {
 			// Check the arg against the rest of the program args
 			for (ProgramArgument pa : ProgramArgument.values()) {
-				if (pa.shortcut_ != null && args[i].equals(pa.shortcut_)) {
+				// If the arg equals the shortcut or the name with a hyphen
+				// added, use that argument
+				if (args[i].equals("-" + pa.name_)
+						|| args[i].equals(pa.shortcut_)) {
 					i++;
 					pa.setValue(args[i]);
 					break;
