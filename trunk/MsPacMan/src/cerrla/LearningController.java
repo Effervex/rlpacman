@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -397,6 +398,8 @@ public class LearningController {
 		// Calculate the average and print out the stats
 		FileWriter writer = new FileWriter(performanceFile_);
 		BufferedWriter buf = new BufferedWriter(writer);
+		writeFileHeader(buf);
+		
 		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
 		boolean moreEpisodes = true;
 		int index = 0;
@@ -1102,6 +1105,8 @@ public class LearningController {
 			throws Exception {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
+		
+		writeFileHeader(buf);
 
 		if (comment_ != null)
 			buf.write(comment_ + "\n");
@@ -1129,8 +1134,16 @@ public class LearningController {
 	private void savePerformance(SortedMap<Integer, Double> episodeMeans,
 			SortedMap<Integer, Double> episodeSDs, File perfFile,
 			boolean finalWrite) throws Exception {
+		// If the file has just been created, add the arguments to the head of
+		// the file
+		boolean newFile = perfFile.createNewFile();
+
 		FileWriter wr = new FileWriter(perfFile, true);
 		BufferedWriter buf = new BufferedWriter(wr);
+
+		// If the file is fresh, add the program args to the top
+		if (newFile)
+			writeFileHeader(buf);
 
 		if (comment_ != null)
 			buf.write(comment_ + "\n");
@@ -1167,6 +1180,14 @@ public class LearningController {
 
 		buf.close();
 		wr.close();
+	}
+
+	private void writeFileHeader(BufferedWriter buf) throws IOException {
+		buf.write("---PROGRAM ARGUMENTS---\n");
+		ProgramArgument.saveArgs(buf);
+		buf.write("-----------------------\n");
+		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
+				+ StateSpec.getInstance().getGoalState() + "\n\n");
 	}
 
 	/**
@@ -1376,8 +1397,6 @@ public class LearningController {
 		// Remove any old file if this is the first run
 		if (episodeMeans.size() <= 1 && serializedFile_ == null)
 			tempPerf.delete();
-
-		tempPerf.createNewFile();
 
 		if (!serialiseOnly) {
 			saveElitePolicies(pvs);

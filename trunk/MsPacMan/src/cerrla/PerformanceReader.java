@@ -34,60 +34,63 @@ public class PerformanceReader {
 		generator_ = null;
 		FileReader reader = new FileReader(perfFile);
 		BufferedReader buf = new BufferedReader(reader);
+		
+		// Read up to "A typical policy"
+		String input = "";
+		while (input != null && !input.equals("A typical policy:")) {
+			input = buf.readLine();
+		}
 
 		// For every value within the performance file
-		boolean noNote = false;
-		String input = buf.readLine();
+		
 		int regularCEcount = 1;
 		while (input != null) {
 			// Check for end of file
 			if ((input == null)
 					|| (input.equals(LearningController.END_PERFORMANCE)))
 				break;
-			if (!noNote) {
-				// First read in the readableGenerator
-				readableGenerator_ = input;
-				while (!(input = buf.readLine()).equals(""))
-					readableGenerator_ += "\n" + input;
+			// First read in the readableGenerator
+			readableGenerator_ = input;
+			while (!(input = buf.readLine()).equals(""))
+				readableGenerator_ += "\n" + input;
 
-				// Then read the generator
-				while (input.equals(""))
-					input = buf.readLine();
-				generator_ = input;
-				while (!(input = buf.readLine()).equals(""))
-					generator_ += "\n" + input;
-				
-				// Then read the convergence
-				buf.readLine();
-				buf.readLine();
-				buf.readLine();
-
-				// Then read the performance
-				while (input.equals(""))
-					input = buf.readLine();
-
-				String[] split = input.split("\t");
-				int ep = 0;
-				float val = 0;
-				if (split.length == 2) {
-					ep = Integer.parseInt(split[0]);
-					val = Float.parseFloat(split[1]);
-				} else if (split.length == 1) {
-					ep = regularCEcount;
-					val = Float.parseFloat(split[0]);
-				}
-				if (!byEpisode)
-					ep = regularCEcount;
-
+			// Then read the generator
+			while (input.equals(""))
 				input = buf.readLine();
-				while ((input != null) && input.equals(""))
-					input = buf.readLine();
+			generator_ = input;
+			while (!(input = buf.readLine()).equals(""))
+				generator_ += "\n" + input;
 
-				// Some performance files may be cut off, so just use the
-				// last recorded value.
-				performanceMap_.put(ep, val);
-				regularCEcount++;
+			// Then read the convergence
+			buf.readLine();
+			buf.readLine();
+			buf.readLine();
+
+			// Then read the performance
+			while (input.equals(""))
+				input = buf.readLine();
+
+			String[] split = input.split("\t");
+			int ep = 0;
+			float val = 0;
+			if (split.length == 2) {
+				ep = Integer.parseInt(split[0]);
+				val = Float.parseFloat(split[1]);
+			} else if (split.length == 1) {
+				ep = regularCEcount;
+				val = Float.parseFloat(split[0]);
 			}
+			if (!byEpisode)
+				ep = regularCEcount;
+
+			input = buf.readLine();
+			while ((input != null) && input.equals(""))
+				input = buf.readLine();
+
+			// Some performance files may be cut off, so just use the
+			// last recorded value.
+			performanceMap_.put(ep, val);
+			regularCEcount++;
 		}
 
 		buf.close();
