@@ -5,22 +5,19 @@
 (assert (block b))
 (assert (block c))
 (assert (block d))
-(assert (floor fl))
-(assert (on a fl))
+(assert (onFloor a))
 (assert (on b a))
-(assert (on c fl))
+(assert (onFloor c))
 (assert (on d b))
+(assert (goalArgs onAB b a))
 
 ;; define the terminal fact
-(deftemplate goalState (slot goalMet))
+(deftemplate goal (slot goalMet))
 
-(defrule unstack
-    "Unstacked state"
-    (floor ?Y) (forall (block ?X) (on ?X ?Y)) => (assert (goalMet TRUE)))
+(defrule onAB
+    (goalArgs onAB ?G_0 ?G_1) (on ?G_0 ?G_1)
+	=> (assert (goal (goalMet TRUE))))
 
-(defrule exists
-    "Does X exist?"
-    (onFloor ?) => (assert (floorexists TRUE)))
 
 (run)
 

@@ -463,8 +463,13 @@ public class Slot implements Serializable, Comparable<Slot> {
 			int population, int numElites) {
 		numUpdates_++;
 		// If using local or global
-		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
-				: PolicyGenerator.getInstance().getPoliciesEvaluated();
+		int policiesEvaluated = numUpdates_;
+		// If not using a local alpha, or not using dynamic slots, use global
+		// policies evaluated
+		if (!ProgramArgument.LOCAL_ALPHA.booleanValue()
+				|| !ProgramArgument.DYNAMIC_SLOTS.booleanValue())
+			policiesEvaluated = PolicyGenerator.getInstance()
+					.getPoliciesEvaluated();
 
 		if (policiesEvaluated >= 2 * numElites) {
 			double alphaPrime = getLocalAlpha(alpha, population, numElites);

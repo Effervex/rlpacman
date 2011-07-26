@@ -91,6 +91,7 @@ public class LearningController {
 	public LearningController(String[] args) {
 		File argumentFile = new File(args[0]);
 		ProgramArgument.loadArgs();
+		ProgramArgument.saveArgsFile();
 
 		// Read the arguments in from file.
 		try {
