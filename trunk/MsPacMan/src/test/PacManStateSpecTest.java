@@ -2,8 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -13,8 +11,6 @@ import relationalFramework.StateSpec;
 public class PacManStateSpecTest {
 	@Before
 	public void setUp() throws Exception {
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
 		StateSpec.initInstance("rlPacMan.PacMan");
 	}
 

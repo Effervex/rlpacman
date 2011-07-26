@@ -13,8 +13,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
-import org.apache.log4j.BasicConfigurator;
-import org.apache.log4j.Level;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
 import relationalFramework.GoalCondition;
@@ -92,8 +90,7 @@ public class LearningController {
 	 */
 	public LearningController(String[] args) {
 		File argumentFile = new File(args[0]);
-		BasicConfigurator.configure();
-		org.apache.log4j.Logger.getRootLogger().setLevel(Level.OFF);
+		ProgramArgument.loadArgs();
 
 		// Read the arguments in from file.
 		try {
@@ -551,7 +548,6 @@ public class LearningController {
 
 		// Learn for a finite number of episodes, or until it is converged.
 		int finiteNum = Integer.MAX_VALUE;
-		int policiesEvaled = 0;
 
 		// Noting min/max rewards
 		double maxReward = -(Float.MAX_VALUE - 1);
@@ -561,7 +557,7 @@ public class LearningController {
 		boolean isConverged = false;
 		boolean hasUpdated = false;
 		// Test until: finite steps, not converged, not doing just testing
-		while ((policiesEvaled < finiteNum) && !isConverged && !testing_) {
+		while ((localPolicy.getPoliciesEvaluated() < finiteNum) && !isConverged && !testing_) {
 			// Clear any 'waiting' flags
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
@@ -627,9 +623,10 @@ public class LearningController {
 				float worst = (!pvs.isEmpty()) ? pvs.last().getValue()
 						: Float.NaN;
 				PolicyValue thisPolicy = new PolicyValue(policy.objA_, score,
-						policiesEvaled);
+						localPolicy.getPoliciesEvaluated());
 				pvs.add(thisPolicy);
-				policiesEvaled++;
+				localPolicy.incrementPoliciesEvaluated();
+				
 
 				if (worst == Float.NaN)
 					worst = pvs.first().getValue();
@@ -661,11 +658,11 @@ public class LearningController {
 
 				// Update the distributions
 				boolean clearElites = updateDistributions(localPolicy, pvs,
-						population, policiesEvaled, numElites, minReward);
+						population, numElites, minReward);
 
 				// Write generators
 				if (!hasUpdated
-						|| policiesEvaled
+						|| localPolicy.getPoliciesEvaluated()
 								% ProgramArgument.PERFORMANCE_TESTING_SIZE
 										.doubleValue() == 0) {
 					try {
@@ -691,14 +688,14 @@ public class LearningController {
 				// }
 			} else {
 				filterPolicyValues(pvs, localPolicy);
-				policiesEvaled = pvs.size();
+				localPolicy.setPoliciesEvaluated(pvs.size());
 			}
 		}
 
 		// Perform a final test
 		if (!prelimRun)
 			testRecordAgent(localPolicy, run, episodeMeans, episodeSDs, pvs,
-					finiteNum, policiesEvaled, numEpisodes);
+					finiteNum, numEpisodes);
 		if (testing_)
 			return null;
 
@@ -1205,16 +1202,15 @@ public class LearningController {
 	 *            The maximum number of iterations to learn in.
 	 * @param t
 	 *            The current progress of the iterations.
-	 * @param numEpisodes
-	 *            The number of episodes passed.
 	 */
 	private void testRecordAgent(PolicyGenerator localPolicy, int run,
 			SortedMap<Integer, Double> episodeMeans,
 			SortedMap<Integer, Double> episodeSDs, SortedSet<PolicyValue> pvs,
-			int finiteNum, int t, int numEpisodes) {
+			int finiteNum, int t) {
 		// Test the agent and record the performances
 		double expProg = ((1.0 * (t + 1)) / finiteNum + (1.0 * (run - repetitionsStart_)))
 				/ (repetitionsEnd_ - repetitionsStart_);
+		int numEpisodes = localPolicy.getPoliciesEvaluated();
 
 		// Pre-testing fixing
 		localPolicy.freeze(true);
@@ -1419,8 +1415,6 @@ public class LearningController {
 	 *            The elite samples.
 	 * @param population
 	 *            The number of steps to take before testing.
-	 * @param iteration
-	 *            The current iteration.
 	 * @param numElites
 	 *            The population value.
 	 * @param minReward
@@ -1428,15 +1422,14 @@ public class LearningController {
 	 * @return True if the elites should be cleared and restarted.
 	 */
 	public boolean updateDistributions(PolicyGenerator localPolicy,
-			SortedSet<PolicyValue> elites, int population, int iteration,
-			int numElites, double minReward) {
+			SortedSet<PolicyValue> elites, int population, int numElites,
+			double minReward) {
 		// Clean up the policy values
 		SortedSet<PolicyValue> removed = preUpdateModification(elites,
 				numElites);
 
 		localPolicy.updateDistributions(elites,
-				ProgramArgument.ALPHA.doubleValue(), population, numElites,
-				iteration);
+				ProgramArgument.ALPHA.doubleValue(), population, numElites);
 		// Negative updates:
 		// localPolicy.updateNegative(elites, STEP_SIZE, removed, minReward);
 
