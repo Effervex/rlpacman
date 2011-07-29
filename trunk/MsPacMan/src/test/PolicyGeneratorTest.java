@@ -14,6 +14,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import cerrla.PolicyGenerator;
+import cerrla.ProgramArgument;
 import cerrla.Slot;
 
 import relationalFramework.RelationalRule;
@@ -33,6 +34,7 @@ public class PolicyGeneratorTest {
 
 	@Test
 	public void testTriggerRLGGCovering() throws Exception {
+		ProgramArgument.DYNAMIC_SLOTS.setBooleanValue(false);
 		assertTrue("No agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations());
 		AgentObservations.getInstance().clearLocalObservations();

@@ -79,15 +79,13 @@ public class Module {
 			parameterTerms_.add(StateSpec.createGoalTerm(i));
 
 		// Add the rules by taking the most likely rule from the ordered slots.
-		List<RelationalRule> policyRules = bestPolicy.getPolicyRules(false);
+		List<RelationalRule> policyRules = bestPolicy.getPolicyRules();
 		moduleRules_ = new ArrayList<RelationalRule>();
 		for (RelationalRule policyRule : policyRules) {
 			// Ground any modular rules and remove any non-fired rules
-			if (bestPolicy.getFiringRules().contains(policyRule)
-					|| policyRule.isLoadedModuleRule()) {
+			if (bestPolicy.getFiringRules().contains(policyRule)) {
 				// Ground modular
 				policyRule = policyRule.groundModular();
-				policyRule.setAsLoadedModuleRule(true);
 				policyRule.setQueryParams(parameterTerms_);
 				moduleRules_.add(policyRule);
 			}

@@ -4,7 +4,9 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.TreeSet;
 
 import cerrla.RuleCreation;
 
@@ -183,6 +185,46 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			if (!retainedArgs.contains(arguments_[i]))
 				arguments_[i] = "?";
 		}
+	}
+
+	/**
+	 * Creates all possible non-anonymous sub-facts of this fact by replacing
+	 * arguments with anonymous terms (and optionally creating variable args).
+	 * 
+	 * @param generateArgs
+	 *            If variable arguments should be generated to fill
+	 *            non-anonymous args, or if the fact should just use existing
+	 *            args.
+	 * @param includeFullyAnonymous
+	 *            If the fully anonymous sub-fact should be created.
+	 * @return A collection of all sub-facts.
+	 */
+	public Collection<RelationalPredicate> createSubFacts(boolean generateArgs,
+			boolean includeFullyAnonymous) {
+		Collection<RelationalPredicate> generalities = new TreeSet<RelationalPredicate>();
+
+		int permutations = (int) Math.pow(2, arguments_.length);
+		if (!includeFullyAnonymous)
+			permutations--;
+		// Create all generalisations of this fact
+		for (int p = 1; p < permutations; p++) {
+			String[] genArguments = new String[arguments_.length];
+			// Run through each index location, using bitwise ops
+			for (int i = 0; i < genArguments.length; i++) {
+				// If the argument is not 0, enter a variable.
+				if ((p & (int) Math.pow(2, i)) != 0) {
+					if (generateArgs)
+						genArguments[i] = RuleCreation.getVariableTermString(i);
+					else
+						genArguments[i] = arguments_[i];
+				} else
+					genArguments[i] = StateSpec.ANONYMOUS;
+			}
+
+			generalities.add(new RelationalPredicate(this, genArguments));
+		}
+
+		return generalities;
 	}
 
 	/**

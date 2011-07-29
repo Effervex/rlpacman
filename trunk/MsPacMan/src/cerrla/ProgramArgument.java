@@ -29,7 +29,7 @@ public enum ProgramArgument implements Serializable {
 			ParameterType.SAMPLING, "The SD of the slot order"),
 	INITIAL_SLOT_MEAN(1, "initialSlotMean", "-slotProb",
 			ParameterType.SAMPLING,
-			"The initial slot mu probabilities. -1 means use 1/D_S"),
+			"The initial slot mu probabilities."),
 	LOCAL_ALPHA(true, "localAlpha", null, ParameterType.UPDATING,
 			"If updates are performed slot locally"),
 	MIN_WEIGHTED_UPDATE(0.1, "minWeightedUpdate", null, ParameterType.UPDATING,
@@ -45,6 +45,9 @@ public enum ProgramArgument implements Serializable {
 	ONLY_GOAL_RULES(false, "onlyGoalRules", "-goalRules",
 			ParameterType.SPECIALISATION,
 			"If the agent should only create rules with the goal condition in it"),
+	PERFORMANCE_CONVERGENCE(false, "performanceConvergence", null,
+			ParameterType.CONVERGENCE,
+			"If converging when performance has settled"),
 	PERFORMANCE_EPISODE_GAP(100, "performanceEpisodeGap", null,
 			ParameterType.EVALUATION, "The gap between measuring performances"),
 	PERFORMANCE_TESTING_SIZE(100, "policyTestingSize", null,
@@ -241,8 +244,11 @@ public enum ProgramArgument implements Serializable {
 	 * 
 	 * @param bw
 	 *            The buffered writer.
+	 * @param outputAllArgs
+	 *            If every argument should be output, or just the changed ones.
 	 */
-	public static void saveArgs(BufferedWriter bw) throws IOException {
+	public static void saveArgs(BufferedWriter bw, boolean outputAllArgs)
+			throws IOException {
 		SortedSet<ProgramArgument> sortedArgs = new TreeSet<ProgramArgument>(
 				new Comparator<ProgramArgument>() {
 					@Override
@@ -259,22 +265,35 @@ public enum ProgramArgument implements Serializable {
 		}
 
 		ParameterType pt = null;
+		boolean modifiedParameters = false;
 		for (ProgramArgument pa : sortedArgs) {
-			// Outline the parameter type
-			if (!pa.parameterType_.equals(pt)) {
-				if (pt != null)
-					bw.write("\n");
-				pt = pa.parameterType_;
-				bw.write("\t-----" + pt + "-----\n");
-			}
-			
-			if (!pa.getValue().equals(pa.getDefaultValue()))
-				bw.write(pa.getName() + "=" + pa.getValue()
+			String output = null;
+			// Determine if outputting an argument (MODIFIED or not)
+			if (!pa.getValue().equals(pa.getDefaultValue())) {
+				output = pa.getName() + "=" + pa.getValue()
 						+ "\t\t\t% -----MODIFIED----- % " + pa.getComment()
-						+ "\n");
-			else
-				bw.write(pa.getName() + "=" + pa.getValue() + "\t\t\t% "
-						+ pa.getComment() + "\n");
+						+ "\n";
+				modifiedParameters = true;
+			} else if (outputAllArgs)
+				output = pa.getName() + "=" + pa.getValue() + "\t\t\t% "
+						+ pa.getComment() + "\n";
+
+			// Outline the parameter type if the output isn't null and haven't
+			// already outlined it.
+			if (output != null) {
+				if (!pa.parameterType_.equals(pt)) {
+					if (pt != null) {
+						// If no modified parameters
+						if (!modifiedParameters && !outputAllArgs)
+							bw.write("<DEFAULT ARGS>\n");
+						bw.write("\n");
+					}
+					pt = pa.parameterType_;
+					bw.write("\t-----" + pt + "-----\n");
+					modifiedParameters = false;
+				}
+				bw.write(output);
+			}
 		}
 	}
 
@@ -291,7 +310,7 @@ public enum ProgramArgument implements Serializable {
 			FileWriter fw = new FileWriter(ARG_FILE);
 			BufferedWriter bw = new BufferedWriter(fw);
 
-			saveArgs(bw);
+			saveArgs(bw, true);
 
 			bw.close();
 			fw.close();

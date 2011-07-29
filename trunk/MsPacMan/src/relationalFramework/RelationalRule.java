@@ -70,16 +70,13 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/** The rule's internal value for calculating standard deviation. */
 	private double internalS_ = 0;
 
-	/** If this rule is from a loaded module. */
-	private boolean isLoadedModule_ = false;
-
 	/** If this slot is a mutation. */
 	private boolean mutant_ = false;
 
 	/** If the rule is a mutant, the parent of the mutant. */
 	private Collection<RelationalRule> mutantParents_;
 	
-	/** TODO If the rule has mutated, the children of the mutation. */
+	/** If the rule has mutated, the children of the mutation. */
 	private Collection<RelationalRule> mutantChildren_;
 
 	/** The actual parameters given for this rule. */
@@ -194,7 +191,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	public RelationalRule(String ruleString, List<String> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
-		isLoadedModule_ = true;
 		findConstants();
 	}
 
@@ -238,7 +234,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			cloneConds.add(new RelationalPredicate(cond));
 		RelationalRule clone = new RelationalRule(cloneConds, ruleAction_);
 		clone.hasSpawned_ = hasSpawned_;
-		clone.isLoadedModule_ = isLoadedModule_;
 		clone.statesSeen_ = statesSeen_;
 		clone.mutant_ = mutant_;
 		if (mutantParents_ != null)
@@ -282,13 +277,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		} else if (other.ruleConditions_ == null)
 			return false;
 		else if (!ruleConditions_.equals(other.ruleConditions_))
-			return false;
-		if (queryParams_ == null) {
-			if (other.queryParams_ != null)
-				return false;
-		} else if (other.queryParams_ == null)
-			return false;
-		else if (!queryParams_.equals(other.queryParams_))
 			return false;
 		return true;
 	}
@@ -510,7 +498,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 
 		SortedSet<RelationalPredicate> groundConditions = new TreeSet<RelationalPredicate>(
 				ruleConditions_.comparator());
-		for (RelationalPredicate ruleCond : ruleConditions_) {
+		for (RelationalPredicate ruleCond : getConditions(true)) {
 			RelationalPredicate groundCond = new RelationalPredicate(ruleCond);
 			groundCond.replaceArguments(termReplacements_, true, false);
 			groundConditions.add(groundCond);
@@ -520,8 +508,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 
 		RelationalRule groundRule = new RelationalRule(groundConditions, groundAction,
 				null);
+		groundRule.expandConditions();
 		groundRule.hasSpawned_ = hasSpawned_;
-		groundRule.isLoadedModule_ = isLoadedModule_;
 		groundRule.statesSeen_ = statesSeen_;
 		groundRule.mutant_ = mutant_;
 		if (mutantParents_ != null)
@@ -545,8 +533,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		for (RelationalPredicate condition : ruleConditions_)
 			conditionResult += condition.hashCode();
 		result = prime * result + conditionResult;
-		result = prime * result
-				+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
 		return result;
 	}
 
@@ -573,10 +559,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	public void incrementStatesCovered() {
 		if (statesSeen_ <= SETTLED_RULE_STATES)
 			statesSeen_++;
-	}
-
-	public boolean isLoadedModuleRule() {
-		return isLoadedModule_;
 	}
 
 	public boolean isMutant() {
@@ -676,13 +658,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 */
 	public void setActionTerms(String[] terms) {
 		ruleAction_ = new RelationalPredicate(ruleAction_, terms);
-	}
-
-	/**
-	 * Sets this rule as a loaded module.
-	 */
-	public void setAsLoadedModuleRule(boolean isModule) {
-		isLoadedModule_ = isModule;
 	}
 
 	/**

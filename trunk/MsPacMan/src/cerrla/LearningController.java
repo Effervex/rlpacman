@@ -229,6 +229,7 @@ public class LearningController {
 	 */
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
 		// Get the goal conditions from the local agent observations
+		// TODO Regular BW not quite working...
 		Collection<GoalCondition> goalConditions = AgentObservations
 				.getInstance().getLocalSpecificGoalConditions();
 
@@ -397,7 +398,7 @@ public class LearningController {
 		FileWriter writer = new FileWriter(performanceFile_);
 		BufferedWriter buf = new BufferedWriter(writer);
 		writeFileHeader(buf);
-		
+
 		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
 		boolean moreEpisodes = true;
 		int index = 0;
@@ -543,6 +544,7 @@ public class LearningController {
 		SortedMap<Integer, Double> episodeSDs = new TreeMap<Integer, Double>();
 		Queue<Double> valueQueue = new LinkedList<Double>();
 		Queue<Double> averageValues = new LinkedList<Double>();
+		Queue<Double> eliteAverageValues = new LinkedList<Double>();
 
 		// Forming a population of solutions
 		SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
@@ -558,7 +560,8 @@ public class LearningController {
 		boolean isConverged = false;
 		boolean hasUpdated = false;
 		// Test until: finite steps, not converged, not doing just testing
-		while ((localPolicy.getPoliciesEvaluated() < finiteNum) && !isConverged && !testing_) {
+		while ((localPolicy.getPoliciesEvaluated() < finiteNum) && !isConverged
+				&& !testing_) {
 			// Clear any 'waiting' flags
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
@@ -627,7 +630,6 @@ public class LearningController {
 						localPolicy.getPoliciesEvaluated());
 				pvs.add(thisPolicy);
 				localPolicy.incrementPoliciesEvaluated();
-				
 
 				if (worst == Float.NaN)
 					worst = pvs.first().getValue();
@@ -653,6 +655,16 @@ public class LearningController {
 							* ProgramArgument.POLICY_REPEATS.doubleValue())
 						averageValues.poll();
 					averageValues.add(scores[i] - minScore);
+
+					// Noting average elite fluctuation values
+					// If elites represent actual elite (not all values)
+					if (worst > minReward && score >= worst) {
+						if (eliteAverageValues.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
+								.doubleValue()
+								* ProgramArgument.POLICY_REPEATS.doubleValue())
+							eliteAverageValues.poll();
+						eliteAverageValues.add(scores[i] - minScore);
+					}
 				}
 				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,
 						valueQueue, averageValues, numEpisodes, population);
@@ -661,6 +673,9 @@ public class LearningController {
 				boolean clearElites = updateDistributions(localPolicy, pvs,
 						population, numElites, minReward);
 
+				// If elites are all the same (within an interval)
+				isElitesConverged(eliteAverageValues, pvs, numElites);
+
 				// Write generators
 				if (!hasUpdated
 						|| localPolicy.getPoliciesEvaluated()
@@ -668,15 +683,15 @@ public class LearningController {
 										.doubleValue() == 0) {
 					try {
 						saveFiles(run, episodeMeans, episodeSDs, pvs,
-								!hasUpdated);
+								!hasUpdated, false);
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
 				}
 
-				hasUpdated = true;
+				hasUpdated = localPolicy.getConvergenceValue() != PolicyGenerator.NO_UPDATES_CONVERGENCE;
 
-				if (prelimRun)
+				if (hasUpdated && prelimRun)
 					break;
 
 				isConverged |= localPolicy.isConverged();
@@ -730,6 +745,24 @@ public class LearningController {
 					.getLocalGoalName(), AgentObservations.getInstance()
 					.getNumGoalArgs(), bestPolicy.getPolicy());
 		return bestPolicy;
+	}
+
+	private void isElitesConverged(Queue<Double> eliteAverageValues,
+			SortedSet<PolicyValue> pvs, int numElites) {
+		StandardDeviation sd = new StandardDeviation();
+		double[] eliteAverages = new double[eliteAverageValues.size()];
+		int i = 0;
+		for (Double val : eliteAverageValues)
+			eliteAverages[i++] = val;
+		if (eliteAverages.length >= ProgramArgument.PERFORMANCE_TESTING_SIZE
+				.doubleValue() * ProgramArgument.POLICY_REPEATS.doubleValue()
+				&& pvs.size() >= numElites * 2
+				&& pvs.first().getValue() - pvs.last().getValue() <= sd
+						.evaluate(eliteAverages)) {
+			System.out.println("---------ELITE CONVERGED!-----------");
+		}
+		if (eliteAverages.length > 1)
+			System.out.println("EliteSD:" + sd.evaluate(eliteAverages));
 	}
 
 	/**
@@ -790,8 +823,9 @@ public class LearningController {
 					+ formatter.format(mean)
 					+ " \u00b1 " + meanDeviation);
 
-			if (convergedCount_ > convergedSteps) {
-				return false;
+			if (convergedCount_ > convergedSteps
+					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
+				return true;
 			}
 		}
 		return false;
@@ -849,7 +883,7 @@ public class LearningController {
 					+ PolicyGenerator.getInstance().getLocalGoal() + "] ";
 		// No updates yet, convergence unknown
 		String percentStr = null;
-		if (convergenceValue == 0) {
+		if (convergenceValue == PolicyGenerator.NO_UPDATES_CONVERGENCE) {
 			percentStr = "Unknown convergence; No updates yet.";
 		} else {
 			percentStr = formatter.format(100 * convergencePercent) + "% "
@@ -1103,7 +1137,7 @@ public class LearningController {
 			throws Exception {
 		FileWriter wr = new FileWriter(policyFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
-		
+
 		writeFileHeader(buf);
 
 		if (comment_ != null)
@@ -1132,6 +1166,9 @@ public class LearningController {
 	private void savePerformance(SortedMap<Integer, Double> episodeMeans,
 			SortedMap<Integer, Double> episodeSDs, File perfFile,
 			boolean finalWrite) throws Exception {
+		if (episodeMeans.isEmpty())
+			return;
+
 		// If the file has just been created, add the arguments to the head of
 		// the file
 		boolean newFile = perfFile.createNewFile();
@@ -1182,7 +1219,7 @@ public class LearningController {
 
 	private void writeFileHeader(BufferedWriter buf) throws IOException {
 		buf.write("---PROGRAM ARGUMENTS---\n");
-		ProgramArgument.saveArgs(buf);
+		ProgramArgument.saveArgs(buf, false);
 		buf.write("-----------------------\n");
 		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
 				+ StateSpec.getInstance().getGoalState() + "\n\n");
@@ -1273,7 +1310,7 @@ public class LearningController {
 
 		// Save the results at each episode
 		try {
-			saveFiles(run, episodeMeans, episodeSDs, pvs, false);
+			saveFiles(run, episodeMeans, episodeSDs, pvs, false, true);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1373,12 +1410,14 @@ public class LearningController {
 	 *            The current elites.
 	 * @param serialiseOnly
 	 *            If only serialisation files should be saved.
+	 * @param finalWrite
+	 *            If this is the final write of the performance file.
 	 * @throws Exception
 	 *             If something goes awry...
 	 */
 	public void saveFiles(int run, SortedMap<Integer, Double> episodeMeans,
 			SortedMap<Integer, Double> episodeSDs, SortedSet<PolicyValue> pvs,
-			boolean serialiseOnly) throws Exception {
+			boolean serialiseOnly, boolean finalWrite) throws Exception {
 		File tempPerf = null;
 		if (PolicyGenerator.getInstance().isModuleGenerator()) {
 			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
@@ -1398,7 +1437,7 @@ public class LearningController {
 		if (!serialiseOnly) {
 			saveElitePolicies(pvs);
 			// Output the episode averages
-			savePerformance(episodeMeans, episodeSDs, tempPerf, false);
+			savePerformance(episodeMeans, episodeSDs, tempPerf, finalWrite);
 		}
 		PolicyGenerator.getInstance().savePolicyGenerator(
 				new File(tempPerf + ".ser"));
@@ -1430,7 +1469,8 @@ public class LearningController {
 				numElites);
 
 		localPolicy.updateDistributions(elites,
-				ProgramArgument.ALPHA.doubleValue(), population, numElites);
+				ProgramArgument.ALPHA.doubleValue(), population, numElites,
+				minReward);
 		// Negative updates:
 		// localPolicy.updateNegative(elites, STEP_SIZE, removed, minReward);
 

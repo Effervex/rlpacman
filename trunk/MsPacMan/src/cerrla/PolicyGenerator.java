@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -68,6 +69,9 @@ public final class PolicyGenerator implements Serializable {
 	/** The name of a module-saved policy generator serialised file. */
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
+	/** The value of convergence if the algorithm hasn't updated yet. */
+	public static final double NO_UPDATES_CONVERGENCE = -1;
+
 	/** Policies awaiting testing. */
 	private Stack<RelationalPolicy> awaitingTest_;
 
@@ -78,13 +82,13 @@ public final class PolicyGenerator implements Serializable {
 	 * The maximum amount of change between the slots before it is considered
 	 * converged.
 	 */
-	private transient double convergedValue_ = 0;
+	private transient double convergedValue_ = NO_UPDATES_CONVERGENCE;
 
 	/**
 	 * The collection of currently active rules, so no duplicate rules are
 	 * created.
 	 */
-	private Collection<RelationalRule> currentRules_;
+	private SelectableSet<RelationalRule> currentRules_;
 
 	/** The current slots used. */
 	private MultiMap<String, Slot> currentSlots_;
@@ -106,12 +110,6 @@ public final class PolicyGenerator implements Serializable {
 
 	/** The goal this generator is working towards if modular. */
 	private GoalCondition moduleGoal_;
-
-	/** The list of mutated rules. Mutually exclusive from the other LGG lists. */
-	private MultiMap<Slot, RelationalRule> mutatedRules_;
-
-	/** The collection of rules that have been removed. */
-	private Collection<RelationalRule> removedRules_;
 
 	/**
 	 * A flag for when the experiment needs to restart (due to new rules being
@@ -137,9 +135,7 @@ public final class PolicyGenerator implements Serializable {
 	public PolicyGenerator() {
 		rlggRules_ = new HashMap<String, RelationalRule>();
 		ruleCreation_ = new RuleCreation();
-		mutatedRules_ = MultiMap.createListMultiMap();
-		removedRules_ = new HashSet<RelationalRule>();
-		currentRules_ = new HashSet<RelationalRule>();
+		currentRules_ = new SelectableSet<RelationalRule>();
 		currentSlots_ = MultiMap.createListMultiMap();
 		klDivergence_ = Double.MAX_VALUE;
 		policiesEvaluated_ = 0;
@@ -153,17 +149,20 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param elites
 	 *            The elite samples to iterate through.
-	 * @param slotCounts
-	 *            The counts for the slots
-	 * @param ruleCounts
-	 *            The counts for the individual rules.
-	 * @param slotPositions
-	 *            The relative positions of slots within the elite policies.
+	 * @param minValue
+	 *            The minimum value the agent has observed so far.
 	 * @return The average value of the elite samples.
 	 */
-	private ElitesData countRules(SortedSet<PolicyValue> elites) {
+	private ElitesData countRules(SortedSet<PolicyValue> elites, double minValue) {
+		// Check that the elites are actually a sub-set of the population
+		if (elites.size() == PolicyGenerator.getInstance().policiesEvaluated_
+				&& elites.last().getValue() == minValue)
+			return null;
+
+		// TODO Something isn't counting right here. Ending up with >1 means.
 		ElitesData ed = new ElitesData();
 
+		// WEIGHTED UPDATES CODE
 		double gradient = 0;
 		double offset = 1;
 		if (ProgramArgument.WEIGHTED_UPDATES.booleanValue()) {
@@ -174,59 +173,53 @@ public final class PolicyGenerator implements Serializable {
 						.doubleValue()) / diffValues;
 			offset = 1 - gradient * elites.first().getValue();
 		}
+		// /////////////////////
 
 		// Only selecting the top elite samples
-		MultiMap<Slot, Double> slotNumeracy = MultiMap.createListMultiMap();
+		Map<Slot, Double> slotMean = new HashMap<Slot, Double>();
 		for (PolicyValue pv : elites) {
-			Map<Slot, Integer> policySlotCounts = new HashMap<Slot, Integer>();
+			// Note which slots were used in this policy
+			Collection<Slot> policySlotCounts = new HashSet<Slot>();
 			double weight = pv.getValue() * gradient + offset;
 			RelationalPolicy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Collection<RelationalRule> firingRules = eliteSolution
-					.getFiringRules();
+			Set<RelationalRule> firingRules = eliteSolution.getFiringRules();
 			int firedRuleIndex = 0;
-			for (RelationalRule rule : firingRules) {
-				Slot ruleSlot = rule.getSlot();
-				// Slot counts
-				ed.addSlotCount(ruleSlot, weight);
+			for (RelationalRule rule : eliteSolution.getPolicyRules()) {
+				if (firingRules.contains(rule)) {
+					Slot ruleSlot = rule.getSlot();
+					// Slot counts
+					ed.addSlotCount(ruleSlot, weight);
 
-				// Slot ordering
-				ed.addSlotOrdering(ruleSlot,
-						(1.0 * firedRuleIndex / eliteSolution.size()));
-				firedRuleIndex++;
+					// Slot ordering
+					double order = (firingRules.size() == 1) ? 0 : 1.0
+							* firedRuleIndex / (firingRules.size() - 1);
+					ed.addSlotOrdering(ruleSlot, order);
+					firedRuleIndex++;
 
-				// Rule counts
-				ed.addRuleCount(rule, weight);
+					// Rule counts
+					ed.addRuleCount(rule, weight);
 
-				// Note the slot count within the policy
-				Integer policySlotCount = policySlotCounts.get(ruleSlot);
-				if (policySlotCount == null)
-					policySlotCount = 0;
-				policySlotCounts.put(ruleSlot, policySlotCount + 1);
+					// Note which slots were active in this policy
+					policySlotCounts.add(ruleSlot);
+				}
 			}
 
 			// Add to the slot numeracy multimap
-			for (Slot slot : policySlotCounts.keySet()) {
-				slotNumeracy
-						.put(slot, policySlotCounts.get(slot).doubleValue());
+			for (Slot slot : policySlotCounts) {
+				Double val = slotMean.get(slot);
+				if (val == null)
+					val = 0.0;
+				slotMean.put(slot, val + 1);
 			}
 		}
 
-		// Calculate the slot numeracy data.
-		for (Slot slot : slotNumeracy.keySet()) {
+		// Calculate the Bernoulli probabilities of each slot
+		for (Slot slot : slotMean.keySet()) {
 			// Each slot should have elites number of counts
-			double[] slotCounts = new double[elites.size()];
-			int i = 0;
-			for (Double val : slotNumeracy.get(slot)) {
-				slotCounts[i] = val;
-				i++;
-			}
-
-			Mean mean = new Mean();
-			StandardDeviation sd = new StandardDeviation();
-			double meanVal = mean.evaluate(slotCounts);
-			ed.setUsageStats(slot, meanVal, sd.evaluate(slotCounts, meanVal));
+			double meanVal = slotMean.get(slot) / elites.size();
+			ed.setUsageStats(slot, meanVal);
 		}
 
 		return ed;
@@ -248,8 +241,7 @@ public final class PolicyGenerator implements Serializable {
 			int mutationUses) {
 		int observationHash = AgentObservations.getInstance()
 				.getObservationHash();
-		if (ProgramArgument.DYNAMIC_SLOTS.booleanValue()
-				|| ruleCanMutate(baseRule, mutationUses, observationHash)) {
+		if (ruleCanMutate(baseRule, mutationUses, observationHash)) {
 			// If the rule can mutate.
 			boolean needToPause = false;
 			// Remove old rules if this rule is an LGG rule.
@@ -274,65 +266,56 @@ public final class PolicyGenerator implements Serializable {
 
 			// If the slot has settled, remove any mutants not present in
 			// the permanent mutant set
-			if (removeOld) {
-				if (mutatedRules_.get(ruleSlot) != null) {
-					// Run through the rules in the slot, removing any direct
-					// mutants of the base rule not in the current set of direct
-					// mutants.
-					List<RelationalRule> removables = new ArrayList<RelationalRule>();
-					ProbabilityDistribution<RelationalRule> distribution = ruleSlot
-							.getGenerator();
-					for (RelationalRule gr : distribution) {
-						// If the rule was once a child of this rule and the
-						// current set of mutants doesn't contain the rule,
-						// remove the parent child link and possibly remove the
-						// rule as well.
-						if ((gr.getParentRules() != null)
-								&& gr.getParentRules().contains(baseRule)
-								&& !mutants.contains(gr)) {
-							needToPause = true;
-							gr.removeParent(baseRule);
-							if (gr.isWithoutParents())
-								removables.add(gr);
+			Collection<RelationalRule> previousChildren = baseRule
+					.getChildrenRules();
+			if (removeOld && previousChildren != null) {
+				Collection<RelationalRule> removables = new ArrayList<RelationalRule>(
+						previousChildren);
+				removables.removeAll(mutants);
 
-							if (debugMode_) {
-								System.out.println("\tREMOVING MUTANT: " + gr);
-							}
-						}
+				// Remove any parent-child links from the rule first
+				for (Iterator<RelationalRule> iter = removables.iterator(); iter
+						.hasNext();) {
+					RelationalRule rr = iter.next();
+					needToPause = true;
+					rr.removeParent(baseRule);
+					if (!rr.isWithoutParents())
+						iter.remove();
+
+					if (debugMode_) {
+						System.out.println("\tREMOVING MUTANT: " + rr);
 					}
-
-					// Setting the restart value.
-					if (!removables.isEmpty()) {
-						restart_ = true;
-					}
-
-					if (ruleSlot.getGenerator().removeAll(removables))
-						ruleSlot.getGenerator().normaliseProbs();
-					mutatedRules_.get(ruleSlot).removeAll(removables);
 				}
+
+				// Setting the restart value.
+				if (!removables.isEmpty()) {
+					restart_ = true;
+					baseRule.getSlot().resetPolicyCount();
+				}
+
+				if (ruleSlot.getGenerator().removeAll(removables))
+					ruleSlot.getGenerator().normaliseProbs();
 			} else {
 				restart_ = false;
 			}
 
 			// Add all mutants to the ruleSlot
-			for (RelationalRule gr : mutants) {
-				if (!removedRules_.contains(gr)) {
-					// Only add if not already in there
-					ruleSlot.addNewRule(gr);
+			for (RelationalRule rr : mutants) {
+				// Only add if not already in there
+				ruleSlot.addNewRule(rr);
 
-					if (debugMode_) {
-						if (mutatedRules_.containsValue(gr))
-							System.out.println("\tEXISTING MUTANT: " + gr);
-						else {
-							needToPause = true;
-							System.out.println("\tADDED MUTANT: " + gr);
-						}
+				if (debugMode_) {
+					if (previousChildren != null
+							&& previousChildren.contains(rr))
+						System.out.println("\tEXISTING MUTANT: " + rr);
+					else {
+						needToPause = true;
+						System.out.println("\tADDED MUTANT: " + rr);
 					}
-
-					mutatedRules_.putContains(ruleSlot, gr);
-					currentRules_.addAll(mutants);
 				}
 			}
+			currentRules_.addAll(mutants);
+			baseRule.setChildren(mutants);
 
 			if (debugMode_ && needToPause) {
 				try {
@@ -447,6 +430,32 @@ public final class PolicyGenerator implements Serializable {
 		return convergedValue_;
 	}
 
+	/**
+	 * Gets (if it exists) or creates a new rule and slot corresponding to a
+	 * rule in the current generator. If the generator does not contain the
+	 * rule, it is created in a slot of its own.
+	 * 
+	 * @param rule
+	 *            The rule to get the corresponding rule for.
+	 * @return The relational rule from within this generator corresponding to
+	 *         the rule.
+	 */
+	public RelationalRule getCreateCorrespondingRule(RelationalRule rule) {
+		rule = rule.groundModular();
+		RelationalRule match = currentRules_.findMatch(rule);
+		// TODO Somewhere around here, a rule is losing its slot
+		if (match == null) {
+			currentRules_.add(rule);
+			// Create a new slot with that rule in it (Min level 2)
+			Slot newSlot = new Slot(rule, false, 2);
+			mutateRule(rule, newSlot, -1);
+			slotGenerator_.add(newSlot);
+			match = rule;
+		}
+
+		return match;
+	}
+
 	public Collection<Slot> getGenerator() {
 		return slotGenerator_;
 	}
@@ -470,7 +479,7 @@ public final class PolicyGenerator implements Serializable {
 	public int getPoliciesEvaluated() {
 		return policiesEvaluated_;
 	}
-	
+
 	public void incrementPoliciesEvaluated() {
 		policiesEvaluated_++;
 	}
@@ -562,6 +571,8 @@ public final class PolicyGenerator implements Serializable {
 						} else {
 							// Set ordering to be the same
 							newSlot.setOrdering(slot.getOrdering());
+							newSlot.setSelectionProb(slot
+									.getSelectionProbability());
 							mutateRule(bestRule, newSlot, -1);
 							newSlots.add(newSlot);
 							mutated = true;
@@ -595,8 +606,6 @@ public final class PolicyGenerator implements Serializable {
 		slotGenerator_ = new SelectableSet<Slot>();
 
 		rlggRules_.clear();
-		mutatedRules_.clear();
-		removedRules_.clear();
 		currentRules_.clear();
 		currentSlots_.clear();
 
@@ -743,24 +752,29 @@ public final class PolicyGenerator implements Serializable {
 
 			// Add remaining information to rules.
 			for (RelationalRule coveredRule : covered) {
+				Slot rlggSlot = coveredRule.getSlot();
 				if (coveredRule.isRecentlyModified()) {
 					System.out.println("\tCOVERED RULE: " + coveredRule);
-					restart_ = true;
+					if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
+						restart_ = true;
+						if (rlggSlot != null)
+							rlggSlot.resetPolicyCount();
+					}
 				}
 
 				RelationalPredicate action = coveredRule.getAction();
-				if (coveredRule.getSlot() == null) {
-					Slot slot = new Slot(coveredRule, false, 0);
-					if (ProgramArgument.DYNAMIC_SLOTS.booleanValue())
-						mutateRule(coveredRule, slot, -1);
-					slotGenerator_.add(slot);
+				if (rlggSlot == null) {
+					rlggSlot = new Slot(coveredRule, false, 0);
+					slotGenerator_.add(rlggSlot);
 					currentSlots_.clearValues(coveredRule.getActionPredicate());
-					currentSlots_.put(coveredRule.getActionPredicate(), slot);
+					currentSlots_.put(coveredRule.getActionPredicate(),
+							rlggSlot);
 				}
+				if (ProgramArgument.DYNAMIC_SLOTS.booleanValue())
+					mutateRule(coveredRule, rlggSlot, -1);
 
 				// Add to the covered rules
 				rlggRules_.put(action.getFactName(), coveredRule);
-
 			}
 
 			// If not using dynamic slots, split the slots now.
@@ -789,6 +803,10 @@ public final class PolicyGenerator implements Serializable {
 		// If the rule has already spawned under this hash.
 		if (rule.hasSpawned(preGoalHash))
 			return false;
+
+		// If using dynamic slots, that's all we need to check.
+		if (ProgramArgument.DYNAMIC_SLOTS.booleanValue())
+			return true;
 
 		// (Only check for postUpdate mutations - not split slot mutations)
 		// If the rule's slot isn't already full (using klSize() to simulate
@@ -936,12 +954,13 @@ public final class PolicyGenerator implements Serializable {
 	 *            The current population value.
 	 * @param numElites
 	 *            The minimum number of elites.
-	 * 
+	 * @param minValue
+	 *            The minimum value the agent has seen.
 	 */
 	public void updateDistributions(SortedSet<PolicyValue> elites,
-			double alpha, int population, int numElites) {
+			double alpha, int population, int numElites, double minValue) {
 		// Keep count of the rules seen (and slots used)
-		ElitesData ed = countRules(elites);
+		ElitesData ed = countRules(elites, minValue);
 
 		klDivergence_ = 0;
 
@@ -951,12 +970,14 @@ public final class PolicyGenerator implements Serializable {
 			// Update the slot
 			double result = slot.updateProbabilities(ed, alpha, population,
 					numElites);
-			updated |= (result != alpha); 
+			updated |= (result != alpha);
 			klDivergence_ += result;
 		}
-		
+
 		if (updated)
 			convergedValue_ = alpha * ProgramArgument.BETA.doubleValue();
+		else
+			convergedValue_ = NO_UPDATES_CONVERGENCE;
 	}
 
 	/**

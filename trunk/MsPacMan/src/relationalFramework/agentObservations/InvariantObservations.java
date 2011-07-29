@@ -20,6 +20,12 @@ public class InvariantObservations implements Serializable {
 	private Collection<RelationalPredicate> specificInvariants_;
 
 	/**
+	 * The specific invariants note only purely instantiated invariants, but not
+	 * fully anonymous versions of them are also invariants.
+	 */
+	private Collection<RelationalPredicate> expandedSpecificInvariants_;
+
+	/**
 	 * The generalised 'existence' invariants (only noting if a predicate is
 	 * always present, regardless of its arguments).
 	 */
@@ -74,7 +80,8 @@ public class InvariantObservations implements Serializable {
 		for (RelationalPredicate stateFact : stateFacts) {
 			RelationalPredicate checkFact = new RelationalPredicate(stateFact);
 			if (checkFact.replaceArguments(goalReplacements, false, false)) {
-				RelationalPredicate replFact = new RelationalPredicate(stateFact);
+				RelationalPredicate replFact = new RelationalPredicate(
+						stateFact);
 				replFact.replaceArguments(goalReplacements, true, false);
 				if (counter_ == 1)
 					specificInvariants_.add(replFact);
@@ -84,7 +91,10 @@ public class InvariantObservations implements Serializable {
 
 		if (counter_ == 1)
 			return true;
-		return specificInvariants_.retainAll(goalFacts);
+		boolean result = specificInvariants_.retainAll(goalFacts);
+		if (result)
+			expandedSpecificInvariants_ = null;
+		return result;
 	}
 
 	@Override
@@ -142,6 +152,15 @@ public class InvariantObservations implements Serializable {
 	public Collection<RelationalPredicate> getSpecificInvariants() {
 		if (specificInvariants_ == null)
 			return new TreeSet<RelationalPredicate>();
-		return specificInvariants_;
+		// Return the expanded invariants
+		if (expandedSpecificInvariants_ == null) {
+			expandedSpecificInvariants_ = new TreeSet<RelationalPredicate>();
+			for (RelationalPredicate invariant : specificInvariants_) {
+				expandedSpecificInvariants_.add(invariant);
+				expandedSpecificInvariants_.addAll(invariant.createSubFacts(false, false));
+			}
+		}
+		
+		return expandedSpecificInvariants_;
 	}
 }

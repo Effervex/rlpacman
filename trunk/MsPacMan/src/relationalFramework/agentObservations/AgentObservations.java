@@ -550,8 +550,20 @@ public final class AgentObservations implements Serializable {
 	 */
 	public boolean simplifyRule(SortedSet<RelationalPredicate> simplified,
 			boolean testForIllegalRule, boolean onlyEquivalencies) {
-		return conditionObservations_.simplifyRule(simplified,
+		boolean result = false;
+
+		// Simplify using background knowledge
+		result |= conditionObservations_.simplifyRule(simplified,
 				testForIllegalRule, onlyEquivalencies);
+		
+		// Simplify using invariants
+		if (!onlyEquivalencies) {
+			result |= simplified.removeAll(conditionObservations_.invariants_
+					.getSpecificInvariants());
+			result |= simplified.removeAll(localAgentObservations_
+					.getConditionInvariants().getSpecificInvariants());
+		}
+		return result;
 	}
 
 	/**
@@ -710,6 +722,7 @@ public final class AgentObservations implements Serializable {
 					}
 				} else {
 					variants.add(invFact);
+					changed = true;
 				}
 			}
 			invariants.clear();
