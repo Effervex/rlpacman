@@ -5,8 +5,6 @@ import org.rlcommunity.rlglue.codec.*;
 import cerrla.LearningController;
 import cerrla.PolicyActor;
 
-
-
 public class RunBlocksWorldMoveExperiment {
 	public static void main(String[] args) {
 		// Create the Agent

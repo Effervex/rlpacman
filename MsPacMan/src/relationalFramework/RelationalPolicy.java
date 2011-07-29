@@ -36,6 +36,8 @@ public class RelationalPolicy implements Serializable {
 	private boolean noteTriggered_;
 	/** The rules of this policy, organised in a deterministic list format. */
 	private List<RelationalRule> policyRules_;
+	/** The modular rules in the policy. */
+	private Collection<RelationalRule> modularRules_;
 	/** The number of rules added to this policy (excluding modular) */
 	private int policySize_;
 	/** The triggered rules in the policy */
@@ -51,6 +53,7 @@ public class RelationalPolicy implements Serializable {
 		policyRules_ = new ArrayList<RelationalRule>();
 		triggeredRules_ = new HashSet<RelationalRule>();
 		policySize_ = 0;
+		modularRules_ = new HashSet<RelationalRule>();
 	}
 
 	/**
@@ -91,23 +94,21 @@ public class RelationalPolicy implements Serializable {
 				for (String arg : cond.getArguments()) {
 					// If modules are recursive, set up the parameters
 					// accordingly.
-					if (!rule.isLoadedModuleRule())
-						parameters.add(arg);
-					else {
-						int index = rule.getQueryParameters().indexOf(arg);
-						if (index != -1)
-							parameters.add(rule.getModuleParameters()
-									.get(index));
-						else
-							parameters.add(arg);
-					}
+					parameters.add(arg);
 				}
 
 				// Add the module rules.
 				for (RelationalRule gr : module.getModuleRules()) {
 					gr.setModularParameters(parameters);
 					checkModular(gr);
-					policyRules_.add(gr);
+					// Get/create the corresponding rule in the generator
+					gr = PolicyGenerator.getInstance().getCreateCorrespondingRule(gr);
+					if (!policyRules_.contains(gr)) {
+						gr.setQueryParams(null);
+						modularRules_.add(gr);
+						policyRules_.add(gr);
+						policySize_++;
+					}
 				}
 			}
 		}
@@ -212,16 +213,6 @@ public class RelationalPolicy implements Serializable {
 		// If the agent isn't noting triggered rules, return false.
 		if (!noteTriggered_)
 			return false;
-		// If the rule is a loaded module rule trigger the rule that caused the
-		// module to be loaded.
-		if (rule.isLoadedModuleRule()) {
-			int index = policyRules_.indexOf(rule) + 1;
-			rule = policyRules_.get(index);
-			while (rule.isLoadedModuleRule()) {
-				index++;
-				rule = policyRules_.get(index);
-			}
-		}
 
 		triggeredRules_.add(rule);
 		return true;
@@ -374,19 +365,9 @@ public class RelationalPolicy implements Serializable {
 	/**
 	 * Gets the rules that this policy is made up of.
 	 * 
-	 * @param excludeModular
-	 *            If excluding the modular rules of the policy.
 	 * @return The rule for the policy.
 	 */
-	public List<RelationalRule> getPolicyRules(boolean excludeModular) {
-		if (excludeModular) {
-			List<RelationalRule> rules = new ArrayList<RelationalRule>();
-			for (RelationalRule gr : policyRules_) {
-				if (!gr.isLoadedModuleRule())
-					rules.add(gr);
-			}
-			return rules;
-		}
+	public List<RelationalRule> getPolicyRules() {
 		return policyRules_;
 	}
 
@@ -416,15 +397,7 @@ public class RelationalPolicy implements Serializable {
 
 		// Set the parameters for the policy rules.
 		for (RelationalRule gr : policyRules_) {
-			// Special case for loaded module rules - they have their parameter
-			// args swapped.
-			if (gr.isLoadedModuleRule()) {
-				List<String> modParams = new ArrayList<String>();
-				for (String modParam : gr.getModuleParameters())
-					modParams.add(goalArgs.get(modParam));
-				gr.setParameters(modParams);
-			} else
-				gr.setParameters(params);
+			gr.setParameters(params);
 		}
 	}
 
@@ -449,7 +422,7 @@ public class RelationalPolicy implements Serializable {
 		StringBuffer buffer = new StringBuffer("Policy:\n");
 		for (RelationalRule rule : policyRules_) {
 			// Don't display module rules or unused rules
-			if (!rule.isLoadedModuleRule() && triggeredRules_.contains(rule)) {
+			if (triggeredRules_.contains(rule)) {
 				buffer.append(rule.toNiceString() + "\n");
 			}
 		}
@@ -465,7 +438,7 @@ public class RelationalPolicy implements Serializable {
 		buffer.append(":\n");
 
 		for (RelationalRule rule : policyRules_) {
-			if (!rule.isLoadedModuleRule()) {
+			if (!modularRules_.contains(rule)) {
 				buffer.append(rule.toNiceString() + "\n");
 			} else {
 				buffer.append("MODULAR: " + rule.toNiceString() + "\n");

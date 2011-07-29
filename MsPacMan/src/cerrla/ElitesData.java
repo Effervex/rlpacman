@@ -75,13 +75,10 @@ public class ElitesData {
 	 *            The slot for which the data is being recorded.
 	 * @param mean
 	 *            The mean of the slot usage.
-	 * @param sd
-	 *            The sd of the slot usage.
 	 */
-	public void setUsageStats(Slot slot, double mean, double sd) {
+	public void setUsageStats(Slot slot, double mean) {
 		SlotData slotData = getSlotData(slot);
-		slotData.setNumeracy(mean);
-		slotData.setSD(sd);
+		slotData.setMean(mean);
 	}
 
 	/**
@@ -141,19 +138,6 @@ public class ElitesData {
 	}
 
 	/**
-	 * Gets the slot sd value.
-	 * 
-	 * @param slot
-	 *            The slot to get the data for.
-	 * @return The sd value, or 0 if not recorded.
-	 */
-	public double getSlotNumeracySD(Slot slot) {
-		if (slotData_.containsKey(slot))
-			return slotData_.get(slot).getSD();
-		return 0;
-	}
-
-	/**
 	 * Gets or initialises the slot data.
 	 * 
 	 * @param slot
@@ -172,8 +156,13 @@ public class ElitesData {
 
 		buffer.append("Slot counts: \n");
 		for (Slot slot : slotData_.keySet()) {
-			buffer.append("\t" + slot.getAction() + ":\n" + slotData_.get(slot)
-					+ "\n");
+			if (slot.getSlotSplitFacts() == null)
+				buffer.append("\tSlot " + slot.getAction() + ":\n"
+						+ slotData_.get(slot) + "\n");
+			else
+				buffer.append("\tSlot " + slot.getSlotSplitFacts() + " => "
+						+ slot.getAction() + ":\n" + slotData_.get(slot)
+						+ "\n");
 		}
 
 		buffer.append("Rule counts: \n");
@@ -200,24 +189,14 @@ public class ElitesData {
 		private Double position_ = null;
 
 		/** The average number of slots per policy. */
-		private double numeracy_;
-
-		/**
-		 * The amount of SD between the number of slots per policy in the
-		 * elites.
-		 */
-		private double sd_;
+		private double mean_;
 
 		public void addCount(double weight) {
 			count_ += weight;
 		}
 
-		public void setNumeracy(double mean) {
-			numeracy_ = mean;
-		}
-
-		public void setSD(double sd) {
-			sd_ = sd;
+		public void setMean(double mean) {
+			mean_ = mean;
 		}
 
 		public double getCount() {
@@ -241,20 +220,15 @@ public class ElitesData {
 		}
 
 		public double getNumeracy() {
-			return numeracy_;
-		}
-
-		public double getSD() {
-			return sd_;
+			return mean_;
 		}
 
 		@Override
 		public String toString() {
 			StringBuffer buffer = new StringBuffer("\tCount: " + count_);
 			buffer.append("\n\tRaw Count: " + rawCount_);
-			buffer.append("\n\tPosition: " + position_);
-			buffer.append("\n\tNumeracy: " + numeracy_);
-			buffer.append("\n\tNumeracy SD: " + sd_);
+			buffer.append("\n\tPosition: " + getAverageOrdering());
+			buffer.append("\n\tNumeracy: " + mean_);
 			return buffer.toString();
 		}
 	}

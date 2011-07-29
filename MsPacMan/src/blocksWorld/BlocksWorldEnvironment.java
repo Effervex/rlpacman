@@ -82,7 +82,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	// @Override
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
-			maxSteps_ = (int) (numBlocks_ / actionSuccess_);
+			maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
 			return maxSteps_ + "";
 		}
 		if (arg0.equals("freeze")) {
@@ -193,7 +193,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		boolean isGoal = StateSpec.getInstance().isGoal(rete_)
 				|| ObjectObservations.getInstance().earlyExit;
 		if (isGoal || steps_ == maxSteps_) {
-			if (optimalSteps_ == maxSteps_)
+			if (optimalSteps_ >= maxSteps_)
 				reward = 0;
 			else
 				reward = MINIMAL_REWARD * (steps_ - optimalSteps_)

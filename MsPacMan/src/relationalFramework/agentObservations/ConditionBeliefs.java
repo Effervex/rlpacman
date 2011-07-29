@@ -148,36 +148,6 @@ public class ConditionBeliefs implements Serializable {
 	}
 
 	/**
-	 * Creates the generalities of this fact and this fact itself.
-	 * 
-	 * @return A collection of all generalities of this rule.
-	 */
-	private Collection<RelationalPredicate> createGeneralities() {
-		Collection<RelationalPredicate> generalities = new TreeSet<RelationalPredicate>();
-
-		// Add general rules to always true (on ?X ?Y) => (on ?X ?), (on ? ?Y)
-		RelationalPredicate thisFact = StateSpec.getInstance().getStringFact(
-				condition_);
-		int permutations = (int) Math.pow(2, thisFact.getArgTypes().length);
-		// Create all generalisations of this fact
-		for (int p = 1; p < permutations; p++) {
-			String[] genArguments = new String[thisFact.getArgTypes().length];
-			// Run through each index location, using bitwise ops
-			for (int i = 0; i < genArguments.length; i++) {
-				// If the argument is not 0, enter a variable.
-				if ((p & (int) Math.pow(2, i)) != 0)
-					genArguments[i] = RuleCreation.getVariableTermString(i);
-				else
-					genArguments[i] = StateSpec.ANONYMOUS;
-			}
-
-			generalities.add(new RelationalPredicate(thisFact, genArguments));
-		}
-
-		return generalities;
-	}
-
-	/**
 	 * Creates a collection of all possible facts that the base condition could
 	 * be paired with. This is achieved by recursively placing arguments
 	 * throughout every condition. This method is only called once.
@@ -808,7 +778,9 @@ public class ConditionBeliefs implements Serializable {
 			// If this is our first state, all true facts are always true, and
 			// all others are always false.
 			if (firstState_) {
-				generalities_ = createGeneralities();
+				RelationalPredicate thisFact = StateSpec.getInstance().getStringFact(
+						condition_);
+				generalities_ = thisFact.createSubFacts(true, true);
 				alwaysTrue_.addAll(trueFacts);
 				addNeverSeenPreds();
 				if (addGeneralities)

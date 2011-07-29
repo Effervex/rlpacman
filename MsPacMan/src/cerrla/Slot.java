@@ -72,11 +72,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 			selectionProb_ = 1;
 			fixedRule_ = seedRule;
 		} else {
-			if (ProgramArgument.INITIAL_SLOT_MEAN.doubleValue() == -1)
-				selectionProb_ = 1;
-			else
-				selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN
-						.doubleValue();
+			selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN
+					.doubleValue();
 			ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
 					PolicyGenerator.random_);
 			ruleGenerator_.add(seedRule);
@@ -273,9 +270,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public double getLocalAlpha(double alpha, int population, int numElites) {
 		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
 				: PolicyGenerator.getInstance().getPoliciesEvaluated();
-		return alpha
-				/ Math.max(population - numElites - policiesEvaluated,
-						numElites);
+		return alpha / Math.max(population - policiesEvaluated, numElites);
 	}
 
 	/**
@@ -355,8 +350,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 		double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
 		if (threshold == -1)
-			threshold = Math.pow(1 - 1.0 / size(), slotLevel_ + 1) * size();
-		if (klSize() < threshold)
+			threshold = 1 - 1.0 / size();
+		if (klSize() < Math.pow(threshold, slotLevel_ + 1) * size())
 			return true;
 		return false;
 	}
@@ -428,7 +423,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 		}
 		buffer.append(action_.toString() + ")");
 		buffer.append(" [MU:" + selectionProb_ + ";ORD:" + ordering_
-				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + "]");
+				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + ";LVL:"
+				+ slotLevel_ + ";#UPDATES:" + numUpdates_ + "]");
 		if (fixed_)
 			buffer.append(" " + fixedRule_.toString());
 		else
@@ -462,6 +458,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public double updateProbabilities(ElitesData ed, double alpha,
 			int population, int numElites) {
 		numUpdates_++;
+		if (ed == null)
+			return alpha;
+		
 		// If using local or global
 		int policiesEvaluated = numUpdates_;
 		// If not using a local alpha, or not using dynamic slots, use global
@@ -518,5 +517,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean useSlot(Random random) {
 		return random.nextDouble() < selectionProb_;
+	}
+
+	public void resetPolicyCount() {
+		numUpdates_ = 0;
 	}
 }

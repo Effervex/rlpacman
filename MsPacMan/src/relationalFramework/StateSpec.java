@@ -546,7 +546,7 @@ public abstract class StateSpec {
 	public Collection<RelationalPredicate> createTypeConds(RelationalPredicate fact) {
 		Collection<RelationalPredicate> typeConds = new HashSet<RelationalPredicate>();
 		// If the term itself is a type pred, return.
-		if (isTypePredicate(fact.getFactName()) || fact.isNegated()) {
+		if (isTypePredicate(fact.getFactName())) {
 			return typeConds;
 		}
 

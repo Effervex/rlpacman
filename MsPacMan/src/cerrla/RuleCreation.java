@@ -352,7 +352,7 @@ public class RuleCreation implements Serializable {
 			simplified.add(condition);
 		}
 
-		// Simplify using the learned background knowledge
+		// Simplify using the learned background knowledge and local invariants
 		AgentObservations.getInstance().simplifyRule(simplified,
 				testForIllegalRule, false);
 
@@ -408,7 +408,8 @@ public class RuleCreation implements Serializable {
 						specConditions, action, rule);
 				specialisation.setQueryParams(rule.getQueryParameters());
 				specialisation.expandConditions();
-				if (!specialisations.contains(specialisation)) {
+				if (!specialisations.contains(specialisation)
+						&& !specialisation.equals(rule)) {
 					// Only add specialisations if they contain goal conditions
 					// (if there are goal conditions).
 					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
@@ -474,7 +475,7 @@ public class RuleCreation implements Serializable {
 		newTerms[i] = goalTerm;
 		SortedSet<RelationalPredicate> ruleConditions = rule
 				.getConditions(true);
-		Collection<RelationalPredicate> specConditions = new TreeSet<RelationalPredicate>(
+		SortedSet<RelationalPredicate> specConditions = new TreeSet<RelationalPredicate>(
 				ruleConditions.comparator());
 		// Form the replacement map
 		Map<String, String> replacementMap = new HashMap<String, String>();
@@ -500,6 +501,9 @@ public class RuleCreation implements Serializable {
 				break;
 			}
 		}
+
+		AgentObservations.getInstance().simplifyRule(specConditions, false,
+				false);
 
 		if (validRule) {
 			// Create the mutant
