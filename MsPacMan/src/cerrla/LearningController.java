@@ -70,13 +70,15 @@ public class LearningController {
 	private int repetitionsEnd_ = 1;
 	/** The first run number. */
 	private int repetitionsStart_ = 0;
+	/** If optiona rules are seeded from file. */
+	private File ruleFile_;
 	/** The time the run started. */
 	private long runStart_;
 
 	/** The loaded serializable file. */
 	private File serializedFile_;
 	/**
-	 * if the agent is doing no learning - just testing. Works with serialised
+	 * If the agent is doing no learning - just testing. Works with serialised
 	 * files.
 	 */
 	private boolean testing_ = false;
@@ -148,6 +150,9 @@ public class LearningController {
 					serializedFile_ = new File(args[i]);
 				} else if (args[i].equals("-t") || args[i].equals("-test")) {
 					testing_ = true;
+				} else if (args[i].equals("-ruleFile")) {
+					i++;
+					ruleFile_ = new File(args[i]);
 				} else {
 					// Handle the argument
 					i = ProgramArgument.handleArg(i, args);
@@ -157,6 +162,72 @@ public class LearningController {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Checks if the algorithm has converged in regards to the average
+	 * performance.
+	 * 
+	 * @param episodeMeans
+	 *            The episode means for the run.
+	 * @param episodeSDs
+	 *            The episode standard deviations for the run.
+	 * @param valueQueue
+	 *            The mean scores for the last N policies.
+	 * @param averageValues
+	 *            The adjusted-to-0 scores for the last N policies.
+	 * @param numEpisodes
+	 *            The number of episodes passed.
+	 * @param population
+	 *            The number of samples.
+	 * @return True if the algorithm is considered converged.
+	 */
+	private boolean checkConvergenceValues(
+			SortedMap<Integer, Double> episodeMeans,
+			SortedMap<Integer, Double> episodeSDs, Queue<Double> valueQueue,
+			Queue<Double> averageValues, int numEpisodes, int population) {
+		if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
+				.intValue()) {
+			// Transform the queues into arrays
+			double[] vals = new double[ProgramArgument.PERFORMANCE_TESTING_SIZE
+					.intValue()];
+			int i = 0;
+			for (Double val : valueQueue)
+				vals[i++] = val.doubleValue();
+			double[] envSDs = new double[averageValues.size()];
+			i = 0;
+			for (Double envSD : averageValues)
+				envSDs[i++] = envSD.doubleValue();
+
+			Mean m = new Mean();
+			StandardDeviation sd = new StandardDeviation();
+			double mean = m.evaluate(vals);
+			double meanDeviation = sd.evaluate(envSDs);
+			// double meanDeviation = (maxReward - minReward) * 0.1;
+
+			if (Math.abs(mean - convergedMean_) > meanDeviation) {
+				convergedMean_ = mean;
+				convergedCount_ = -1;
+			}
+			convergedCount_++;
+			int convergedSteps = population
+					* ProgramArgument.NUM_PERFORMANCES_CONVERGED.intValue();
+			episodeMeans.put(numEpisodes, mean);
+			episodeSDs.put(numEpisodes, sd.evaluate(vals));
+
+			DecimalFormat formatter = new DecimalFormat("#0.00");
+			System.out.println(formatter.format(convergedCount_ * 100.0
+					/ convergedSteps)
+					+ "% converged at value: "
+					+ formatter.format(mean)
+					+ " \u00b1 " + meanDeviation);
+
+			if (convergedCount_ > convergedSteps
+					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -229,7 +300,6 @@ public class LearningController {
 	 */
 	private void checkForModularLearning(PolicyGenerator policyGenerator) {
 		// Get the goal conditions from the local agent observations
-		// TODO Regular BW not quite working...
 		Collection<GoalCondition> goalConditions = AgentObservations
 				.getInstance().getLocalSpecificGoalConditions();
 
@@ -505,7 +575,8 @@ public class LearningController {
 		// System.out.println("POPOPOPOPOPOPOPOPOPOPOP: " + numElites);
 		// System.out.println("SLOTS: " +
 		// policyGenerator.getGenerator().size());
-		return (int) Math.ceil(numElites / ProgramArgument.RHO.doubleValue());
+		return (int) Math.max(1,
+				Math.round(numElites / ProgramArgument.RHO.doubleValue()));
 
 		// N_E = Max(# specialisations)
 		// int maxSpecialisations = 0;
@@ -566,7 +637,8 @@ public class LearningController {
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
 
-			if (ProgramArgument.USE_MODULES.booleanValue() && hasUpdated
+			if (ProgramArgument.USE_MODULES.booleanValue()
+					&& AgentObservations.getInstance().isSettled()
 					&& !PolicyGenerator.getInstance().isModuleGenerator()) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
@@ -747,90 +819,6 @@ public class LearningController {
 		return bestPolicy;
 	}
 
-	private void isElitesConverged(Queue<Double> eliteAverageValues,
-			SortedSet<PolicyValue> pvs, int numElites) {
-		StandardDeviation sd = new StandardDeviation();
-		double[] eliteAverages = new double[eliteAverageValues.size()];
-		int i = 0;
-		for (Double val : eliteAverageValues)
-			eliteAverages[i++] = val;
-		if (eliteAverages.length >= ProgramArgument.PERFORMANCE_TESTING_SIZE
-				.doubleValue() * ProgramArgument.POLICY_REPEATS.doubleValue()
-				&& pvs.size() >= numElites * 2
-				&& pvs.first().getValue() - pvs.last().getValue() <= sd
-						.evaluate(eliteAverages)) {
-			System.out.println("---------ELITE CONVERGED!-----------");
-		}
-		if (eliteAverages.length > 1)
-			System.out.println("EliteSD:" + sd.evaluate(eliteAverages));
-	}
-
-	/**
-	 * Checks if the algorithm has converged in regards to the average
-	 * performance.
-	 * 
-	 * @param episodeMeans
-	 *            The episode means for the run.
-	 * @param episodeSDs
-	 *            The episode standard deviations for the run.
-	 * @param valueQueue
-	 *            The mean scores for the last N policies.
-	 * @param averageValues
-	 *            The adjusted-to-0 scores for the last N policies.
-	 * @param numEpisodes
-	 *            The number of episodes passed.
-	 * @param population
-	 *            The number of samples.
-	 * @return True if the algorithm is considered converged.
-	 */
-	private boolean checkConvergenceValues(
-			SortedMap<Integer, Double> episodeMeans,
-			SortedMap<Integer, Double> episodeSDs, Queue<Double> valueQueue,
-			Queue<Double> averageValues, int numEpisodes, int population) {
-		if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
-				.intValue()) {
-			// Transform the queues into arrays
-			double[] vals = new double[ProgramArgument.PERFORMANCE_TESTING_SIZE
-					.intValue()];
-			int i = 0;
-			for (Double val : valueQueue)
-				vals[i++] = val.doubleValue();
-			double[] envSDs = new double[averageValues.size()];
-			i = 0;
-			for (Double envSD : averageValues)
-				envSDs[i++] = envSD.doubleValue();
-
-			Mean m = new Mean();
-			StandardDeviation sd = new StandardDeviation();
-			double mean = m.evaluate(vals);
-			double meanDeviation = sd.evaluate(envSDs);
-			// double meanDeviation = (maxReward - minReward) * 0.1;
-
-			if (Math.abs(mean - convergedMean_) > meanDeviation) {
-				convergedMean_ = mean;
-				convergedCount_ = -1;
-			}
-			convergedCount_++;
-			int convergedSteps = population
-					* ProgramArgument.NUM_PERFORMANCES_CONVERGED.intValue();
-			episodeMeans.put(numEpisodes, mean);
-			episodeSDs.put(numEpisodes, sd.evaluate(vals));
-
-			DecimalFormat formatter = new DecimalFormat("#0.00");
-			System.out.println(formatter.format(convergedCount_ * 100.0
-					/ convergedSteps)
-					+ "% converged at value: "
-					+ formatter.format(mean)
-					+ " \u00b1 " + meanDeviation);
-
-			if (convergedCount_ > convergedSteps
-					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	/**
 	 * Prints out the percentage complete, time elapsed and estimated time
 	 * remaining.
@@ -874,6 +862,8 @@ public class LearningController {
 
 		double convergencePercent = Math
 				.min(convergenceValue / klDivergence, 1);
+		if (convergenceValue == PolicyGenerator.NO_UPDATES_CONVERGENCE)
+			convergencePercent = 0;
 		double totalRunComplete = (1.0 * run + convergencePercent) / maxRuns;
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
@@ -1010,6 +1000,24 @@ public class LearningController {
 
 		// Initialise the state spec.
 		StateSpec.initInstance(environmentClass, goalArg);
+	}
+
+	private void isElitesConverged(Queue<Double> eliteAverageValues,
+			SortedSet<PolicyValue> pvs, int numElites) {
+		StandardDeviation sd = new StandardDeviation();
+		double[] eliteAverages = new double[eliteAverageValues.size()];
+		int i = 0;
+		for (Double val : eliteAverageValues)
+			eliteAverages[i++] = val;
+		if (eliteAverages.length >= ProgramArgument.PERFORMANCE_TESTING_SIZE
+				.doubleValue() * ProgramArgument.POLICY_REPEATS.doubleValue()
+				&& pvs.size() >= numElites * 2
+				&& pvs.first().getValue() - pvs.last().getValue() <= sd
+						.evaluate(eliteAverages)) {
+			System.out.println("---------ELITE CONVERGED!-----------");
+		}
+		if (eliteAverages.length > 1)
+			System.out.println("EliteSD:" + sd.evaluate(eliteAverages));
 	}
 
 	/**
@@ -1217,14 +1225,6 @@ public class LearningController {
 		wr.close();
 	}
 
-	private void writeFileHeader(BufferedWriter buf) throws IOException {
-		buf.write("---PROGRAM ARGUMENTS---\n");
-		ProgramArgument.saveArgs(buf, false);
-		buf.write("-----------------------\n");
-		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
-				+ StateSpec.getInstance().getGoalState() + "\n\n");
-	}
-
 	/**
 	 * Tests and records the agent's progress.
 	 * 
@@ -1330,6 +1330,14 @@ public class LearningController {
 		return timeString;
 	}
 
+	private void writeFileHeader(BufferedWriter buf) throws IOException {
+		buf.write("---PROGRAM ARGUMENTS---\n");
+		ProgramArgument.saveArgs(buf, false);
+		buf.write("-----------------------\n");
+		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
+				+ StateSpec.getInstance().getGoalState() + "\n\n");
+	}
+
 	/**
 	 * Runs the experiment through a number of iterations and saves the averaged
 	 * performance.
@@ -1368,13 +1376,12 @@ public class LearningController {
 				localPolicy = PolicyGenerator.newInstance(run);
 			}
 
+			if (ruleFile_ != null)
+				localPolicy.seedRules(ruleFile_);
 			developPolicy(localPolicy, run, false);
 
 			if (testing_)
 				break;
-
-			// Flushing the rete object.
-			StateSpec.reinitInstance();
 
 			// Resetting experiment values
 			PolicyGenerator.getInstance().resetGenerator();

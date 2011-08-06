@@ -129,7 +129,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.m_gameUI.m_bRedrawAll = false;
 		}
 
-		return formObservations(rete_);
+		return formObservations();
 	}
 
 	@Override
@@ -174,7 +174,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (model_.m_player.m_score > model_.m_highScore)
 			model_.m_highScore = model_.m_player.m_score;
 
-		Observation obs = formObservations(rete_);
+		Observation obs = formObservations();
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				calculateReward(), obs, isTerminal(obs));
 		return rot;
@@ -196,7 +196,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 		handCodedAgent.agent_message("Optimal");
 		handCodedAgent.agent_message("SetPolicy");
-		Action act = handCodedAgent.agent_start(formObservations(rete_));
+		Action act = handCodedAgent.agent_start(formObservations());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = env_step(act);
 		while ((rot == null) || !rot.isTerminal()) {
@@ -225,7 +225,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
 			handCodedAgent.agent_message("SetPolicy");
-			Action act = handCodedAgent.agent_start(formObservations(rete_));
+			Action act = handCodedAgent.agent_start(formObservations());
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);
 			while ((rot == null) || !rot.isTerminal()) {
@@ -453,7 +453,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int isTerminal(Observation obs) {
 		int state = model_.m_state;
 		if (state == GameModel.STATE_GAMEOVER) {
-			ObjectObservations.getInstance().setNoPreGoal();
 			return 1;
 		}
 		if (StateSpec.getInstance().isGoal(rete_))
@@ -466,13 +465,11 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * These are put into the Rete object, and placed into the
 	 * ObjectObservations object.
 	 * 
-	 * @param rete
-	 *            The rete object to add observations to.
 	 * @return An observation of the current state
 	 */
-	private Observation formObservations(Rete rete) {
+	private Observation formObservations() {
 		try {
-			rete.reset();
+			rete_.reset();
 
 			// Player
 			rete_.eval("(assert (pacman player))");
@@ -629,7 +626,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			rete_.eval("(assert (score " + model_.m_player.m_score + "))");
 			rete_.eval("(assert (highScore " + model_.m_highScore + "))");
 
-			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
+			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete_);
 			rete_.run();
 
 			// Adding the valid actions
@@ -641,7 +638,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		}
 
 		// Send the state of the system
-		ObjectObservations.getInstance().predicateKB = rete;
+		ObjectObservations.getInstance().predicateKB = rete_;
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 

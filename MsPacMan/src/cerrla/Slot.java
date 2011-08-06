@@ -2,6 +2,7 @@ package cerrla;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Random;
 
 import relationalFramework.RelationalPredicate;
@@ -45,11 +46,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 	/** The chance of this slot being selected. */
 	private double selectionProb_;
 
+	/** The hashcode for the slot. */
+	private int slotHash_;
+
 	/** The slot level (number of splits frm RLGG slot). */
 	private int slotLevel_;
-
-	/** The facts used in this slot split, if it has any. */
-	private Collection<RelationalPredicate> slotSplitFacts_;
 
 	/**
 	 * A constructor for a new slot. The slot may be fixed (only one rule
@@ -72,21 +73,29 @@ public class Slot implements Serializable, Comparable<Slot> {
 			selectionProb_ = 1;
 			fixedRule_ = seedRule;
 		} else {
-			selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN
-					.doubleValue();
+			selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN.doubleValue();
 			ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
 					PolicyGenerator.random_);
 			ruleGenerator_.add(seedRule);
 			slotLevel_ = level;
-			slotSplitFacts_ = seedRule.getConditions(true);
-			RelationalRule rlggRule = PolicyGenerator.getInstance()
-					.getRLGGRules().get(action_);
-			if (rlggRule == null || seedRule == rlggRule)
-				slotSplitFacts_ = null;
-			else
-				slotSplitFacts_.removeAll(rlggRule.getConditions(true));
 		}
 		ordering_ = 0.5;
+		calculateHash();
+	}
+
+	/**
+	 * Calculates the has for this slot, which remains the same on initialisation.
+	 */
+	private void calculateHash() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
+		result = prime * result + (fixed_ ? 1231 : 1237);
+		result = prime * result
+				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
+		result = prime * result
+				+ ((seedRule_ == null) ? 0 : seedRule_.hashCode());
+		slotHash_ = result;
 	}
 
 	/**
@@ -118,15 +127,15 @@ public class Slot implements Serializable, Comparable<Slot> {
 		if (result != 0)
 			return result;
 
-		if (slotSplitFacts_ == null) {
-			if (other.slotSplitFacts_ != null)
+		if (seedRule_ == null) {
+			if (other.seedRule_ != null)
 				return -1;
 		} else {
-			if (other.slotSplitFacts_ == null)
+			if (other.seedRule_ == null)
 				return 1;
 			else
-				result = Double.compare(slotSplitFacts_.hashCode(),
-						other.slotSplitFacts_.hashCode());
+				result = Double.compare(seedRule_.hashCode(),
+						other.seedRule_.hashCode());
 		}
 		if (result != 0)
 			return result;
@@ -306,21 +315,24 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return selectionProb_;
 	}
 
+	/**
+	 * Calculates what facts from the seed rule differ from the RLGG rule.
+	 * 
+	 * @return A collection of facts that differ (if any).
+	 */
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
-		return slotSplitFacts_;
+		Collection<RelationalPredicate> splitFacts = new HashSet<RelationalPredicate>(
+				seedRule_.getConditions(true));
+		RelationalRule rlggRule = PolicyGenerator.getInstance().getRLGGRules()
+				.get(action_);
+		if (rlggRule != null)
+			splitFacts.removeAll(rlggRule.getConditions(true));
+		return splitFacts;
 	}
 
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((action_ == null) ? 0 : action_.hashCode());
-		result = prime * result + (fixed_ ? 1231 : 1237);
-		result = prime * result
-				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
-		result = prime * result
-				+ ((seedRule_ == null) ? 0 : seedRule_.hashCode());
-		return result;
+		return slotHash_;
 	}
 
 	public boolean isEmpty() {
@@ -411,9 +423,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
 		buffer.append("Slot (");
-		if (slotSplitFacts_ != null) {
+		Collection<RelationalPredicate> splitFacts = getSlotSplitFacts();
+		if (!splitFacts.isEmpty()) {
 			boolean first = true;
-			for (RelationalPredicate fact : slotSplitFacts_) {
+			for (RelationalPredicate fact : splitFacts) {
 				if (!first)
 					buffer.append(" ");
 				buffer.append(fact);
@@ -460,7 +473,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		numUpdates_++;
 		if (ed == null)
 			return alpha;
-		
+
 		// If using local or global
 		int policiesEvaluated = numUpdates_;
 		// If not using a local alpha, or not using dynamic slots, use global

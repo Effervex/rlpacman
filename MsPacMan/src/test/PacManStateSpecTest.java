@@ -20,7 +20,7 @@ public class PacManStateSpecTest {
 
 		// Testing numbers
 		RelationalRule rule = new RelationalRule(
-				"(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost)");
+				"(distanceGhost ?Player ?Ghost 4) => (fromGhost ?Ghost 4)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(distanceGhost ?Player ?Ghost 4)")));
 		assertTrue(rule.getConditions(false).contains(
@@ -35,12 +35,12 @@ public class PacManStateSpecTest {
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), StateSpec
-				.toRelationalPredicate("(fromGhost ?Ghost)"));
+				.toRelationalPredicate("(fromGhost ?Ghost 4)"));
 
 		// Testing conditional &:elements
 		rule = new RelationalRule(
 				"(distanceGhost ?Player ?Ghost ?Dist0&:(betweenRange ?Dist0 1 4))"
-						+ " => (fromGhost ?Ghost)");
+						+ " => (fromGhost ?Ghost ?Dist0)");
 		assertEquals(rule.getConditions(false).size(), 4);
 		assertTrue(rule
 				.getConditions(false)
@@ -58,6 +58,6 @@ public class PacManStateSpecTest {
 		assertTrue(rule.getStringConditions().indexOf("pacman") < rule
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(), StateSpec
-				.toRelationalPredicate("(fromGhost ?Ghost)"));
+				.toRelationalPredicate("(fromGhost ?Ghost ?Dist0)"));
 	}
 }

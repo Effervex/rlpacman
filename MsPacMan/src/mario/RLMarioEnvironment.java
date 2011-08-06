@@ -294,7 +294,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 			if (environment_.getMarioStatus() == Environment.MARIO_STATUS_DEAD
 					|| environment_.getMarioFloatPos()[1] > environment_
 							.getLevelHeight() * LevelScene.cellSize) {
-				ObjectObservations.getInstance().setNoPreGoal();
 				return 1;
 			}
 

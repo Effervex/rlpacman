@@ -323,6 +323,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			else
 				removedConditions.add(condition);
 		}
+		
+		if (ruleAction_ != null)
+			addedConditions.addAll(StateSpec.getInstance().createTypeConds(
+					ruleAction_));
 
 		ruleConditions_.removeAll(removedConditions);
 

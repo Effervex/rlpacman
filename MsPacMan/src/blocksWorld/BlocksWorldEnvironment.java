@@ -181,7 +181,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		} else if (!actionFailed) {
 			// If the agent caused the state to remain the same, exit the
 			// episode with max negative reward.
-			ObjectObservations.getInstance().setNoPreGoal();
 			return new Reward_observation_terminal(MINIMAL_REWARD,
 					new Observation(), true);
 		}

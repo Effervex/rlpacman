@@ -57,6 +57,9 @@ public final class AgentObservations implements Serializable {
 	public static final File AGENT_OBSERVATIONS_DIR = new File(
 			"agentObservations/");
 
+	/** 2^SETTLED inactive iterations before considered settled. */
+	private static final int SETTLED_THRESHOLD = 7;
+
 	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
 
@@ -323,6 +326,15 @@ public final class AgentObservations implements Serializable {
 	}
 
 	/**
+	 * If the agent observations are basically settled (have not changed in X iterations).
+	 * 
+	 * @return 
+	 */
+	public boolean isSettled() {
+		return inactivity_ >= SETTLED_THRESHOLD;
+	}
+
+	/**
 	 * Notes the arguments given for the goal.
 	 * 
 	 * @param stateGoals
@@ -493,8 +505,15 @@ public final class AgentObservations implements Serializable {
 		Collection<String> generalStateFacts = new HashSet<String>();
 		termMappedFacts_ = MultiMap.createSortedSetMultiMap();
 		for (Fact stateFact : state) {
-			RelationalPredicate strFact = StateSpec
-					.toRelationalPredicate(stateFact.toString());
+			RelationalPredicate strFact = null;
+			try {
+				strFact = StateSpec
+						.toRelationalPredicate(stateFact.toString());
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
 			// Ignore the type, goal, inequal and actions pred
 			if (strFact != null) {
 				if (StateSpec.getInstance().isUsefulPredicate(
