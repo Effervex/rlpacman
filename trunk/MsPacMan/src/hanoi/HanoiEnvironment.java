@@ -152,7 +152,6 @@ public class HanoiEnvironment implements EnvironmentInterface {
 			state_ = newState;
 			formObservation();
 		} else {
-			ObjectObservations.getInstance().setNoPreGoal();
 			return new Reward_observation_terminal(-1 * maxSteps_ - steps_,
 					new Observation(), true);
 		}

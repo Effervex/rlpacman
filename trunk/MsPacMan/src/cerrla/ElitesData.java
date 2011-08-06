@@ -156,7 +156,7 @@ public class ElitesData {
 
 		buffer.append("Slot counts: \n");
 		for (Slot slot : slotData_.keySet()) {
-			if (slot.getSlotSplitFacts() == null)
+			if (slot.getSlotSplitFacts().isEmpty())
 				buffer.append("\tSlot " + slot.getAction() + ":\n"
 						+ slotData_.get(slot) + "\n");
 			else

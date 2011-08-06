@@ -18,6 +18,7 @@ public class Pair<A,B> {
 		return result;
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -40,5 +41,8 @@ public class Pair<A,B> {
 		return true;
 	}
 	
-	
+	@Override
+	public String toString() {
+		return objA_ + ", " + objB_;
+	}
 }

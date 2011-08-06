@@ -22,9 +22,16 @@ public class RelationalRuleTest {
 		RelationalRule rule = new RelationalRule(
 				"(clear ?X) (clear ?Y) (above ?X ?G_0) (not (highest ?Y))"
 						+ " => (move ?X ?Y)");
-		System.out.println(rule.toString());
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?Y)")));
+		
+		rule = new RelationalRule(
+				"(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertFalse(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?Y)")));
 	}
-
 }

@@ -23,6 +23,7 @@ import cerrla.Unification;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.util.ArgumentComparator;
 import relationalFramework.util.MultiMap;
+import relationalFramework.util.Pair;
 
 import jess.Fact;
 import jess.QueryResult;
@@ -90,8 +91,8 @@ public abstract class StateSpec {
 	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
 
-	/** The query name for finding all non-achieved goals (possible goals). */
-	public static final String NON_GOALS = "nonGoal";
+//	/** The query name for finding all non-achieved goals (possible goals). */
+//	public static final String NON_GOALS = "nonGoal";
 
 	/** The outside a range of values function name. */
 	public static final String OUTSIDE_RANGE = "outsideRange";
@@ -100,8 +101,8 @@ public abstract class StateSpec {
 	public static final String POLICY_QUERY_PREFIX = "polRule";
 
 	/** The StringFact definition for the test predicate. */
-	public static final RelationalPredicate TEST_DEFINITION = new RelationalPredicate("test",
-			new String[] { "testArgs" });
+	public static final RelationalPredicate TEST_DEFINITION = new RelationalPredicate(
+			"test", new String[] { "testArgs" });
 
 	/** The valid actions predicate name. */
 	public static final String VALID_ACTIONS = "validActions";
@@ -220,59 +221,59 @@ public abstract class StateSpec {
 		return buffer.toString();
 	}
 
-	/**
-	 * Forms the non-goals by negating the non-type conditions required for the
-	 * goal to be met.
-	 * 
-	 * @param goalState
-	 *            The goal state.
-	 * @return A negated goal state (except for the type preds).
-	 */
-	private String formNonGoal(String goalState) throws Exception {
-		RelationalRule nonGoalRule = new RelationalRule(goalState_);
-		SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
-
-		// Split the conds up into 2 sets: types and normal
-		Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
-				conds.comparator());
-		Collection<RelationalPredicate> normal = new TreeSet<RelationalPredicate>(
-				conds.comparator());
-		Collection<RelationalPredicate> inequalities = new TreeSet<RelationalPredicate>(
-				conds.comparator());
-		for (RelationalPredicate cond : conds) {
-			if (isTypePredicate(cond.getFactName()))
-				types.add(cond);
-			else if (cond.getFactName().equals("test"))
-				inequalities.add(cond);
-			else
-				normal.add(cond);
-		}
-		// If there are no normal conds, negate the types instead (otherwise
-		// there would be an infinite number of goals)
-		if (normal.isEmpty()) {
-			throw new Exception("Goal is only type conditions! Cannot negate.");
-		}
-
-		// Build the string
-		StringBuffer nonGoalStr = new StringBuffer();
-		// Types first
-		for (RelationalPredicate type : types)
-			nonGoalStr.append(type + " ");
-		// Then Inequalities
-		for (RelationalPredicate ineq : inequalities)
-			nonGoalStr.append(ineq + " ");
-		// Then normals
-		nonGoalStr.append("(not");
-		if (normal.size() > 1)
-			nonGoalStr.append(" (and");
-		for (RelationalPredicate norm : normal)
-			nonGoalStr.append(" " + norm);
-		nonGoalStr.append(")");
-		if (normal.size() > 1)
-			nonGoalStr.append(")");
-
-		return nonGoalStr.toString();
-	}
+//	/**
+//	 * Forms the non-goals by negating the non-type conditions required for the
+//	 * goal to be met.
+//	 * 
+//	 * @param goalState
+//	 *            The goal state.
+//	 * @return A negated goal state (except for the type preds).
+//	 */
+//	private String formNonGoal(String goalState) throws Exception {
+//		RelationalRule nonGoalRule = new RelationalRule(goalState_);
+//		SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
+//
+//		// Split the conds up into 2 sets: types and normal
+//		Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
+//				conds.comparator());
+//		Collection<RelationalPredicate> normal = new TreeSet<RelationalPredicate>(
+//				conds.comparator());
+//		Collection<RelationalPredicate> inequalities = new TreeSet<RelationalPredicate>(
+//				conds.comparator());
+//		for (RelationalPredicate cond : conds) {
+//			if (isTypePredicate(cond.getFactName()))
+//				types.add(cond);
+//			else if (cond.getFactName().equals("test"))
+//				inequalities.add(cond);
+//			else
+//				normal.add(cond);
+//		}
+//		// If there are no normal conds, negate the types instead (otherwise
+//		// there would be an infinite number of goals)
+//		if (normal.isEmpty()) {
+//			throw new Exception("Goal is only type conditions! Cannot negate.");
+//		}
+//
+//		// Build the string
+//		StringBuffer nonGoalStr = new StringBuffer();
+//		// Types first
+//		for (RelationalPredicate type : types)
+//			nonGoalStr.append(type + " ");
+//		// Then Inequalities
+//		for (RelationalPredicate ineq : inequalities)
+//			nonGoalStr.append(ineq + " ");
+//		// Then normals
+//		nonGoalStr.append("(not");
+//		if (normal.size() > 1)
+//			nonGoalStr.append(" (and");
+//		for (RelationalPredicate norm : normal)
+//			nonGoalStr.append(" " + norm);
+//		nonGoalStr.append(")");
+//		if (normal.size() > 1)
+//			nonGoalStr.append(")");
+//
+//		return nonGoalStr.toString();
+//	}
 
 	/**
 	 * The constructor for a state specification.
@@ -368,7 +369,8 @@ public abstract class StateSpec {
 			factTypes[0] = "goalPred";
 			for (int i = 1; i < factTypes.length; i++)
 				factTypes[i] = "arg" + (i - 1);
-			goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED, factTypes);
+			goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED,
+					factTypes);
 			rete_.eval("(deftemplate goal (slot goalMet))");
 			String goalPred = formGoalPred(constants_);
 			String goalRule = "(defrule goalState " + goalPred + " "
@@ -377,9 +379,9 @@ public abstract class StateSpec {
 			// Initialise the goal checking query
 			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
 			// Only need a non-goal if the goal is parameterisable
-			if (!constants_.isEmpty())
-				rete_.eval("(defquery " + NON_GOALS + " "
-						+ formNonGoal(goalState_) + ")");
+//			if (!constants_.isEmpty())
+//				rete_.eval("(defquery " + NON_GOALS + " "
+//						+ formNonGoal(goalState_) + ")");
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
@@ -541,9 +543,10 @@ public abstract class StateSpec {
 	 * 
 	 * @param fact
 	 *            The fact.
-	 * @return The type cocditions.
+	 * @return The type conditions.
 	 */
-	public Collection<RelationalPredicate> createTypeConds(RelationalPredicate fact) {
+	public Collection<RelationalPredicate> createTypeConds(
+			RelationalPredicate fact) {
 		Collection<RelationalPredicate> typeConds = new HashSet<RelationalPredicate>();
 		// If the term itself is a type pred, return.
 		if (isTypePredicate(fact.getFactName())) {
@@ -555,8 +558,8 @@ public abstract class StateSpec {
 			if (!fact.getArguments()[i].equals("?")) {
 				RelationalPredicate typeFact = typePredicates_.get(types[i]);
 				if (typeFact != null) {
-					typeConds.add(new RelationalPredicate(typeFact, new String[] { fact
-							.getArguments()[i] }));
+					typeConds.add(new RelationalPredicate(typeFact,
+							new String[] { fact.getArguments()[i] }));
 				}
 			}
 		}
@@ -675,12 +678,15 @@ public abstract class StateSpec {
 	 * @return The query from the rule (possibly newly created).
 	 */
 	public String getRuleQuery(RelationalRule gr) {
-		String result = queryNames_.get(gr);
+		Pair<RelationalRule, List<String>> ruleQuery = new Pair<RelationalRule, List<String>>(
+				gr, gr.getQueryParameters());
+		String result = queryNames_.get(ruleQuery);
 		if (result == null) {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() == null) {
+				if (gr.getQueryParameters() == null
+						|| gr.getQueryParameters().isEmpty()) {
 					rete_.eval("(defquery " + result + " "
 							+ gr.getStringConditions() + ")");
 				} else {
@@ -696,7 +702,7 @@ public abstract class StateSpec {
 							+ declares.toString() + " "
 							+ gr.getStringConditions() + ")");
 				}
-				queryNames_.put(gr, result);
+				queryNames_.put(ruleQuery, result);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -926,8 +932,8 @@ public abstract class StateSpec {
 
 			if (isValid) {
 				buffer.append(")");
-				tests.add(new RelationalPredicate(TEST_DEFINITION, new String[] { buffer
-						.toString() }));
+				tests.add(new RelationalPredicate(TEST_DEFINITION,
+						new String[] { buffer.toString() }));
 			}
 		}
 		return tests;
@@ -1072,8 +1078,8 @@ public abstract class StateSpec {
 	 */
 	public static void reinitInstance(String goalString) {
 		try {
-			instance_.rete_.clear();
 			instance_.envParameter_ = goalString;
+			instance_.rete_.clear();
 			instance_.initialise();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1134,7 +1140,7 @@ public abstract class StateSpec {
 		}
 		String[] arguments = new String[condSplit.length - offset];
 		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
-		return new RelationalPredicate(getInstance()
-				.getStringFact(condSplit[offset - 1]), arguments, negated);
+		return new RelationalPredicate(getInstance().getStringFact(
+				condSplit[offset - 1]), arguments, negated);
 	}
 }

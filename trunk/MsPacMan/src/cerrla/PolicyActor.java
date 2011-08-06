@@ -54,7 +54,7 @@ public class PolicyActor implements AgentInterface {
 	/** Sets the ensemble size. */
 	private int ensembleSize_ = 1;
 
-	/** The reward received using this policy. */
+	/** The number of steps evaluated by this policy. */
 	private int policySteps_;
 
 	/** The last chosen actions. */
@@ -184,6 +184,7 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		totalEpisodes_++;
+		policySteps_++;
 
 		// Initialising the actions
 		prevActions_ = new PolicyActions();
@@ -245,7 +246,6 @@ public class PolicyActor implements AgentInterface {
 			}
 		}
 
-		policySteps_++;
 		prevActions_ = null;
 	}
 

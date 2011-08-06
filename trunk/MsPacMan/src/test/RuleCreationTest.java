@@ -552,21 +552,14 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(floor floor)"));
 		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
-		assertTrue(results.contains(StateSpec
-				.toRelationalPredicate("(floor floor)")));
-		assertEquals(results.size(), 1);
+		assertTrue(results.isEmpty());
 
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(above a floor)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ? floor)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(floor floor)"));
-		ruleConds.add(StateSpec.toRelationalPredicate("(block a)"));
 		results = sut_.simplifyRule(ruleConds, null, false, true);
 		assertNotNull(results);
-		assertTrue(results.contains(StateSpec
-				.toRelationalPredicate("(floor floor)")));
-		assertTrue(results.contains(StateSpec
-				.toRelationalPredicate("(block a)")));
-		assertEquals(results.size(), 2);
+		assertTrue(results.isEmpty());
 
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));

@@ -25,7 +25,6 @@ import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import cerrla.LearningController;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
@@ -38,7 +37,6 @@ import relationalFramework.StateSpec;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;
-	private Rete rete_;
 	private PacMan environment_;
 	private int prevScore_;
 	private int prevLives_;
@@ -128,7 +126,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			environment_.m_gameUI.m_bRedrawAll = false;
 		}
 
-		return formObservations(rete_);
+		return formObservations();
 	}
 
 	@Override
@@ -174,7 +172,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		if (model_.m_player.m_score > model_.m_highScore)
 			model_.m_highScore = model_.m_player.m_score;
 
-		Observation obs = formObservations(rete_);
+		Observation obs = formObservations();
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				calculateReward(), obs, isTerminal(obs));
 		return rot;
@@ -198,7 +196,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 		ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 		handCodedAgent.agent_message("Optimal");
 		handCodedAgent.agent_message("SetPolicy");
-		Action act = handCodedAgent.agent_start(formObservations(rete_));
+		Action act = handCodedAgent.agent_start(formObservations());
 		// Loop until the task is complete
 		Reward_observation_terminal rot = env_step(act);
 		while ((rot == null) || !rot.isTerminal()) {
@@ -229,7 +227,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 			ObjectObservations.getInstance().objectArray = new RelationalPolicy[] { handCodedPolicy };
 			handCodedAgent.agent_message("Optimal");
 			handCodedAgent.agent_message("SetPolicy");
-			Action act = handCodedAgent.agent_start(formObservations(rete_));
+			Action act = handCodedAgent.agent_start(formObservations());
 			// Loop until the task is complete
 			Reward_observation_terminal rot = env_step(act);
 			while ((rot == null) || !rot.isTerminal()) {
@@ -266,7 +264,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		model_.oneLife_ = oneLife;
 		model_.m_highScore = highScore;
 		model_.setRandom(PolicyGenerator.random_);
-		rete_ = StateSpec.getInstance().getRete();
 
 		prevScore_ = 0;
 		prevLives_ = model_.m_nLives;
@@ -274,7 +271,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 		// Letting the thread 'sleep' when not experiment mode, so it's
 		// watchable for humans.
 		try {
-			rete_.reset();
 			if (!experimentMode_)
 				Thread.sleep(playerDelay_);
 		} catch (Exception e) {
@@ -342,7 +338,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 
 			// Only use the closest object(s) to make decisions
 			for (FiredAction firedAction : firedActions) {
-				// For each rule, a list of actions are returned
 				WeightedDirection weightedDir = ((PacManStateSpec) StateSpec
 						.getInstance()).applyAction(firedAction.getAction(),
 						state);
@@ -415,7 +410,7 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private double calculateReward() {
 		int scoreDiff = model_.m_player.m_score - prevScore_;
 		prevScore_ += scoreDiff;
-		// Including -10000 if suvival environment
+		// Including -10000 if survival environment
 		if (StateSpec.getInstance().getGoalName().equals("survive")
 				&& model_.m_nLives < prevLives_)
 			scoreDiff -= (prevLives_ - model_.m_nLives) * 10000;
@@ -433,10 +428,9 @@ public class PacManEnvironment implements EnvironmentInterface {
 	private int isTerminal(Observation obs) {
 		int state = model_.m_state;
 		if (state == GameModel.STATE_GAMEOVER) {
-			ObjectObservations.getInstance().setNoPreGoal();
 			return 1;
 		}
-		if (StateSpec.getInstance().isGoal(rete_))
+		if (StateSpec.getInstance().isGoal(StateSpec.getInstance().getRete()))
 			return 1;
 		return 0;
 	}
@@ -446,11 +440,10 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 * These are put into the Rete object, and placed into the
 	 * ObjectObservations object.
 	 * 
-	 * @param rete
-	 *            The rete object to add observations to.
 	 * @return An observation of the current state
 	 */
-	private Observation formObservations(Rete rete) {
+	private Observation formObservations() {
+		Rete rete = StateSpec.getInstance().getRete();
 		try {
 			rete.reset();
 
@@ -479,24 +472,24 @@ public class PacManEnvironment implements EnvironmentInterface {
 				// Don't note ghost if it is running back to hideout or if it is
 				// in hideout
 				if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-					rete_.eval("(assert (ghost " + ghost + "))");
+					rete.eval("(assert (ghost " + ghost + "))");
 					// If edible, add assertion
 					if (ghost.isEdible()) {
-						rete_.eval("(assert (edible " + ghost + "))");
+						rete.eval("(assert (edible " + ghost + "))");
 					}
 					// If flashing, add assertion
 					if (ghost.isBlinking()) {
-						rete_.eval("(assert (blinking " + ghost + "))");
+						rete.eval("(assert (blinking " + ghost + "))");
 					}
 
 					// Distances from pacman to ghost
-					distanceAssertions(ghost, ghost.toString(), model_.m_player);
+					distanceAssertions(ghost, ghost.toString(), model_.m_player, rete);
 
 					// Junction distance
 					for (Junction junc : closeJunctions_) {
 						if (!junctionsNoted) {
 							// Assert types
-							rete_.eval("(assert (junction " + junc + "))");
+							rete.eval("(assert (junction " + junc + "))");
 							// Max safety
 							junc.setSafety(model_.m_gameSizeX);
 						}
@@ -546,13 +539,13 @@ public class PacManEnvironment implements EnvironmentInterface {
 			for (Junction junc : closeJunctions_) {
 				if (!junctionsNoted) {
 					// Assert types
-					rete_.eval("(assert (junction " + junc + "))");
+					rete.eval("(assert (junction " + junc + "))");
 					// Max safety
 					junc.setSafety(model_.m_gameSizeX);
 				}
 
 				// Assert safety
-				rete_.eval("(assert (junctionSafety " + junc + " "
+				rete.eval("(assert (junctionSafety " + junc + " "
 						+ junc.getSafety() + "))");
 			}
 
@@ -571,50 +564,50 @@ public class PacManEnvironment implements EnvironmentInterface {
 				centrePoint.y /= ghostCount;
 				GhostCentre gc = new GhostCentre(centrePoint);
 
-				rete_.eval("(assert (ghostCentre " + gc + "))");
+				rete.eval("(assert (ghostCentre " + gc + "))");
 
-				distanceAssertions(gc, gc.toString(), model_.m_player);
+				distanceAssertions(gc, gc.toString(), model_.m_player, rete);
 			}
 
 			// Dots
 			for (Dot dot : model_.m_dots.values()) {
-				rete_.eval("(assert (dot " + dot + "))");
+				rete.eval("(assert (dot " + dot + "))");
 
 				// Distances
-				distanceAssertions(dot, dot.toString(), model_.m_player);
+				distanceAssertions(dot, dot.toString(), model_.m_player, rete);
 			}
 
 			// Powerdots
 			for (PowerDot powerdot : model_.m_powerdots.values()) {
-				rete_.eval("(assert (powerDot " + powerdot + "))");
+				rete.eval("(assert (powerDot " + powerdot + "))");
 
 				// Distances
 				distanceAssertions(powerdot, powerdot.toString(),
-						model_.m_player);
+						model_.m_player, rete);
 			}
 
 			// Fruit
 			if (model_.m_fruit.isEdible()) {
-				rete_.eval("(assert (fruit " + model_.m_fruit + "))");
+				rete.eval("(assert (fruit " + model_.m_fruit + "))");
 
 				// Distances
 				distanceAssertions(model_.m_fruit, model_.m_fruit.toString(),
-						model_.m_player);
+						model_.m_player, rete);
 			}
 
 			// Score, level, lives, highScore
-			rete_.eval("(assert (level " + model_.m_stage + "))");
-			rete_.eval("(assert (lives " + model_.m_nLives + "))");
-			rete_.eval("(assert (score " + model_.m_player.m_score + "))");
-			rete_.eval("(assert (highScore " + model_.m_highScore + "))");
+			rete.eval("(assert (level " + model_.m_stage + "))");
+			rete.eval("(assert (lives " + model_.m_nLives + "))");
+			rete.eval("(assert (score " + model_.m_player.m_score + "))");
+			rete.eval("(assert (highScore " + model_.m_highScore + "))");
 
 			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(),
 					rete);
-			rete_.run();
+			rete.run();
 
 			// Adding the valid actions
 			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete_);
+					.getInstance().generateValidActions(rete);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -640,17 +633,17 @@ public class PacManEnvironment implements EnvironmentInterface {
 	 *             If Jess goes wrong.
 	 */
 	private void distanceAssertions(PacPoint thing, String thingName,
-			Player pacMan) throws JessException {
+			Player pacMan, Rete rete) throws JessException {
 		if (distanceGrid_[thing.m_locX][thing.m_locY] != null) {
 			// Use Ms. PacMan's natural distance (manhatten)
-			rete_.eval("(assert (distance " + thingName + " "
+			rete.eval("(assert (distance " + thingName + " "
 					+ distanceGrid_[thing.m_locX][thing.m_locY].getDistance()
 					+ "))");
 		} else {
 			// Use Euclidean distance, rounding
 			int distance = (int) Math.round(Point2D.distance(thing.m_locX,
 					thing.m_locY, pacMan.m_locX, pacMan.m_locY));
-			rete_.eval("(assert (distance " + thingName + " " + distance + "))");
+			rete.eval("(assert (distance " + thingName + " " + distance + "))");
 		}
 	}
 

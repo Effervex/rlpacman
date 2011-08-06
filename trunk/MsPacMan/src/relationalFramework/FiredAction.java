@@ -70,7 +70,7 @@ public class FiredAction implements Comparable<FiredAction> {
 		RelationalPredicate action = firingRule_.getAction();
 		StringBuffer buffer = new StringBuffer(action.getFactName());
 		Slot ruleSlot = firingRule_.getSlot();
-		if (ruleSlot == null || ruleSlot.getSlotSplitFacts() == null)
+		if (ruleSlot == null || ruleSlot.getSlotSplitFacts().isEmpty())
 			buffer.append("()");
 		else
 			buffer.append(ruleSlot.getSlotSplitFacts().iterator().next());
