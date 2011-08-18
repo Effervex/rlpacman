@@ -3,6 +3,7 @@ package cerrla;
 import relationalFramework.GoalCondition;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -17,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
-import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -57,9 +57,6 @@ public class PolicyActor implements AgentInterface {
 
 	/** The number of steps evaluated by this policy. */
 	private int policySteps_;
-
-	/** If this agent is the hand-coded agent. */
-	private boolean handCoded_;
 
 	/** The current goal arguments. (e.g. a -> ?G_0) */
 	private BidiMap goalArgs_;
@@ -106,7 +103,6 @@ public class PolicyActor implements AgentInterface {
 
 	// @Override
 	public void agent_init(String arg0) {
-		handCoded_ = false;
 		totalReward_ = 0;
 		totalSteps_ = 0;
 		totalEpisodes_ = -1;
@@ -129,8 +125,6 @@ public class PolicyActor implements AgentInterface {
 			policy_ = null;
 			bestPolicy_ = null;
 			mostSteps_ = Integer.MIN_VALUE;
-		} else if (arg0.equals("Optimal")) {
-			handCoded_ = true;
 		} else if (arg0.equals("SetPolicy")) {
 			policy_ = new PolicyEnsemble(
 					(RelationalPolicy) ObjectObservations.getInstance().objectArray[0]);
@@ -164,9 +158,8 @@ public class PolicyActor implements AgentInterface {
 
 		// Scanning the observations
 		Rete rete = ObjectObservations.getInstance().predicateKB;
-		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
-		if (!handCoded_)
-			setInternalGoal(rete);
+
+		setInternalGoal(rete);
 
 		// Initialise the policy
 		if (policy_ == null) {
@@ -177,7 +170,7 @@ public class PolicyActor implements AgentInterface {
 			AgentObservations.getInstance().setNumGoalArgs(goalArgs_.size());
 			policy_.parameterArgs(goalArgs_.inverseBidiMap());
 
-			if (PolicyGenerator.debugMode_ && !handCoded_)
+			if (PolicyGenerator.debugMode_)
 				System.out.println("Goal: " + goalArgs_);
 		}
 
@@ -188,23 +181,21 @@ public class PolicyActor implements AgentInterface {
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		ObjectObservations.getInstance().objectArray = new PolicyActions[] { chooseAction(
-				ObjectObservations.getInstance().predicateKB, stateFacts, null) };
+				ObjectObservations.getInstance().predicateKB, null) };
 
 		return action;
 	}
 
 	// @Override
 	public Action agent_step(double arg0, Observation arg1) {
-		if (!handCoded_)
-			noteInternalFigures(arg0);
+		noteInternalFigures(arg0);
 
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		Rete rete = ObjectObservations.getInstance().predicateKB;
-		Collection<Fact> stateFacts = StateSpec.extractFacts(rete);
 
 		// Check the internal goal here
-		if (!handCoded_ && (goalCondition_ != null)) {
+		if (goalCondition_ != null) {
 			processInternalGoal(rete);
 			if (internalGoalMet_) {
 				ObjectObservations.getInstance().earlyExit = true;
@@ -222,22 +213,19 @@ public class PolicyActor implements AgentInterface {
 
 		policySteps_++;
 		ObjectObservations.getInstance().objectArray = new PolicyActions[] { chooseAction(
-				rete, stateFacts, arg0) };
+				rete, arg0) };
 
 		return action;
 	}
 
 	// @Override
 	public void agent_end(double arg0) {
-		if (!handCoded_)
-			noteInternalFigures(arg0);
+		noteInternalFigures(arg0);
 
 		// Save the pre-goal state and goal action
 		if (goalCondition_ != null) {
-			if (!handCoded_) {
-				Rete rete = ObjectObservations.getInstance().predicateKB;
-				processInternalGoal(rete);
-			}
+			Rete rete = ObjectObservations.getInstance().predicateKB;
+			processInternalGoal(rete);
 		}
 	}
 
@@ -258,7 +246,7 @@ public class PolicyActor implements AgentInterface {
 		Collection<RelationalPolicy> policies = new ArrayList<RelationalPolicy>(
 				ensembleSize_);
 		for (int i = 0; i < ensembleSize_; i++) {
-			RelationalPolicy pol = PolicyGenerator.getInstance()
+			CoveringRelationalPolicy pol = PolicyGenerator.getInstance()
 					.generatePolicy(false);
 
 			// Apply the goal parameters to the goal conditions.
@@ -309,32 +297,27 @@ public class PolicyActor implements AgentInterface {
 	 *            The reward received this step.
 	 * @return A relational action.
 	 */
-	private PolicyActions chooseAction(Rete state, Collection<Fact> stateFacts,
-			Double reward) {
+	private PolicyActions chooseAction(Rete state, Double reward) {
 		PolicyActions actions = new PolicyActions();
 
-		boolean noteTriggered = true;
-		if (internalGoalMet_)
-			noteTriggered = false;
 		// Evaluate the policy for true rules and activates
 		MultiMap<String, String[]> validActions = ObjectObservations
 				.getInstance().validActions;
 
 		actions = policy_.evaluatePolicy(state, validActions, goalArgs_,
-				StateSpec.getInstance().getNumReturnedActions(), handCoded_,
-				noteTriggered);
+				StateSpec.getInstance().getNumReturnedActions());
 
 		// This allows action covering to catch variant action conditions.
 		// This problem is caused by hierarchical RLGG rules, which cover
 		// actions regarding new object type already
-		if (!handCoded_)
-			checkForUnseenPreds(state, validActions);
+		checkForUnseenPreds(state, validActions);
 
-		// Save the previous state (if not an optimal agent).
-		StateAction stateAction = new StateAction(stateFacts, actions);
+		if (totalEpisodes_ > 0 && ProgramArgument.CHI.doubleValue() > 0
+				&& episodeStateActions_ != null) {
+			// Save the previous state (if not an optimal agent).
+			StateAction stateAction = new StateAction(
+					StateSpec.extractFacts(state), actions);
 
-		if (!handCoded_ && totalEpisodes_ > 0
-				&& ProgramArgument.CHI.doubleValue() > 0) {
 			// Put the state action pair in the collection
 			double resampleShiftAmount = 1 / (ProgramArgument.CHI.doubleValue()
 					* totalSteps_ / totalEpisodes_);

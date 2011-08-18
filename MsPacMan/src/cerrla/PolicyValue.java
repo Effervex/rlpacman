@@ -1,6 +1,6 @@
 package cerrla;
 
-import relationalFramework.RelationalPolicy;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalRule;
 
 /**
@@ -11,7 +11,7 @@ import relationalFramework.RelationalRule;
  */
 public class PolicyValue implements Comparable<PolicyValue> {
 	/** The policy. */
-	private RelationalPolicy policy_;
+	private CoveringRelationalPolicy policy_;
 	/** The estimated value of the policy. */
 	private float value_;
 	/** The iteration this policy value was created at. */
@@ -25,7 +25,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The (estimated) value
 	 */
-	public PolicyValue(RelationalPolicy pol, float value, int iteration) {
+	public PolicyValue(CoveringRelationalPolicy pol, float value, int iteration) {
 		policy_ = pol;
 		value_ = value;
 		iteration_ = iteration;
@@ -41,7 +41,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The value the policy achieved
 	 */
-	private void updateInternalRuleValues(RelationalPolicy pol, float value) {
+	private void updateInternalRuleValues(CoveringRelationalPolicy pol, float value) {
 		for (RelationalRule rule : pol.getFiringRules()) {
 			rule.updateInternalValue(value);
 		}
@@ -52,7 +52,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * 
 	 * @return The policy.
 	 */
-	public RelationalPolicy getPolicy() {
+	public CoveringRelationalPolicy getPolicy() {
 		return policy_;
 	}
 

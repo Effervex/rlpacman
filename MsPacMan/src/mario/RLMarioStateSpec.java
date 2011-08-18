@@ -13,6 +13,7 @@ import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
+import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalRule;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
@@ -159,8 +160,8 @@ public class RLMarioStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected RelationalPolicy initialiseOptimalPolicy() {
-		RelationalPolicy goodPolicy = new RelationalPolicy();
+	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
 
 		// Defining a good policy (basic at the moment)
 		ArrayList<String> rules = new ArrayList<String>();
@@ -189,7 +190,7 @@ public class RLMarioStateSpec extends StateSpec {
 		rules.add("(flag ?X) (distance ?X ?Y) => (move ?X ?Y)");
 
 		for (String rule : rules)
-			goodPolicy.addRule(new RelationalRule(rule), false, false);
+			goodPolicy.addRule(new RelationalRule(rule));
 
 		return goodPolicy;
 	}
