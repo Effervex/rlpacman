@@ -1,5 +1,8 @@
 package relationalFramework;
 
+import relationalFramework.PolicyActions;
+import relationalFramework.StateAction;
+
 import java.util.Collection;
 
 import jess.Fact;

@@ -3,6 +3,9 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,8 +16,6 @@ import org.junit.Test;
 
 import cerrla.Unification;
 
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 public class UnificationTest {
 	private Unification sut_;

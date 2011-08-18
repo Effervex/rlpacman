@@ -1,5 +1,11 @@
 package cerrla;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -25,16 +31,11 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
-import relationalFramework.util.MultiMap;
-import relationalFramework.util.ProbabilityDistribution;
-import relationalFramework.util.SelectableSet;
-import relationalFramework.util.SlotOrderComparator;
+import util.MultiMap;
+import util.ProbabilityDistribution;
+import util.SelectableSet;
+import util.SlotOrderComparator;
 
 import jess.Rete;
 
@@ -45,6 +46,8 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public final class PolicyGenerator implements Serializable {
+	private static final long serialVersionUID = 3157117448981353095L;
+
 	/** The instance. */
 	private static PolicyGenerator instance_;
 
@@ -53,8 +56,6 @@ public final class PolicyGenerator implements Serializable {
 	 * value clashes.
 	 */
 	private static final double ORDER_CLASH_INCREMENT = 0.001;
-
-	private static final long serialVersionUID = -7316823916026570650L;
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -1100,8 +1101,11 @@ public final class PolicyGenerator implements Serializable {
 			instance_ = (PolicyGenerator) ois.readObject();
 			AgentObservations.loadAgentObservations();
 			ois.close();
+			
+			StateSpec.reinitInstance();
 			return instance_;
 		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		return null;
 	}
@@ -1124,6 +1128,7 @@ public final class PolicyGenerator implements Serializable {
 			modPG.moduleGoal_ = goalCondition;
 		}
 		instance_ = modPG;
+		StateSpec.reinitInstance();
 		return instance_;
 	}
 

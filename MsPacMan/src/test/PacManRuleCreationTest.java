@@ -3,6 +3,10 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
@@ -13,9 +17,6 @@ import org.junit.Test;
 import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManRuleCreationTest {

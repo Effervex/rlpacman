@@ -9,11 +9,11 @@ import relationalFramework.State;
  * @author Sam Sarjant
  */
 public class RLMarioState extends State {
-	public static final int GHOST_ARRAY = 0;
-	public static final int FRUIT = 1;
-	public static final int DISTANCE_GRID = 2;
-	public static final int SAFEST_JUNCTION = 3;
-	public static final int PLAYER = 4;
+	public static final int IS_MARIO_IN_AIR = 0;
+	public static final int MARIO_DIRECTION = 1;
+	public static final int MARIO_GROUND_POS = 2;
+	public static final int PREV_BOOL_ACTION = 3;
+	public static final int STATIC_OBJECT_FACTS = 4;
 
 	/**
 	 * A constructor for a pacman state.

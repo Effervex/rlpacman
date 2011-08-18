@@ -2,6 +2,9 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -18,13 +21,11 @@ import cerrla.PolicyGenerator;
 
 import blocksWorld.BlocksWorldStateSpec;
 
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
 import relationalFramework.agentObservations.IntegerArray;
-import relationalFramework.util.MultiMap;
+import util.MultiMap;
 
 public class AgentObservationsTest {
 	private AgentObservations sut_;
@@ -659,6 +660,7 @@ public class AgentObservationsTest {
 		neverTrue.add("(above ?X ?X)");
 		neverTrue.add("(above ?Y ?X)");
 		neverTrue.add("(above ?Y ?Y)");
+		cb.toString();
 		assertBeliefs(cb, alwaysTrue, occasionallyTrue, neverTrue);
 
 		// On

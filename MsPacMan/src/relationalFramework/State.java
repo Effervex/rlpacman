@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import relationalFramework.State;
+
 import java.util.Arrays;
 
 /**

@@ -1,10 +1,11 @@
 package relationalFramework.ensemble;
 
+import relationalFramework.FiredAction;
+import relationalFramework.RelationalPredicate;
+
 import java.util.Collection;
 import java.util.HashSet;
 
-import relationalFramework.FiredAction;
-import relationalFramework.RelationalPredicate;
 
 /**
  * A structure for representing a number of actions together as one. It also

@@ -174,7 +174,7 @@ public class RLMarioStateSpec extends StateSpec {
 				+ " (marioPower fire) => (shootFireball ?X ?Y fire)");
 		// Pickup shell
 		rules.add("(passive ?X) (distance ?X ?Y) (carrying ?X) (shell ?X)"
-				+ "=> (shootShell ?X ?Y)");
+				+ "=> (pickup ?X ?Y)");
 		// Shoot shell
 		rules.add("(enemy ?X) (distance ?X ?Y&:(betweenRange ?Y -32 64))"
 				+ " => (shootShell ?X ?Y fire)");

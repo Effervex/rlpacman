@@ -2,6 +2,9 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.Set;
 
 import org.junit.Before;
@@ -9,8 +12,6 @@ import org.junit.Test;
 
 import cerrla.RuleCreation;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManGeneralRuleCreationTest {

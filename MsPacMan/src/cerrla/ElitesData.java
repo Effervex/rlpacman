@@ -1,10 +1,11 @@
 package cerrla;
 
+import relationalFramework.RelationalRule;
+
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.util.ProbabilityDistribution;
+import util.ProbabilityDistribution;
 
 /**
  * A class for containing all of the data gathered about the elite solutions,

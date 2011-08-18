@@ -1,14 +1,15 @@
 package cerrla;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Random;
 
-import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
 import relationalFramework.agentObservations.AgentObservations;
-import relationalFramework.util.ProbabilityDistribution;
+import util.ProbabilityDistribution;
 
 /**
  * An inner class forming the slot of the policy generator. Contains the rules

@@ -1,5 +1,11 @@
 package relationalFramework;
 
+import relationalFramework.ObjectObservations;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -8,8 +14,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,9 +25,9 @@ import cerrla.RuleCreation;
 import cerrla.Unification;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
-import relationalFramework.util.ArgumentComparator;
-import relationalFramework.util.MultiMap;
-import relationalFramework.util.Pair;
+import util.ArgumentComparator;
+import util.MultiMap;
+import util.Pair;
 
 import jess.Fact;
 import jess.QueryResult;
@@ -1103,6 +1107,26 @@ public abstract class StateSpec {
 			matches.add(m.group());
 
 		return matches.toArray(new String[matches.size()]);
+	}
+
+	/**
+	 * Basic method that converts a Collection of conditions into a neat JESS
+	 * parseable String.
+	 * 
+	 * @param conditions
+	 *            The conditions to put into string format.
+	 * @return The JESS parseable string of the conditions.
+	 */
+	public static String conditionsToString(Collection<RelationalPredicate> conditions) {
+		StringBuffer buffer = new StringBuffer();
+		boolean first = true;
+		for (RelationalPredicate cond : conditions) {
+			if (!first)
+				buffer.append(" ");
+			buffer.append(cond.toString());
+			first = false;
+		}
+		return buffer.toString();
 	}
 
 	/**

@@ -1,9 +1,9 @@
 package rlPacManGeneral;
 
+import relationalFramework.State;
 import msPacMan.Fruit;
 import msPacMan.Ghost;
 import msPacMan.Player;
-import relationalFramework.State;
 
 /**
  * The state values present in Object Observations and associated methods for

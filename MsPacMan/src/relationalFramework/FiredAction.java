@@ -1,5 +1,9 @@
 package relationalFramework;
 
+import relationalFramework.FiredAction;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
 import cerrla.Slot;
 
 /**

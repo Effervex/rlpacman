@@ -1,14 +1,14 @@
 package test;
 
 import static org.junit.Assert.*;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
 
 import org.junit.Before;
 import org.junit.Test;
 
 import cerrla.PolicyGenerator;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 
 public class RelationalRuleTest {
 	@Before

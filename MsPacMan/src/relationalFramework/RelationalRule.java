@@ -1,5 +1,10 @@
 package relationalFramework;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,7 +21,7 @@ import java.util.regex.Pattern;
 
 import cerrla.Slot;
 
-import relationalFramework.util.ConditionComparator;
+import util.ConditionComparator;
 
 /**
  * A class that keeps track of the guided predicates that make up the rule
@@ -25,32 +30,13 @@ import relationalFramework.util.ConditionComparator;
  * @author Sam Sarjant
  */
 public class RelationalRule implements Serializable, Comparable<RelationalRule> {
-	private static final long serialVersionUID = -591116779683745624L;
+	private static final long serialVersionUID = -7517726681678896438L;
 
 	/**
 	 * The rule has to see 5 states without changing to be considered
 	 * artificially LGG.
 	 */
 	private static final int SETTLED_RULE_STATES = 50;
-
-	/**
-	 * Splits a conditions string into individual facts.
-	 * 
-	 * @param conditionString
-	 *            The condition string to be split.
-	 * @return The facts of the string in segments.
-	 */
-	public static SortedSet<RelationalPredicate> splitConditions(String conditionString) {
-		SortedSet<RelationalPredicate> conds = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
-		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
-		Matcher m = p.matcher(conditionString);
-		while (m.find()) {
-			RelationalPredicate cond = StateSpec.toRelationalPredicate(m.group());
-			conds.add(cond);
-		}
-		return conds;
-	}
 
 	/** The ancestry count of the rule (how far from the RLGG). */
 	private int ancestryCount_;
@@ -70,26 +56,23 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/** The rule's internal value for calculating standard deviation. */
 	private double internalS_ = 0;
 
+	/** The modular parameters for loaded module rules. */
+	private List<String> moduleParams_;
+
 	/** If this slot is a mutation. */
 	private boolean mutant_ = false;
 
-	/** If the rule is a mutant, the parent of the mutant. */
-	private Collection<RelationalRule> mutantParents_;
-	
 	/** If the rule has mutated, the children of the mutation. */
 	private Collection<RelationalRule> mutantChildren_;
+
+	/** If the rule is a mutant, the parent of the mutant. */
+	private Collection<RelationalRule> mutantParents_;
 
 	/** The actual parameters given for this rule. */
 	private List<String> parameters_;
 
 	/** The query parameters associated with this rule. */
 	private List<String> queryParams_;
-
-	/** The modular parameters for loaded module rules. */
-	private List<String> moduleParams_;
-
-	/** The term replacement map built from the parameter members. */
-	private Map<String, String> termReplacements_;
 
 	/** The guided predicate that defined the action. */
 	private RelationalPredicate ruleAction_;
@@ -109,6 +92,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
 
+	/** The term replacement map built from the parameter members. */
+	private Map<String, String> termReplacements_;
+
 	/**
 	 * A private constructor used only for the clone.
 	 * 
@@ -117,7 +103,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * @param action
 	 *            The actions for the rule.
 	 */
-	private RelationalRule(Collection<RelationalPredicate> cloneConds, RelationalPredicate ruleAction) {
+	private RelationalRule(Collection<RelationalPredicate> cloneConds,
+			RelationalPredicate ruleAction) {
 		this(cloneConds, ruleAction, null);
 	}
 
@@ -131,8 +118,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * @param parent
 	 *            If this rule has a parent - hence is a mutant (null if not).
 	 */
-	public RelationalRule(Collection<RelationalPredicate> conditions, RelationalPredicate action,
-			RelationalRule parent) {
+	public RelationalRule(Collection<RelationalPredicate> conditions,
+			RelationalPredicate action, RelationalRule parent) {
 		if (!(conditions instanceof SortedSet)) {
 			ruleConditions_ = new TreeSet<RelationalPredicate>(
 					ConditionComparator.getInstance());
@@ -166,21 +153,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	}
 
 	/**
-	 * A constructor taking the bare minimum for a guided rule.
-	 * 
-	 * @param ruleString
-	 *            The string representing this rule.
-	 * @param parent
-	 *            If this rule has a parent - hence is a mutant (null if not).
-	 */
-	public RelationalRule(String ruleString, RelationalRule parent) {
-		this(ruleString);
-		if (parent != null) {
-			setMutant(parent);
-		}
-	}
-
-	/**
 	 * Creates a rule which is part of a parameterised query.
 	 * 
 	 * @param ruleString
@@ -192,18 +164,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		this(ruleString);
 		queryParams_ = queryParams;
 		findConstants();
-	}
-
-	/**
-	 * Adds all parents to this rule.
-	 * 
-	 * @param parentRules
-	 *            The parent rules to add.
-	 */
-	public void addParents(Collection<RelationalRule> parentRules) {
-		if (mutantParents_ == null)
-			mutantParents_ = new ArrayList<RelationalRule>();
-		mutantParents_.addAll(parentRules);
 	}
 
 	/**
@@ -220,6 +180,85 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				termReplacements_
 						.put(queryParams_.get(i), moduleParams_.get(i));
 		}
+	}
+
+	/**
+	 * Finds the constants in the rule conditions.
+	 */
+	private void findConstants() {
+		List<GoalCondition> constants = new ArrayList<GoalCondition>();
+		for (RelationalPredicate cond : ruleConditions_) {
+			// If the condition isn't a type predicate or test
+			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
+					&& StateSpec.getInstance().isUsefulPredicate(
+							cond.getFactName()) && !cond.isNegated()) {
+				// If the condition doesn't contain variables - except modular
+				// variables
+				boolean isConstant = true;
+				for (String argument : cond.getArguments()) {
+					// If the arg isn't a constant or a goal term, the condition
+					// isn't a constant condition.
+					if (argument.startsWith("?")
+							&& !argument
+									.startsWith(StateSpec.GOAL_VARIABLE_PREFIX)) {
+						isConstant = false;
+						break;
+					}
+				}
+
+				if (isConstant) {
+					constants.add(new GoalCondition(cond));
+				}
+			}
+		}
+
+		if (constants.isEmpty())
+			constantConditions_ = null;
+		else
+			constantConditions_ = constants;
+	}
+
+	/**
+	 * Removes unnecessary conditions from the set of conditions by removing any
+	 * not containing action terms.
+	 * 
+	 * @param conditions
+	 *            The conditions to scan through and remove.
+	 */
+	private void removeUnnecessaryFacts(
+			SortedSet<RelationalPredicate> conditions) {
+		// Run through the conditions, ensuring each one has at least one unique
+		// term seen in the action.
+		for (Iterator<RelationalPredicate> iter = conditions.iterator(); iter
+				.hasNext();) {
+			RelationalPredicate condition = iter.next();
+
+			// Check if any of the terms are in the condition
+			boolean containsAny = false;
+			for (String term : ruleAction_.getArguments()) {
+				if (StateSpec.arrayContains(condition.getArguments(), term)) {
+					containsAny = true;
+					break;
+				}
+			}
+
+			// Removing unnecessary terms
+			if (!containsAny) {
+				iter.remove();
+			}
+		}
+	}
+
+	/**
+	 * Adds all parents to this rule.
+	 * 
+	 * @param parentRules
+	 *            The parent rules to add.
+	 */
+	public void addParents(Collection<RelationalRule> parentRules) {
+		if (mutantParents_ == null)
+			mutantParents_ = new ArrayList<RelationalRule>();
+		mutantParents_.addAll(parentRules);
 	}
 
 	/**
@@ -294,8 +333,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		for (RelationalPredicate condition : ruleConditions_) {
 			if (StateSpec.getInstance().isUsefulPredicate(
 					condition.getFactName())) {
-				Map<String, RelationalPredicate> predicates = StateSpec.getInstance()
-						.getPredicates();
+				Map<String, RelationalPredicate> predicates = StateSpec
+						.getInstance().getPredicates();
 
 				// Adding the terms
 				String[] arguments = condition.getArguments();
@@ -323,7 +362,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			else
 				removedConditions.add(condition);
 		}
-		
+
 		if (ruleAction_ != null)
 			addedConditions.addAll(StateSpec.getInstance().createTypeConds(
 					ruleAction_));
@@ -342,42 +381,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		ruleHash_ = newHash;
 	}
 
-	/**
-	 * Finds the constants in the rule conditions.
-	 */
-	private void findConstants() {
-		List<GoalCondition> constants = new ArrayList<GoalCondition>();
-		for (RelationalPredicate cond : ruleConditions_) {
-			// If the condition isn't a type predicate or test
-			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
-					&& StateSpec.getInstance().isUsefulPredicate(
-							cond.getFactName()) && !cond.isNegated()) {
-				// If the condition doesn't contain variables - except modular
-				// variables
-				boolean isConstant = true;
-				for (String argument : cond.getArguments()) {
-					// If the arg isn't a constant or a goal term, the condition
-					// isn't a constant condition.
-					if (argument.startsWith("?")
-							&& !argument
-									.startsWith(StateSpec.GOAL_VARIABLE_PREFIX)) {
-						isConstant = false;
-						break;
-					}
-				}
-
-				if (isConstant) {
-					constants.add(new GoalCondition(cond));
-				}
-			}
-		}
-
-		if (constants.isEmpty())
-			constantConditions_ = null;
-		else
-			constantConditions_ = constants;
-	}
-
 	public RelationalPredicate getAction() {
 		return ruleAction_;
 	}
@@ -394,7 +397,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	public String[] getActionTerms() {
 		return ruleAction_.getArguments();
 	}
-	
+
 	public Collection<RelationalRule> getChildrenRules() {
 		return mutantChildren_;
 	}
@@ -478,12 +481,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	}
 
 	public String getStringConditions() {
-		StringBuffer buffer = new StringBuffer();
-		for (RelationalPredicate cond : ruleConditions_) {
-			buffer.append(cond + " ");
-		}
-
-		return buffer.toString();
+		return StateSpec.conditionsToString(ruleConditions_);
 	}
 
 	public int getUses() {
@@ -510,19 +508,16 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		RelationalPredicate groundAction = new RelationalPredicate(ruleAction_);
 		groundAction.replaceArguments(termReplacements_, true, false);
 
-		RelationalRule groundRule = new RelationalRule(groundConditions, groundAction,
-				null);
+		RelationalRule groundRule = new RelationalRule(groundConditions,
+				groundAction, null);
 		groundRule.expandConditions();
 		groundRule.hasSpawned_ = hasSpawned_;
 		groundRule.statesSeen_ = statesSeen_;
 		groundRule.mutant_ = mutant_;
 		if (mutantParents_ != null)
-			groundRule.mutantParents_ = new ArrayList<RelationalRule>(mutantParents_);
+			groundRule.mutantParents_ = new ArrayList<RelationalRule>(
+					mutantParents_);
 
-		if (queryParams_ != null)
-			groundRule.queryParams_ = new ArrayList<String>(queryParams_);
-		if (parameters_ != null)
-			groundRule.parameters_ = new ArrayList<String>(parameters_);
 		groundRule.findConstants();
 		return groundRule;
 	}
@@ -534,8 +529,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		result = prime * result
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		int conditionResult = 0;
-		for (RelationalPredicate condition : ruleConditions_)
-			conditionResult += condition.hashCode();
+		if (ruleConditions_ != null)
+			for (RelationalPredicate condition : ruleConditions_)
+				conditionResult += condition.hashCode();
 		result = prime * result + conditionResult;
 		return result;
 	}
@@ -626,35 +622,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	}
 
 	/**
-	 * Removes unnecessary conditions from the set of conditions by removing any
-	 * not containing action terms.
-	 * 
-	 * @param conditions
-	 *            The conditions to scan through and remove.
-	 */
-	private void removeUnnecessaryFacts(SortedSet<RelationalPredicate> conditions) {
-		// Run through the conditions, ensuring each one has at least one unique
-		// term seen in the action.
-		for (Iterator<RelationalPredicate> iter = conditions.iterator(); iter.hasNext();) {
-			RelationalPredicate condition = iter.next();
-
-			// Check if any of the terms are in the condition
-			boolean containsAny = false;
-			for (String term : ruleAction_.getArguments()) {
-				if (StateSpec.arrayContains(condition.getArguments(), term)) {
-					containsAny = true;
-					break;
-				}
-			}
-
-			// Removing unnecessary terms
-			if (!containsAny) {
-				iter.remove();
-			}
-		}
-	}
-
-	/**
 	 * Sets the new action terms.
 	 * 
 	 * @param terms
@@ -662,6 +629,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 */
 	public void setActionTerms(String[] terms) {
 		ruleAction_ = new RelationalPredicate(ruleAction_, terms);
+	}
+
+	public void setChildren(Collection<RelationalRule> children) {
+		mutantChildren_ = children;
 	}
 
 	/**
@@ -694,6 +665,20 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	}
 
 	/**
+	 * Sets the modular parameters (only when loading a modular rule). These are
+	 * a special case which direct the module parameters to the appropriate goal
+	 * parameters they are geared towards.
+	 * 
+	 * @param parameters
+	 *            The special module parameters which act as a bridge between
+	 *            the query params and the episodic parameters.
+	 */
+	public void setModularParameters(List<String> parameters) {
+		moduleParams_ = parameters;
+		buildModuleReplacementMap();
+	}
+
+	/**
 	 * Sets this rule as a mutant and adds the parent rule.
 	 * 
 	 * @param parent
@@ -708,10 +693,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		mutantParents_.add(parent);
 		if (parent.ancestryCount_ < ancestryCount_ - 1)
 			ancestryCount_ = parent.ancestryCount_ + 1;
-	}
-	
-	public void setChildren(Collection<RelationalRule> children) {
-		mutantChildren_ = children;
 	}
 
 	/**
@@ -786,20 +767,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		findConstants();
 	}
 
-	/**
-	 * Sets the modular parameters (only when loading a modular rule). These are
-	 * a special case which direct the module parameters to the appropriate goal
-	 * parameters they are geared towards.
-	 * 
-	 * @param parameters
-	 *            The special module parameters which act as a bridge between
-	 *            the query params and the episodic parameters.
-	 */
-	public void setModularParameters(List<String> parameters) {
-		moduleParams_ = parameters;
-		buildModuleReplacementMap();
-	}
-
 	public void setSlot(Slot slot) {
 		slot_ = slot;
 	}
@@ -849,8 +816,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 					if (!stringFact.getArguments()[i].equals("?")
 							&& !StateSpec
 									.isNumberType(stringFact.getArgTypes()[i])) {
-						RelationalPredicate type = new RelationalPredicate(StateSpec
-								.getInstance().getStringFact(
+						RelationalPredicate type = new RelationalPredicate(
+								StateSpec.getInstance().getStringFact(
 										stringFact.getArgTypes()[i]),
 								new String[] { stringFact.getArguments()[i] });
 						standardType.add(type);
@@ -865,7 +832,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 
 	@Override
 	public String toString() {
-		return getStringConditions() + "=> " + ruleAction_;
+		return getStringConditions() + " => " + ruleAction_;
 	}
 
 	/**
@@ -889,5 +856,26 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			internalMean_ = newMean;
 			internalS_ = newS;
 		}
+	}
+
+	/**
+	 * Splits a conditions string into individual facts.
+	 * 
+	 * @param conditionString
+	 *            The condition string to be split.
+	 * @return The facts of the string in segments.
+	 */
+	public static SortedSet<RelationalPredicate> splitConditions(
+			String conditionString) {
+		SortedSet<RelationalPredicate> conds = new TreeSet<RelationalPredicate>(
+				ConditionComparator.getInstance());
+		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
+		Matcher m = p.matcher(conditionString);
+		while (m.find()) {
+			RelationalPredicate cond = StateSpec.toRelationalPredicate(m
+					.group());
+			conds.add(cond);
+		}
+		return conds;
 	}
 }

@@ -2,6 +2,9 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -17,11 +20,9 @@ import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
-import relationalFramework.util.ArgumentComparator;
-import relationalFramework.util.MultiMap;
+import util.ArgumentComparator;
+import util.MultiMap;
 
 public class PolicyGeneratorTest {
 	private PolicyGenerator sut_;

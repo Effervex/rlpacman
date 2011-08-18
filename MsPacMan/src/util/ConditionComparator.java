@@ -1,10 +1,11 @@
-package relationalFramework.util;
+package util;
+
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
 
 import java.io.Serializable;
 import java.util.Comparator;
 
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 /**
  * A comparator for comparing conditions within a rule. The comparator performs

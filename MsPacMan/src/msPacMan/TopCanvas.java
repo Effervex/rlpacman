@@ -2,7 +2,6 @@ package msPacMan;
 
 import java.awt.*;
 
-import relationalFramework.FiredAction;
 
 // Top Right Canvas which is repainted many times because
 // it contains the Score string.

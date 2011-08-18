@@ -1,8 +1,10 @@
 package relationalFramework;
 
+import relationalFramework.ObjectObservations;
+
 import org.apache.commons.collections.BidiMap;
 
-import relationalFramework.util.MultiMap;
+import util.MultiMap;
 
 import jess.Rete;
 

@@ -1,5 +1,11 @@
 package rlPacMan;
 
+import relationalFramework.FiredAction;
+import relationalFramework.ObjectObservations;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.StateSpec;
+
 import java.awt.Point;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -29,13 +35,8 @@ import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 
-import relationalFramework.FiredAction;
-import relationalFramework.PolicyActions;
-import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.StateSpec;
-import relationalFramework.util.MultiMap;
 import rlPacManGeneral.PacManLowAction;
+import util.MultiMap;
 
 public class PacManEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;

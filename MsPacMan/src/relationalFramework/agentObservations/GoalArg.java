@@ -1,12 +1,13 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 /**
  * A class for representing a possible goal state to use (i.e. one that has

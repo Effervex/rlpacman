@@ -5,16 +5,16 @@ import game.controllers.examples.Legacy;
 import game.core.G;
 import game.core.GameView;
 import game.core._G_;
+import relationalFramework.ObjectObservations;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalWrapper;
+import relationalFramework.StateSpec;
 
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 
-import relationalFramework.PolicyActions;
-import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalWrapper;
-import relationalFramework.StateSpec;
 
 public class MsPacManGhostEnvironment implements EnvironmentInterface {
 	public static int playerDelay_ = 0;
@@ -89,10 +89,12 @@ public class MsPacManGhostEnvironment implements EnvironmentInterface {
 		PolicyActions actions = (PolicyActions) ObjectObservations
 				.getInstance().objectArray[0];
 		int action = (Integer) wrapper_.groundActions(actions, game_);
-		for (int i = 0; i < 2; i++)
+		//for (int i = 0; i < 2; i++)
 			game_.advanceGame(action, ghosts_.getActions(game_, G.DELAY));
-		if (!experimentMode_)
+		if (!experimentMode_) {
 			gv_.repaint();
+			//GameView.addPoints(game_, Color.GREEN, action);
+		}
 
 		ObjectObservations.getInstance().predicateKB = wrapper_
 				.formObservations(game_);

@@ -1,20 +1,22 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.SortedSet;
+import java.util.TreeSet;
+
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.Unification;
-import cerrla.UnifiedFact;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 /**
  * A class representing background knowledge assertions
@@ -24,6 +26,10 @@ import relationalFramework.RelationalPredicate;
 public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		Serializable {
 	private static final long serialVersionUID = 8755871369618060470L;
+
+	/** Precendence constants. */
+	private final int LEFT_SIDE = -1;
+	private final int RIGHT_SIDE = 1;
 
 	/** The JESS compatible assertion string. */
 	private String assertionString_;
@@ -39,6 +45,9 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	/** If this background knowledge is equivalent or just inferred. */
 	private boolean equivalentRule_;
 
+	/** If equivalent, which side of the knowledge will be simplified to. */
+	private int precendence_;
+
 	/**
 	 * A constructor for the background knowledge.
 	 * 
@@ -52,6 +61,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		jessAssert_ = jessAssert;
 		String splitter = StateSpec.INFERS_ACTION;
 		equivalentRule_ = false;
+		precendence_ = LEFT_SIDE;
 		if (assertion.contains(StateSpec.EQUIVALENT_RULE)) {
 			equivalentRule_ = true;
 			splitter = StateSpec.EQUIVALENT_RULE;
@@ -66,6 +76,14 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 					.substring(assertStr.length(), split[1].length() - 1));
 		else
 			postCondition_ = StateSpec.toRelationalPredicate(split[1].trim());
+
+		// Determine precendence if equivalent rule
+		if (equivalentRule_) {
+			// If the left side have more conditions (but the right isn't
+			// negated)
+			if (preConds_.size() > 1 && !postCondition_.isNegated())
+				precendence_ = RIGHT_SIDE;
+		}
 	}
 
 	/**
@@ -94,32 +112,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		backgroundConditions.add(negated);
 
 		return backgroundConditions;
-	}
-
-	/**
-	 * Gets the preconditions of the background knowledge with optionally
-	 * replaced arguments.
-	 * 
-	 * @param replacementTerms
-	 *            The replacement map, or null.
-	 * @return The preconditions of the background knowledge.
-	 */
-	@SuppressWarnings("unchecked")
-	private Collection<RelationalPredicate> getPreConds(BidiMap replacementTerms) {
-		Collection<RelationalPredicate> preConds = new ArrayList<RelationalPredicate>(
-				preConds_.size());
-		for (RelationalPredicate preCond : preConds_) {
-			RelationalPredicate replacedFact = new RelationalPredicate(preCond);
-			if (replacementTerms != null)
-				replacedFact.replaceArguments(
-						replacementTerms.inverseBidiMap(), true, false);
-			if (!replacedFact.isFullyAnonymous())
-				preConds.add(replacedFact);
-			else
-				return null;
-		}
-
-		return preConds;
 	}
 
 	/**
@@ -184,32 +176,61 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_) {
 			replacementTerms.clear();
 
-			Collection<UnifiedFact> unifiedEquivs = Unification.getInstance()
-					.unifyFact(getPostCond(null), ruleConds,
-							new DualHashBidiMap(), replacementTerms,
-							new String[0], true, false);
-			for (UnifiedFact unified : unifiedEquivs) {
-				replacementTerms = unified.getResultReplacements();
+			Collection<RelationalPredicate> backgroundConds = new ArrayList<RelationalPredicate>();
+			backgroundConds.add(new RelationalPredicate(postCondition_));
+			Collection<RelationalPredicate> resultantFacts = new ArrayList<RelationalPredicate>();
+			for (RelationalPredicate rp : preConds_)
+				resultantFacts.add(new RelationalPredicate(rp));
+
+			// If precendence is on the other side, swap facts.
+			if (precendence_ == RIGHT_SIDE) {
+				Collection<RelationalPredicate> temp = backgroundConds;
+				backgroundConds = resultantFacts;
+				resultantFacts = temp;
+			}
+
+			result = Unification.getInstance().unifyStates(backgroundConds,
+					ruleConds, replacementTerms);
+			if (result == 0) {
 				// Remove any replacements which specialise anonymous terms
-				replacementTerms.removeValue("?");
-				RelationalPredicate unifiedFact = unified.getResultFact();
+				replacementTerms = replacementTerms.inverseBidiMap();
 
-				// If there is a unification, attempt to remove the right side
-				if (!unifiedEquivs.isEmpty()) {
-					unifiedFact.replaceArguments(
-							replacementTerms.inverseBidiMap(), true, false);
+				// Replace the arguments
+				for (RelationalPredicate removed : backgroundConds) {
+					// If there is a unification, attempt to remove the right
+					// side
+					removed.replaceArguments(replacementTerms, true, false);
+				}
 
-					// Swap variable
-					Collection<RelationalPredicate> equivFacts = getPreConds(replacementTerms);
-					if (equivFacts != null && ruleConds.remove(unifiedFact)) {
-						// Add all equivalent facts.
-						for (RelationalPredicate equivFact : equivFacts) {
-							if (!ruleConds.contains(equivFact)) {
-								ruleConds.add(equivFact);
-								changed = true;
-							}
+				// Check that all unified conditions exist
+				boolean abortAnonymous = false;
+				SortedSet<RelationalPredicate> backupConds = new TreeSet<RelationalPredicate>(
+						ruleConds);
+				if (ruleConds.containsAll(backgroundConds)) {
+					changed = true;
+					ruleConds.removeAll(backgroundConds);
+					for (RelationalPredicate resultFact : resultantFacts) {
+						// Check for attempting to create anonymous terms with
+						// an anonymous replacement
+						if (replacementTerms.containsKey("?")
+								&& !replacementTerms.get("?").equals("?")
+								&& !resultFact.isFullyNotAnonymous()) {
+							abortAnonymous = true;
+							break;
 						}
+						resultFact.replaceArguments(replacementTerms, true,
+								false);
+						if (!ruleConds.contains(resultFact))
+							ruleConds.add(resultFact);
 					}
+				}
+
+				// If the unification has anonymous unity problems, revert to
+				// normal
+				if (abortAnonymous) {
+					ruleConds.clear();
+					ruleConds.addAll(backupConds);
+					changed = false;
 				}
 			}
 		}
@@ -247,6 +268,11 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 	@Override
 	public String toString() {
+		// Output the rule differently if precendence is on the right side
+		if (precendence_ == RIGHT_SIDE) {
+			String[] split = assertionString_.split(" <=> ");
+			return split[1] + " <=> " + split[0];
+		}
 		return assertionString_;
 	}
 

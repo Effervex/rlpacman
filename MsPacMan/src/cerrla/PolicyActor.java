@@ -1,5 +1,14 @@
 package cerrla;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.ObjectObservations;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateAction;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -19,20 +28,12 @@ import org.rlcommunity.rlglue.codec.AgentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 
-import relationalFramework.PolicyActions;
-import relationalFramework.GoalCondition;
-import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateAction;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.GoalArg;
 import relationalFramework.ensemble.PolicyEnsemble;
-import relationalFramework.util.ArgumentComparator;
-import relationalFramework.util.MultiMap;
-import relationalFramework.util.Pair;
+import util.ArgumentComparator;
+import util.MultiMap;
+import util.Pair;
 
 /**
  * An agent that chooses its decisions based on a fixed policy, fed in via agent
@@ -56,9 +57,6 @@ public class PolicyActor implements AgentInterface {
 
 	/** The number of steps evaluated by this policy. */
 	private int policySteps_;
-
-	/** The last chosen actions. */
-	private PolicyActions prevActions_;
 
 	/** If this agent is the hand-coded agent. */
 	private boolean handCoded_;
@@ -186,15 +184,11 @@ public class PolicyActor implements AgentInterface {
 		totalEpisodes_++;
 		policySteps_++;
 
-		// Initialising the actions
-		prevActions_ = new PolicyActions();
-
 		// Choosing an action
 		Action action = new Action(0, 0);
 		action.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		prevActions_ = chooseAction(
-				ObjectObservations.getInstance().predicateKB, stateFacts, null);
-		ObjectObservations.getInstance().objectArray = new PolicyActions[] { prevActions_ };
+		ObjectObservations.getInstance().objectArray = new PolicyActions[] { chooseAction(
+				ObjectObservations.getInstance().predicateKB, stateFacts, null) };
 
 		return action;
 	}
@@ -227,8 +221,8 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		policySteps_++;
-		prevActions_ = chooseAction(rete, stateFacts, arg0);
-		ObjectObservations.getInstance().objectArray = new PolicyActions[] { prevActions_ };
+		ObjectObservations.getInstance().objectArray = new PolicyActions[] { chooseAction(
+				rete, stateFacts, arg0) };
 
 		return action;
 	}
@@ -245,8 +239,6 @@ public class PolicyActor implements AgentInterface {
 				processInternalGoal(rete);
 			}
 		}
-
-		prevActions_ = null;
 	}
 
 	/**
@@ -278,12 +270,12 @@ public class PolicyActor implements AgentInterface {
 		policy_ = new PolicyEnsemble(policies);
 		if (ensembleSize_ > 1)
 			System.out.println("Num policies: " + policy_.numPolicies());
-		if (PolicyGenerator.debugMode_) {
-			if (isResampled)
-				System.out.println("RESAMPLED POLICY: " + policy_);
-			else
-				System.out.println(policy_);
-		}
+		// if (PolicyGenerator.debugMode_) {
+		if (isResampled)
+			System.out.println("RESAMPLED POLICY: " + policy_);
+		else
+			System.out.println(policy_);
+		// }
 
 		// Reset the state observations
 		resampleProb_ = 0;
@@ -341,7 +333,8 @@ public class PolicyActor implements AgentInterface {
 		// Save the previous state (if not an optimal agent).
 		StateAction stateAction = new StateAction(stateFacts, actions);
 
-		if (!handCoded_ && totalEpisodes_ > 0) {
+		if (!handCoded_ && totalEpisodes_ > 0
+				&& ProgramArgument.CHI.doubleValue() > 0) {
 			// Put the state action pair in the collection
 			double resampleShiftAmount = 1 / (ProgramArgument.CHI.doubleValue()
 					* totalSteps_ / totalEpisodes_);

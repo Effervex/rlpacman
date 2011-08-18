@@ -1,5 +1,9 @@
 package cerrla;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,11 +18,8 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
-import relationalFramework.util.MultiMap;
+import util.MultiMap;
 
 import jess.Rete;
 
@@ -103,8 +104,10 @@ public class RuleCreation implements Serializable {
 		else
 			replacementTerm = lowerBound + "";
 
-		RelationalPredicate mutantFact = new RelationalPredicate(condition);
-		mutantFact.getArguments()[condArgIndex] = replacementTerm;
+		String[] mutantArgs = condition.getArguments();
+		mutantArgs[condArgIndex] = replacementTerm;
+		RelationalPredicate mutantFact = new RelationalPredicate(condition,
+				mutantArgs);
 		SortedSet<RelationalPredicate> cloneConds = baseRule
 				.getConditions(false);
 		cloneConds.remove(condition);
@@ -468,6 +471,23 @@ public class RuleCreation implements Serializable {
 		return mutants;
 	}
 
+	/**
+	 * Swaps a term in a rule for another goal term, assuming the swap is valid
+	 * in regards to the existing conditions.
+	 * 
+	 * @param rule
+	 *            The rule.
+	 * @param mutants
+	 *            The mutants to add to.
+	 * @param goalPredicates
+	 *            The goal predicate replacement map.
+	 * @param oldTerms
+	 *            The rule action terms.
+	 * @param i
+	 *            The action term index.
+	 * @param goalTerm
+	 *            The goal term to replace in.
+	 */
 	private void swapRuleTerm(RelationalRule rule, Set<RelationalRule> mutants,
 			MultiMap<String, RelationalPredicate> goalPredicates,
 			String[] oldTerms, int i, String goalTerm) {
