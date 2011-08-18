@@ -2,7 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
-import relationalFramework.RelationalPolicy;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -27,17 +27,17 @@ public class RelationalPolicyTest {
 	@Test
 	public void testAddRule() {
 		// Basic rule adding
-		RelationalPolicy pol = new RelationalPolicy();
+		CoveringRelationalPolicy pol = new CoveringRelationalPolicy();
 		RelationalRule rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
-		pol.addRule(rule, false, false);
+		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 1);
 		assertTrue(pol.getPolicyRules().contains(rule));
 		assertTrue(pol.getFiringRules().isEmpty());
 
 		// Rule adding with modular check (but no module defined)
-		pol = new RelationalPolicy();
+		pol = new CoveringRelationalPolicy();
 		rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
-		pol.addRule(rule, true, false);
+		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 1);
 		assertTrue(pol.getPolicyRules().contains(rule));
 
@@ -48,9 +48,9 @@ public class RelationalPolicyTest {
 				.getModuleRules().size();
 
 		// Rule adding with modular check (module fires)
-		pol = new RelationalPolicy();
+		pol = new CoveringRelationalPolicy();
 		rule = new RelationalRule("(clear a) => (moveFloor a)");
-		pol.addRule(rule, true, false);
+		pol.addRule(rule);
 
 		assertEquals(pol.getPolicyRules().size(), clearRulesNum + 1);
 		assertTrue(pol.getPolicyRules().contains(rule));
@@ -67,9 +67,9 @@ public class RelationalPolicyTest {
 			fail("'clear&clear' module doesn't exist!");
 
 		// Rule adding with multiple modular check
-		pol = new RelationalPolicy();
+		pol = new CoveringRelationalPolicy();
 		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
-		pol.addRule(rule, true, false);
+		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), clearRulesNum * 2 + 1);
 		assertTrue(pol.getPolicyRules().contains(rule));
 		int i = 0;
@@ -93,9 +93,9 @@ public class RelationalPolicyTest {
 
 		// Rule adding with modular check (recursive modular firing where on
 		// module calls clear module)
-		pol = new RelationalPolicy();
+		pol = new CoveringRelationalPolicy();
 		rule = new RelationalRule("(on a b) => (moveFloor a)");
-		pol.addRule(rule, true, false);
+		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 6);
 		assertTrue(pol.getPolicyRules().contains(rule));
 		// Clear rules

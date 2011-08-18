@@ -1,7 +1,7 @@
 package cerrla;
 
 import relationalFramework.GoalCondition;
-import relationalFramework.RelationalPolicy;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -73,7 +73,7 @@ public final class PolicyGenerator implements Serializable {
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
 	/** Policies awaiting testing. */
-	private Stack<RelationalPolicy> awaitingTest_;
+	private Stack<CoveringRelationalPolicy> awaitingTest_;
 
 	/** The number of times in a row the updates have been convergent. */
 	private transient int convergedStrike_ = 0;
@@ -180,7 +180,7 @@ public final class PolicyGenerator implements Serializable {
 			// Note which slots were used in this policy
 			Collection<Slot> policySlotCounts = new HashSet<Slot>();
 			double weight = pv.getValue() * gradient + offset;
-			RelationalPolicy eliteSolution = pv.getPolicy();
+			CoveringRelationalPolicy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
 			Set<RelationalRule> firingRules = eliteSolution.getFiringRules();
@@ -540,11 +540,11 @@ public final class PolicyGenerator implements Serializable {
 	 * @return A new policy, formed using weights from the probability
 	 *         distributions.
 	 */
-	public RelationalPolicy generatePolicy(boolean influenceUntestedRules) {
+	public CoveringRelationalPolicy generatePolicy(boolean influenceUntestedRules) {
 		if (!awaitingTest_.isEmpty())
 			return awaitingTest_.pop();
 
-		RelationalPolicy policy = new RelationalPolicy();
+		CoveringRelationalPolicy policy = new CoveringRelationalPolicy();
 
 		SortedMap<Double, RelationalRule> policyOrdering = new TreeMap<Double, RelationalRule>();
 
@@ -588,7 +588,7 @@ public final class PolicyGenerator implements Serializable {
 		// Add the rules, noting the RLGG rules.
 		for (Double orders : policyOrdering.keySet()) {
 			RelationalRule rule = policyOrdering.get(orders);
-			policy.addRule(rule, true, false);
+			policy.addRule(rule);
 		}
 
 		return policy;
@@ -772,7 +772,7 @@ public final class PolicyGenerator implements Serializable {
 		currentRules_.clear();
 		currentSlots_.clear();
 
-		awaitingTest_ = new Stack<RelationalPolicy>();
+		awaitingTest_ = new Stack<CoveringRelationalPolicy>();
 	}
 
 	/**
@@ -782,8 +782,8 @@ public final class PolicyGenerator implements Serializable {
 	 * @param policy
 	 *            The policy to retest.
 	 */
-	public void retestPolicy(RelationalPolicy policy) {
-		awaitingTest_.push(new RelationalPolicy(policy));
+	public void retestPolicy(CoveringRelationalPolicy policy) {
+		awaitingTest_.push(new CoveringRelationalPolicy(policy));
 	}
 
 	/**
@@ -819,11 +819,11 @@ public final class PolicyGenerator implements Serializable {
 		buf.write("A typical policy:\n");
 
 		// Generate a bunch of policies and display the most frequent one
-		RelationalPolicy bestPolicy = null;
+		CoveringRelationalPolicy bestPolicy = null;
 		int bestCount = 0;
-		Map<RelationalPolicy, Integer> policies = new HashMap<RelationalPolicy, Integer>();
+		Map<CoveringRelationalPolicy, Integer> policies = new HashMap<CoveringRelationalPolicy, Integer>();
 		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue(); i++) {
-			RelationalPolicy policy = generatePolicy(false);
+			CoveringRelationalPolicy policy = generatePolicy(false);
 			Integer count = policies.get(policy);
 			if (count == null)
 				count = 0;

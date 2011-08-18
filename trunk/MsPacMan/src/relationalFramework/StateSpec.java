@@ -1,7 +1,6 @@
 package relationalFramework;
 
 import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -94,9 +93,6 @@ public abstract class StateSpec {
 
 	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
-
-//	/** The query name for finding all non-achieved goals (possible goals). */
-//	public static final String NON_GOALS = "nonGoal";
 
 	/** The outside a range of values function name. */
 	public static final String OUTSIDE_RANGE = "outsideRange";
@@ -382,10 +378,6 @@ public abstract class StateSpec {
 			rete_.eval(goalRule);
 			// Initialise the goal checking query
 			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
-			// Only need a non-goal if the goal is parameterisable
-//			if (!constants_.isEmpty())
-//				rete_.eval("(defquery " + NON_GOALS + " "
-//						+ formNonGoal(goalState_) + ")");
 
 			// Initialise the queries for determining action preconditions
 			Map<String, String> purePreConds = initialiseActionPreconditions();
@@ -399,7 +391,7 @@ public abstract class StateSpec {
 			}
 
 			// Initialise the optimal policy
-			handCodedPolicy_ = initialiseOptimalPolicy();
+			handCodedPolicy_ = initialiseHandCodedPolicy();
 
 			queryNames_ = new HashMap<Object, String>();
 			queryCount_ = 0;
@@ -495,7 +487,7 @@ public abstract class StateSpec {
 	 * 
 	 * @return The policy that solves the goal in optimal time.
 	 */
-	protected abstract RelationalPolicy initialiseOptimalPolicy();
+	protected abstract BasicRelationalPolicy initialiseHandCodedPolicy();
 
 	/**
 	 * Initialises the state predicates.

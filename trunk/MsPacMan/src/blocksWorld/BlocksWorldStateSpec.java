@@ -1,6 +1,6 @@
 package blocksWorld;
 
-import relationalFramework.RelationalPolicy;
+import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -113,9 +113,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected RelationalPolicy initialiseOptimalPolicy() {
-		RelationalPolicy optimal = null;
-
+	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
@@ -144,9 +142,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
 
-		optimal = new RelationalPolicy();
+		BasicRelationalPolicy optimal = new BasicRelationalPolicy();
 		for (int i = 0; i < rules.length; i++)
-			optimal.addRule(new RelationalRule(rules[i]), false, false);
+			optimal.addRule(new RelationalRule(rules[i]));
 
 		return optimal;
 	}

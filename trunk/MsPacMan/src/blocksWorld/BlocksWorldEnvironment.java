@@ -26,7 +26,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 
-
 /**
  * The environment for the blocks world interface.
  * 

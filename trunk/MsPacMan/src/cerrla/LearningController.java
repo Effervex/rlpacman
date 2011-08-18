@@ -2,7 +2,7 @@ package cerrla;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -691,7 +691,7 @@ public class LearningController {
 				// Storing the policy value.
 				RLGlue.RL_agent_message("GetPolicy");
 				@SuppressWarnings("unchecked")
-				Pair<RelationalPolicy, Double> policy = (Pair<RelationalPolicy, Double>) ObjectObservations
+				Pair<CoveringRelationalPolicy, Double> policy = (Pair<CoveringRelationalPolicy, Double>) ObjectObservations
 						.getInstance().objectArray[0];
 				score /= ProgramArgument.POLICY_REPEATS.doubleValue();
 				System.out.println();
@@ -790,11 +790,11 @@ public class LearningController {
 		// Return the best policy. if multiple policies have the same value,
 		// return the most common one.
 		float threshold = pvs.first().getValue();
-		Map<RelationalPolicy, Integer> bestPolicyMap = new HashMap<RelationalPolicy, Integer>();
+		Map<CoveringRelationalPolicy, Integer> bestPolicyMap = new HashMap<CoveringRelationalPolicy, Integer>();
 		PolicyValue bestPolicy = null;
 		int mostCounts = 0;
 		for (PolicyValue pv : pvs) {
-			RelationalPolicy thisPolicy = pv.getPolicy();
+			CoveringRelationalPolicy thisPolicy = pv.getPolicy();
 			float thisValue = pv.getValue();
 			if (thisValue < threshold)
 				break;
@@ -1287,7 +1287,7 @@ public class LearningController {
 
 			RLGlue.RL_agent_message("GetPolicy");
 			@SuppressWarnings("unchecked")
-			Pair<RelationalPolicy, Double> pol = (Pair<RelationalPolicy, Double>) ObjectObservations
+			Pair<CoveringRelationalPolicy, Double> pol = (Pair<CoveringRelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
 			System.out.println(pol.objA_);
 			if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())

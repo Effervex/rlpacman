@@ -1,6 +1,6 @@
 package rlPacManGeneral;
 
-import relationalFramework.RelationalPolicy;
+import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -112,8 +112,8 @@ public class PacManStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected RelationalPolicy initialiseOptimalPolicy() {
-		RelationalPolicy goodPolicy = new RelationalPolicy();
+	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();
@@ -177,7 +177,7 @@ public class PacManStateSpec extends StateSpec {
 		}
 
 		for (String rule : rules)
-			goodPolicy.addRule(new RelationalRule(rule), false, false);
+			goodPolicy.addRule(new RelationalRule(rule));
 
 		return goodPolicy;
 	}

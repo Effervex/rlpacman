@@ -1,7 +1,7 @@
 package cerrla;
 
 import relationalFramework.GoalCondition;
-import relationalFramework.RelationalPolicy;
+import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -72,7 +72,7 @@ public class Module {
 	 * @param bestPolicy
 	 *            The state of the distribution for the agent.
 	 */
-	private Module(String modName, int numArgs, RelationalPolicy bestPolicy) {
+	private Module(String modName, int numArgs, CoveringRelationalPolicy bestPolicy) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = modName;
@@ -193,7 +193,7 @@ public class Module {
 	 * @param bestPolicy
 	 *            The best policy in the elites at the end of learning.
 	 */
-	public static void saveModule(String modName, int numArgs, RelationalPolicy bestPolicy) {
+	public static void saveModule(String modName, int numArgs, CoveringRelationalPolicy bestPolicy) {
 		if (!moduleExists(StateSpec.getInstance().getEnvironmentName(), modName)) {
 			Module newModule = new Module(modName, numArgs, bestPolicy);
 			nonExistantModules_.remove(modName);

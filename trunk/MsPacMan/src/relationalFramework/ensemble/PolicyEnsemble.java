@@ -101,11 +101,11 @@ public class PolicyEnsemble {
 	@SuppressWarnings("unchecked")
 	public PolicyActions evaluatePolicy(Rete state,
 			MultiMap<String, String[]> validActions, BidiMap goalArgs,
-			int numReturnedActions, boolean handCoded, boolean noteTriggered) {
+			int numReturnedActions) {
 		ActionChoiceEnsemble ace = new ActionChoiceEnsemble();
 		for (RelationalPolicy pol : policies_) {
 			PolicyActions actions = pol.evaluatePolicy(state, validActions,
-					goalArgs, numReturnedActions, handCoded, noteTriggered);
+					goalArgs, numReturnedActions);
 			// If we only have one policy, just use that.
 			if (policies_.size() == 1)
 				return actions;
@@ -113,7 +113,8 @@ public class PolicyEnsemble {
 		}
 
 		PolicyActions result = ace.getVotedActionChoice();
-		Set<RelationalPolicy> votedPolicies = ace.getPolicyConsistency();
+		Set<RelationalPolicy> votedPolicies = ace
+				.getPolicyConsistency();
 		for (RelationalPolicy rp : votedPolicies) {
 			Double count = policyConsistency_.get(rp);
 			if (count == null)
@@ -144,8 +145,8 @@ public class PolicyEnsemble {
 	 */
 	public Pair<RelationalPolicy, Double> getMajorPolicy() {
 		if (policies_.size() == 1)
-			return new Pair<RelationalPolicy, Double>(policies_.iterator()
-					.next(), 1d);
+			return new Pair<RelationalPolicy, Double>(policies_
+					.iterator().next(), 1d);
 
 		// Use the policy with the greatest consistency
 		double bestWeight = 0;
@@ -157,7 +158,8 @@ public class PolicyEnsemble {
 				bestPolicy = rp;
 			}
 		}
-		return new Pair<RelationalPolicy, Double>(bestPolicy, bestWeight);
+		return new Pair<RelationalPolicy, Double>(bestPolicy,
+				bestWeight);
 	}
 
 	@Override
