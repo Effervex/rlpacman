@@ -1,5 +1,12 @@
 package blocksWorldMove;
 
+import relationalFramework.FiredAction;
+import relationalFramework.ObjectObservations;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.awt.Point;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,12 +26,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 
-import relationalFramework.FiredAction;
-import relationalFramework.PolicyActions;
-import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 /**
  * The environment for the blocks world interface.

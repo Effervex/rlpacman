@@ -1,5 +1,13 @@
 package relationalFramework;
 
+import relationalFramework.FiredAction;
+import relationalFramework.GoalCondition;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,8 +24,8 @@ import cerrla.Module;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 
-import relationalFramework.util.ArgumentComparator;
-import relationalFramework.util.MultiMap;
+import util.ArgumentComparator;
+import util.MultiMap;
 
 import jess.QueryResult;
 import jess.Rete;
@@ -152,12 +160,8 @@ public class RelationalPolicy implements Serializable {
 		if (results.next()) {
 			// For each possible replacement
 			do {
-				// Get the rule action, without brackets
-				RelationalPredicate action = new RelationalPredicate(
-						rule.getAction());
-
 				// Find the arguments.
-				String[] arguments = action.getArguments();
+				String[] arguments = rule.getAction().getArguments();
 				for (int i = 0; i < arguments.length; i++) {
 					// If the action is variable, use the replacement
 					if (arguments[i].charAt(0) == '?')
@@ -170,7 +174,9 @@ public class RelationalPolicy implements Serializable {
 					if (activatedActions != null)
 						activatedActions.add(arguments);
 
-					// Use the found action set as a result.
+					// Create the swapped action
+					RelationalPredicate action = new RelationalPredicate(
+							rule.getAction(), arguments);
 					returnedActions.add(new FiredAction(action, rule, this));
 				}
 			} while (results.next());
@@ -437,12 +443,16 @@ public class RelationalPolicy implements Serializable {
 		StringBuffer buffer = new StringBuffer("Policy");
 		buffer.append(":\n");
 
+		boolean first = true;
 		for (RelationalRule rule : policyRules_) {
+			if (!first)
+				buffer.append("\n");
 			if (!modularRules_.contains(rule)) {
-				buffer.append(rule.toNiceString() + "\n");
+				buffer.append(rule.toNiceString());
 			} else {
-				buffer.append("MODULAR: " + rule.toNiceString() + "\n");
+				buffer.append("MODULAR: " + rule.toNiceString());
 			}
+			first = false;
 		}
 		return buffer.toString();
 	}

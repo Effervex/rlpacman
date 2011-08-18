@@ -2,14 +2,15 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 
 public class RelationalPredicateTest {
 

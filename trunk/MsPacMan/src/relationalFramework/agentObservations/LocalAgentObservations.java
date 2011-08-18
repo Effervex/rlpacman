@@ -1,5 +1,9 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -14,10 +18,7 @@ import java.util.TreeSet;
 import cerrla.Module;
 import cerrla.PolicyGenerator;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
-import relationalFramework.util.MultiMap;
+import util.MultiMap;
 
 /**
  * A part of AgentObservations. The LocalAgentObservations contain observation

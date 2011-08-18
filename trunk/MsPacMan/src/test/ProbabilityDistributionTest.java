@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.util.ProbabilityDistribution;
+import util.ProbabilityDistribution;
 
 public class ProbabilityDistributionTest {
 	private ProbabilityDistribution<String> sut_;

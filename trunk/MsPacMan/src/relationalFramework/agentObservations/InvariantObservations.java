@@ -1,11 +1,12 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.RelationalPredicate;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeSet;
 
-import relationalFramework.RelationalPredicate;
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -23,7 +24,7 @@ public class InvariantObservations implements Serializable {
 	 * The specific invariants note only purely instantiated invariants, but not
 	 * fully anonymous versions of them are also invariants.
 	 */
-	private Collection<RelationalPredicate> expandedSpecificInvariants_;
+	private transient Collection<RelationalPredicate> expandedSpecificInvariants_;
 
 	/**
 	 * The generalised 'existence' invariants (only noting if a predicate is
@@ -53,6 +54,8 @@ public class InvariantObservations implements Serializable {
 
 		// Otherwise, perform a basic retainAll operation
 		boolean result = specificInvariants_.retainAll(stateFacts);
+		if (result)
+			expandedSpecificInvariants_ = null;
 		result |= generalInvariants_.retainAll(generalStateFacts);
 		return result;
 	}

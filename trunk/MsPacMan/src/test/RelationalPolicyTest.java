@@ -2,6 +2,10 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,9 +15,6 @@ import org.junit.Test;
 import cerrla.Module;
 import cerrla.PolicyGenerator;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.StateSpec;
 
 public class RelationalPolicyTest {
 

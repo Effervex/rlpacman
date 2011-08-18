@@ -1,14 +1,15 @@
 package hanoi;
 
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class HanoiStateSpec extends StateSpec {

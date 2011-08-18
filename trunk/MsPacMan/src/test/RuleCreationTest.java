@@ -2,6 +2,10 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.SortedSet;
@@ -13,12 +17,9 @@ import org.junit.Test;
 import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
-import relationalFramework.util.ConditionComparator;
+import util.ConditionComparator;
 
 public class RuleCreationTest {
 	private RuleCreation sut_;
@@ -575,6 +576,8 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
+		
+		
 	}
 
 	@Test

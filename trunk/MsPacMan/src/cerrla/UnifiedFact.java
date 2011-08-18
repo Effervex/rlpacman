@@ -1,8 +1,9 @@
 package cerrla;
 
+import relationalFramework.RelationalPredicate;
+
 import org.apache.commons.collections.BidiMap;
 
-import relationalFramework.RelationalPredicate;
 
 /**
  * A unified fact is the resulting information from a successful unification.

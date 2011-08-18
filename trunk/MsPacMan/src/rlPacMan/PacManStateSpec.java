@@ -1,5 +1,10 @@
 package rlPacMan;
 
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -9,10 +14,6 @@ import msPacMan.Ghost;
 
 import cerrla.NumberEnum;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 /**

@@ -1,5 +1,11 @@
 package cerrla;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -15,11 +21,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 
 
 /**

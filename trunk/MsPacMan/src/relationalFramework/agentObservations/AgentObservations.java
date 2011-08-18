@@ -1,5 +1,10 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,12 +33,8 @@ import cerrla.Unification;
 import cerrla.UnifiedFact;
 
 import jess.Fact;
-import relationalFramework.GoalCondition;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
-import relationalFramework.util.ConditionComparator;
-import relationalFramework.util.MultiMap;
+import util.ConditionComparator;
+import util.MultiMap;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -42,6 +43,8 @@ import relationalFramework.util.MultiMap;
  * @author Sam Sarjant
  */
 public final class AgentObservations implements Serializable {
+	private static final long serialVersionUID = -3485610187532540886L;
+
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
 	private static final String CONDITION_BELIEF_FILE = "conditionBeliefs.txt";
@@ -50,8 +53,6 @@ public final class AgentObservations implements Serializable {
 	private static AgentObservations instance_;
 
 	private static final String SERIALISATION_FILE = "agentObservations.ser";
-
-	private static final long serialVersionUID = -3707261549494747211L;
 
 	/** The agent observations directory. */
 	public static final File AGENT_OBSERVATIONS_DIR = new File(
@@ -153,7 +154,7 @@ public final class AgentObservations implements Serializable {
 			RelationalPredicate action, Map<String, String> goalReplacements) {
 		// Note down action conditions if still unsettled.
 		Map<String, String> replacementMap = action
-				.createVariableTermReplacementMap(false);
+				.createVariableTermReplacementMap(false, false);
 		if (goalReplacements != null) {
 			goalReplacements = new HashMap<String, String>(goalReplacements);
 			goalReplacements.putAll(replacementMap);
@@ -326,9 +327,10 @@ public final class AgentObservations implements Serializable {
 	}
 
 	/**
-	 * If the agent observations are basically settled (have not changed in X iterations).
+	 * If the agent observations are basically settled (have not changed in X
+	 * iterations).
 	 * 
-	 * @return 
+	 * @return
 	 */
 	public boolean isSettled() {
 		return inactivity_ >= SETTLED_THRESHOLD;
@@ -506,14 +508,8 @@ public final class AgentObservations implements Serializable {
 		termMappedFacts_ = MultiMap.createSortedSetMultiMap();
 		for (Fact stateFact : state) {
 			RelationalPredicate strFact = null;
-			try {
-				strFact = StateSpec
-						.toRelationalPredicate(stateFact.toString());
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
+			strFact = StateSpec.toRelationalPredicate(stateFact.toString());
+
 			// Ignore the type, goal, inequal and actions pred
 			if (strFact != null) {
 				if (StateSpec.getInstance().isUsefulPredicate(
@@ -522,11 +518,10 @@ public final class AgentObservations implements Serializable {
 					generalStateFacts.add(strFact.getFactName());
 
 					// Run through the arguments and index the fact by term
-					String[] arguments = strFact.getArguments();
-					for (int i = 0; i < arguments.length; i++) {
+					for (String arg : strFact.getArguments()) {
 						// Ignore numerical terms
-						if (!StateSpec.isNumber(arguments[i]))
-							termMappedFacts_.putContains(arguments[i], strFact);
+						if (!StateSpec.isNumber(arg))
+							termMappedFacts_.putContains(arg, strFact);
 					}
 				}
 			}
@@ -574,7 +569,7 @@ public final class AgentObservations implements Serializable {
 		// Simplify using background knowledge
 		result |= conditionObservations_.simplifyRule(simplified,
 				testForIllegalRule, onlyEquivalencies);
-		
+
 		// Simplify using invariants
 		if (!onlyEquivalencies) {
 			result |= simplified.removeAll(conditionObservations_.invariants_
@@ -646,6 +641,7 @@ public final class AgentObservations implements Serializable {
 				}
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 		}
 		instance_ = getInstance();
 		return false;
@@ -669,7 +665,7 @@ public final class AgentObservations implements Serializable {
 	 * @author Sam Sarjant
 	 */
 	private class ActionBasedObservations implements Serializable {
-		private static final long serialVersionUID = -2057778490724445386L;
+		private static final long serialVersionUID = -8610855617194241967L;
 
 		/**
 		 * The action itself, usually expressed in variables, but possibly
@@ -915,18 +911,18 @@ public final class AgentObservations implements Serializable {
 					localInvariants, localVariants);
 
 			// Generalise the action if necessary
-			for (int i = 0; i < action_.getArguments().length; i++) {
-				String argument = action_.getArguments()[i];
+			for (int i = 0; i < actionArgs.length; i++) {
+				String argument = actionArgs[i];
 
 				// If the action isn't variable, but doesn't match with the
 				// current action, generalise it.
 				if ((argument.charAt(0) != '?')
 						&& (!argument.equals(action.getArguments()[i]))) {
-					action_.getArguments()[i] = RuleCreation
-							.getVariableTermString(i);
+					actionArgs[i] = RuleCreation.getVariableTermString(i);
 					changed = true;
 				}
 			}
+			action_ = new RelationalPredicate(action_, actionArgs);
 
 			if (changed) {
 				recreateAllSpecialisations(action.getFactName());
@@ -1033,7 +1029,7 @@ public final class AgentObservations implements Serializable {
 	 * 
 	 */
 	public class ConditionObservations implements Serializable {
-		private static final long serialVersionUID = -8013187183769560531L;
+		private static final long serialVersionUID = -3548961174011793059L;
 
 		/** The agent's beliefs about the condition inter-relations. */
 		private Map<String, ConditionBeliefs> conditionBeliefs_;
@@ -1143,7 +1139,7 @@ public final class AgentObservations implements Serializable {
 
 				// Create a replacement map here (excluding numerical values)
 				Map<String, String> replacementMap = baseFact
-						.createVariableTermReplacementMap(true);
+						.createVariableTermReplacementMap(true, false);
 
 				// Replace facts for all relevant facts and store as condition
 				// beliefs.

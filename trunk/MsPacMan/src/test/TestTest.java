@@ -2,6 +2,8 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.StateSpec;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -19,8 +21,7 @@ import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
 
-import relationalFramework.StateSpec;
-import relationalFramework.util.ArgumentComparator;
+import util.ArgumentComparator;
 
 public class TestTest {
 	@Test

@@ -3,18 +3,19 @@ package msPacManVsGhosts;
 import game.core.Game;
 import game.core._G_;
 import game.core.Game.DM;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-
 import relationalFramework.FiredAction;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalWrapper;
 import relationalFramework.StateSpec;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+
+import util.Pair;
 import jess.JessException;
 import jess.Rete;
 
@@ -52,11 +53,13 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 	 *            The action to apply.
 	 * @param game
 	 *            The game state.
-	 * @return An int direction to move to + 1 (so UP == 1 instead of 0). If the
-	 *         direction is negative, that means NOT moving to that particular
-	 *         positive direction (still factoring in the +1).
+	 * @return A pair: an int direction to move to + 1 (so UP == 1 instead of
+	 *         0). If the direction is negative, that means NOT moving to that
+	 *         particular positive direction (still factoring in the +1); and
+	 *         the location of the thing being acted upon.
 	 */
-	private int getDirection(RelationalPredicate action, _G_ game) {
+	private Pair<Integer, Integer> getDirection(RelationalPredicate action,
+			_G_ game) {
 		String[] arguments = action.getArguments();
 
 		// First parse the location of the object
@@ -73,13 +76,20 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 		} else
 			index = Integer.parseInt(split[1]);
 
+		Pair<Integer, Integer> result = new Pair<Integer, Integer>(
+				Integer.MAX_VALUE, -1);
 		if (action.getFactName().equals("moveTo")
-				|| action.getFactName().equals("toJunction"))
-			return game.getNextPacManDir(index, true, DM.PATH) + 1;
-		else if (action.getFactName().equals("moveFrom"))
-			return -game.getNextPacManDir(index, true, DM.PATH) - 1;
+				|| action.getFactName().equals("toJunction")) {
+			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
+					true, DM.PATH) + 1, index);
+		} else if (action.getFactName().equals("moveFrom")) {
+			result = new Pair<Integer, Integer>(-game.getNextPacManDir(index,
+					true, DM.PATH) - 1, index);
+//			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
+//					false, DM.PATH) + 1, index);
+		}
 
-		return Integer.MAX_VALUE;
+		return result;
 	}
 
 	/**
@@ -124,7 +134,7 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 				if (pacPos != junc) {
 					// Find the direction and distance to a junction
 					int dir = game.getNextPacManDir(junc, true, DM.PATH);
-					int dist = game.getPathDistance(pacPos, junc) / 4;
+					int dist = game.getPathDistance(pacPos, junc);
 					// Find closest junction
 					if (dist < juncDists[dir]) {
 						juncDists[dir] = dist;
@@ -144,6 +154,10 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 				if (game.getLairTime(g) == 0) {
 					String ghost = ghostNames[g];
 					rete.assertString("(ghost " + ghost + ")");
+
+					int pacGhostDist = game.getPathDistance(pacPos, ghostPos);
+					distanceAssertion(ghost, pacGhostDist, rete);
+
 					// If edible, add assertion
 					if (game.isEdible(g)) {
 						rete.assertString("(edible " + ghost + ")");
@@ -152,25 +166,32 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 						if (game.getEdibleTime(g) <= _G_.EDIBLE_ALERT) {
 							rete.assertString("(blinking " + ghost + ")");
 						}
-					}
+					} else {
+						// Calculating junction safety
+						for (int j = 0; j < closestJuncs.length; j++) {
+							if (closestJuncs[j] != -1) {
+								int ghostDistance = game.getGhostPathDistance(
+										g, closestJuncs[j]);
+								int thisGhostDist = ghostDistance
+										- juncDists[j];
+								// Special case for when a ghost is between
+								// PacMan and the junction
+								int ghostJuncDist = game.getPathDistance(
+										ghostPos, closestJuncs[j]);
+								if (pacGhostDist <= ghostJuncDist
+										&& game.getNextPacManDir(ghostPos,
+												true, DM.PATH) == game
+												.getNextPacManDir(
+														closestJuncs[j], true,
+														DM.PATH))
+									thisGhostDist = ghostJuncDist
+											- juncDists[j];
 
-					distanceAssertion(ghost,
-							game.getPathDistance(pacPos, ghostPos), rete);
-
-					// Calculating junction safety
-					for (int j = 0; j < closestJuncs.length; j++) {
-						if (closestJuncs[j] != -1) {
-							int ghostDistance = game.getGhostPathDistance(g,
-									closestJuncs[j]) / 4;
-							juncSafety[j] = Math.min(juncSafety[j],
-									ghostDistance - juncDists[j]);
+								juncSafety[j] = Math.min(juncSafety[j],
+										thisGhostDist / 4);
+							}
 						}
 					}
-
-					// Adding ghost centre calculations
-					// centreX += game.getX(ghostPos);
-					// centreY += game.getY(ghostPos);
-					// numActiveGhosts++;
 				}
 			}
 
@@ -259,7 +280,8 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 
 			// Only use the closest object(s) to make decisions
 			for (FiredAction firedAction : firedActions) {
-				int direction = getDirection(firedAction.getAction(), game);
+				Pair<Integer, Integer> direction = getDirection(
+						firedAction.getAction(), game);
 				double weight = getWeight(firedAction.getAction());
 				// Only note the best weighted actions
 				if (weight > bestWeight) {
@@ -267,14 +289,14 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 					bestWeight = weight;
 				}
 				if (weight == bestWeight) {
-					if (direction < 0) {
+					if (direction.objA_ < 0) {
 						// Add all directions BUT this one
 						for (int pacDir : pacManDirs) {
-							if (pacDir != -direction - 1)
+							if (pacDir != -direction.objA_ - 1)
 								actionDirections.add(pacDir);
 						}
 					} else {
-						actionDirections.add(direction - 1);
+						actionDirections.add(direction.objA_ - 1);
 					}
 				}
 			}

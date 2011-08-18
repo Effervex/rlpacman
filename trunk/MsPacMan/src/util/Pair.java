@@ -1,4 +1,4 @@
-package relationalFramework.util;
+package util;
 
 public class Pair<A,B> {
 	public A objA_;

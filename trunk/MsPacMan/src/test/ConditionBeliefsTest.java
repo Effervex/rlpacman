@@ -2,14 +2,16 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.StateSpec;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.ConditionBeliefs;
 
 public class ConditionBeliefsTest {
@@ -229,7 +231,7 @@ public class ConditionBeliefsTest {
 		trueFacts.add(StateSpec.toRelationalPredicate("on ?X ?)"));
 		trueFacts.add(StateSpec.toRelationalPredicate("above ?X ?)"));
 		trueFacts.add(StateSpec.toRelationalPredicate("highest ?X)"));
-		Collection<RelationalPredicate> untrueFacts = new ArrayList<RelationalPredicate>();
+		Collection<RelationalPredicate> untrueFacts = new HashSet<RelationalPredicate>();
 		assertTrue(cb.noteTrueRelativeFacts(trueFacts, untrueFacts, true));
 		assertFalse(cb.getAlwaysTrue(null).isEmpty());
 		assertTrue(cb.getAlwaysTrue(null).contains(

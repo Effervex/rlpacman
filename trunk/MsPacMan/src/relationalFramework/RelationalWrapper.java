@@ -1,5 +1,7 @@
 package relationalFramework;
 
+import relationalFramework.PolicyActions;
+import relationalFramework.StateSpec;
 import jess.Rete;
 
 /**

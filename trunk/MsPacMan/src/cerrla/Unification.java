@@ -1,5 +1,8 @@
 package cerrla;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.regex.Matcher;
@@ -8,8 +11,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import relationalFramework.RelationalPredicate;
-import relationalFramework.StateSpec;
 
 public class Unification {
 	/** The prefix for range variables. */
@@ -132,8 +133,7 @@ public class Unification {
 		if (oldState.isEmpty()) {
 			oldState.addAll(oldStateClone);
 			return -1;
-		}
-		else if (oldState.containsAll(oldStateClone))
+		} else if (oldState.containsAll(oldStateClone))
 			return 0;
 		else
 			return 1;

@@ -1,5 +1,8 @@
 package relationalFramework.ensemble;
 
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,10 +13,8 @@ import jess.Rete;
 
 import org.apache.commons.collections.BidiMap;
 
-import relationalFramework.PolicyActions;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.util.MultiMap;
-import relationalFramework.util.Pair;
+import util.MultiMap;
+import util.Pair;
 
 /**
  * A class for possibly holding multiple policies.
@@ -196,7 +197,8 @@ public class PolicyEnsemble {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
 		for (RelationalPolicy pol : policies_) {
-			buffer.append("WEIGHT " + duplicateCount_.get(pol) + "\n");
+			if (policies_.size() > 1)
+				buffer.append("WEIGHT " + duplicateCount_.get(pol) + "\n");
 			buffer.append(pol.toString());
 		}
 

@@ -1,5 +1,11 @@
 package cerrla;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.ObjectObservations;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -15,14 +21,9 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.ObjectObservations;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.LocalAgentObservations;
-import relationalFramework.util.Pair;
+import util.Pair;
 
 /**
  * The cross entropy algorithm implementation.
@@ -65,7 +66,7 @@ public class LearningController {
 	/** The performance output file. */
 	private File performanceFile_;
 	/** The best policy found output file. */
-	private File policyFile_;
+	private File elitesFile_;
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The first run number. */
@@ -381,6 +382,9 @@ public class LearningController {
 		int minRun = -1;
 		float max = -Float.MAX_VALUE;
 		int maxRun = -1;
+
+		if (!performanceFile_.exists())
+			performanceFile_.createNewFile();
 		// For every performance file
 		for (int i = 0; i < runEnd; i++) {
 			File tempPerf = new File(TEMP_FOLDER + "/" + performanceFile_ + i);
@@ -637,8 +641,8 @@ public class LearningController {
 			PolicyGenerator.getInstance().shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
 
-			if (ProgramArgument.USE_MODULES.booleanValue()
-					&& AgentObservations.getInstance().isSettled()
+			boolean oldAOSettled = AgentObservations.getInstance().isSettled();
+			if (ProgramArgument.USE_MODULES.booleanValue() && oldAOSettled
 					&& !PolicyGenerator.getInstance().isModuleGenerator()) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(localPolicy);
@@ -691,7 +695,7 @@ public class LearningController {
 						.getInstance().objectArray[0];
 				score /= ProgramArgument.POLICY_REPEATS.doubleValue();
 				System.out.println();
-				System.out.println(policy.objA_);
+				//System.out.println(policy.objA_);
 				if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 					System.out.println("Policy consistency: " + policy.objB_);
 				System.out.println(numEpisodes + ": " + score);
@@ -748,11 +752,13 @@ public class LearningController {
 				// If elites are all the same (within an interval)
 				isElitesConverged(eliteAverageValues, pvs, numElites);
 
+				hasUpdated = localPolicy.getConvergenceValue() != PolicyGenerator.NO_UPDATES_CONVERGENCE;
+
 				// Write generators
-				if (!hasUpdated
+				if ((AgentObservations.getInstance().isSettled() && !oldAOSettled)
 						|| localPolicy.getPoliciesEvaluated()
 								% ProgramArgument.PERFORMANCE_TESTING_SIZE
-										.doubleValue() == 0) {
+										.doubleValue() == 1) {
 					try {
 						saveFiles(run, episodeMeans, episodeSDs, pvs,
 								!hasUpdated, false);
@@ -761,19 +767,13 @@ public class LearningController {
 					}
 				}
 
-				hasUpdated = localPolicy.getConvergenceValue() != PolicyGenerator.NO_UPDATES_CONVERGENCE;
-
 				if (hasUpdated && prelimRun)
 					break;
 
 				isConverged |= localPolicy.isConverged();
 
-				// If the generators have changed (added new rules), remove
-				// the old elites and reset the alpha.
-				// if (clearElites) {
-				// policiesEvaled = 0;
-				// pvs.clear();
-				// }
+				System.out.println();
+				System.out.println();
 			} else {
 				filterPolicyValues(pvs, localPolicy);
 				localPolicy.setPoliciesEvaluated(pvs.size());
@@ -980,14 +980,13 @@ public class LearningController {
 		repetitionsEnd_ = repetitionsEnd;
 		maxEpisodes_ = episodeCount;
 
-		// Create the output files if necessary
-		policyFile_ = new File(elitesFile);
+		elitesFile_ = new File(elitesFile);
 		performanceFile_ = new File(performanceFile);
+
+		// Create temp folder
 		try {
-			if (!policyFile_.exists())
-				policyFile_.createNewFile();
-			if (!performanceFile_.exists())
-				performanceFile_.createNewFile();
+			if (!elitesFile_.exists())
+				elitesFile_.createNewFile();
 			TEMP_FOLDER.mkdir();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -1143,7 +1142,7 @@ public class LearningController {
 	 */
 	private void saveElitePolicies(Collection<PolicyValue> elites)
 			throws Exception {
-		FileWriter wr = new FileWriter(policyFile_);
+		FileWriter wr = new FileWriter(elitesFile_);
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		writeFileHeader(buf);
@@ -1192,7 +1191,7 @@ public class LearningController {
 			buf.write(comment_ + "\n");
 
 		PolicyGenerator.getInstance().saveHumanGenerators(buf);
-		buf.write("\n");
+		buf.write("\n\n");
 		PolicyGenerator.getInstance().saveGenerators(buf, perfFile.getPath());
 		int lastKey = episodeMeans.lastKey();
 		buf.write("\n\n" + lastKey + "\t" + episodeMeans.get(lastKey) + "\n");
@@ -1332,7 +1331,7 @@ public class LearningController {
 
 	private void writeFileHeader(BufferedWriter buf) throws IOException {
 		buf.write("---PROGRAM ARGUMENTS---\n");
-		ProgramArgument.saveArgs(buf, false);
+		ProgramArgument.saveArgs(buf, true);
 		buf.write("-----------------------\n");
 		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
 				+ StateSpec.getInstance().getGoalState() + "\n\n");

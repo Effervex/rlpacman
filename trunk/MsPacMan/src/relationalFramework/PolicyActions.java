@@ -1,5 +1,8 @@
 package relationalFramework;
 
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
+
 import java.util.ArrayList;
 import java.util.Collection;
 

@@ -2,6 +2,9 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
+
 import java.util.ArrayList;
 
 import org.junit.Before;
@@ -9,8 +12,6 @@ import org.junit.Test;
 
 import cerrla.Module;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 
 public class ModuleTest {
 	

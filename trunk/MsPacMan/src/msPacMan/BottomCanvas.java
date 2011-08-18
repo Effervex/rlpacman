@@ -1,5 +1,7 @@
 package msPacMan;
 
+import relationalFramework.FiredAction;
+
 import java.awt.Canvas;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -8,7 +10,6 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Image;
 
-import relationalFramework.FiredAction;
 
 //Bottom right canvas that is repainted infrequently.
 //It contains the number of lives, level and instructions

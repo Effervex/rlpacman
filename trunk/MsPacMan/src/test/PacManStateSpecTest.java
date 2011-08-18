@@ -1,12 +1,12 @@
 package test;
 
 import static org.junit.Assert.*;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 
 public class PacManStateSpecTest {
 	@Before

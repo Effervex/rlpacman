@@ -1,5 +1,8 @@
 package relationalFramework;
 
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Collection;
@@ -17,7 +20,7 @@ import cerrla.RuleCreation;
  */
 public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		Serializable {
-	private static final long serialVersionUID = -2426239299662874771L;
+	private static final long serialVersionUID = -8297103733587908025L;
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -233,18 +236,21 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param formNumericalReplacement
 	 *            If the numerical values should have variable replacements or
 	 *            not. If not, they remain as is.
+	 * @param ignoreAnonymous
+	 *            If anonymous terms should be used for the replacement map.
 	 * @return A replacement map which converts this string fact's non-numerical
 	 *         terms into ordered variable terms.
 	 */
 	public Map<String, String> createVariableTermReplacementMap(
-			boolean formNumericalReplacement) {
+			boolean formNumericalReplacement, boolean ignoreAnonymous) {
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i])
-					|| formNumericalReplacement)
-				replacementMap.put(arguments_[i],
-						RuleCreation.getVariableTermString(i));
-			else
+					|| formNumericalReplacement) {
+				if (!arguments_[i].equals("?") || !ignoreAnonymous)
+					replacementMap.put(arguments_[i],
+							RuleCreation.getVariableTermString(i));
+			} else
 				replacementMap.put(arguments_[i], arguments_[i]);
 		}
 		return replacementMap;
@@ -274,7 +280,9 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @return The fact arguments.
 	 */
 	public String[] getArguments() {
-		return arguments_;
+		String[] argCopy = new String[arguments_.length];
+		System.arraycopy(arguments_, 0, argCopy, 0, arguments_.length);
+		return argCopy;
 	}
 
 	public boolean isNegated() {

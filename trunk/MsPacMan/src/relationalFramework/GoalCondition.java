@@ -1,5 +1,9 @@
 package relationalFramework;
 
+import relationalFramework.GoalCondition;
+import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
+
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.HashSet;
