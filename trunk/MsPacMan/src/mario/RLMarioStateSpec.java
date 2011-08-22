@@ -7,13 +7,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import cerrla.NumberEnum;
 import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.engine.sprites.Mario;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
 import relationalFramework.BasicRelationalPolicy;
+import relationalFramework.NumberEnum;
 import relationalFramework.RelationalRule;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;

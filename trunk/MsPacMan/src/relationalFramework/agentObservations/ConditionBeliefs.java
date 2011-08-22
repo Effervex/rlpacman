@@ -18,8 +18,6 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import cerrla.RuleCreation;
-
 import util.MultiMap;
 
 /**
@@ -92,7 +90,7 @@ public class ConditionBeliefs implements Serializable {
 		String[] arguments = new String[cbFact_.getArguments().length];
 		for (int i = 0; i < arguments.length; i++) {
 			if (args_ == null)
-				arguments[i] = RuleCreation.getVariableTermString(i);
+				arguments[i] = RelationalPredicate.getVariableTermString(i);
 			else
 				arguments[i] = args_[i];
 		}
@@ -186,7 +184,7 @@ public class ConditionBeliefs implements Serializable {
 		if (pred.equals(condition_)) {
 			String[] baseArgs = new String[predFact.getArguments().length];
 			for (int i = 0; i < baseArgs.length; i++)
-				baseArgs[i] = RuleCreation.getVariableTermString(i);
+				baseArgs[i] = RelationalPredicate.getVariableTermString(i);
 			shapedFacts.remove(new RelationalPredicate(predFact, baseArgs));
 		}
 
@@ -213,7 +211,7 @@ public class ConditionBeliefs implements Serializable {
 				if (args_ != null)
 					varName = args_[i];
 				else
-					varName = RuleCreation.getVariableTermString(i);
+					varName = RelationalPredicate.getVariableTermString(i);
 				if (!varName.equals("?")) {
 					actionTerms.putContains(argTypes[i], varName);
 					// Also put any parent type of the given type
@@ -422,7 +420,7 @@ public class ConditionBeliefs implements Serializable {
 			// rules.
 			if (StateSpec.getInstance().isTypePredicate(
 					relatedFact.getFactName())) {
-				int index = RuleCreation.getVariableTermIndex(relatedFact
+				int index = RelationalPredicate.getVariableTermIndex(relatedFact
 						.getArguments()[0]);
 				if (cbFact_.getArgTypes()[index].equals(relatedFact
 						.getFactName()))
@@ -493,7 +491,7 @@ public class ConditionBeliefs implements Serializable {
 			for (int i = 0; i < otherArgs.length; i++) {
 				if (!otherArgs[i].equals("?"))
 					replacementMap.put(otherArgs[i],
-							RuleCreation.getVariableTermString(i));
+							RelationalPredicate.getVariableTermString(i));
 			}
 
 			RelationalPredicate modCond = new RelationalPredicate(cbFact_);

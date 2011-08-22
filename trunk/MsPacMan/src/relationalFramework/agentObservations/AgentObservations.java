@@ -28,7 +28,6 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
-import cerrla.RuleCreation;
 import cerrla.Unification;
 import cerrla.UnifiedFact;
 
@@ -918,7 +917,7 @@ public final class AgentObservations implements Serializable {
 				// current action, generalise it.
 				if ((argument.charAt(0) != '?')
 						&& (!argument.equals(action.getArguments()[i]))) {
-					actionArgs[i] = RuleCreation.getVariableTermString(i);
+					actionArgs[i] = RelationalPredicate.getVariableTermString(i);
 					changed = true;
 				}
 			}
@@ -1240,7 +1239,7 @@ public final class AgentObservations implements Serializable {
 					if (!untrueFactArgs[i].equals("?")) {
 						if (!replacementMap.containsKey(untrueFactArgs[i]))
 							replacementMap.put(untrueFactArgs[i],
-									RuleCreation.getVariableTermString(i));
+									RelationalPredicate.getVariableTermString(i));
 						untrueFactArgs[i] = replacementMap
 								.get(untrueFactArgs[i]);
 					}

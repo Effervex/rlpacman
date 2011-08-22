@@ -2,6 +2,7 @@ package msPacManVsGhosts;
 
 import game.controllers.GhostController;
 import game.controllers.examples.Legacy;
+import game.controllers.examples.Legacy2TheReckoning;
 import game.core.G;
 import game.core.GameView;
 import game.core._G_;
@@ -112,7 +113,7 @@ public class MsPacManGhostEnvironment implements EnvironmentInterface {
 		if (!experimentMode_ && gv_ == null)
 			gv_ = new GameView(game_).showGame();
 		// TODO Define proper Ms. Pac-Man Ghost behaviour
-		ghosts_ = new Legacy();
+		ghosts_ = new Legacy2TheReckoning();
 		prevScore_ = game_.getScore();
 		prevLives_ = game_.getLivesRemaining();
 	}

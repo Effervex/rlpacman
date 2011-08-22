@@ -576,9 +576,6 @@ public class LearningController {
 		// Elites is equal to the average number of rules in high mean slots.
 		double numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
 				sumSlotMean);
-		// System.out.println("POPOPOPOPOPOPOPOPOPOPOP: " + numElites);
-		// System.out.println("SLOTS: " +
-		// policyGenerator.getGenerator().size());
 		return (int) Math.max(1,
 				Math.round(numElites / ProgramArgument.RHO.doubleValue()));
 

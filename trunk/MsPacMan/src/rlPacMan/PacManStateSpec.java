@@ -1,6 +1,7 @@
 package rlPacMan;
 
 import relationalFramework.BasicRelationalPolicy;
+import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -12,7 +13,6 @@ import java.util.Map;
 
 import msPacMan.Ghost;
 
-import cerrla.NumberEnum;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
