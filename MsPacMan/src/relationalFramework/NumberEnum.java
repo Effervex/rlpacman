@@ -1,4 +1,4 @@
-package cerrla;
+package relationalFramework;
 
 /**
  * A simple class that represents a number argument for predicates.

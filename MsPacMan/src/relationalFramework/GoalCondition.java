@@ -10,8 +10,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import cerrla.Module;
-
 /**
  * A small class representing a possible goal condition for the agent to pursue.
  * 
@@ -19,6 +17,9 @@ import cerrla.Module;
  */
 public class GoalCondition implements Serializable {
 	private static final long serialVersionUID = 578463340574407596L;
+
+	/** The string for joining predicates. */
+	private static final String MODULE_JOIN = "&";
 
 	/** A sorted list of facts using only constant terms */
 	private RelationalPredicate fact_;
@@ -41,7 +42,7 @@ public class GoalCondition implements Serializable {
 		for (String arg : fact.getArguments())
 			seenArgs.add(arg);
 		numArgs_ = seenArgs.size();
-		goalName_ = Module.formName(fact_);
+		goalName_ = formName(fact_);
 	}
 
 	public RelationalPredicate getFact() {
@@ -95,5 +96,31 @@ public class GoalCondition implements Serializable {
 	@Override
 	public String toString() {
 		return goalName_;
+	}
+
+	/**
+	 * Forms the name of a module file.
+	 * 
+	 * @param fact
+	 *            The fact to create a name for.
+	 * @return A String representing the filename of the module.
+	 */
+	public static String formName(RelationalPredicate fact) {
+		StringBuffer buffer = new StringBuffer();
+		boolean first = true;
+		Map<String, Character> argMapping = new HashMap<String, Character>();
+		int i = 0;
+		if (!first)
+			buffer.append(MODULE_JOIN);
+		buffer.append(fact.getFactName());
+		for (String arg : fact.getArguments()) {
+			if (!argMapping.containsKey(arg))
+				argMapping.put(arg, (char) ('A' + i++));
+			buffer.append(argMapping.get(arg));
+		}
+
+		first = false;
+
+		return buffer.toString();
 	}
 }

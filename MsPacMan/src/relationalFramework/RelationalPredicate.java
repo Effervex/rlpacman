@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
-import cerrla.RuleCreation;
+import cerrla.Unification;
 
 /**
  * A class containing the definitions/instantiations of a relational predicate,
@@ -21,6 +21,12 @@ import cerrla.RuleCreation;
 public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		Serializable {
 	private static final long serialVersionUID = -8297103733587908025L;
+	/** The first character for variables. */
+	private static final char FIRST_CHAR = 'A';
+	/** The final character for variables. */
+	private static final char MODULO_LETTERS = 26;
+	/** The starting character for variables. */
+	private static final char STARTING_CHAR = 'X';
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -145,7 +151,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		// Run through the arguments, replacing variable args with the
 		// replacements.
 		for (int i = 0; i < arguments_.length; i++) {
-			int termIndex = RuleCreation.getVariableTermIndex(arguments_[i]);
+			int termIndex = getVariableTermIndex(arguments_[i]);
 			if (termIndex != -1)
 				arguments_[i] = replacements[termIndex];
 		}
@@ -216,7 +222,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 				// If the argument is not 0, enter a variable.
 				if ((p & (int) Math.pow(2, i)) != 0) {
 					if (generateArgs)
-						genArguments[i] = RuleCreation.getVariableTermString(i);
+						genArguments[i] = getVariableTermString(i);
 					else
 						genArguments[i] = arguments_[i];
 				} else
@@ -249,7 +255,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 					|| formNumericalReplacement) {
 				if (!arguments_[i].equals("?") || !ignoreAnonymous)
 					replacementMap.put(arguments_[i],
-							RuleCreation.getVariableTermString(i));
+							getVariableTermString(i));
 			} else
 				replacementMap.put(arguments_[i], arguments_[i]);
 		}
@@ -442,5 +448,45 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (negated_ != other.negated_)
 			return false;
 		return true;
+	}
+
+	/**
+	 * The opposite of getVariableTermString, this method gets the integer the
+	 * variable corresponds to, or -1 if invalid.
+	 * 
+	 * @param variable
+	 *            The variable string to check.
+	 * @return An integer corresponding to the position in the action the
+	 *         variable refers to or -1 if invalid.
+	 */
+	public static int getVariableTermIndex(String variable) {
+		// Don't swap constants or anonymous
+		if (variable.charAt(0) != '?' || variable.length() < 2)
+			return -1;
+
+		// Don't swap number variables
+		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
+			return -1;
+
+		if (variable.contains(StateSpec.GOAL_VARIABLE_PREFIX))
+			return -1;
+
+		int termIndex = (variable.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
+				% MODULO_LETTERS;
+		return termIndex;
+	}
+
+	/**
+	 * Generates a variable term string from the index given.
+	 * 
+	 * @param i
+	 *            The index of the string.
+	 * @return A string in variable format, with the name of the variable in the
+	 *         middle.
+	 */
+	public static String getVariableTermString(int i) {
+		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
+				% MODULO_LETTERS);
+		return "?" + variable;
 	}
 }

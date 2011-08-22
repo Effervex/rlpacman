@@ -1,8 +1,8 @@
 package msPacManVsGhosts;
 
 import game.core.Game;
-import game.core._G_;
 import game.core.Game.DM;
+import game.core._G_;
 import relationalFramework.FiredAction;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
@@ -59,7 +59,7 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 	 *         the location of the thing being acted upon.
 	 */
 	private Pair<Integer, Integer> getDirection(RelationalPredicate action,
-			_G_ game) {
+			Game game) {
 		String[] arguments = action.getArguments();
 
 		// First parse the location of the object
@@ -83,10 +83,10 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
 					true, DM.PATH) + 1, index);
 		} else if (action.getFactName().equals("moveFrom")) {
-			result = new Pair<Integer, Integer>(-game.getNextPacManDir(index,
-					true, DM.PATH) - 1, index);
-//			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
-//					false, DM.PATH) + 1, index);
+//			result = new Pair<Integer, Integer>(-game.getNextPacManDir(index,
+//					true, DM.PATH) - 1, index);
+			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
+					false, DM.PATH) + 1, index);
 		}
 
 		return result;
@@ -120,7 +120,7 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 		Rete rete = StateSpec.getInstance().getRete();
 		try {
 			rete.reset();
-			_G_ game = (_G_) args[0];
+			Game game = (Game) args[0];
 
 			int pacPos = game.getCurPacManLoc();
 
@@ -268,7 +268,7 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 
 	@Override
 	public Object groundActions(PolicyActions actions, Object... args) {
-		_G_ game = (_G_) args[0];
+		Game game = (Game) args[0];
 		Collection<Integer> pacManDirs = new HashSet<Integer>();
 		for (int pacDir : game.getPossiblePacManDirs(true))
 			pacManDirs.add(pacDir);

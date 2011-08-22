@@ -207,4 +207,63 @@ public class TestTest {
 		sameABC.add("c");
 		assertEquals(abc, sameABC);
 	}
+	
+	@Test
+	public void testAssertionSpeeds() throws Exception {
+		Rete rete = new Rete();
+		
+		long start = System.currentTimeMillis();
+		StringBuffer assertion = new StringBuffer();
+		for (int i = 0; i < 500; i++) {
+			assertion.append("(bflock d" + i + ") ");
+		}
+		rete.assertString(assertion.toString());
+		long end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+		
+		assertion = new StringBuffer();
+		for (int i = 0; i < 500; i++) {
+			assertion.append("(belock e" + i + ") ");
+		}
+		rete.assertString(assertion.toString());
+		end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+		
+		assertion = new StringBuffer();
+		for (int i = 0; i < 500; i++) {
+			assertion.append("(bdlock f" + i + ") ");
+		}
+		rete.assertString(assertion.toString());
+		end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+		
+		System.out.println("-------");
+		
+		for (int i = 0; i < 500; i++) {
+			String block = "(bclock a" + i + ")";
+			rete.assertString(block);
+		}
+		end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+		
+		for (int i = 0; i < 500; i++) {
+			String block = "(bblock b" + i + ")";
+			rete.assertString(block);
+		}
+		end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+		
+		for (int i = 0; i < 500; i++) {
+			String block = "(balock c" + i + ")";
+			rete.assertString(block);
+		}
+		end = System.currentTimeMillis();
+		System.out.println(end - start);
+		start = end;
+	}
 }

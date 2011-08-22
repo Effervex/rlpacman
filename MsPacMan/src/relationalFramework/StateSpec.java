@@ -19,8 +19,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import cerrla.NumberEnum;
-import cerrla.RuleCreation;
 import cerrla.Unification;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -201,7 +199,7 @@ public abstract class StateSpec {
 	private List<String> formActionTerms(RelationalPredicate action) {
 		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
 		for (int i = 0; i < action.getArgTypes().length; i++)
-			terms.add(RuleCreation.getVariableTermString(i).substring(1));
+			terms.add(RelationalPredicate.getVariableTermString(i).substring(1));
 		return terms;
 	}
 

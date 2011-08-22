@@ -255,7 +255,7 @@ public class Unification {
 			if (!oldTerm.equals(newTerm) && !StateSpec.isNumber(oldTerm)
 					&& !StateSpec.isNumber(newTerm)) {
 				boolean bothVariables = true;
-				String variable = RuleCreation.getVariableTermString(i);
+				String variable = RelationalPredicate.getVariableTermString(i);
 				// Replace old term if necessary
 				if ((oldTerm.charAt(0) != '?')
 						|| (oldTerm.contains(StateSpec.GOAL_VARIABLE_PREFIX))) {

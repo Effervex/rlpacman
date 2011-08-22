@@ -30,12 +30,6 @@ import jess.Rete;
  */
 public class RuleCreation implements Serializable {
 	private static final long serialVersionUID = -5239359052379344563L;
-	/** The first character for variables. */
-	private static final char FIRST_CHAR = 'A';
-	/** The final character for variables. */
-	private static final char MODULO_LETTERS = 26;
-	/** The starting character for variables. */
-	private static final char STARTING_CHAR = 'X';
 
 	/**
 	 * Checks if the type conditions of the added condition conflict with the
@@ -558,45 +552,5 @@ public class RuleCreation implements Serializable {
 				false, false);
 		return goalPredicates.values().contains(checkedCond) || !notAnonymous
 				|| cond.getFactName().equals(StateSpec.GOALARGS_PRED);
-	}
-
-	/**
-	 * The opposite of getVariableTermString, this method gets the integer the
-	 * variable corresponds to, or -1 if invalid.
-	 * 
-	 * @param variable
-	 *            The variable string to check.
-	 * @return An integer corresponding to the position in the action the
-	 *         variable refers to or -1 if invalid.
-	 */
-	public static int getVariableTermIndex(String variable) {
-		// Don't swap constants or anonymous
-		if (variable.charAt(0) != '?' || variable.length() < 2)
-			return -1;
-
-		// Don't swap number variables
-		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
-			return -1;
-
-		if (variable.contains(StateSpec.GOAL_VARIABLE_PREFIX))
-			return -1;
-
-		int termIndex = (variable.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
-				% MODULO_LETTERS;
-		return termIndex;
-	}
-
-	/**
-	 * Generates a variable term string from the index given.
-	 * 
-	 * @param i
-	 *            The index of the string.
-	 * @return A string in variable format, with the name of the variable in the
-	 *         middle.
-	 */
-	public static String getVariableTermString(int i) {
-		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
-				% MODULO_LETTERS);
-		return "?" + variable;
 	}
 }

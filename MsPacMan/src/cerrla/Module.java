@@ -2,7 +2,6 @@ package cerrla;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.CoveringRelationalPolicy;
-import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -21,8 +20,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
-
 /**
  * A class representing a loaded module. Modules typically have parameterisable
  * arguments and return a rule(s) which solve the module. Note that if modules
@@ -36,9 +33,6 @@ public class Module {
 
 	/** The suffix for module files. */
 	private static final String MODULE_SUFFIX = ".mod";
-
-	/** The string for joining predicates. */
-	private static final String MODULE_JOIN = "&";
 
 	/**
 	 * The policy rules which solve this module (not necessarily optimal). Note
@@ -331,32 +325,6 @@ public class Module {
 			return PolicyGenerator.loadPolicyGenerator(genFile, goalCondition);
 		}
 		return null;
-	}
-
-	/**
-	 * Forms the name of a module file.
-	 * 
-	 * @param fact
-	 *            The fact to create a name for.
-	 * @return A String representing the filename of the module.
-	 */
-	public static String formName(RelationalPredicate fact) {
-		StringBuffer buffer = new StringBuffer();
-		boolean first = true;
-		Map<String, Character> argMapping = new HashMap<String, Character>();
-		int i = 0;
-		if (!first)
-			buffer.append(MODULE_JOIN);
-		buffer.append(fact.getFactName());
-		for (String arg : fact.getArguments()) {
-			if (!argMapping.containsKey(arg))
-				argMapping.put(arg, (char) ('A' + i++));
-			buffer.append(argMapping.get(arg));
-		}
-
-		first = false;
-
-		return buffer.toString();
 	}
 
 	/**

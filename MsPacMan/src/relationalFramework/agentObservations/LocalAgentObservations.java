@@ -15,7 +15,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
 
-import cerrla.Module;
 import cerrla.PolicyGenerator;
 
 import util.MultiMap;
@@ -188,7 +187,7 @@ public class LocalAgentObservations implements Serializable {
 						&& !gc.isNegated()
 						&& !gc.getFactName().equals(StateSpec.GOALARGS_PRED)
 						&& gc.isFullyNotAnonymous()
-						&& !Module.formName(gc).equals(localGoal_))
+						&& !GoalCondition.formName(gc).equals(localGoal_))
 					specificGoalConds_.add(new GoalCondition(gc));
 			}
 		}
