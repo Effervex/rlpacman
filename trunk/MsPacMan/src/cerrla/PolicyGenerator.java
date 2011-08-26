@@ -712,7 +712,7 @@ public final class PolicyGenerator implements Serializable {
 					}
 				}
 			} else {
-				int slotLevel = slot.getLevel() + 1;
+				int newSlotLevel = slot.getLevel() + 1;
 				// Continue to split slot until its KL size has increased to a
 				// non-splitting threshold.
 				while (slot.isSplittable()) {
@@ -721,13 +721,13 @@ public final class PolicyGenerator implements Serializable {
 					RelationalRule bestRule = ruleGenerator.getBestElement();
 					// If the best rule isn't the seed, create a new slot
 					if (!bestRule.equals(slot.getSeedRule())) {
-						Slot newSlot = new Slot(bestRule, false, slotLevel);
+						Slot newSlot = new Slot(bestRule, false, newSlotLevel);
 						if (slotGenerator_.contains(newSlot)) {
 							// If the slot already exists, update the level if
 							// lower
 							Slot existingSlot = slotGenerator_
 									.findMatch(newSlot);
-							existingSlot.updateLevel(slotLevel);
+							existingSlot.updateLevel(newSlotLevel);
 							// Move the rule's slot to the existing slot for
 							// further update operations.
 							bestRule.setSlot(existingSlot);
