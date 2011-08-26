@@ -6,9 +6,6 @@ import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalWrapper;
 import relationalFramework.StateSpec;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
 import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
@@ -17,7 +14,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
-import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.MarioAIOptions;
 

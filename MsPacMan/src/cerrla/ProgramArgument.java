@@ -60,6 +60,7 @@ public enum ProgramArgument implements Serializable {
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),
 	TEST_ITERATIONS(100, "testIterations", null, ParameterType.EVALUATION,
 			"Number of iterations to test the final testing for"),
+			TESTING(false, "test", "-t", ParameterType.EVALUATION, "If just running tests"),
 	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
 	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
