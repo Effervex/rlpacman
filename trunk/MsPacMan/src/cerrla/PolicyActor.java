@@ -150,8 +150,11 @@ public class PolicyActor implements AgentInterface {
 				ObjectObservations.getInstance().goalReplacements);
 
 		// If the policy generator is modular, set the internal goal up
-		if (PolicyGenerator.getInstance().isModuleGenerator())
-			goalCondition_ = PolicyGenerator.getInstance().getModuleGoal();
+		if (CrossEntropyRun.getPolicyGenerator().isModuleGenerator())
+			goalCondition_ = CrossEntropyRun.getPolicyGenerator()
+					.getModuleGoal();
+		else
+			goalCondition_ = null;
 		// else
 		// AgentObservations.getInstance().noteGoalArgs(new GoalArg(goalArgs_,
 		// goalCondition_));
@@ -246,7 +249,7 @@ public class PolicyActor implements AgentInterface {
 		Collection<RelationalPolicy> policies = new ArrayList<RelationalPolicy>(
 				ensembleSize_);
 		for (int i = 0; i < ensembleSize_; i++) {
-			CoveringRelationalPolicy pol = PolicyGenerator.getInstance()
+			CoveringRelationalPolicy pol = CrossEntropyRun.getPolicyGenerator()
 					.generatePolicy(false);
 
 			// Apply the goal parameters to the goal conditions.
@@ -258,12 +261,10 @@ public class PolicyActor implements AgentInterface {
 		policy_ = new PolicyEnsemble(policies);
 		if (ensembleSize_ > 1)
 			System.out.println("Num policies: " + policy_.numPolicies());
-		// if (PolicyGenerator.debugMode_) {
 		if (isResampled)
 			System.out.println("RESAMPLED POLICY: " + policy_);
 		else
 			System.out.println(policy_);
-		// }
 
 		// Reset the state observations
 		resampleProb_ = 0;
@@ -370,7 +371,7 @@ public class PolicyActor implements AgentInterface {
 				MultiMap<String, String[]> emptyActions = MultiMap
 						.createSortedSetMultiMap(ArgumentComparator
 								.getInstance());
-				PolicyGenerator.getInstance().triggerRLGGCovering(state,
+				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(state,
 						validActions, goalArgs_, emptyActions);
 				AgentObservations.getInstance().removeUnseenPredicates(
 						removables);

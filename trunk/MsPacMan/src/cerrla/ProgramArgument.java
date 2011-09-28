@@ -15,12 +15,14 @@ import java.util.TreeSet;
 
 public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, ParameterType.UPDATING, "Step size update"),
-	BETA(0.01, "beta", null, ParameterType.CONVERGENCE,
+	BETA(0.0001, "beta", null, ParameterType.CONVERGENCE,
 			"If KL sum updates are less than Beta * Alpha"),
 	CHI(0.1, "chi", null, ParameterType.SAMPLING,
 			"The resampling percentage of average episode steps"),
 	DYNAMIC_SLOTS(true, "dynamicSlots", null, ParameterType.SPECIALISATION,
 			"If the slots grow dynamically"),
+	ELITES_SIZE(0, "elitesSize", null, ParameterType.SAMPLING,
+			"The size of the elites: 0=Av # rules, 1=Sum slot means, 2=Sum # KL rules"),
 	ENSEMBLE_EVALUATION(false, "ensembleEvaluation", null,
 			ParameterType.EVALUATION, "If using ensemble evaluation"),
 	ENSEMBLE_SIZE(100, "ensembleSize", null, ParameterType.EVALUATION,
@@ -28,12 +30,13 @@ public enum ProgramArgument implements Serializable {
 	INITIAL_ORDERING_SD(0.25, "initialSlotOrderingSD", null,
 			ParameterType.SAMPLING, "The SD of the slot order"),
 	INITIAL_SLOT_MEAN(1, "initialSlotMean", "-slotProb",
-			ParameterType.SAMPLING,
-			"The initial slot mu probabilities."),
+			ParameterType.SAMPLING, "The initial slot mu probabilities."),
 	LOCAL_ALPHA(true, "localAlpha", null, ParameterType.UPDATING,
 			"If updates are performed slot locally"),
 	MIN_WEIGHTED_UPDATE(0.1, "minWeightedUpdate", null, ParameterType.UPDATING,
 			"The minimal update when using weighted updates"),
+	NEGATIVE_UPDATES(false, "negativeUpdates", null, ParameterType.UPDATING,
+			"If performing negative updates"),
 	NUM_NUMERICAL_SPLITS(3, "numNumericalSplits", null,
 			ParameterType.SPECIALISATION, "The number of numerical splits"),
 	NUM_PERFORMANCES_CONVERGED(3, "numPerformancesConverged", null,
@@ -55,18 +58,22 @@ public enum ProgramArgument implements Serializable {
 			"Size of average performance sliding window"),
 	POLICY_REPEATS(3, "policyRepeats", null, ParameterType.EVALUATION,
 			"Number of times policy is repeated"),
-	RHO(0.05, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
-	SLOT_THRESHOLD(-1, "slotThreshold", null, ParameterType.SPECIALISATION,
+	RHO(0.1, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
+	SLOT_THRESHOLD(0.5, "slotThreshold", null, ParameterType.SPECIALISATION,
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),
 	TEST_ITERATIONS(100, "testIterations", null, ParameterType.EVALUATION,
 			"Number of iterations to test the final testing for"),
-			TESTING(false, "test", "-t", ParameterType.EVALUATION, "If just running tests"),
+	TESTING(false, "test", "-t", ParameterType.EVALUATION,
+			"If just running tests"),
 	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
 	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
 			"If using weighted updates");
 
 	public static final File ARG_FILE = new File("cerrlaArgs.txt");
+	public static final int ELITES_SIZE_AV_RULES = 0;
+	public static final int ELITES_SIZE_SUM_SLOTS = 1;
+	public static final int ELITES_SIZE_SUM_RULES = 2;
 	private Boolean booleanValue_;
 	private String comment_;
 	private Object defaultValue_;
@@ -165,6 +172,7 @@ public enum ProgramArgument implements Serializable {
 	 * @return The index after handling.
 	 */
 	public static int handleArg(int i, String[] args) {
+		// TODO Add output messages stating if the argument was received or not.
 		if (args[i].equals("-slotProb")) {
 			i++;
 			if (args[i].equals("dynamic"))

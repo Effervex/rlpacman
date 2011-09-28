@@ -85,7 +85,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Calculates the has for this slot, which remains the same on initialisation.
+	 * Calculates the has for this slot, which remains the same on
+	 * initialisation.
 	 */
 	private void calculateHash() {
 		final int prime = 31;
@@ -267,19 +268,33 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Gets the local alpha for this slot.
+	 * Gets the local alpha for this slot. If the slot is not ready for updates
+	 * yet, return 0.
 	 * 
+	 * @param alpha
+	 *            The standard alpha value.
 	 * @param population
 	 *            The size of the population.
 	 * @param numElites
 	 *            The minimum number of elite samples.
-	 * @param policiesEvaluated
+	 * @param totalPoliciesEvaluated
 	 *            The number of policies updated.
-	 * @return
+	 * @return The local alpha value or 0 if the slot is not ready for updates.
 	 */
-	public double getLocalAlpha(double alpha, int population, int numElites) {
+	public double getLocalAlpha(double alpha, int population, int numElites,
+			int totalPoliciesEvaluated) {
+		// If not using a local alpha, or not using dynamic slots, use global
+		// policies evaluated
+		if (ProgramArgument.LOCAL_ALPHA.booleanValue()
+				&& ProgramArgument.DYNAMIC_SLOTS.booleanValue())
+			totalPoliciesEvaluated = numUpdates_;
+
+		// If the slot has not seen enough samples to update, return 0.
+		if (totalPoliciesEvaluated < 2 * numElites)
+			return 0;
+
 		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
-				: PolicyGenerator.getInstance().getPoliciesEvaluated();
+				: totalPoliciesEvaluated;
 		return alpha / Math.max(population - policiesEvaluated, numElites);
 	}
 
@@ -324,8 +339,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
 		Collection<RelationalPredicate> splitFacts = new HashSet<RelationalPredicate>(
 				seedRule_.getConditions(true));
-		RelationalRule rlggRule = PolicyGenerator.getInstance().getRLGGRules()
-				.get(action_);
+		RelationalRule rlggRule = CrossEntropyRun.getPolicyGenerator()
+				.getRLGGRules().get(action_);
 		if (rlggRule != null)
 			splitFacts.removeAll(rlggRule.getConditions(true));
 		return splitFacts;
@@ -364,7 +379,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 		double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
-		if (klSize() < Math.pow(threshold, slotLevel_ + 1) * size())
+		threshold = Math.max(Math.pow(threshold, slotLevel_ + 1) * size(), 1);
+		
+		if (klSize() <= threshold)
 			return true;
 		return false;
 	}
@@ -423,6 +440,24 @@ public class Slot implements Serializable, Comparable<Slot> {
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
+		buffer.append(slotSplitToString());
+		buffer.append(" [MU:" + selectionProb_ + ";ORD:" + ordering_
+				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + ";LVL:"
+				+ slotLevel_ + ";#UPDATES:" + numUpdates_ + "]");
+		if (fixed_)
+			buffer.append(" " + fixedRule_.toString());
+		else
+			buffer.append(" " + ruleGenerator_.toString());
+		return buffer.toString();
+	}
+
+	/**
+	 * Outputs this slot split facts as a string.
+	 * 
+	 * @return The string form of the slot split facts.
+	 */
+	public String slotSplitToString() {
+		StringBuffer buffer = new StringBuffer();
 		buffer.append("Slot (");
 		Collection<RelationalPredicate> splitFacts = getSlotSplitFacts();
 		if (!splitFacts.isEmpty()) {
@@ -436,13 +471,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
-		buffer.append(" [MU:" + selectionProb_ + ";ORD:" + ordering_
-				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + ";LVL:"
-				+ slotLevel_ + ";#UPDATES:" + numUpdates_ + "]");
-		if (fixed_)
-			buffer.append(" " + fixedRule_.toString());
-		else
-			buffer.append(" " + ruleGenerator_.toString());
 		return buffer.toString();
 	}
 
@@ -455,10 +483,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * Updates the selection values of this slot stepwise towards the given
 	 * values.
 	 * 
-	 * @param ordering
-	 *            The (possibly null) average ordering of the slot (0..1)
-	 * @param mean
-	 *            The mean value to step towards.
+	 * @param ed
+	 *            The elites data to perform the update with.
 	 * @param alpha
 	 *            The amount the value should update by.
 	 * @param population
@@ -466,34 +492,23 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * @param numElites
 	 *            The minimum number of elite samples.
 	 * @param totalPoliciesEvaluated
-	 *            The global number of policies evaluated.
+	 *            The number of policies evaluated so far.
 	 * @return A normalised (to alpha) KL divergence of the generators.
 	 */
 	public double updateProbabilities(ElitesData ed, double alpha,
-			int population, int numElites) {
+			int population, int numElites, int totalPoliciesEvaluated) {
 		numUpdates_++;
 		if (ed == null)
 			return alpha;
 
-		// If using local or global
-		int policiesEvaluated = numUpdates_;
-		// If not using a local alpha, or not using dynamic slots, use global
-		// policies evaluated
-		if (!ProgramArgument.LOCAL_ALPHA.booleanValue()
-				|| !ProgramArgument.DYNAMIC_SLOTS.booleanValue())
-			policiesEvaluated = PolicyGenerator.getInstance()
-					.getPoliciesEvaluated();
+		double alphaPrime = getLocalAlpha(alpha, population, numElites,
+				totalPoliciesEvaluated);
+		if (alphaPrime > 0) {
+			// Update the slot values
+			updateSlotValues(ed.getSlotPosition(this),
+					ed.getSlotNumeracyMean(this), alphaPrime);
 
-		if (policiesEvaluated >= 2 * numElites) {
-			double alphaPrime = getLocalAlpha(alpha, population, numElites);
-
-			Double ordering = ed.getSlotPosition(this);
-			if (ordering != null)
-				ordering_ = ordering * alphaPrime + (1 - alphaPrime)
-						* ordering_;
-			selectionProb_ = ed.getSlotNumeracyMean(this) * alphaPrime
-					+ (1 - alphaPrime) * selectionProb_;
-
+			// If not fixed, update the rule values.
 			if (!fixed_) {
 				double updateModifier = alpha / alphaPrime;
 				return updateModifier

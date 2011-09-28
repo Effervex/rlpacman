@@ -17,9 +17,10 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
+import blocksWorld.BlocksWorldStateSpec;
+
 import cerrla.PolicyGenerator;
 
-import blocksWorld.BlocksWorldStateSpec;
 
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -33,7 +34,7 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		PolicyGenerator.newInstance(0);
+		new PolicyGenerator(0);
 		sut_ = AgentObservations.getInstance();
 	}
 
@@ -83,7 +84,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance();
+		sut_ = AgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -460,7 +461,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance();
+		sut_ = AgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -586,7 +587,7 @@ public class AgentObservationsTest {
 	@Test
 	public void testMoveBWScanState() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		sut_ = AgentObservations.newInstance();
+		sut_ = AgentObservations.newInstance("blah");
 
 		// [e]
 		// [b][d]
@@ -951,40 +952,6 @@ public class AgentObservationsTest {
 	}
 
 	@Test
-	public void testPacManScanState() {
-		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = AgentObservations.newInstance();
-
-		// Rete state = StateSpec.getInstance().getRete();
-		// state.eval("(assert (dot d))");
-		// state.eval("(assert (dot e))");
-		// state.eval("(assert (dot c))");
-		// state.eval("(assert (thing ))");
-		// state.eval("(assert (thing e))");
-		// state.eval("(assert (on d a))");
-		// state.eval("(assert (on e b))");
-		// state.eval("(assert (on b f))");
-		// state.eval("(assert (above e b))");
-		// state.eval("(assert (above e f))");
-		// state.eval("(assert (above b f))");
-		// state.eval("(assert (above d a))");
-		// state.eval("(assert (onFloor c))");
-		// state.eval("(assert (onFloor a))");
-		// state.eval("(assert (onFloor f))");
-		// state.eval("(assert (block a))");
-		// state.eval("(assert (block b))");
-		// state.eval("(assert (block c))");
-		// state.eval("(assert (block d))");
-		// state.eval("(assert (block e))");
-		// state.eval("(assert (block f))");
-		// Collection<Fact> facts = StateSpec.extractFacts(state);
-		//
-		// sut_.scanState(facts);
-		// Map<String, ConditionBeliefs> condBeliefs =
-		// sut_.getConditionBeliefs();
-	}
-
-	@Test
 	public void testLearnNegatedConditionBeliefs() throws Exception {
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (above e f))");
@@ -1031,7 +998,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance();
+		sut_ = AgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");

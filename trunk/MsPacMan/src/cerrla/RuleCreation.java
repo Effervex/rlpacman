@@ -1,5 +1,6 @@
 package cerrla;
 
+import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -261,11 +262,14 @@ public class RuleCreation implements Serializable {
 	 *            The set of valid actions to choose from.
 	 * @param goalReplacements
 	 *            The goal replacements.
+	 * @param moduleGoal
+	 *            The modular goal (if any).
 	 * @return A list of guided rules, one for each action type.
 	 */
 	public List<RelationalRule> rlggState(Rete state,
 			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements) throws Exception {
+			Map<String, String> goalReplacements, GoalCondition moduleGoal)
+			throws Exception {
 		// The relevant facts which contain the key term
 		AgentObservations.getInstance().scanState(
 				StateSpec.extractFacts(state), goalReplacements);
@@ -287,8 +291,7 @@ public class RuleCreation implements Serializable {
 		// conditions.
 		int numGoalArgs = 0;
 		if (goalReplacements == null)
-			numGoalArgs = PolicyGenerator.getInstance().getModuleGoal()
-					.getNumArgs();
+			numGoalArgs = moduleGoal.getNumArgs();
 		else
 			numGoalArgs = goalReplacements.size();
 		List<String> queryTerms = new ArrayList<String>(numGoalArgs);
@@ -307,33 +310,20 @@ public class RuleCreation implements Serializable {
 	 * @param condition
 	 *            The optional condition to be added to the rule conditions.
 	 *            Useful for quickly checking duplicates/negations.
-	 * @param testForIllegalRule
+	 * @param exitIfIllegalRule
 	 *            If the conditions need to be tested for illegal combinations
 	 *            as well (use background knowledge in conjugated form)
-	 * @param checkConditionUnification
-	 *            If the added condition is checked if it already unifies with
-	 *            existing conditions.
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
 	public SortedSet<RelationalPredicate> simplifyRule(
 			SortedSet<RelationalPredicate> ruleConds,
-			RelationalPredicate condition, boolean testForIllegalRule,
-			boolean checkConditionUnification) {
+			RelationalPredicate condition, boolean exitIfIllegalRule) {
 		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(
 				ruleConds);
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
-			if (checkConditionUnification) {
-				Collection<UnifiedFact> unification = Unification.getInstance()
-						.unifyFact(condition, ruleConds, new DualHashBidiMap(),
-								new DualHashBidiMap(), new String[0], false,
-								false);
-				if (!unification.isEmpty())
-					return null;
-			}
-
 			condition.swapNegated();
 			Collection<UnifiedFact> negUnification = Unification.getInstance()
 					.unifyFact(condition, ruleConds, new DualHashBidiMap(),
@@ -350,9 +340,13 @@ public class RuleCreation implements Serializable {
 		}
 
 		// Simplify using the learned background knowledge and local invariants
-		AgentObservations.getInstance().simplifyRule(simplified,
-				testForIllegalRule, false);
+		int result = AgentObservations.getInstance().simplifyRule(simplified,
+				exitIfIllegalRule, false);
+		// If rule is illegal, return null
+		if (exitIfIllegalRule && result == -1)
+			return null;
 
+		// If no change from original condition, return null
 		if (simplified.equals(ruleConds))
 			return null;
 
@@ -399,7 +393,7 @@ public class RuleCreation implements Serializable {
 
 			// Check for the regular condition
 			SortedSet<RelationalPredicate> specConditions = simplifyRule(
-					conditions, condition, true, false);
+					conditions, condition, true);
 			if (specConditions != null) {
 				RelationalRule specialisation = new RelationalRule(
 						specConditions, action, rule);

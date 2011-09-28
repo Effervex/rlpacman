@@ -20,9 +20,6 @@ import java.util.Set;
  * @param <V> The value.
  */
 public class MutableKeyMap<K, V> implements Map<K, V>, Serializable {
-	/**
-	 * 
-	 */
 	private static final long serialVersionUID = 1629296299318752989L;
 	private List<K> keys_;
 	private List<V> values_;

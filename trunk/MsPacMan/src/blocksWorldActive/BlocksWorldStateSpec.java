@@ -1,4 +1,4 @@
-package blocksWorldMove;
+package blocksWorldActive;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;
@@ -10,60 +10,30 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.agentObservations.BackgroundKnowledge;
-
-public class BlocksWorldStateSpec extends StateSpec {
+public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 
 	@Override
 	protected Map<String, String> initialiseActionPreconditions() {
-		Map<String, String> actionPreconditions = new HashMap<String, String>();
+		Map<String, String> actionPreconditions = super
+				.initialiseActionPreconditions();
 
-		actionPreconditions.put("move",
-				"(clear ?X) (block ?X) (clear ?Y &:(neq ?X ?Y)) "
-						+ "(not (on ?X ?Y))");
+		// Activates or deactivates a block
+		actionPreconditions.put("toggle", "(block ?X)");
 
 		return actionPreconditions;
 	}
 
 	@Override
-	protected int initialiseActionsPerStep() {
-		return 1;
-	}
-
-	@Override
 	protected Collection<RelationalPredicate> initialiseActionTemplates() {
-		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
+		Collection<RelationalPredicate> actions = super
+				.initialiseActionTemplates();
 
 		// Move action
-		String[] structure = new String[2];
+		String[] structure = new String[1];
 		structure[0] = "block";
-		structure[1] = "thing";
-		actions.add(new RelationalPredicate("move", structure));
+		actions.add(new RelationalPredicate("toggle", structure));
 
 		return actions;
-	}
-
-	@Override
-	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
-		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
-
-		// Block(Y) & !On(?,Y) -> Clear(Y)
-		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
-
-		// On(X,Y) -> Above(X,Y)
-		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
-
-		// Floor is always clear
-		bkMap.put("floorClear", new BackgroundKnowledge(
-				"(floor ?X) => (assert (clear ?X))", true));
-
-		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
-		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
-
-		return bkMap;
 	}
 
 	@Override
@@ -75,38 +45,45 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
 			result[0] = "onAB";
-			result[1] = "(on " + StateSpec.createGoalTerm(0) + " "
-					+ StateSpec.createGoalTerm(1) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ") (block "
-					+ StateSpec.createGoalTerm(1) + ")";
+			String[] goalBlocks = { StateSpec.createGoalTerm(0),
+					StateSpec.createGoalTerm(1) };
+			result[1] = "(on " + goalBlocks[0] + " " + goalBlocks[1]
+					+ ") (active " + goalBlocks[0] + ") (active "
+					+ goalBlocks[1] + ") (not (active ?X&:(<> ?X "
+					+ goalBlocks[0] + " " + goalBlocks[1] + ")))";
 			return result;
 		}
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(forall (block ?X) (clear ?X))";
+			result[1] = "(forall (block ?X) (clear ?X) (active ?X))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X)))";
+			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X))) "
+					+ "(forall (block ?A) (active ?A))";
 			return result;
 		}
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
 			result[0] = "clearA";
-			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ")";
+			String goalBlock = StateSpec.createGoalTerm(0);
+			result[1] = "(clear " + goalBlock + ") (block " + goalBlock
+					+ ") (active " + goalBlock + ") (not (active ?X&:(<> ?X "
+					+ goalBlock + ")))";
 			return result;
 		}
 
 		if (envParameter_.equals("highestA")) {
 			result[0] = "highestA";
-			result[1] = "(highest " + StateSpec.createGoalTerm(0) + ")";
+			String goalBlock = StateSpec.createGoalTerm(0);
+			result[1] = "(highest " + goalBlock + ") (active " + goalBlock
+					+ ") (not (active ?X&:(<> ?X " + goalBlock + ")))";
 			return result;
 		}
 		return null;

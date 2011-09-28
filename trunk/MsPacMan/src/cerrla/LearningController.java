@@ -17,8 +17,6 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.rlcommunity.rlglue.codec.RLGlue;
 
-import relationalFramework.agentObservations.AgentObservations;
-
 /**
  * The cross entropy algorithm implementation.
  * 
@@ -26,8 +24,7 @@ import relationalFramework.agentObservations.AgentObservations;
  */
 public class LearningController {
 	/** The folder to store the temp files. */
-	public static final File TEMP_FOLDER = new File("temp"
-			+ File.separatorChar);
+	public static final File TEMP_FOLDER = new File("temp" + File.separatorChar);
 
 	/** The marker for the end of a successfully completed performance file. */
 	public static final String END_PERFORMANCE = "<--END-->";
@@ -43,8 +40,6 @@ public class LearningController {
 	private long experimentStart_;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
-	/** The time at which the run started */
-	private long runStart_;
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
 	/** The maximum number of steps the agent can take. */
@@ -222,6 +217,7 @@ public class LearningController {
 		int minRun = -1;
 		float max = -Float.MAX_VALUE;
 		int maxRun = -1;
+		double[] episodeLengths = new double[runEnd];
 
 		if (!performanceFile_.exists())
 			performanceFile_.createNewFile();
@@ -286,9 +282,10 @@ public class LearningController {
 					currentKeyframeEpisode += ProgramArgument.PERFORMANCE_EPISODE_GAP
 							.intValue();
 				} while (currentKeyframeEpisode <= runPerformances.lastKey());
-				thisRunPerformances.add(runPerformances.get(current));
-				System.out.println(thisRunPerformances.get(thisRunPerformances
-						.size() - 1));
+				thisRunPerformances.add(runPerformances.get(runPerformances
+						.lastKey()));
+				System.out.println(runPerformances.get(runPerformances
+						.lastKey()));
 			} else {
 				// Take the values directly from the run performances
 				for (Integer key : runPerformances.keySet()) {
@@ -306,6 +303,7 @@ public class LearningController {
 				max = runVal;
 				maxRun = i;
 			}
+			episodeLengths[i] = runPerformances.lastKey();
 		}
 
 		// Calculate the average and print out the stats
@@ -316,6 +314,8 @@ public class LearningController {
 		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
 		boolean moreEpisodes = true;
 		int index = 0;
+		Mean mean = new Mean();
+		StandardDeviation sd = new StandardDeviation();
 		while (moreEpisodes) {
 			moreEpisodes = false;
 			// Compile the array of performances for the given index
@@ -325,7 +325,7 @@ public class LearningController {
 			for (int run = 0; run < performanceArray.length; run++) {
 				List<Float> runPerformanceList = performances.get(run);
 				int thisIndex = Math.min(index, runPerformanceList.size() - 1);
-				if (index < runPerformanceList.size())
+				if (index < runPerformanceList.size() - 1)
 					moreEpisodes = true;
 				performanceArray[run] = runPerformanceList.get(thisIndex);
 
@@ -337,8 +337,6 @@ public class LearningController {
 			}
 
 			// Find the statistics
-			Mean mean = new Mean();
-			StandardDeviation sd = new StandardDeviation();
 			int episodeNum = (int) ((byEpisode) ? index
 					* ProgramArgument.PERFORMANCE_EPISODE_GAP.doubleValue()
 					: index + 1);
@@ -351,8 +349,10 @@ public class LearningController {
 		buf.write("Total Run Time: "
 				+ toTimeFormat(System.currentTimeMillis() - experimentStart_)
 				+ "\n");
-		buf.write("Total Learning Time: " + toTimeFormat(runStart_)
-				+ "\n");
+
+		// Write the average episode length
+		buf.write("\nAverage episode length: " + mean.evaluate(episodeLengths)
+				+ " +- " + sd.evaluate(episodeLengths) + "\n");
 
 		buf.close();
 		writer.close();
@@ -402,8 +402,6 @@ public class LearningController {
 
 		// Create temp folder
 		try {
-			if (!elitesFile_.exists())
-				elitesFile_.createNewFile();
 			TEMP_FOLDER.mkdir();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -458,96 +456,6 @@ public class LearningController {
 	}
 
 	/**
-	 * Saves the elite policies to file.
-	 * 
-	 * @param elites
-	 *            The best policy, in string format.
-	 */
-	private void saveElitePolicies(Collection<PolicyValue> elites)
-			throws Exception {
-		FileWriter wr = new FileWriter(elitesFile_);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		writeFileHeader(buf);
-
-		if (comment_ != null)
-			buf.write(comment_ + "\n");
-
-		for (PolicyValue pv : elites) {
-			buf.write(pv.getPolicy().toOnlyUsedString() + "\n");
-			buf.write(pv.getValue() + "\n\n");
-		}
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
-	 * Saves the performance to file and outputs them. Saves to two files: One
-	 * with a breakdown of the generators, and another with purely episodic
-	 * performances.
-	 * 
-	 * @param episodeMeans
-	 *            The saved episode average performances mapped by number of
-	 *            episodes passed.
-	 * @param finalWrite
-	 *            If this write was the final write for the run.
-	 */
-	private void savePerformance(SortedMap<Integer, Double> episodeMeans,
-			SortedMap<Integer, Double> episodeSDs, File perfFile,
-			boolean finalWrite) throws Exception {
-		if (episodeMeans.isEmpty())
-			return;
-
-		// If the file has just been created, add the arguments to the head of
-		// the file
-		boolean newFile = perfFile.createNewFile();
-
-		FileWriter wr = new FileWriter(perfFile, true);
-		BufferedWriter buf = new BufferedWriter(wr);
-
-		// If the file is fresh, add the program args to the top
-		if (newFile)
-			writeFileHeader(buf);
-
-		if (comment_ != null)
-			buf.write(comment_ + "\n");
-
-		PolicyGenerator.getInstance().saveHumanGenerators(buf);
-		buf.write("\n\n");
-		PolicyGenerator.getInstance().saveGenerators(buf, perfFile.getPath());
-		int lastKey = episodeMeans.lastKey();
-		buf.write("\n\n" + lastKey + "\t" + episodeMeans.get(lastKey) + "\n");
-		buf.write("\n\n\n");
-
-		if (finalWrite) {
-			buf.write(END_PERFORMANCE + "\n");
-			buf.write("Total run time: "
-					+ toTimeFormat(System.currentTimeMillis() - runStart_));
-		}
-
-		buf.close();
-		wr.close();
-
-		// Writing the raw performance
-		File rawNumbers = new File(perfFile.getAbsoluteFile() + "raw");
-
-		wr = new FileWriter(rawNumbers);
-		buf = new BufferedWriter(wr);
-
-		System.out.println("Average episode scores:");
-		for (Integer episode : episodeMeans.keySet()) {
-			buf.write(episode + "\t" + episodeMeans.get(episode) + "\t"
-					+ episodeSDs.get(episode) + "\n");
-			System.out.println(episode + "\t" + episodeMeans.get(episode)
-					+ "\t\u00b1\t" + episodeSDs.get(episode));
-		}
-
-		buf.close();
-		wr.close();
-	}
-
-	/**
 	 * Runs the experiment through a number of iterations and saves the averaged
 	 * performance.
 	 * 
@@ -571,7 +479,6 @@ public class LearningController {
 
 		// The ultra-outer loop, for averaging experiment results
 		for (; run < repetitionsEnd_; run++) {
-			runStart_ = System.currentTimeMillis();
 			// Initialise a new policy generator.
 			PolicyGenerator localPolicy = null;
 			if (serializedFile_ != null)
@@ -581,21 +488,17 @@ public class LearningController {
 				if (serializedFile_ != null)
 					System.err.println("Could not load " + serializedFile_
 							+ "\nUsing new policy generator");
-				localPolicy = PolicyGenerator.newInstance(run);
+				localPolicy = new PolicyGenerator(run);
 			}
 
 			if (ruleFile_ != null)
 				localPolicy.seedRules(ruleFile_);
-			CrossEntropyRun cer = CrossEntropyRun.newInstance(localPolicy, this);
+			CrossEntropyRun cer = CrossEntropyRun
+					.newInstance(localPolicy, this);
 			cer.beginRun(run, false, maxSteps_, maxEpisodes_);
-			//developPolicy(localPolicy, run, false);
 
 			if (ProgramArgument.TESTING.booleanValue())
 				break;
-
-			// Resetting experiment values
-			PolicyGenerator.getInstance().resetGenerator();
-			AgentObservations.loadAgentObservations();
 		}
 
 		Module.saveAllModules();
@@ -611,55 +514,7 @@ public class LearningController {
 		}
 
 		System.out.println("Total learning time: "
-				+ toTimeFormat(experimentStart_));
-	}
-
-	/**
-	 * Saves any output files and serialisations required.
-	 * 
-	 * @param run
-	 *            The current run.
-	 * @param episodeMeans
-	 *            The episode mean performances, sorted by episode number.
-	 * @param episodeSDs
-	 *            The episode standard deviations, sorted by episode number.
-	 * @param pvs
-	 *            The current elites.
-	 * @param serialiseOnly
-	 *            If only serialisation files should be saved.
-	 * @param finalWrite
-	 *            If this is the final write of the performance file.
-	 * @throws Exception
-	 *             If something goes awry...
-	 */
-	public void saveFiles(int run, SortedMap<Integer, Double> episodeMeans,
-			SortedMap<Integer, Double> episodeSDs, SortedSet<PolicyValue> pvs,
-			boolean serialiseOnly, boolean finalWrite) throws Exception {
-		File tempPerf = null;
-		if (PolicyGenerator.getInstance().isModuleGenerator()) {
-			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
-					+ TEMP_FOLDER + File.separatorChar);
-			modTemps.mkdirs();
-			tempPerf = new File(modTemps, PolicyGenerator.getInstance()
-					.getLocalGoal() + performanceFile_.getName());
-		} else {
-			TEMP_FOLDER.mkdir();
-			tempPerf = new File(TEMP_FOLDER, performanceFile_.getName() + run);
-		}
-
-		// Remove any old file if this is the first run
-		if (episodeMeans.size() <= 1 && serializedFile_ == null)
-			tempPerf.delete();
-
-		if (!serialiseOnly) {
-			saveElitePolicies(pvs);
-			// Output the episode averages
-			savePerformance(episodeMeans, episodeSDs, tempPerf, finalWrite);
-		}
-		PolicyGenerator.getInstance().savePolicyGenerator(
-				new File(tempPerf + ".ser"));
-		if (!Module.saveAtEnd_)
-			AgentObservations.getInstance().saveAgentObservations();
+				+ toTimeFormat(System.currentTimeMillis() - experimentStart_));
 	}
 
 	public String getComment() {
@@ -700,10 +555,6 @@ public class LearningController {
 
 	public File getRuleFile() {
 		return ruleFile_;
-	}
-
-	public long getRunStart() {
-		return runStart_;
 	}
 
 	public File getSerializedFile() {

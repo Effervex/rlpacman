@@ -8,6 +8,7 @@ import relationalFramework.StateSpec;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -28,9 +29,9 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		PolicyGenerator.newInstance(0);
+		new PolicyGenerator(0);
 		assertTrue("No onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
+				AgentObservations.loadAgentObservations("onab"));
 	}
 
 	@Test
@@ -194,22 +195,7 @@ public class RuleCreationTest {
 		rule = new RelationalRule(
 				"(clear ?X) (clear ?Y) (on ?X ?Y) => (move ?X ?Y)");
 		results = sut_.specialiseRule(rule);
-
-		// Should not be there
-		mutant = new RelationalRule(
-				"(clear ?X) (clear ?Y) (on ?X ?Y) (on ?X ?) => (move ?X ?Y)");
-		assertFalse(results.contains(mutant));
-		mutant = new RelationalRule(
-				"(clear ?X) (clear ?Y) (on ?X ?Y) (not (on ?X ?)) => (move ?X ?Y)");
-		assertFalse(results.contains(mutant));
-		// Using background knowledge to disallow pointless and illegal
-		// mutations
-		mutant = new RelationalRule(
-				"(clear ?X) (clear ?Y) (on ?X ?Y) (onFloor ?X) => (move ?X ?Y)");
-		assertFalse(results.contains(mutant));
-		mutant = new RelationalRule(
-				"(clear ?X) (clear ?Y) (on ?X ?Y) (not (onFloor ?X)) => (move ?X ?Y)");
-		assertFalse(results.contains(mutant));
+		assertTrue(results.isEmpty());
 
 		// Adding to the right term
 		rule = new RelationalRule("(clear ?X) (block ?Y) => (move ?X ?Y)");
@@ -225,6 +211,22 @@ public class RuleCreationTest {
 		results = sut_.specialiseRule(rule);
 
 		assertFalse(results.toString().contains("(on ?G_0 ?G_1)"));
+	}
+	
+	@Test
+	public void testSpecialiseRuleBWMove() {
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
+		sut_ = new RuleCreation();
+		new PolicyGenerator(0);
+		assertTrue("No loaded onAB agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations("onab"));
+		
+		// Interesting case of losing (clear/highest ?Y)
+		RelationalRule rule = new RelationalRule(
+				"(clear ?X) (highest ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
+		Set<RelationalRule> results = sut_.specialiseRule(rule);
+		RelationalRule mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
 	}
 
 	@Test
@@ -279,14 +281,14 @@ public class RuleCreationTest {
 				ConditionComparator.getInstance());
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
-				null, false, true);
+				null, false);
 		assertNull(results);
 
 		// Equivalence condition removal
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -296,14 +298,14 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(on ?X ?)"), false, true);
+				StateSpec.toRelationalPredicate("(on ?X ?)"), false);
 		assertNull(results);
 
 		// Using an added condition (no simplification)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(clear ?X)"), false, true);
+				StateSpec.toRelationalPredicate("(clear ?X)"), false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -315,7 +317,7 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(above ?X ?)"), false, true);
+				StateSpec.toRelationalPredicate("(above ?X ?)"), false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -325,17 +327,16 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(not (above ?X ?))"), false,
-				true);
+				StateSpec.toRelationalPredicate("(not (above ?X ?))"), false);
 		assertNull(results);
 
 		// Testing illegal condition
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(onFloor ?X)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, true);
 		assertNull(results);
-		results = sut_.simplifyRule(ruleConds, null, true, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(onFloor ?X)")));
@@ -343,9 +344,9 @@ public class RuleCreationTest {
 
 		// Testing same condition
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(on ?X ?)"), false, true);
+				StateSpec.toRelationalPredicate("(above ?X ?)"), false);
 		assertNull(results);
 
 		ruleConds.clear();
@@ -353,21 +354,24 @@ public class RuleCreationTest {
 		results = sut_
 				.simplifyRule(ruleConds,
 						StateSpec.toRelationalPredicate("(not (on ?X ?))"),
-						false, true);
+						false);
 		assertNull(results);
 
 		// Testing unification
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(on ?X ?Y)"), false, true);
-		assertNull(results);
+				StateSpec.toRelationalPredicate("(on ?X ?Y)"), false);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?Y)")));
+		assertEquals(results.size(), 1);
 
 		// Testing double unification (onX? -> aboveX? which is removed)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X a)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X a)")));
@@ -378,7 +382,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ? ?Y)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?Y)")));
@@ -389,7 +393,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ? ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (onFloor ?X))"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?Y)")));
@@ -399,7 +403,7 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (on ?X ?))"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(onFloor ?X)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(onFloor ?X)")));
@@ -408,7 +412,7 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (onFloor ?X))"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -417,7 +421,7 @@ public class RuleCreationTest {
 		// Testing swapped for left equivalent conditions
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (on ?X ?))"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(onFloor ?X)")));
@@ -425,7 +429,7 @@ public class RuleCreationTest {
 
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (onFloor ?X))"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -435,7 +439,7 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(on ?X ?Y)")));
@@ -444,7 +448,7 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?Y)")));
@@ -455,7 +459,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y b)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -468,7 +472,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y b)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -480,7 +484,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X a)")));
@@ -492,7 +496,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(highest ?X)"), false, true);
+				StateSpec.toRelationalPredicate("(highest ?X)"), false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?X)")));
@@ -505,8 +509,9 @@ public class RuleCreationTest {
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
+		new PolicyGenerator(0);
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
+				AgentObservations.loadAgentObservations("onab"));
 
 		// Strange issue:
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
@@ -515,7 +520,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
 		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
-				null, false, true);
+				null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?Y)")));
@@ -528,7 +533,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y floor)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?Y)")));
@@ -541,7 +546,7 @@ public class RuleCreationTest {
 		// Test the (block X) <=> (above X ?) rule
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(block ?X)")));
@@ -551,14 +556,14 @@ public class RuleCreationTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear floor)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(floor floor)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.isEmpty());
 
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ? floor)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(floor floor)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.isEmpty());
 
@@ -566,8 +571,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(not (above ?X ?Y))"), false,
-				true);
+				StateSpec.toRelationalPredicate("(not (above ?X ?Y))"), false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(clear ?X)")));
@@ -577,7 +581,15 @@ public class RuleCreationTest {
 				.toRelationalPredicate("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
 		
-		
+		// Disallowing an illegal rule
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
+		results = sut_.simplifyRule(ruleConds, StateSpec
+				.toRelationalPredicate("(above ?X ?Y)"), true);
+		assertNull(results);
 	}
 
 	@Test
@@ -650,7 +662,7 @@ public class RuleCreationTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?X)"));
 		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
-				null, false, true);
+				null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?X)")));
@@ -659,7 +671,7 @@ public class RuleCreationTest {
 		// Basic equivalency swap test
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ?X ?)")));
@@ -668,7 +680,7 @@ public class RuleCreationTest {
 		// Basic negated equivalency swap test
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (clear ?X))"));
-		results = sut_.simplifyRule(ruleConds, null, false, true);
+		results = sut_.simplifyRule(ruleConds, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(above ? ?X)")));

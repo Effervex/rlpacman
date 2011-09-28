@@ -15,8 +15,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
 
-import cerrla.PolicyGenerator;
-
 import util.MultiMap;
 
 /**
@@ -302,10 +300,10 @@ public class LocalAgentObservations implements Serializable {
 	 * Loads the local agent observations from serialised file if possible.
 	 * Otherwise, it just creates a new local agent observations object.
 	 * 
+	 * @param localGoal The local goal observations to load.
 	 * @return The local agent observations object (loaded or new).
 	 */
-	public static LocalAgentObservations loadAgentObservations() {
-		String localGoal = PolicyGenerator.getInstance().getLocalGoal();
+	public static LocalAgentObservations loadAgentObservations(String localGoal) {
 		try {
 			File localObsFile = getLocalFile(localGoal);
 			if (localObsFile.exists()) {
@@ -331,9 +329,8 @@ public class LocalAgentObservations implements Serializable {
 				+ localGoal + File.separatorChar + SERIALISATION_FILE);
 	}
 
-	public static LocalAgentObservations newAgentObservations() {
-		return new LocalAgentObservations(PolicyGenerator.getInstance()
-				.getLocalGoal());
+	public static LocalAgentObservations newAgentObservations(String localGoal) {
+		return new LocalAgentObservations(localGoal);
 	}
 
 	/**

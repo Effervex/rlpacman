@@ -264,14 +264,17 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/**
 	 * Clone this rule.
 	 * 
+	 * @param cloneInternalMembers If internal counters should also be cloned.
 	 * @return A clone of this rule.
 	 */
-	@Override
-	public Object clone() {
+	public RelationalRule clone(boolean cloneInternalMembers) {
 		Collection<RelationalPredicate> cloneConds = new ArrayList<RelationalPredicate>();
 		for (RelationalPredicate cond : ruleConditions_)
 			cloneConds.add(new RelationalPredicate(cond));
 		RelationalRule clone = new RelationalRule(cloneConds, ruleAction_);
+		if (!cloneInternalMembers)
+			return clone;
+		
 		clone.hasSpawned_ = hasSpawned_;
 		clone.statesSeen_ = statesSeen_;
 		clone.mutant_ = mutant_;
@@ -495,8 +498,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * @return A cloned, but modularly grounded, rule.
 	 */
 	public RelationalRule groundModular() {
-		if (moduleParams_ == null)
-			return this;
+		if (moduleParams_ == null) {
+			return clone(false);
+		}
 
 		SortedSet<RelationalPredicate> groundConditions = new TreeSet<RelationalPredicate>(
 				ruleConditions_.comparator());
@@ -511,14 +515,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		RelationalRule groundRule = new RelationalRule(groundConditions,
 				groundAction, null);
 		groundRule.expandConditions();
-		groundRule.hasSpawned_ = hasSpawned_;
-		groundRule.statesSeen_ = statesSeen_;
-		groundRule.mutant_ = mutant_;
-		if (mutantParents_ != null)
-			groundRule.mutantParents_ = new ArrayList<RelationalRule>(
-					mutantParents_);
-
 		groundRule.findConstants();
+		
 		return groundRule;
 	}
 
@@ -693,6 +691,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		mutantParents_.add(parent);
 		if (parent.ancestryCount_ < ancestryCount_ - 1)
 			ancestryCount_ = parent.ancestryCount_ + 1;
+	}
+
+	public int getAncestryCount() {
+		return ancestryCount_;
 	}
 
 	/**
