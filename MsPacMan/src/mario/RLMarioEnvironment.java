@@ -84,12 +84,6 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
 			return 10000 + "";
-		} else if (arg0.equals("freeze")) {
-			PolicyGenerator.getInstance().freeze(true);
-			return null;
-		} else if (arg0.equals("unfreeze")) {
-			PolicyGenerator.getInstance().freeze(false);
-			return null;
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;

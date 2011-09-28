@@ -14,7 +14,7 @@ public class RelationalRuleTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
-		PolicyGenerator.newInstance(0);
+		new PolicyGenerator(0);
 	}
 
 	@Test

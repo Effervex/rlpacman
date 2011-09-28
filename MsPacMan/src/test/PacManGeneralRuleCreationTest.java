@@ -24,7 +24,7 @@ public class PacManGeneralRuleCreationTest {
 
 		// Set up the allowable conditions
 		assertTrue("No loaded agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
+				AgentObservations.loadAgentObservations("blah"));
 	}
 
 	// @Test

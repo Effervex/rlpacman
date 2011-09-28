@@ -133,7 +133,7 @@ public class Unification {
 		if (oldState.isEmpty()) {
 			oldState.addAll(oldStateClone);
 			return -1;
-		} else if (oldState.containsAll(oldStateClone))
+		} else if (oldState.containsAll(oldStateClone) && oldStateClone.containsAll(oldState))
 			return 0;
 		else
 			return 1;

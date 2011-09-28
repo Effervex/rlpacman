@@ -33,6 +33,7 @@ import java.util.TreeSet;
 
 import relationalFramework.agentObservations.AgentObservations;
 import util.MultiMap;
+import util.Pair;
 import util.ProbabilityDistribution;
 import util.SelectableSet;
 import util.SlotOrderComparator;
@@ -47,9 +48,6 @@ import jess.Rete;
  */
 public final class PolicyGenerator implements Serializable {
 	private static final long serialVersionUID = 3157117448981353095L;
-
-	/** The instance. */
-	private static PolicyGenerator instance_;
 
 	/**
 	 * The increment for an ordering value to increase when resolving ordering
@@ -71,6 +69,9 @@ public final class PolicyGenerator implements Serializable {
 
 	/** The name of a module-saved policy generator serialised file. */
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
+
+	/** The point at which low mean slots are ignored for text output. */
+	private static final double LOW_SLOT_THRESHOLD = 0.001;
 
 	/** Policies awaiting testing. */
 	private Stack<CoveringRelationalPolicy> awaitingTest_;
@@ -126,6 +127,9 @@ public final class PolicyGenerator implements Serializable {
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
 
+	/** The trace of the slot splits. */
+	private SortedMap<Double, RelationalRule> mutationTree_;
+
 	/** The rule creation object. */
 	protected RuleCreation ruleCreation_;
 
@@ -139,8 +143,44 @@ public final class PolicyGenerator implements Serializable {
 		currentSlots_ = MultiMap.createListMultiMap();
 		klDivergence_ = Double.MAX_VALUE;
 		policiesEvaluated_ = 0;
+		mutationTree_ = new TreeMap<Double, RelationalRule>();
 
 		resetGenerator();
+	}
+
+	/**
+	 * Initialises the instance as a new policy generator.
+	 * 
+	 * @return The new PolicyGenerator.
+	 */
+	public PolicyGenerator(int randSeed) {
+		this();
+		random_ = new Random(randSeed);
+		localGoal_ = StateSpec.getInstance().getGoalName();
+		moduleGenerator_ = false;
+
+		loadAgentData();
+	}
+
+	/**
+	 * Initialises the instance as a new policy generator which uses information
+	 * from the old generator.
+	 * 
+	 * @param policyGenerator
+	 *            The policy generator containing the old LGG rules.
+	 * @param goalCondition
+	 *            The modular goal being worked towards.
+	 * @return The new PolicyGenerator.
+	 */
+	public PolicyGenerator(PolicyGenerator policyGenerator,
+			GoalCondition goalCondition) {
+		this();
+		// Set up the new local goal.
+		localGoal_ = goalCondition.toString();
+		loadAgentData();
+		moduleGenerator_ = true;
+		goalCondition.normaliseArgs();
+		moduleGoal_ = goalCondition;
 	}
 
 	/**
@@ -155,7 +195,7 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private ElitesData countRules(SortedSet<PolicyValue> elites, double minValue) {
 		// Check that the elites are actually a sub-set of the population
-		if (elites.size() == PolicyGenerator.getInstance().policiesEvaluated_
+		if (elites.size() == policiesEvaluated_
 				&& elites.last().getValue() == minValue)
 			return null;
 
@@ -192,7 +232,7 @@ public final class PolicyGenerator implements Serializable {
 					ed.addSlotCount(ruleSlot, weight);
 
 					// Slot ordering
-					double order = (firingRules.size() == 1) ? 0 : 1.0
+					double order = (firingRules.size() == 1) ? 0.5 : 1.0
 							* firedRuleIndex / (firingRules.size() - 1);
 					ed.addSlotOrdering(ruleSlot, order);
 					firedRuleIndex++;
@@ -293,10 +333,8 @@ public final class PolicyGenerator implements Serializable {
 					RelationalRule rr = iter.next();
 					needToPause = true;
 					rr.removeParent(baseRule);
-					if (!rr.isWithoutParents()) {
+					if (!rr.isWithoutParents())
 						iter.remove();
-						currentRules_.remove(rr);
-					}
 
 					if (debugMode_) {
 						System.out.println("\tREMOVING MUTANT: " + rr);
@@ -309,8 +347,10 @@ public final class PolicyGenerator implements Serializable {
 					baseRule.getSlot().resetPolicyCount();
 				}
 
-				if (ruleSlot.getGenerator().removeAll(removables))
+				if (ruleSlot.getGenerator().removeAll(removables)) {
+					currentRules_.removeAll(removables);
 					ruleSlot.getGenerator().normaliseProbs();
+				}
 			} else {
 				restart_ = false;
 			}
@@ -332,6 +372,8 @@ public final class PolicyGenerator implements Serializable {
 			}
 			currentRules_.addAll(mutants);
 			baseRule.setChildren(mutants);
+			noteMutationTree(baseRule, CrossEntropyRun.getInstance()
+					.getCurrentEpisode());
 
 			if (debugMode_ && needToPause) {
 				try {
@@ -343,6 +385,23 @@ public final class PolicyGenerator implements Serializable {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Note down the mutation in the mutation tree.
+	 * 
+	 * @param baseRule
+	 *            The rule being mutated.
+	 * @param currentEpisode
+	 *            The current episode.
+	 */
+	private void noteMutationTree(RelationalRule baseRule, int currentEpisode) {
+		// Modify the episode value by a small amount if two or more rules
+		// mutate on the same episode.
+		Double episodeF = Double.valueOf(currentEpisode);
+		while (mutationTree_.containsKey(episodeF))
+			episodeF += ORDER_CLASH_INCREMENT;
+		mutationTree_.put(episodeF, baseRule);
 	}
 
 	/**
@@ -540,7 +599,8 @@ public final class PolicyGenerator implements Serializable {
 	 * @return A new policy, formed using weights from the probability
 	 *         distributions.
 	 */
-	public CoveringRelationalPolicy generatePolicy(boolean influenceUntestedRules) {
+	public CoveringRelationalPolicy generatePolicy(
+			boolean influenceUntestedRules) {
 		if (!awaitingTest_.isEmpty())
 			return awaitingTest_.pop();
 
@@ -791,17 +851,33 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param buf
 	 *            The predefined stream to write to.
-	 * @param performanceFile
-	 *            The path to the temporary performance file.
 	 */
-	public void saveGenerators(BufferedWriter buf, String performanceFile)
-			throws Exception {
+	public void saveGenerators(BufferedWriter buf) throws Exception {
 		SortedSet<Slot> orderSlots = new TreeSet<Slot>(
 				SlotOrderComparator.getInstance());
 		orderSlots.addAll(slotGenerator_);
 		StringBuffer slotBuffer = new StringBuffer();
-		for (Slot s : orderSlots)
+		Slot uselessSlot = null;
+		for (Slot s : orderSlots) {
+			if (s.getSelectionProbability() < LOW_SLOT_THRESHOLD) {
+				uselessSlot = s;
+				break;
+			}
 			slotBuffer.append(s.toString() + "\n");
+		}
+		if (uselessSlot != null) {
+			SortedSet<Slot> unusedSlots = orderSlots.tailSet(uselessSlot);
+			slotBuffer.append("+ " + unusedSlots.size() + " OTHER MU < "
+					+ LOW_SLOT_THRESHOLD + " SLOTS: {");
+			boolean first = true;
+			for (Slot unused : unusedSlots) {
+				if (!first)
+					slotBuffer.append(", ");
+				slotBuffer.append(unused.slotSplitToString());
+				first = false;
+			}
+			slotBuffer.append("}\n");
+		}
 
 		// For each of the rule generators
 		buf.write(slotBuffer.toString() + "\n");
@@ -856,6 +932,95 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
+	 * Saves a trace of the mutations to file.
+	 * 
+	 * @param buf
+	 *            The buffer to save to.
+	 */
+	public void saveMutationTree(BufferedWriter buf) throws Exception {
+		Map<String, MultiMap<RelationalRule, Pair<RelationalRule, Integer>>> actionRules = new HashMap<String, MultiMap<RelationalRule, Pair<RelationalRule, Integer>>>();
+		MultiMap<String, Pair<RelationalRule, Integer>> parentlessRules = MultiMap
+				.createSortedSetMultiMap(MutationEpisodeComparator
+						.getInstance());
+		// Write an episodic list of mutations
+		buf.append("Per episode mutations\n");
+		for (Double episode : mutationTree_.keySet()) {
+			int episodeInt = episode.intValue();
+			buf.append(episodeInt + ":");
+			RelationalRule rule = mutationTree_.get(episode);
+			for (int i = rule.getAncestryCount() - 1; i >= 0; i--) {
+				if (i == 0)
+					buf.append("|-");
+				else
+					buf.append(" ");
+			}
+			buf.append(rule.toNiceString() + "\n");
+
+			// Noting the rules
+			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> rules = actionRules
+					.get(rule.getActionPredicate());
+			// Initialise the multimap
+			if (rules == null) {
+				rules = MultiMap
+						.createSortedSetMultiMap(MutationEpisodeComparator
+								.getInstance());
+				actionRules.put(rule.getActionPredicate(), rules);
+			}
+
+			// Add the rule to the multimap, with the parent rule as the key
+			Pair<RelationalRule, Integer> pair = new Pair<RelationalRule, Integer>(
+					rule, episodeInt);
+			if (!rule.isWithoutParents()) {
+				rules.put(rule.getParentRules().iterator().next(), pair);
+			} else {
+				// If the rule has no parents, use it as a base rule
+				parentlessRules.put(rule.getActionPredicate(), pair);
+			}
+		}
+		buf.append("\n");
+
+		// Output each action mutation tree
+		for (String action : actionRules.keySet()) {
+			buf.append("Per action (" + action + ")\n");
+			for (Pair<RelationalRule, Integer> rule : parentlessRules
+					.get(action)) {
+				recurseMutationTree(rule, actionRules.get(action), buf);
+			}
+		}
+	}
+
+	/**
+	 * Recurse through a multimap tree.
+	 * 
+	 * @param rule
+	 *            The current rule.
+	 * @param mutationTree
+	 *            The mutation tree to traverse
+	 * @param buf
+	 *            The writer to write out to.
+	 */
+	private void recurseMutationTree(
+			Pair<RelationalRule, Integer> rule,
+			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> mutationTree,
+			BufferedWriter buf) throws Exception {
+		for (int i = rule.objA_.getAncestryCount() - 1; i >= 0; i--) {
+			if (i == 0)
+				buf.append("|-");
+			else
+				buf.append(" ");
+		}
+		buf.append(rule.objA_.toNiceString() + ":" + rule.objB_ + "\n");
+
+		// Recurse through the rules
+		Collection<Pair<RelationalRule, Integer>> children = mutationTree
+				.get(rule.objA_);
+		if (children != null)
+			for (Pair<RelationalRule, Integer> childRule : mutationTree
+					.get(rule.objA_))
+				recurseMutationTree(childRule, mutationTree, buf);
+	}
+
+	/**
 	 * Seed rules from a file as new slots.
 	 * 
 	 * @param ruleFile
@@ -868,8 +1033,9 @@ public final class PolicyGenerator implements Serializable {
 			String input = null;
 			while ((input = br.readLine()) != null) {
 				RelationalRule seedRule = new RelationalRule(input);
-				SortedSet<RelationalPredicate> ruleConds = seedRule.getConditions(false);
-				ruleConds = ruleCreation_.simplifyRule(ruleConds, null, false, false);
+				SortedSet<RelationalPredicate> ruleConds = seedRule
+						.getConditions(false);
+				ruleConds = ruleCreation_.simplifyRule(ruleConds, null, false);
 				seedRule.setConditions(ruleConds, false);
 				createSeededSlot(seedRule);
 			}
@@ -934,7 +1100,7 @@ public final class PolicyGenerator implements Serializable {
 			List<RelationalRule> covered = null;
 			try {
 				covered = ruleCreation_.rlggState(state, validActions,
-						goalReplacements);
+						goalReplacements, moduleGoal_);
 				currentRules_.addAll(covered);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1005,7 +1171,7 @@ public final class PolicyGenerator implements Serializable {
 		for (Slot slot : slotGenerator_) {
 			// Update the slot
 			double result = slot.updateProbabilities(ed, alpha, population,
-					numElites);
+					numElites, policiesEvaluated_);
 			updated |= (result != alpha);
 			klDivergence_ += result;
 		}
@@ -1034,16 +1200,12 @@ public final class PolicyGenerator implements Serializable {
 	 * @param removed
 	 *            The samples this iteration that did not make the elite
 	 *            samples.
-	 * @param totalPoliciesEvaluated
-	 *            The number of policies evaluated.
 	 */
 	public void updateNegative(SortedSet<PolicyValue> elites, double alpha,
-			int population, int numElites, SortedSet<PolicyValue> removed,
-			int totalPoliciesEvaluated) {
+			int population, int numElites, SortedSet<PolicyValue> removed) {
 		if (removed == null || removed.isEmpty())
 			return;
 
-		System.err.println("ERROR: Not properly implemented yet!");
 		// 'Negative' updates
 		float bestVal = elites.first().getValue();
 		float gamma = elites.last().getValue();
@@ -1057,31 +1219,28 @@ public final class PolicyGenerator implements Serializable {
 			// Negative update each rule
 			for (RelationalRule gr : negVal.getPolicy().getFiringRules()) {
 				Slot slot = gr.getSlot();
-				// Calculate the update appropriation based on how influential
-				// the rule is within the slot.
-				double ruleProb = slot.getGenerator().getProb(gr);
-				double ruleRatio = ruleProb * slot.size();
-				ruleRatio /= (ruleRatio + 1);
-				double negAlpha = negModifier
-						* slot.getLocalAlpha(alpha, population, numElites)
-						/ numElites;
+				if (slot != null) {
+					double negAlpha = negModifier
+							* slot.getLocalAlpha(alpha, population, numElites,
+									policiesEvaluated_) / numElites;
 
-				slot.updateSlotValues(slot.getOrdering(), 0, negAlpha
-						* (1 - ruleRatio));
-				slot.getGenerator().updateElement(gr, 1, 0,
-						negAlpha * ruleRatio);
-				slot.getGenerator().normaliseProbs();
+					// If the slot is ready for updates.
+					if (negAlpha != 0) {
+						// Calculate the update appropriation based on how
+						// influential the rule is within the slot.
+						double ruleProb = slot.getGenerator().getProb(gr);
+						double ruleRatio = ruleProb * slot.size();
+						ruleRatio /= (ruleRatio + 1);
+
+						slot.updateSlotValues(slot.getOrdering(), 0, negAlpha
+								* (1 - ruleRatio));
+						slot.getGenerator().updateElement(gr, 1, 0,
+								negAlpha * ruleRatio);
+						slot.getGenerator().normaliseProbs();
+					}
+				}
 			}
 		}
-	}
-
-	/**
-	 * Gets the rule base instance.
-	 * 
-	 * @return The rule base instance or null if not yet initialised.
-	 */
-	public static PolicyGenerator getInstance() {
-		return instance_;
 	}
 
 	/**
@@ -1098,12 +1257,12 @@ public final class PolicyGenerator implements Serializable {
 		try {
 			FileInputStream fis = new FileInputStream(serializedFile);
 			ois = new ObjectInputStream(fis);
-			instance_ = (PolicyGenerator) ois.readObject();
-			AgentObservations.loadAgentObservations();
+			PolicyGenerator loaded = (PolicyGenerator) ois.readObject();
+			AgentObservations.loadAgentObservations(loaded.localGoal_);
 			ois.close();
-			
+
 			StateSpec.reinitInstance();
-			return instance_;
+			return loaded;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1127,64 +1286,16 @@ public final class PolicyGenerator implements Serializable {
 			goalCondition.normaliseArgs();
 			modPG.moduleGoal_ = goalCondition;
 		}
-		instance_ = modPG;
+		PolicyGenerator loaded = modPG;
 		StateSpec.reinitInstance();
-		return instance_;
+		return loaded;
 	}
 
 	/**
-	 * Initialises the instance as a new policy generator.
-	 * 
-	 * @return The new PolicyGenerator.
+	 * Loads external agent data (AgentObservations and StateSpec).
 	 */
-	public static PolicyGenerator newInstance(int randSeed) {
-		random_ = new Random(randSeed);
-		instance_ = new PolicyGenerator();
-		instance_.localGoal_ = StateSpec.getInstance().getGoalName();
-		instance_.moduleGenerator_ = false;
-
-		AgentObservations.loadAgentObservations();
+	public void loadAgentData() {
+		AgentObservations.loadAgentObservations(localGoal_);
 		StateSpec.reinitInstance();
-		return instance_;
-	}
-
-	/**
-	 * Initialises the instance as a new policy generator which uses information
-	 * from the old generator.
-	 * 
-	 * @param policyGenerator
-	 *            The policy generator containing the old LGG rules.
-	 * @param goalCondition
-	 *            The modular goal being worked towards.
-	 * @return The new PolicyGenerator.
-	 */
-	public static PolicyGenerator newInstance(PolicyGenerator policyGenerator,
-			GoalCondition goalCondition) {
-		instance_ = new PolicyGenerator();
-
-		// Set up the new local goal.
-		instance_.localGoal_ = goalCondition.toString();
-		AgentObservations.loadAgentObservations();
-		instance_.moduleGenerator_ = true;
-		goalCondition.normaliseArgs();
-		instance_.moduleGoal_ = goalCondition;
-
-		StateSpec.reinitInstance();
-
-		return instance_;
-	}
-
-	/**
-	 * Sets the instance to a particular generator.
-	 * 
-	 * @param generator
-	 *            The PolicyGenerator instance.
-	 */
-	public static void setInstance(PolicyGenerator generator) {
-		if (generator == instance_)
-			return;
-		instance_ = generator;
-		instance_.moduleGenerator_ = false;
-		instance_.moduleGoal_ = null;
 	}
 }

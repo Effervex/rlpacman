@@ -16,6 +16,7 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
+import cerrla.CrossEntropyRun;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
@@ -30,15 +31,15 @@ public class PolicyGeneratorTest {
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = PolicyGenerator.newInstance(0);
+		sut_ = new PolicyGenerator(0);
+		CrossEntropyRun.newInstance(sut_, null);
 	}
 
 	@Test
 	public void testTriggerRLGGCovering() throws Exception {
 		ProgramArgument.DYNAMIC_SLOTS.setBooleanValue(false);
-		assertTrue("No agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
-		AgentObservations.getInstance().clearLocalObservations();
+		AgentObservations.loadAgentObservations("blah");
+
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		state.eval("(assert (clear b))");
@@ -150,10 +151,8 @@ public class PolicyGeneratorTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = PolicyGenerator.newInstance(0);
-		assertTrue("No agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations());
-		AgentObservations.getInstance().clearLocalObservations();
+		sut_ = new PolicyGenerator(0);
+		AgentObservations.loadAgentObservations("blah");
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");

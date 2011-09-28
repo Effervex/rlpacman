@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import cerrla.CrossEntropyRun;
 import cerrla.Module;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
@@ -98,7 +99,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 					gr.setModularParameters(parameters);
 					checkModular(gr);
 					// Get/create the corresponding rule in the generator
-					gr = PolicyGenerator.getInstance()
+					gr = CrossEntropyRun.getPolicyGenerator()
 							.getCreateCorrespondingRule(gr);
 					if (!policyRules_.contains(gr)) {
 						gr.setQueryParams(null);
@@ -205,7 +206,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			// First evaluate the RLGG rules (if any). If the actions there
 			// don't match up to the activated actions, covering will be
 			// required.
-			for (RelationalRule rlgg : PolicyGenerator.getInstance()
+			for (RelationalRule rlgg : CrossEntropyRun.getPolicyGenerator()
 					.getRLGGRules().values()) {
 				SortedSet<String[]> rlggActions = new TreeSet<String[]>(
 						ArgumentComparator.getInstance());
@@ -218,7 +219,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 
 			// Next trigger covering, storing the rules in the policy if
 			// required
-			List<RelationalRule> coveredRules = PolicyGenerator.getInstance()
+			List<RelationalRule> coveredRules = CrossEntropyRun.getPolicyGenerator()
 					.triggerRLGGCovering(state, validActions, goalReplacements,
 							activatedActions);
 			// If the policy is empty, store the rules in it.

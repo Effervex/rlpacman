@@ -42,8 +42,6 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public final class AgentObservations implements Serializable {
-	private static final long serialVersionUID = -3485610187532540886L;
-
 	private static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
 	private static final String CONDITION_BELIEF_FILE = "conditionBeliefs.txt";
@@ -53,12 +51,14 @@ public final class AgentObservations implements Serializable {
 
 	private static final String SERIALISATION_FILE = "agentObservations.ser";
 
-	/** The agent observations directory. */
-	public static final File AGENT_OBSERVATIONS_DIR = new File(
-			"agentObservations/");
+	private static final long serialVersionUID = -3485610187532540886L;
 
 	/** 2^SETTLED inactive iterations before considered settled. */
 	private static final int SETTLED_THRESHOLD = 7;
+
+	/** The agent observations directory. */
+	public static final File AGENT_OBSERVATIONS_DIR = new File(
+			"agentObservations/");
 
 	/** The action based observations, keyed by action predicate. */
 	private Map<String, ActionBasedObservations> actionBasedObservations_;
@@ -90,8 +90,6 @@ public final class AgentObservations implements Serializable {
 		observationHash_ = null;
 		inactivity_ = 0;
 		lastCover_ = 0;
-		localAgentObservations_ = LocalAgentObservations
-				.loadAgentObservations();
 
 		AGENT_OBSERVATIONS_DIR.mkdir();
 	}
@@ -137,7 +135,9 @@ public final class AgentObservations implements Serializable {
 	}
 
 	public void clearLocalObservations() {
-		localAgentObservations_ = LocalAgentObservations.newAgentObservations();
+		localAgentObservations_ = LocalAgentObservations
+				.newAgentObservations(localAgentObservations_
+						.getLocalGoalName());
 	}
 
 	/**
@@ -203,8 +203,17 @@ public final class AgentObservations implements Serializable {
 		return actionFacts;
 	}
 
+	// TEST METHODS
+	public Map<String, ConditionBeliefs> getConditionBeliefs() {
+		return conditionObservations_.conditionBeliefs_;
+	}
+
 	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
 		return localAgentObservations_.getGoalPredicateMap();
+	}
+
+	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
+		return conditionObservations_.learnedEnvironmentRules_;
 	}
 
 	public String getLocalGoalName() {
@@ -213,6 +222,10 @@ public final class AgentObservations implements Serializable {
 
 	public Collection<GoalCondition> getLocalSpecificGoalConditions() {
 		return localAgentObservations_.getSpecificGoalConditions();
+	}
+
+	public Map<String, Map<IntegerArray, ConditionBeliefs>> getNegatedConditionBeliefs() {
+		return conditionObservations_.negatedConditionBeliefs_;
 	}
 
 	public int getNumGoalArgs() {
@@ -371,15 +384,18 @@ public final class AgentObservations implements Serializable {
 
 	/**
 	 * Saves agent observations to file in the agent observations directory.
+	 * 
+	 * @param localGenerator
+	 *            The local policy generator.
 	 */
-	public void saveAgentObservations() {
+	public void saveAgentObservations(PolicyGenerator localGenerator) {
 		try {
 			// Make the environment directory if necessary
 			File environmentDir = new File(AGENT_OBSERVATIONS_DIR, StateSpec
 					.getInstance().getEnvironmentName() + File.separatorChar);
 			environmentDir.mkdir();
-			File localEnvironmentDir = new File(environmentDir, PolicyGenerator
-					.getInstance().getLocalGoal() + File.separatorChar);
+			File localEnvironmentDir = new File(environmentDir,
+					localGenerator.getLocalGoal() + File.separatorChar);
 			localEnvironmentDir.mkdir();
 
 			// Condition beliefs
@@ -545,6 +561,17 @@ public final class AgentObservations implements Serializable {
 		return localAgentObservations_.searchAllGoalArgs();
 	}
 
+	public void setActionConditions(String action,
+			Collection<RelationalPredicate> conditions) {
+		getActionBasedObservation(action).setActionConditions(conditions);
+		observationHash_ = null;
+		inactivity_ = 0;
+	}
+
+	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
+		conditionObservations_.learnedEnvironmentRules_ = backKnow;
+	}
+
 	public void setNumGoalArgs(int num) {
 		localAgentObservations_.setNumGoalArgs(num);
 	}
@@ -555,19 +582,21 @@ public final class AgentObservations implements Serializable {
 	 * 
 	 * @param simplified
 	 *            The facts to be simplified.
-	 * @param testForIllegalRule
-	 *            If the procedure is also testing for illegal rules.
+	 * @param exitIfIllegalRule
+	 *            If the procedure is exits if rule is illegal.
 	 * @param onlyEquivalencies
 	 *            If only equivalent rules should be tested.
-	 * @return True if the condition was simplified.
+	 * @return 1 if the condition was simplified, 0 if no change, -1 if illegal
+	 *         rule (and exiting with illegal rules).
 	 */
-	public boolean simplifyRule(SortedSet<RelationalPredicate> simplified,
-			boolean testForIllegalRule, boolean onlyEquivalencies) {
-		boolean result = false;
-
+	public int simplifyRule(SortedSet<RelationalPredicate> simplified,
+			boolean exitIfIllegalRule, boolean onlyEquivalencies) {
 		// Simplify using background knowledge
-		result |= conditionObservations_.simplifyRule(simplified,
-				testForIllegalRule, onlyEquivalencies);
+		int simplResult = conditionObservations_.simplifyRule(simplified,
+				exitIfIllegalRule, onlyEquivalencies);
+		if (simplResult == -1 && exitIfIllegalRule)
+			return -1;
+		boolean result = (simplResult != 0);
 
 		// Simplify using invariants
 		if (!onlyEquivalencies) {
@@ -576,7 +605,7 @@ public final class AgentObservations implements Serializable {
 			result |= simplified.removeAll(localAgentObservations_
 					.getConditionInvariants().getSpecificInvariants());
 		}
-		return result;
+		return (result) ? 1 : 0;
 	}
 
 	/**
@@ -607,8 +636,8 @@ public final class AgentObservations implements Serializable {
 	 * @return The instance.
 	 */
 	public static AgentObservations getInstance() {
-		if (instance_ == null)
-			instance_ = new AgentObservations();
+		// if (instance_ == null)
+		// instance_ = new AgentObservations();
 		return instance_;
 	}
 
@@ -616,9 +645,11 @@ public final class AgentObservations implements Serializable {
 	 * Loads an AgentObservation serialised class from file, or if no file
 	 * available, creates a new one.
 	 * 
+	 * @param localGoal
+	 *            The local goal observations to load.
 	 * @return True if local observations were also loaded.
 	 */
-	public static boolean loadAgentObservations() {
+	public static boolean loadAgentObservations(String localGoal) {
 		try {
 			File globalObsFile = new File(AGENT_OBSERVATIONS_DIR, StateSpec
 					.getInstance().getEnvironmentName()
@@ -634,7 +665,7 @@ public final class AgentObservations implements Serializable {
 					// Attempt to load the local observations pertaining to the
 					// goal at hand.
 					instance_.localAgentObservations_ = LocalAgentObservations
-							.loadAgentObservations();
+							.loadAgentObservations(localGoal);
 
 					return instance_.localAgentObservations_.isLoaded();
 				}
@@ -642,19 +673,21 @@ public final class AgentObservations implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		instance_ = getInstance();
+		instance_ = newInstance(localGoal);
 		return false;
 	}
 
 	/**
 	 * Gets the AgentObservations instance.
 	 * 
+	 * @param localGoal
+	 *            The local goal for local observations.
 	 * @return The instance.
 	 */
-	public static AgentObservations newInstance() {
+	public static AgentObservations newInstance(String localGoal) {
 		instance_ = new AgentObservations();
 		instance_.localAgentObservations_ = LocalAgentObservations
-				.newAgentObservations();
+				.newAgentObservations(localGoal);
 		return instance_;
 	}
 
@@ -844,7 +877,7 @@ public final class AgentObservations implements Serializable {
 			SortedSet<RelationalPredicate> set = new TreeSet<RelationalPredicate>(
 					ConditionComparator.getInstance());
 			set.add(condition);
-			if (simplifyRule(set, false, true)) {
+			if (simplifyRule(set, false, true) == 1) {
 				RelationalPredicate simplify = set.first();
 				// If the condition is not in the invariants and if it's not
 				// negated, IS in the variants, keep it.
@@ -917,7 +950,8 @@ public final class AgentObservations implements Serializable {
 				// current action, generalise it.
 				if ((argument.charAt(0) != '?')
 						&& (!argument.equals(action.getArguments()[i]))) {
-					actionArgs[i] = RelationalPredicate.getVariableTermString(i);
+					actionArgs[i] = RelationalPredicate
+							.getVariableTermString(i);
 					changed = true;
 				}
 			}
@@ -1239,7 +1273,8 @@ public final class AgentObservations implements Serializable {
 					if (!untrueFactArgs[i].equals("?")) {
 						if (!replacementMap.containsKey(untrueFactArgs[i]))
 							replacementMap.put(untrueFactArgs[i],
-									RelationalPredicate.getVariableTermString(i));
+									RelationalPredicate
+											.getVariableTermString(i));
 						untrueFactArgs[i] = replacementMap
 								.get(untrueFactArgs[i]);
 					}
@@ -1372,15 +1407,16 @@ public final class AgentObservations implements Serializable {
 		 * 
 		 * @param simplified
 		 *            The to-be-simplified set of conditions.
-		 * @param testForIllegalRule
+		 * @param exitIfIllegal
 		 *            If the conditions are to be tested for conflicting
 		 *            conditions.
 		 * @param onlyEquivalencies
 		 *            If the simplification only looks at equivalencies.
-		 * @return True if the rule is simplified/altered.
+		 * @return 1 if the rule is simplified/altered, 0 if no change, -1 if
+		 *         rule conditions are illegal.
 		 */
-		public boolean simplifyRule(SortedSet<RelationalPredicate> simplified,
-				boolean testForIllegalRule, boolean onlyEquivalencies) {
+		public int simplifyRule(SortedSet<RelationalPredicate> simplified,
+				boolean exitIfIllegal, boolean onlyEquivalencies) {
 			boolean changedOverall = false;
 			// Note which facts have already been tested, so changes don't
 			// restart the process.
@@ -1414,9 +1450,17 @@ public final class AgentObservations implements Serializable {
 							if (!testedBackground.contains(bckKnow)
 									&& (!onlyEquivalencies || bckKnow
 											.isEquivalence())) {
+								// If this rule is an illegal rule
+								if (bckKnow.checkIllegalRule(simplified,
+										!exitIfIllegal)) {
+									if (exitIfIllegal)
+										return -1;
+									changedThisIter = true;
+									testedBackground.clear();
+								}
+
 								// If the simplification process changes things
-								if (bckKnow.simplify(simplified,
-										testForIllegalRule)) {
+								if (bckKnow.simplify(simplified)) {
 									changedThisIter = true;
 									testedBackground.clear();
 								} else
@@ -1429,31 +1473,7 @@ public final class AgentObservations implements Serializable {
 				changedOverall |= changedThisIter;
 			}
 
-			return changedOverall;
+			return (changedOverall) ? 1 : 0;
 		}
-	}
-
-	// TEST METHODS
-	public Map<String, ConditionBeliefs> getConditionBeliefs() {
-		return conditionObservations_.conditionBeliefs_;
-	}
-
-	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
-		return conditionObservations_.learnedEnvironmentRules_;
-	}
-
-	public Map<String, Map<IntegerArray, ConditionBeliefs>> getNegatedConditionBeliefs() {
-		return conditionObservations_.negatedConditionBeliefs_;
-	}
-
-	public void setActionConditions(String action,
-			Collection<RelationalPredicate> conditions) {
-		getActionBasedObservation(action).setActionConditions(conditions);
-		observationHash_ = null;
-		inactivity_ = 0;
-	}
-
-	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
-		conditionObservations_.learnedEnvironmentRules_ = backKnow;
 	}
 }

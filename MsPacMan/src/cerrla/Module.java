@@ -66,7 +66,8 @@ public class Module {
 	 * @param bestPolicy
 	 *            The state of the distribution for the agent.
 	 */
-	private Module(String modName, int numArgs, CoveringRelationalPolicy bestPolicy) {
+	private Module(String modName, int numArgs,
+			CoveringRelationalPolicy bestPolicy) {
 		parameterTerms_ = new ArrayList<String>();
 		// Run through the facts (probably only 1)
 		modulePredicate_ = modName;
@@ -77,13 +78,10 @@ public class Module {
 		List<RelationalRule> policyRules = bestPolicy.getPolicyRules();
 		moduleRules_ = new ArrayList<RelationalRule>();
 		for (RelationalRule policyRule : policyRules) {
-			// Ground any modular rules and remove any non-fired rules
-			if (bestPolicy.getFiringRules().contains(policyRule)) {
-				// Ground modular
-				policyRule = policyRule.groundModular();
-				policyRule.setQueryParams(parameterTerms_);
-				moduleRules_.add(policyRule);
-			}
+			// Ground modular rules
+			policyRule = policyRule.groundModular();
+			policyRule.setQueryParams(parameterTerms_);
+			moduleRules_.add(policyRule);
 		}
 	}
 
@@ -187,7 +185,8 @@ public class Module {
 	 * @param bestPolicy
 	 *            The best policy in the elites at the end of learning.
 	 */
-	public static void saveModule(String modName, int numArgs, CoveringRelationalPolicy bestPolicy) {
+	public static void saveModule(String modName, int numArgs,
+			CoveringRelationalPolicy bestPolicy) {
 		if (!moduleExists(StateSpec.getInstance().getEnvironmentName(), modName)) {
 			Module newModule = new Module(modName, numArgs, bestPolicy);
 			nonExistantModules_.remove(modName);
@@ -336,7 +335,7 @@ public class Module {
 	public ArrayList<RelationalRule> getModuleRules() {
 		ArrayList<RelationalRule> clonedRules = new ArrayList<RelationalRule>();
 		for (RelationalRule gr : moduleRules_) {
-			clonedRules.add((RelationalRule) gr.clone());
+			clonedRules.add((RelationalRule) gr.clone(true));
 		}
 		return clonedRules;
 	}

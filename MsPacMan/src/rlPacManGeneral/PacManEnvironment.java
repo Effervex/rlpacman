@@ -71,12 +71,6 @@ public class PacManEnvironment implements EnvironmentInterface {
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps")) {
 			return 10000 + "";
-		} else if (arg0.equals("freeze")) {
-			PolicyGenerator.getInstance().freeze(true);
-			return null;
-		} else if (arg0.equals("unfreeze")) {
-			PolicyGenerator.getInstance().freeze(false);
-			return null;
 		} else if ((arg0.length() > 7)
 				&& (arg0.substring(0, 6).equals("simple"))) {
 			// PacMan simplified by removing certain aspects of it.

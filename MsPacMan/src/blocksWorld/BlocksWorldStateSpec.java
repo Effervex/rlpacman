@@ -1,4 +1,4 @@
-package blocksWorldMove;
+package blocksWorld;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;
@@ -18,9 +18,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
-		actionPreconditions.put("move",
-				"(clear ?X) (block ?X) (clear ?Y &:(neq ?X ?Y)) "
-						+ "(not (on ?X ?Y))");
+		// Put the pure precondition in, the rest is taken care of...
+		actionPreconditions.put("move", "(clear ?X) (clear ?Y &:(neq ?X ?Y))");
+
+		actionPreconditions.put("moveFloor", "(clear ?X) (on ?X ?)");
 
 		return actionPreconditions;
 	}
@@ -37,8 +38,13 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Move action
 		String[] structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		actions.add(new RelationalPredicate("move", structure));
+
+		// MoveFloor action
+		structure = new String[1];
+		structure[0] = "block";
+		actions.add(new RelationalPredicate("moveFloor", structure));
 
 		return actions;
 	}
@@ -55,10 +61,6 @@ public class BlocksWorldStateSpec extends StateSpec {
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
 
-		// Floor is always clear
-		bkMap.put("floorClear", new BackgroundKnowledge(
-				"(floor ?X) => (assert (clear ?X))", true));
-
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
 				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
@@ -71,13 +73,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 		if (envParameter_ == null)
 			envParameter_ = "onab";
 
-		String[] result = new String[2];
 		// On(a,b) goal
+		String[] result = new String[2];
 		if (envParameter_.equals("onab")) {
 			result[0] = "onAB";
 			result[1] = "(on " + StateSpec.createGoalTerm(0) + " "
-					+ StateSpec.createGoalTerm(1) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ") (block "
 					+ StateSpec.createGoalTerm(1) + ")";
 			return result;
 		}
@@ -85,22 +85,21 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(forall (block ?X) (clear ?X))";
+			result[1] = "(not (on ? ?))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X)))";
+			result[1] = "(onFloor ?X) (not (onFloor ?Y &:(<> ?Y ?X)))";
 			return result;
 		}
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
 			result[0] = "clearA";
-			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ")";
+			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ")";
 			return result;
 		}
 
@@ -109,6 +108,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 			result[1] = "(highest " + StateSpec.createGoalTerm(0) + ")";
 			return result;
 		}
+
 		return null;
 	}
 
@@ -121,23 +121,23 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
 			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_1) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?X) (above ?X ?G_1) => (moveFloor ?X)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
-			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
+			rules[0] = "(highest ?X) => (moveFloor ?X)";
 		} else if (envParameter_.equals("clearA")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
 		} else if (envParameter_.equals("highestA")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
@@ -156,18 +156,23 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On predicate
 		String[] structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		predicates.add(new RelationalPredicate("on", structure));
+
+		// OnFloor predicate
+		structure = new String[1];
+		structure[0] = "block";
+		predicates.add(new RelationalPredicate("onFloor", structure));
 
 		// Clear predicate
 		structure = new String[1];
-		structure[0] = "thing";
+		structure[0] = "block";
 		predicates.add(new RelationalPredicate("clear", structure));
 
 		// Above predicate
 		structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		predicates.add(new RelationalPredicate("above", structure));
 
 		// Highest predicate
@@ -182,9 +187,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Map<String, String> initialiseTypePredicateTemplates() {
 		Map<String, String> typePreds = new HashMap<String, String>();
 
-		typePreds.put("thing", null);
-		typePreds.put("block", "thing");
-		typePreds.put("floor", "thing");
+		typePreds.put("block", null);
 
 		return typePreds;
 	}

@@ -36,6 +36,8 @@ import util.Pair;
  * @author Sam Sarjant
  */
 public class CrossEntropyRun {
+	public static final String SD_SYMBOL = "\u00b1";
+
 	/** The singleton instance. */
 	private static CrossEntropyRun instance_;
 
@@ -45,13 +47,15 @@ public class CrossEntropyRun {
 	/** Current converged value. */
 	private double convergedMean_;
 
+	private int currentEpisode_;
+
 	/** The experiment controller containing various program args. */
 	private LearningController experimentController_;
 
 	/** The policy generator for this CE method. */
 	private PolicyGenerator policyGenerator_;
 
-	/** The time at which the run started */
+	/** The time that the run started. */
 	private long runStart_;
 
 	/**
@@ -122,7 +126,8 @@ public class CrossEntropyRun {
 					/ convergedSteps)
 					+ "% converged at value: "
 					+ formatter.format(mean)
-					+ " \u00b1 " + meanDeviation);
+					+ " "
+					+ SD_SYMBOL + " " + meanDeviation);
 
 			if (convergedCount_ > convergedSteps
 					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
@@ -153,9 +158,15 @@ public class CrossEntropyRun {
 			if (Module.moduleExists(StateSpec.getInstance()
 					.getEnvironmentName(), gc.toString())
 					|| gc.toString().equals(
-							PolicyGenerator.getInstance().getLocalGoal()))
+							currentPolicyGenerator.getLocalGoal()))
 				newGConds.remove(gc);
 		}
+
+		if (newGConds.isEmpty())
+			return;
+
+		// Backup the run time so module learning time isn't included
+		long moduleTime = System.currentTimeMillis();
 
 		// Run a preliminary test on each to determine which module has the
 		// least further goal conditions (relies on the least other modules to
@@ -165,7 +176,7 @@ public class CrossEntropyRun {
 			if (!LocalAgentObservations.observationsExist(gc.toString())) {
 				System.out.println("\n\n\n------PRELIMINARY MODULE RUN: "
 						+ gc.toString() + "------\n\n\n");
-				PolicyGenerator localPolicy = PolicyGenerator.newInstance(
+				PolicyGenerator localPolicy = new PolicyGenerator(
 						currentPolicyGenerator, gc);
 				CrossEntropyRun prelimModuleRun = CrossEntropyRun.newInstance(
 						localPolicy, experimentController_);
@@ -198,16 +209,20 @@ public class CrossEntropyRun {
 
 			PolicyGenerator localGenerator = Module.loadGenerator(orderGC);
 			if (localGenerator == null)
-				localGenerator = PolicyGenerator.newInstance(
-						currentPolicyGenerator, orderGC);
+				localGenerator = new PolicyGenerator(currentPolicyGenerator,
+						orderGC);
 			CrossEntropyRun prelimModuleRun = CrossEntropyRun.newInstance(
 					localGenerator, experimentController_);
 			prelimModuleRun.beginRun(-1, false, maxSteps, maxEpisodes);
 		}
 
-		// TODO Don't need this when PG stops being singleton.
-		PolicyGenerator.setInstance(currentPolicyGenerator);
+		// Modify the run start time so module learning isn't included.
+		long moduleLearningTime = System.currentTimeMillis() - moduleTime;
+		runStart_ += moduleLearningTime;
+
+		instance_ = this;
 		policyGenerator_ = currentPolicyGenerator;
+		policyGenerator_.loadAgentData();
 	}
 
 	/**
@@ -239,9 +254,19 @@ public class CrossEntropyRun {
 				maxWeightedRuleCount = weightedRuleCount;
 		}
 
-		// Elites is equal to the average number of rules in high mean slots.
-		double numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
-				sumSlotMean);
+		double numElites = 1;
+		if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_AV_RULES) {
+			// Elites is equal to the average number of rules in high mean
+			// slots.
+			numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
+					sumSlotMean);
+		} else if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_SUM_SLOTS) {
+			// Elites is equal to the sum of the slot means
+			numElites = sumSlotMean;
+		} else if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_SUM_RULES) {
+			// Elites is equal to the total number of rules (KL sized)
+			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
+		}
 		return (int) Math.max(1,
 				Math.round(numElites / ProgramArgument.RHO.doubleValue()));
 	}
@@ -264,6 +289,8 @@ public class CrossEntropyRun {
 	 *            The time the experiment was started.
 	 * @param numElites
 	 *            The minimal size of the elites.
+	 * @param actualNumElites
+	 *            The actual size of the elites.
 	 * @param bestElite
 	 *            The best value of the elite samples.
 	 * @param worstElite
@@ -272,15 +299,13 @@ public class CrossEntropyRun {
 	 */
 	private void estimateETA(double klDivergence, double convergenceValue,
 			int run, int maxRuns, long startTime, int numElites,
-			float bestElite, float worstElite) {
+			int actualNumElites, float bestElite, float worstElite) {
 		long currentTime = System.currentTimeMillis();
 
 		long elapsedTime = currentTime - startTime;
 		String elapsed = "Elapsed: "
 				+ LearningController.toTimeFormat(elapsedTime);
-		String learningElapsed = "Learning elapsed: "
-				+ LearningController.toTimeFormat(runStart_);
-		System.out.println(elapsed + ", " + learningElapsed);
+		System.out.println(elapsed);
 
 		double convergencePercent = Math
 				.min(convergenceValue / klDivergence, 1);
@@ -290,9 +315,8 @@ public class CrossEntropyRun {
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
 		String modular = "";
-		if (PolicyGenerator.getInstance().isModuleGenerator())
-			modular = "MODULAR: ["
-					+ PolicyGenerator.getInstance().getLocalGoal() + "] ";
+		if (policyGenerator_.isModuleGenerator())
+			modular = "MODULAR: [" + policyGenerator_.getLocalGoal() + "] ";
 		// No updates yet, convergence unknown
 		String percentStr = null;
 		if (convergenceValue == PolicyGenerator.NO_UPDATES_CONVERGENCE) {
@@ -301,10 +325,11 @@ public class CrossEntropyRun {
 			percentStr = formatter.format(100 * convergencePercent) + "% "
 					+ modular + "converged.";
 		}
-		String eliteString = "N_E: " + numElites + ", E_best: "
-				+ formatter.format(bestElite) + ", E_worst: "
+		System.out.println(percentStr);
+		String eliteString = "N_E: " + numElites + ", |E|: " + actualNumElites
+				+ ", E_best: " + formatter.format(bestElite) + ", E_worst: "
 				+ formatter.format(worstElite);
-		System.out.println(percentStr + " " + eliteString);
+		System.out.println(eliteString);
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
@@ -327,9 +352,7 @@ public class CrossEntropyRun {
 		long testElapsedTime = System.currentTimeMillis() - startTime;
 		String elapsed = "Elapsed: "
 				+ LearningController.toTimeFormat(testElapsedTime);
-		String learningElapsed = "Learning elapsed: "
-				+ LearningController.toTimeFormat(runStart_);
-		System.out.println(elapsed + ", " + learningElapsed);
+		System.out.println(elapsed);
 
 		// Test percent with ETA for test
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
@@ -378,22 +401,33 @@ public class CrossEntropyRun {
 		}
 	}
 
-	private void isElitesConverged(Queue<Double> eliteAverageValues,
-			SortedSet<PolicyValue> pvs, int numElites) {
-		StandardDeviation sd = new StandardDeviation();
-		double[] eliteAverages = new double[eliteAverageValues.size()];
-		int i = 0;
-		for (Double val : eliteAverageValues)
-			eliteAverages[i++] = val;
-		if (eliteAverages.length >= ProgramArgument.PERFORMANCE_TESTING_SIZE
-				.doubleValue() * ProgramArgument.POLICY_REPEATS.doubleValue()
-				&& pvs.size() >= numElites * 2
-				&& pvs.first().getValue() - pvs.last().getValue() <= sd
-						.evaluate(eliteAverages)) {
-			System.out.println("---------ELITE CONVERGED!-----------");
-		}
-		if (eliteAverages.length > 1)
-			System.out.println("EliteSD:" + sd.evaluate(eliteAverages));
+	/**
+	 * Checks if the elite samples are converged, through various measurements.
+	 * 
+	 * @param elites
+	 *            The elite samples.
+	 * @param numElites
+	 *            The minimum number N_E of elite samples.
+	 * @param population
+	 *            The population N of samples.
+	 * @param minReward
+	 *            The observed minimal reward
+	 * @return True if the elite samples are causing convergence.
+	 */
+	private boolean isElitesConverged(SortedSet<PolicyValue> elites,
+			int numElites, int population, double minReward) {
+		// If the elites are all the same value and the number of elites = (1 -
+		// rho) * population (and not the min value)
+		if (elites.size() >= population
+				* (1 - ProgramArgument.RHO.doubleValue())
+				&& elites.first().getValue() == elites.last().getValue()
+				&& elites.first().getValue() > minReward)
+			return true;
+
+		// TODO Need alternative convergence which measures if the elites
+		// changes at all over a period of time.
+
+		return false;
 	}
 
 	/**
@@ -427,7 +461,7 @@ public class CrossEntropyRun {
 	 * some rules to work with.
 	 */
 	private void preliminaryProcessing(int maxSteps) {
-		PolicyGenerator.getInstance().shouldRestart();
+		policyGenerator_.shouldRestart();
 		RLGlue.RL_agent_message("GetPolicy");
 		RLGlue.RL_episode(maxSteps);
 	}
@@ -480,7 +514,10 @@ public class CrossEntropyRun {
 	 */
 	private void saveElitePolicies(Collection<PolicyValue> elites)
 			throws Exception {
-		FileWriter wr = new FileWriter(experimentController_.getElitesFile());
+		File outputFile = new File(LearningController.TEMP_FOLDER,
+				experimentController_.getElitesFile().getName());
+		outputFile.createNewFile();
+		FileWriter wr = new FileWriter(outputFile);
 		BufferedWriter buf = new BufferedWriter(wr);
 
 		LearningController.writeFileHeader(buf);
@@ -528,9 +565,10 @@ public class CrossEntropyRun {
 		if (experimentController_.getComment() != null)
 			buf.write(experimentController_.getComment() + "\n");
 
-		PolicyGenerator.getInstance().saveHumanGenerators(buf);
+		policyGenerator_.saveHumanGenerators(buf);
 		buf.write("\n\n");
-		PolicyGenerator.getInstance().saveGenerators(buf, perfFile.getPath());
+		// TODO Also output the number of slots.
+		policyGenerator_.saveGenerators(buf);
 		int lastKey = episodeMeans.lastKey();
 		buf.write("\n\n" + lastKey + "\t" + episodeMeans.get(lastKey) + "\n");
 		buf.write("\n\n\n");
@@ -556,8 +594,19 @@ public class CrossEntropyRun {
 			buf.write(episode + "\t" + episodeMeans.get(episode) + "\t"
 					+ episodeSDs.get(episode) + "\n");
 			System.out.println(episode + "\t" + episodeMeans.get(episode)
-					+ "\t\u00b1\t" + episodeSDs.get(episode));
+					+ "\t" + SD_SYMBOL + "\t" + episodeSDs.get(episode));
 		}
+
+		buf.close();
+		wr.close();
+
+		// Writing the mutation tree
+		File mutationTreeFile = new File(perfFile.getAbsoluteFile()
+				+ "mutation");
+
+		wr = new FileWriter(mutationTreeFile);
+		buf = new BufferedWriter(wr);
+		policyGenerator_.saveMutationTree(buf);
 
 		buf.close();
 		wr.close();
@@ -592,7 +641,6 @@ public class CrossEntropyRun {
 				.getRepetitionsStart())))
 				/ (experimentController_.getRepetitionsEnd() - experimentController_
 						.getRepetitionsStart());
-		int numEpisodes = localPolicy.getPoliciesEvaluated();
 
 		// Pre-testing fixing
 		localPolicy.freeze(true);
@@ -620,24 +668,23 @@ public class CrossEntropyRun {
 					(1.0 * i) / ProgramArgument.TEST_ITERATIONS.intValue(),
 					expProg, startTime);
 
-			for (int j = 0; j < ProgramArgument.POLICY_REPEATS.intValue(); j++) {
+			for (int j = 0; j < 3; j++) {
 				RLGlue.RL_episode(maxSteps);
-				if (PolicyGenerator.getInstance().isModuleGenerator())
+				if (localPolicy.isModuleGenerator())
 					scores[i] += Double.parseDouble(RLGlue
 							.RL_agent_message("internalReward"));
 				else
 					scores[i] += RLGlue.RL_return();
 			}
-			scores[i] /= ProgramArgument.POLICY_REPEATS.intValue();
+			scores[i] /= 3;
 
 			RLGlue.RL_agent_message("GetPolicy");
 			@SuppressWarnings("unchecked")
 			Pair<CoveringRelationalPolicy, Double> pol = (Pair<CoveringRelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
-			System.out.println(pol.objA_);
 			if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 				System.out.println("Policy consistency: " + pol.objB_);
-			System.out.println(numEpisodes + ": " + scores[i] + "\n");
+			System.out.println(currentEpisode_ + ": " + scores[i] + "\n");
 		}
 
 		// Post-testing unfixing
@@ -647,9 +694,9 @@ public class CrossEntropyRun {
 
 		// Episode performance output
 		Mean mean = new Mean();
-		episodeMeans.put(numEpisodes, mean.evaluate(scores));
+		episodeMeans.put(currentEpisode_, mean.evaluate(scores));
 		StandardDeviation sd = new StandardDeviation();
-		episodeSDs.put(numEpisodes, sd.evaluate(scores));
+		episodeSDs.put(currentEpisode_, sd.evaluate(scores));
 
 		// Save the results at each episode
 		try {
@@ -682,12 +729,11 @@ public class CrossEntropyRun {
 			SortedMap<Integer, Double> episodeSDs, SortedSet<PolicyValue> pvs,
 			boolean serialiseOnly, boolean finalWrite) throws Exception {
 		File tempPerf = null;
-		if (PolicyGenerator.getInstance().isModuleGenerator()) {
+		if (policyGenerator_.isModuleGenerator()) {
 			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
 					+ LearningController.TEMP_FOLDER + File.separatorChar);
 			modTemps.mkdirs();
-			tempPerf = new File(modTemps, PolicyGenerator.getInstance()
-					.getLocalGoal()
+			tempPerf = new File(modTemps, policyGenerator_.getLocalGoal()
 					+ experimentController_.getPerformanceFile().getName());
 		} else {
 			LearningController.TEMP_FOLDER.mkdir();
@@ -705,10 +751,10 @@ public class CrossEntropyRun {
 			// Output the episode averages
 			savePerformance(episodeMeans, episodeSDs, tempPerf, finalWrite);
 		}
-		PolicyGenerator.getInstance().savePolicyGenerator(
-				new File(tempPerf + ".ser"));
+		policyGenerator_.savePolicyGenerator(new File(tempPerf + ".ser"));
 		if (!Module.saveAtEnd_)
-			AgentObservations.getInstance().saveAgentObservations();
+			AgentObservations.getInstance().saveAgentObservations(
+					policyGenerator_);
 	}
 
 	/**
@@ -727,7 +773,7 @@ public class CrossEntropyRun {
 	 *            The minimum observed reward.
 	 * @return True if the elites should be cleared and restarted.
 	 */
-	protected boolean updateDistributions(PolicyGenerator localPolicy,
+	protected void updateDistributions(PolicyGenerator localPolicy,
 			SortedSet<PolicyValue> elites, int population, int numElites,
 			double minReward) {
 		// Clean up the policy values
@@ -738,18 +784,19 @@ public class CrossEntropyRun {
 				ProgramArgument.ALPHA.doubleValue(), population, numElites,
 				minReward);
 		// Negative updates:
-		// localPolicy.updateNegative(elites, STEP_SIZE, removed, minReward);
+		if (ProgramArgument.NEGATIVE_UPDATES.booleanValue())
+			localPolicy.updateNegative(elites,
+					ProgramArgument.ALPHA.doubleValue(), population, numElites,
+					removed);
 
 		postUpdateModification(elites, localPolicy.getPoliciesEvaluated(),
 				population, localPolicy);
 
 		// Run the post update operations
-		boolean clearElites = localPolicy.postUpdateOperations(numElites);
+		localPolicy.postUpdateOperations(numElites);
 
 		// Clear the restart
 		localPolicy.shouldRestart();
-
-		return clearElites;
 	}
 
 	/**
@@ -771,6 +818,7 @@ public class CrossEntropyRun {
 			int maxEpisodes) {
 		// Run the preliminary action discovery phase, only to create an initial
 		// number of rules.
+		runStart_ = System.currentTimeMillis();
 		if (experimentController_.getSerializedFile() == null)
 			preliminaryProcessing(maxSteps);
 
@@ -782,7 +830,7 @@ public class CrossEntropyRun {
 		SortedMap<Integer, Double> episodeSDs = new TreeMap<Integer, Double>();
 		Queue<Double> valueQueue = new LinkedList<Double>();
 		Queue<Double> averageValues = new LinkedList<Double>();
-		Queue<Double> eliteAverageValues = new LinkedList<Double>();
+		// Queue<Double> eliteAverageValues = new LinkedList<Double>();
 
 		// Forming a population of solutions
 		SortedSet<PolicyValue> pvs = new TreeSet<PolicyValue>();
@@ -794,21 +842,23 @@ public class CrossEntropyRun {
 		double maxReward = -(Float.MAX_VALUE - 1);
 		double minReward = Float.MAX_VALUE;
 
-		int numEpisodes = 0;
+		currentEpisode_ = 0;
 		boolean isConverged = false;
 		boolean hasUpdated = false;
+		boolean learnedModules = false;
 		// Test until: finite steps, not converged, not doing just testing
 		while ((policyGenerator_.getPoliciesEvaluated() < finiteNum)
 				&& !isConverged && !ProgramArgument.TESTING.booleanValue()) {
 			// Clear any 'waiting' flags
-			PolicyGenerator.getInstance().shouldRestart();
+			policyGenerator_.shouldRestart();
 			RLGlue.RL_agent_message("GetPolicy");
 
 			boolean oldAOSettled = AgentObservations.getInstance().isSettled();
 			if (ProgramArgument.USE_MODULES.booleanValue() && oldAOSettled
-					&& !PolicyGenerator.getInstance().isModuleGenerator()) {
+					&& !policyGenerator_.isModuleGenerator() && !learnedModules) {
 				// Check if the agent needs to drop into learning a module
 				checkForModularLearning(maxSteps, maxEpisodes);
+				learnedModules = true;
 			}
 
 			// Determine the dynamic population, based on rule-base size
@@ -827,7 +877,7 @@ public class CrossEntropyRun {
 					.intValue()];
 			for (int j = 0; j < ProgramArgument.POLICY_REPEATS.intValue(); j++) {
 				double scoreThisIter = 0;
-				numEpisodes++;
+				currentEpisode_++;
 				RLGlue.RL_episode(maxSteps);
 				if (policyGenerator_.isModuleGenerator())
 					scoreThisIter = Double.parseDouble(RLGlue
@@ -861,7 +911,7 @@ public class CrossEntropyRun {
 				// System.out.println(policy.objA_);
 				if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
 					System.out.println("Policy consistency: " + policy.objB_);
-				System.out.println(numEpisodes + ": " + score);
+				System.out.println(currentEpisode_ + ": " + score);
 
 				float worst = (!pvs.isEmpty()) ? pvs.last().getValue()
 						: Float.NaN;
@@ -882,7 +932,7 @@ public class CrossEntropyRun {
 								- repetitionsStart, repetitionsEnd
 								- repetitionsStart,
 						experimentController_.getExperimentStart(), numElites,
-						pvs.first().getValue(), worst);
+						pvs.size(), pvs.first().getValue(), worst);
 
 				// Noting averaged performance
 				if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
@@ -901,23 +951,25 @@ public class CrossEntropyRun {
 
 					// Noting average elite fluctuation values
 					// If elites represent actual elite (not all values)
-					if (worst > minReward && score >= worst) {
-						if (eliteAverageValues.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
-								.doubleValue()
-								* ProgramArgument.POLICY_REPEATS.doubleValue())
-							eliteAverageValues.poll();
-						eliteAverageValues.add(scores[i] - minScore);
-					}
+					// if (worst > minReward && score >= worst) {
+					// if (eliteAverageValues.size() ==
+					// ProgramArgument.PERFORMANCE_TESTING_SIZE
+					// .doubleValue()
+					// * ProgramArgument.POLICY_REPEATS.doubleValue())
+					// eliteAverageValues.poll();
+					// eliteAverageValues.add(scores[i] - minScore);
+					// }
 				}
 				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,
-						valueQueue, averageValues, numEpisodes, population);
+						valueQueue, averageValues, currentEpisode_, population);
 
 				// Update the distributions
-				boolean clearElites = updateDistributions(policyGenerator_,
-						pvs, population, numElites, minReward);
+				updateDistributions(policyGenerator_, pvs, population,
+						numElites, minReward);
 
-				// If elites are all the same (within an interval)
-				isElitesConverged(eliteAverageValues, pvs, numElites);
+				// If elites are converged
+				isConverged |= isElitesConverged(pvs, numElites, population,
+						minReward);
 
 				hasUpdated = policyGenerator_.getConvergenceValue() != PolicyGenerator.NO_UPDATES_CONVERGENCE;
 
@@ -950,7 +1002,7 @@ public class CrossEntropyRun {
 		// Perform a final test
 		if (!prelimRun)
 			testRecordAgent(policyGenerator_, run, episodeMeans, episodeSDs,
-					pvs, finiteNum, numEpisodes, maxSteps);
+					pvs, finiteNum, currentEpisode_, maxSteps);
 		if (ProgramArgument.TESTING.booleanValue())
 			return null;
 
@@ -986,6 +1038,10 @@ public class CrossEntropyRun {
 		return bestPolicy;
 	}
 
+	public int getCurrentEpisode() {
+		return currentEpisode_;
+	}
+
 	/**
 	 * Gets the current cross-entropy run.
 	 * 
@@ -996,6 +1052,18 @@ public class CrossEntropyRun {
 			throw new NullPointerException(
 					"Cross-Entropy Run not instantiated yet!");
 		return instance_;
+	}
+
+	/**
+	 * Gets the current policy generator.
+	 * 
+	 * @return The current policy generator.
+	 */
+	public static PolicyGenerator getPolicyGenerator() {
+		if (instance_ == null)
+			throw new NullPointerException(
+					"Cross-Entropy Run not instantiated yet!");
+		return instance_.policyGenerator_;
 	}
 
 	/**

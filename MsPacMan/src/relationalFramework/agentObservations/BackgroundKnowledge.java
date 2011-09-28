@@ -17,7 +17,6 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.Unification;
 
-
 /**
  * A class representing background knowledge assertions
  * 
@@ -152,13 +151,10 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * 
 	 * @param ruleConds
 	 *            The rule conditions to simplify.
-	 * @param testForIllegalRule
-	 *            If the conditions are being tested for illegal conditions too.
-	 * @return True if the conditions were simplified, false otherwise.
+	 * @return True if the conditions were simplified.
 	 */
 	@SuppressWarnings("unchecked")
-	public boolean simplify(SortedSet<RelationalPredicate> ruleConds,
-			boolean testForIllegalRule) {
+	public boolean simplify(SortedSet<RelationalPredicate> ruleConds) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
 		Collection<RelationalPredicate> bckConditions = getAllConditions();
@@ -235,21 +231,31 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			}
 		}
 
-		if (testForIllegalRule) {
-			replacementTerms.clear();
-			result = Unification.getInstance().unifyStates(
-					getConjugatedConditions(), ruleConds, replacementTerms);
-			// If the rule is found to be illegal using the conjugated
-			// conditions, remove the illegal condition
-			if (result == 0) {
-				RelationalPredicate cond = getPostCond(replacementTerms);
-				cond.swapNegated();
-				if (ruleConds.remove(cond))
-					changed = true;
+		return changed;
+	}
+
+	/**
+	 * Checks if a rule is illegal in regards to this background knowledge.
+	 * 
+	 * @return True if the conditions are illegal.
+	 */
+	public boolean checkIllegalRule(SortedSet<RelationalPredicate> ruleConds, boolean fixRule) {
+		// Check for illegal rules
+		BidiMap replacementTerms = new DualHashBidiMap();
+		int result = Unification.getInstance().unifyStates(
+				getConjugatedConditions(), ruleConds, replacementTerms);
+		// If the rule is found to be illegal using the conjugated
+		// conditions, remove the illegal condition
+		if (result == 0) {
+			RelationalPredicate cond = getPostCond(replacementTerms);
+			cond.swapNegated();
+			if (ruleConds.contains(cond)) {
+				if (fixRule)
+					ruleConds.remove(cond);
+				return true;
 			}
 		}
-
-		return changed;
+		return false;
 	}
 
 	public boolean isEquivalence() {

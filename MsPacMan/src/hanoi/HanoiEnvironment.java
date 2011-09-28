@@ -77,14 +77,6 @@ public class HanoiEnvironment implements EnvironmentInterface {
 	public String env_message(String arg0) {
 		if (arg0.equals("maxSteps"))
 			return maxSteps_ + "";
-		if (arg0.equals("freeze")) {
-			PolicyGenerator.getInstance().freeze(true);
-			return null;
-		}
-		if (arg0.equals("unfreeze")) {
-			PolicyGenerator.getInstance().freeze(false);
-			return null;
-		}
 		try {
 			numTiles_ = Integer.parseInt(arg0);
 			maxSteps(numTiles_);

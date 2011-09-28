@@ -151,6 +151,7 @@ public class MultiMap<K, V> implements Serializable {
 	 *            The list being searched for.
 	 * @return True if the list is a mapped value.
 	 */
+	@SuppressWarnings("rawtypes")
 	public boolean containsList(List list) {
 		return innerMap_.containsValue(list);
 	}
@@ -476,6 +477,7 @@ public class MultiMap<K, V> implements Serializable {
 		return result;
 	}
 
+	@SuppressWarnings("rawtypes")
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)

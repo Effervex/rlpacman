@@ -1,4 +1,4 @@
-package blocksWorldMove;
+package blocksWorldActive;
 
 import relationalFramework.FiredAction;
 import relationalFramework.ObjectObservations;
