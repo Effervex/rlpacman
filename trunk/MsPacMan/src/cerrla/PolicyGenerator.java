@@ -707,6 +707,10 @@ public final class PolicyGenerator implements Serializable {
 		policiesEvaluated_++;
 	}
 
+	public int getNumMutations() {
+		return mutationTree_.size();
+	}
+
 	/**
 	 * If the slots and rules within are converged to stability.
 	 * 
@@ -792,10 +796,13 @@ public final class PolicyGenerator implements Serializable {
 							// further update operations.
 							bestRule.setSlot(existingSlot);
 						} else {
-							// Set ordering to be the same
-							newSlot.setOrdering(slot.getOrdering());
-							newSlot.setSelectionProb(slot
-									.getSelectionProbability());
+							if (ProgramArgument.INHERIT_PARENT_SLOT_VALS
+									.booleanValue()) {
+								// Set ordering to be the same
+								newSlot.setOrdering(slot.getOrdering());
+								newSlot.setSelectionProb(slot
+										.getSelectionProbability());
+							}
 							mutateRule(bestRule, newSlot, -1);
 							newSlots.add(newSlot);
 							mutated = true;

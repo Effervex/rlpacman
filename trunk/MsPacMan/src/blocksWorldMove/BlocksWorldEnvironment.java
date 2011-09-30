@@ -190,7 +190,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			else
 				reward = MINIMAL_REWARD * (steps_ - optimalSteps_)
 						/ (maxSteps_ - optimalSteps_);
+			if (reward > 0)
+				reward = 0;
 		}
+//		reward = -1;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isGoal);
 

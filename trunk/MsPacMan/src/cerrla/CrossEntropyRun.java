@@ -38,6 +38,12 @@ import util.Pair;
 public class CrossEntropyRun {
 	public static final String SD_SYMBOL = "\u00b1";
 
+	/**
+	 * The amount of SD the score is allowed to wander (currently corresponds to
+	 * 5% +- difference).
+	 */
+	private static final double CONVERGENCE_PERCENT_BUFFER = 0.13;
+
 	/** The singleton instance. */
 	private static CrossEntropyRun instance_;
 
@@ -93,7 +99,8 @@ public class CrossEntropyRun {
 			SortedMap<Integer, Double> episodeSDs, Queue<Double> valueQueue,
 			Queue<Double> averageValues, int numEpisodes, int population) {
 		if (valueQueue.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
-				.intValue()) {
+				.intValue()
+				&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
 			// Transform the queues into arrays
 			double[] vals = new double[ProgramArgument.PERFORMANCE_TESTING_SIZE
 					.intValue()];
@@ -108,7 +115,8 @@ public class CrossEntropyRun {
 			Mean m = new Mean();
 			StandardDeviation sd = new StandardDeviation();
 			double mean = m.evaluate(vals);
-			double meanDeviation = sd.evaluate(envSDs);
+			double meanDeviation = sd.evaluate(envSDs)
+					* CONVERGENCE_PERCENT_BUFFER;
 			// double meanDeviation = (maxReward - minReward) * 0.1;
 
 			if (Math.abs(mean - convergedMean_) > meanDeviation) {
@@ -129,8 +137,7 @@ public class CrossEntropyRun {
 					+ " "
 					+ SD_SYMBOL + " " + meanDeviation);
 
-			if (convergedCount_ > convergedSteps
-					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
+			if (convergedCount_ > convergedSteps) {
 				return true;
 			}
 		}
