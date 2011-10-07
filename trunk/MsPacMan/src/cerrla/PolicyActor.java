@@ -31,7 +31,6 @@ import org.rlcommunity.rlglue.codec.types.Observation;
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.GoalArg;
 import relationalFramework.ensemble.PolicyEnsemble;
-import util.ArgumentComparator;
 import util.MultiMap;
 import util.Pair;
 
@@ -308,11 +307,7 @@ public class PolicyActor implements AgentInterface {
 		actions = policy_.evaluatePolicy(state, validActions, goalArgs_,
 				StateSpec.getInstance().getNumReturnedActions());
 
-		// This allows action covering to catch variant action conditions.
-		// This problem is caused by hierarchical RLGG rules, which cover
-		// actions regarding new object type already
-		checkForUnseenPreds(state, validActions);
-
+		// Resampling code
 		if (totalEpisodes_ > 0 && ProgramArgument.CHI.doubleValue() > 0
 				&& episodeStateActions_ != null) {
 			// Save the previous state (if not an optimal agent).
@@ -336,49 +331,6 @@ public class PolicyActor implements AgentInterface {
 
 		// Return the actions.
 		return actions;
-	}
-
-	/**
-	 * Runs through the set of unseen predicates to check if the state contains
-	 * them. This method is used to capture variant action conditions.
-	 * 
-	 * @param state
-	 *            The state to scan.
-	 * @param validActions
-	 *            The state valid actions.
-	 */
-	@SuppressWarnings("unchecked")
-	private void checkForUnseenPreds(Rete state,
-			MultiMap<String, String[]> validActions) {
-		try {
-			// Run through the unseen preds, triggering covering if necessary.
-			boolean triggerCovering = false;
-			Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
-			for (RelationalPredicate unseenPred : AgentObservations
-					.getInstance().getUnseenPredicates()) {
-				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
-				QueryResult results = state.runQueryStar(query,
-						new ValueVector());
-				if (results.next()) {
-					// The unseen pred exists - trigger covering
-					triggerCovering = true;
-					removables.add(unseenPred);
-				}
-			}
-
-			// If any unseen preds are seen, trigger covering.
-			if (triggerCovering) {
-				MultiMap<String, String[]> emptyActions = MultiMap
-						.createSortedSetMultiMap(ArgumentComparator
-								.getInstance());
-				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(state,
-						validActions, goalArgs_, emptyActions);
-				AgentObservations.getInstance().removeUnseenPredicates(
-						removables);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
 	}
 
 	/**

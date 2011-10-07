@@ -189,34 +189,39 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param elites
 	 *            The elite samples to iterate through.
+	 * @param ed
+	 *            The elites data to record into.
 	 * @param minValue
 	 *            The minimum value the agent has observed so far.
-	 * @return The average value of the elite samples.
+	 * @return The number of elites samples used for the count (max |elites|).
 	 */
-	private ElitesData countRules(SortedSet<PolicyValue> elites, double minValue) {
-		// Check that the elites are actually a sub-set of the population
-		if (elites.size() == policiesEvaluated_
-				&& elites.last().getValue() == minValue)
-			return null;
+	private int countRules(SortedSet<PolicyValue> elites, ElitesData ed,
+			float minValue) {
+		// If no samples better than others, return null
+		if (elites == null || elites.isEmpty() || elites.first().getValue() == minValue)
+			return 0;
 
-		ElitesData ed = new ElitesData();
+		// Sub-elites remove any minimally valued samples (useless updates).
+		SortedSet<PolicyValue> subElites = (elites.last().getValue() == minValue) ? elites
+				.headSet(new PolicyValue(null, minValue, Integer.MAX_VALUE))
+				: elites;
 
 		// WEIGHTED UPDATES CODE
 		double gradient = 0;
 		double offset = 1;
 		if (ProgramArgument.WEIGHTED_UPDATES.booleanValue()) {
-			double diffValues = (elites.first().getValue() - elites.last()
-					.getValue());
+			double diffValues = (subElites.first().getValue() - subElites
+					.last().getValue());
 			if (diffValues != 0)
 				gradient = (1 - ProgramArgument.MIN_WEIGHTED_UPDATE
 						.doubleValue()) / diffValues;
-			offset = 1 - gradient * elites.first().getValue();
+			offset = 1 - gradient * subElites.first().getValue();
 		}
 		// /////////////////////
 
 		// Only selecting the top elite samples
 		Map<Slot, Double> slotMean = new HashMap<Slot, Double>();
-		for (PolicyValue pv : elites) {
+		for (PolicyValue pv : subElites) {
 			// Note which slots were used in this policy
 			Collection<Slot> policySlotCounts = new HashSet<Slot>();
 			double weight = pv.getValue() * gradient + offset;
@@ -257,11 +262,11 @@ public final class PolicyGenerator implements Serializable {
 		// Calculate the Bernoulli probabilities of each slot
 		for (Slot slot : slotMean.keySet()) {
 			// Each slot should have elites number of counts
-			double meanVal = slotMean.get(slot) / elites.size();
+			double meanVal = slotMean.get(slot) / subElites.size();
 			ed.setUsageStats(slot, meanVal);
 		}
 
-		return ed;
+		return subElites.size();
 	}
 
 	/**
@@ -669,6 +674,7 @@ public final class PolicyGenerator implements Serializable {
 	 *         the rule.
 	 */
 	public RelationalRule getCreateCorrespondingRule(RelationalRule rule) {
+		// TODO Trial immediate slot creation
 		rule = rule.groundModular();
 		RelationalRule match = currentRules_.findMatch(rule);
 		if (match == null) {
@@ -784,6 +790,8 @@ public final class PolicyGenerator implements Serializable {
 							.getGenerator();
 					RelationalRule bestRule = ruleGenerator.getBestElement();
 					// If the best rule isn't the seed, create a new slot
+					// TODO Maybe bypass this restriction by 'removing' the best
+					// rule to see if the KL size is affected by that at all.
 					if (!bestRule.equals(slot.getSeedRule())) {
 						Slot newSlot = new Slot(bestRule, false, newSlotLevel);
 						if (slotGenerator_.contains(newSlot)) {
@@ -888,6 +896,8 @@ public final class PolicyGenerator implements Serializable {
 
 		// For each of the rule generators
 		buf.write(slotBuffer.toString() + "\n");
+		// Write the number of slots
+		buf.write("Num slots: " + slotGenerator_.size() + "\n");
 		buf.write("Total Update Size: " + klDivergence_ + "\n");
 		buf.write("Converged Value: " + convergedValue_);
 	}
@@ -1167,9 +1177,17 @@ public final class PolicyGenerator implements Serializable {
 	 *            The minimum value the agent has seen.
 	 */
 	public void updateDistributions(SortedSet<PolicyValue> elites,
-			double alpha, int population, int numElites, double minValue) {
+			double alpha, int population, int numElites, float minValue) {
 		// Keep count of the rules seen (and slots used)
-		ElitesData ed = countRules(elites, minValue);
+		ElitesData ed = new ElitesData();
+		int numEliteSamples = countRules(elites, ed, minValue);
+		double modAlpha = (1.0 * numEliteSamples) / numElites;
+		if (modAlpha < 1) {
+			if (ProgramArgument.EARLY_UPDATING.booleanValue())
+				alpha *= modAlpha;
+			else
+				ed = null;
+		}
 
 		klDivergence_ = 0;
 
@@ -1304,5 +1322,13 @@ public final class PolicyGenerator implements Serializable {
 	public void loadAgentData() {
 		AgentObservations.loadAgentObservations(localGoal_);
 		StateSpec.reinitInstance();
+	}
+
+	public Collection<RelationalRule> getMutatedRules() {
+		return mutationTree_.values();
+	}
+
+	public int size() {
+		return slotGenerator_.size();
 	}
 }

@@ -212,7 +212,7 @@ public class RuleCreationTest {
 
 		assertFalse(results.toString().contains("(on ?G_0 ?G_1)"));
 	}
-	
+
 	@Test
 	public void testSpecialiseRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
@@ -220,12 +220,13 @@ public class RuleCreationTest {
 		new PolicyGenerator(0);
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations("onab"));
-		
+
 		// Interesting case of losing (clear/highest ?Y)
 		RelationalRule rule = new RelationalRule(
 				"(clear ?X) (highest ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
 		Set<RelationalRule> results = sut_.specialiseRule(rule);
-		RelationalRule mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
+		RelationalRule mutant = new RelationalRule(
+				"(clear ?X) (above ?X ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
 	}
 
@@ -351,10 +352,8 @@ public class RuleCreationTest {
 
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
-		results = sut_
-				.simplifyRule(ruleConds,
-						StateSpec.toRelationalPredicate("(not (on ?X ?))"),
-						false);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(not (on ?X ?))"), false);
 		assertNull(results);
 
 		// Testing unification
@@ -580,15 +579,15 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
-		
+
 		// Disallowing an illegal rule
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
-		results = sut_.simplifyRule(ruleConds, StateSpec
-				.toRelationalPredicate("(above ?X ?Y)"), true);
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(above ?X ?Y)"), true);
 		assertNull(results);
 	}
 

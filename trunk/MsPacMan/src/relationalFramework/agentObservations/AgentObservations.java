@@ -228,6 +228,10 @@ public final class AgentObservations implements Serializable {
 		return conditionObservations_.negatedConditionBeliefs_;
 	}
 
+	public Collection<String> getNeverSeenInvariants() {
+		return conditionObservations_.invariants_.getNeverSeenPredicates();
+	}
+
 	public int getNumGoalArgs() {
 		return localAgentObservations_.getNumGoalArgs();
 	}
@@ -291,6 +295,10 @@ public final class AgentObservations implements Serializable {
 
 	public Collection<RelationalPredicate> getSpecificInvariants() {
 		return conditionObservations_.invariants_.getSpecificInvariants();
+	}
+
+	public Collection<String> getGeneralInvariants() {
+		return conditionObservations_.invariants_.getGeneralInvariants();
 	}
 
 	public Collection<RelationalPredicate> getUnseenPredicates() {
