@@ -316,7 +316,7 @@ public class CrossEntropyRun {
 			numElites = Math.max(numElites, policyGenerator.getGenerator()
 					.size());
 
-		return (int) Math.max(1, numElites);
+		return checkEliteBounding((int) numElites);
 	}
 
 	/**
@@ -525,7 +525,7 @@ public class CrossEntropyRun {
 		for (Iterator<PolicyValue> iter = elites.iterator(); iter.hasNext();) {
 			PolicyValue pv = iter.next();
 			if (iteration - pv.getIteration() >= staleValue) {
-				localPolicy.retestPolicy(pv.getPolicy());
+				//localPolicy.retestPolicy(pv.getPolicy());
 				iter.remove();
 			}
 		}
