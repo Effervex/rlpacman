@@ -246,16 +246,11 @@ public final class PolicyGenerator implements Serializable {
 					ed.addRuleCount(rule, weight);
 
 					// Note which slots were active in this policy
-					policySlotCounts.add(ruleSlot);
+					Double val = slotMean.get(ruleSlot);
+					if (val == null)
+						val = 0.0;
+					slotMean.put(ruleSlot, val + 1);
 				}
-			}
-
-			// Add to the slot numeracy multimap
-			for (Slot slot : policySlotCounts) {
-				Double val = slotMean.get(slot);
-				if (val == null)
-					val = 0.0;
-				slotMean.put(slot, val + 1);
 			}
 		}
 
