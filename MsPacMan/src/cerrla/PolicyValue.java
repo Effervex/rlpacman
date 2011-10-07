@@ -41,10 +41,12 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The value the policy achieved
 	 */
-	private void updateInternalRuleValues(CoveringRelationalPolicy pol, float value) {
-		for (RelationalRule rule : pol.getFiringRules()) {
-			rule.updateInternalValue(value);
-		}
+	private void updateInternalRuleValues(CoveringRelationalPolicy pol,
+			float value) {
+		if (pol != null)
+			for (RelationalRule rule : pol.getFiringRules()) {
+				rule.updateInternalValue(value);
+			}
 	}
 
 	/**
@@ -64,7 +66,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	public float getValue() {
 		return value_;
 	}
-	
+
 	/**
 	 * Gets the iteration the policy value was create at.
 	 * 

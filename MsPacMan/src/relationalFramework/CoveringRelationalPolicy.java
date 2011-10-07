@@ -7,6 +7,7 @@ import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.AgentObservations;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,7 +28,9 @@ import cerrla.ProgramArgument;
 import util.ArgumentComparator;
 import util.MultiMap;
 
+import jess.QueryResult;
 import jess.Rete;
+import jess.ValueVector;
 
 /**
  * This class represents a policy that the agent can use.
@@ -79,33 +82,36 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			return;
 		// Load every necessary module
 		for (GoalCondition constantCondition : constantConditions) {
-			Module module = Module.loadModule(StateSpec.getInstance()
-					.getEnvironmentName(), constantCondition.toString());
-			// If the module exists
-			if (module != null) {
-				// Put the parameters into an arraylist
-				ArrayList<String> parameters = new ArrayList<String>();
-				RelationalPredicate cond = constantCondition.getFact();
-				// Extract the parameters used in the constant
-				// conditions
-				for (String arg : cond.getArguments()) {
-					// If modules are recursive, set up the parameters
-					// accordingly.
-					parameters.add(arg);
-				}
+			if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
+					.equals(constantCondition.toString())) {
+				Module module = Module.loadModule(StateSpec.getInstance()
+						.getEnvironmentName(), constantCondition.toString());
+				// If the module exists
+				if (module != null) {
+					// Put the parameters into an arraylist
+					ArrayList<String> parameters = new ArrayList<String>();
+					RelationalPredicate cond = constantCondition.getFact();
+					// Extract the parameters used in the constant
+					// conditions
+					for (String arg : cond.getArguments()) {
+						// If modules are recursive, set up the parameters
+						// accordingly.
+						parameters.add(arg);
+					}
 
-				// Add the module rules.
-				for (RelationalRule gr : module.getModuleRules()) {
-					gr.setModularParameters(parameters);
-					checkModular(gr);
-					// Get/create the corresponding rule in the generator
-					gr = CrossEntropyRun.getPolicyGenerator()
-							.getCreateCorrespondingRule(gr);
-					if (!policyRules_.contains(gr)) {
-						gr.setQueryParams(null);
-						modularRules_.add(gr);
-						policyRules_.add(gr);
-						policySize_++;
+					// Add the module rules.
+					for (RelationalRule gr : module.getModuleRules()) {
+						gr.setModularParameters(parameters);
+						checkModular(gr);
+						// Get/create the corresponding rule in the generator
+						gr = CrossEntropyRun.getPolicyGenerator()
+								.getCreateCorrespondingRule(gr);
+						if (!policyRules_.contains(gr)) {
+							gr.setQueryParams(null);
+							modularRules_.add(gr);
+							policyRules_.add(gr);
+							policySize_++;
+						}
 					}
 				}
 			}
@@ -219,9 +225,9 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 
 			// Next trigger covering, storing the rules in the policy if
 			// required
-			List<RelationalRule> coveredRules = CrossEntropyRun.getPolicyGenerator()
-					.triggerRLGGCovering(state, validActions, goalReplacements,
-							activatedActions);
+			List<RelationalRule> coveredRules = CrossEntropyRun
+					.getPolicyGenerator().triggerRLGGCovering(state,
+							validActions, goalReplacements, activatedActions);
 			// If the policy is empty, store the rules in it.
 			if (activatedActions.isKeysEmpty() && coveredRules != null) {
 				Collections.shuffle(coveredRules, PolicyGenerator.random_);
@@ -249,7 +255,57 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			e.printStackTrace();
 		}
 
+		// This allows action covering to catch variant action conditions.
+		// This problem is caused by hierarchical RLGG rules, which cover
+		// actions regarding new object type already
+		checkForUnseenPreds(state, validActions, goalReplacements);
+
 		return actionSwitch;
+	}
+
+	/**
+	 * Runs through the set of unseen predicates to check if the state contains
+	 * them. This method is used to capture variant action conditions.
+	 * 
+	 * @param state
+	 *            The state to scan.
+	 * @param validActions
+	 *            The state valid actions.
+	 * @param goalReplacements
+	 *            The goal argument replacements.
+	 */
+	private void checkForUnseenPreds(Rete state,
+			MultiMap<String, String[]> validActions,
+			Map<String, String> goalReplacements) {
+		try {
+			// Run through the unseen preds, triggering covering if necessary.
+			boolean triggerCovering = false;
+			Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
+			for (RelationalPredicate unseenPred : AgentObservations
+					.getInstance().getUnseenPredicates()) {
+				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
+				QueryResult results = state.runQueryStar(query,
+						new ValueVector());
+				if (results.next()) {
+					// The unseen pred exists - trigger covering
+					triggerCovering = true;
+					removables.add(unseenPred);
+				}
+			}
+
+			// If any unseen preds are seen, trigger covering.
+			if (triggerCovering) {
+				MultiMap<String, String[]> emptyActions = MultiMap
+						.createSortedSetMultiMap(ArgumentComparator
+								.getInstance());
+				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(state,
+						validActions, goalReplacements, emptyActions);
+				AgentObservations.getInstance().removeUnseenPredicates(
+						removables);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**

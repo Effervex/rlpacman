@@ -498,7 +498,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public double updateProbabilities(ElitesData ed, double alpha,
 			int population, int numElites, int totalPoliciesEvaluated) {
 		numUpdates_++;
-		if (ed == null)
+		if (ed == null || alpha == 0)
 			return alpha;
 
 		double alphaPrime = getLocalAlpha(alpha, population, numElites,

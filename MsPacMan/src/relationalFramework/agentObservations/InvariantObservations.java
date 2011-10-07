@@ -1,12 +1,12 @@
 package relationalFramework.agentObservations;
 
 import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
 
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Map;
 import java.util.TreeSet;
-
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -32,8 +32,19 @@ public class InvariantObservations implements Serializable {
 	 */
 	private Collection<String> generalInvariants_;
 
+	/** The predicates that have never been observed to be present. */
+	private Collection<String> neverPresent_;
+
 	/** A counter for the number of times the invariants have been scanned. */
 	private int counter_ = 0;
+
+	public InvariantObservations() {
+		// Initialise the never present invariants
+		neverPresent_ = new TreeSet<String>();
+		neverPresent_.addAll(StateSpec.getInstance().getPredicates().keySet());
+		neverPresent_.addAll(StateSpec.getInstance().getTypePredicates()
+				.keySet());
+	}
 
 	/**
 	 * Note the state down and renew the invariants.
@@ -49,6 +60,7 @@ public class InvariantObservations implements Serializable {
 		if (specificInvariants_ == null) {
 			specificInvariants_ = new TreeSet<RelationalPredicate>(stateFacts);
 			generalInvariants_ = new TreeSet<String>(generalStateFacts);
+			neverPresent_.removeAll(generalStateFacts);
 			return true;
 		}
 
@@ -57,6 +69,7 @@ public class InvariantObservations implements Serializable {
 		if (result)
 			expandedSpecificInvariants_ = null;
 		result |= generalInvariants_.retainAll(generalStateFacts);
+		result |= neverPresent_.removeAll(generalStateFacts);
 		return result;
 	}
 
@@ -108,6 +121,8 @@ public class InvariantObservations implements Serializable {
 				* result
 				+ ((generalInvariants_ == null) ? 0 : generalInvariants_
 						.hashCode());
+		result = prime * result
+				+ ((neverPresent_ == null) ? 0 : neverPresent_.hashCode());
 		result = prime
 				* result
 				+ ((specificInvariants_ == null) ? 0 : specificInvariants_
@@ -129,6 +144,11 @@ public class InvariantObservations implements Serializable {
 				return false;
 		} else if (!generalInvariants_.equals(other.generalInvariants_))
 			return false;
+		if (neverPresent_ == null) {
+			if (other.neverPresent_ != null)
+				return false;
+		} else if (!neverPresent_.equals(other.neverPresent_))
+			return false;
 		if (specificInvariants_ == null) {
 			if (other.specificInvariants_ != null)
 				return false;
@@ -149,6 +169,7 @@ public class InvariantObservations implements Serializable {
 		buffer.append("Specific: " + specificInvariants_.toString());
 		if (generalInvariants_ != null)
 			buffer.append("\n" + "General: " + generalInvariants_.toString());
+		buffer.append("\n" + "Never Present: " + neverPresent_.toString());
 		return buffer.toString();
 	}
 
@@ -160,10 +181,19 @@ public class InvariantObservations implements Serializable {
 			expandedSpecificInvariants_ = new TreeSet<RelationalPredicate>();
 			for (RelationalPredicate invariant : specificInvariants_) {
 				expandedSpecificInvariants_.add(invariant);
-				expandedSpecificInvariants_.addAll(invariant.createSubFacts(false, false));
+				expandedSpecificInvariants_.addAll(invariant.createSubFacts(
+						false, false));
 			}
 		}
-		
+
 		return expandedSpecificInvariants_;
+	}
+
+	public Collection<String> getNeverSeenPredicates() {
+		return neverPresent_;
+	}
+
+	public Collection<String> getGeneralInvariants() {
+		return generalInvariants_;
 	}
 }

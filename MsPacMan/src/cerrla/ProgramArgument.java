@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,10 +18,14 @@ public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, ParameterType.UPDATING, "Step size update"),
 	BETA(0.0001, "beta", null, ParameterType.CONVERGENCE,
 			"If KL sum updates are less than Beta * Alpha"),
-	CHI(0.1, "chi", null, ParameterType.SAMPLING,
+	BOUNDED_ELITES(false, "boundedElites", null, ParameterType.UPDATING,
+			"If the minimum number of elites = |S|."),
+	CHI(0.0, "chi", null, ParameterType.SAMPLING,
 			"The resampling percentage of average episode steps"),
 	DYNAMIC_SLOTS(true, "dynamicSlots", null, ParameterType.SPECIALISATION,
 			"If the slots grow dynamically"),
+	EARLY_UPDATING(true, "earlyUpdating", null, ParameterType.UPDATING,
+			"If the algorithm should perform updates using incomplete, but viable, elites."),
 	ELITES_SIZE(0, "elitesSize", null, ParameterType.SAMPLING,
 			"The size of the elites: 0=Av # rules, 1=Sum slot means, 2=Sum # KL rules"),
 	ENSEMBLE_EVALUATION(false, "ensembleEvaluation", null,
@@ -62,7 +67,7 @@ public enum ProgramArgument implements Serializable {
 	POLICY_REPEATS(3, "policyRepeats", null, ParameterType.EVALUATION,
 			"Number of times policy is repeated"),
 	RHO(0.1, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
-	SLOT_THRESHOLD(0.75, "slotThreshold", null, ParameterType.SPECIALISATION,
+	SLOT_THRESHOLD(0.5, "slotThreshold", null, ParameterType.SPECIALISATION,
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),
 	TEST_ITERATIONS(100, "testIterations", null, ParameterType.EVALUATION,
 			"Number of iterations to test the final testing for"),
@@ -175,20 +180,23 @@ public enum ProgramArgument implements Serializable {
 	 * @return The index after handling.
 	 */
 	public static int handleArg(int i, String[] args) {
-		// TODO Add output messages stating if the argument was received or not.
+		boolean argFound = false;
 		if (args[i].equals("-slotProb")) {
 			i++;
 			if (args[i].equals("dynamic"))
 				INITIAL_SLOT_MEAN.setDoubleValue(-1);
 			else
 				INITIAL_SLOT_MEAN.setDoubleValue(Double.parseDouble(args[i]));
+			argFound = true;
 		} else if (args[i].equals("-ensemble")) {
 			ENSEMBLE_EVALUATION.setBooleanValue(true);
 			i++;
 			ENSEMBLE_SIZE.setDoubleValue(Integer.parseInt(args[i]));
+			argFound = true;
 		} else if (args[i].equals("-dynamicSlots")) {
 			i++;
 			DYNAMIC_SLOTS.setValue(args[i]);
+			argFound = true;
 		} else if (args[i].charAt(0) == '-') {
 			// Check the arg against the rest of the program args
 			for (ProgramArgument pa : ProgramArgument.values()) {
@@ -198,9 +206,15 @@ public enum ProgramArgument implements Serializable {
 						|| args[i].equals(pa.shortcut_)) {
 					i++;
 					pa.setValue(args[i]);
+					argFound = true;
 					break;
 				}
 			}
+		}
+
+		// If no arg found, notify the user
+		if (!argFound) {
+			System.err.println("Invalid arguments! " + Arrays.toString(args));
 		}
 		return i;
 	}

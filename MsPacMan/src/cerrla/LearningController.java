@@ -218,6 +218,7 @@ public class LearningController {
 		float max = -Float.MAX_VALUE;
 		int maxRun = -1;
 		double[] episodeLengths = new double[runEnd];
+		double[] numSlots = new double[runEnd];
 
 		if (!performanceFile_.exists())
 			performanceFile_.createNewFile();
@@ -235,6 +236,7 @@ public class LearningController {
 			// Run through the performances and place them in the matrix
 			SortedMap<Integer, Float> runPerformances = PerformanceReader
 					.getPerformanceArray();
+			numSlots[i] = PerformanceReader.getNumSlots();
 			if (byEpisode) {
 				Iterator<Integer> iter = runPerformances.keySet().iterator();
 				Integer current = iter.next();
@@ -353,6 +355,8 @@ public class LearningController {
 		// Write the average episode length
 		buf.write("\nAverage episode length: " + mean.evaluate(episodeLengths)
 				+ " +- " + sd.evaluate(episodeLengths) + "\n");
+		buf.write("\nAverage num slots: " + mean.evaluate(numSlots) + " +- "
+				+ sd.evaluate(numSlots) + "\n");
 
 		buf.close();
 		writer.close();

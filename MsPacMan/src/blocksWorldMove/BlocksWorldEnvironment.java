@@ -26,7 +26,6 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 
-
 /**
  * The environment for the blocks world interface.
  * 
@@ -37,19 +36,19 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private static final float MINIMAL_REWARD = -10;
 
 	/** The number of blocks. Default 5. */
-	private int numBlocks_ = 5;
+	protected int numBlocks_ = 5;
 
 	/** The probability of an action succeeding (assuming it is legal). */
-	private double actionSuccess_ = 1.0;
+	protected double actionSuccess_ = 1.0;
 
 	/** The maximum number of steps the agent is allocated. */
-	private int maxSteps_;
+	protected int maxSteps_;
 
 	/** The state of the blocks world. */
-	private BlocksState state_;
+	protected BlocksState state_;
 
 	/** The state of the blocks world in base predicates. */
-	private Rete rete_;
+	protected Rete rete_;
 
 	/** The number of steps taken. */
 	private int steps_;
@@ -170,7 +169,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
-			formState(state_.getState());
+			formState(state_);
 		} else if (!actionFailed) {
 			// If the agent caused the state to remain the same, exit the
 			// episode with max negative reward.
@@ -193,7 +192,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 			if (reward > 0)
 				reward = 0;
 		}
-//		reward = -1;
+		// reward = -1;
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, obs, isGoal);
 
@@ -209,7 +208,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The old state of the world, before the action.
 	 * @return The state of the new world.
 	 */
-	private BlocksState actOnAction(RelationalPredicate action, BlocksState worldState) {
+	protected BlocksState actOnAction(RelationalPredicate action,
+			BlocksState worldState) {
 		if (action == null)
 			return worldState;
 
@@ -253,7 +253,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 *            The goal name.
 	 * @return The newly initialised blocks world state.
 	 */
-	private BlocksState initialiseWorld(int numBlocks) {
+	protected BlocksState initialiseWorld(int numBlocks) {
 		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
@@ -313,82 +313,28 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		// Check this isn't the goal state
-		boolean validWorld = formState(worldState);
+		BlocksState blocksState = new BlocksState(worldState);
+		boolean validWorld = formState(blocksState);
 		if (!validWorld)
 			return initialiseWorld(numBlocks);
 
-		return new BlocksState(worldState);
+		return blocksState;
 	}
 
 	/**
 	 * Forms the knowledge base of the state using the int array approximation.
 	 * 
-	 * @param worldState
+	 * @param blocksState
 	 *            The state of the world in int form.
+	 * @return True if the state is not the goal.
 	 */
-	private boolean formState(Integer[] worldState) {
+	private boolean formState(BlocksState blocksState) {
 		try {
 			// Clear the old state
 			rete_.reset();
 
-			// Assert the floor
-			rete_.assertString("(floor floor)");
-
-			// Scanning through, making predicates (On, OnFloor, and Highest)
-			int[] heightMap = new int[worldState.length];
-			int maxHeight = 0;
-			List<Integer> highestBlocks = new ArrayList<Integer>();
-			List<Integer> allBlocks = new ArrayList<Integer>();
-			for (int i = 0; i < worldState.length; i++) {
-				// On the floor
-				if (worldState[i] == 0) {
-					rete_.assertString("(on " + (char) ('a' + i) + " floor))");
-				} else {
-					// On another block
-					rete_.assertString("(on " + (char) ('a' + i) + " "
-							+ (char) ('a' + worldState[i] - 1) + "))");
-				}
-				allBlocks.add(i);
-
-				// Finding the heights
-				int blockHeight = heightMap[i];
-				if (blockHeight == 0) {
-					blockHeight = recurseHeight(i, heightMap, worldState);
-				}
-				if (blockHeight > maxHeight) {
-					maxHeight = blockHeight;
-					highestBlocks.clear();
-				}
-				if (blockHeight == maxHeight) {
-					highestBlocks.add(i);
-				}
-
-				// Assert the blocks
-				rete_.assertString("(block " + (char) ('a' + i) + "))");
-			}
-
-			// Add the highest block/s
-			for (Integer block : highestBlocks) {
-				rete_.assertString("(highest " + (char) ('a' + block) + "))");
-			}
-
-			// Asserting the highest goal
-			if (goalArgs_ == null) {
-				if (StateSpec.getInstance().getGoalName().equals("highestA")) {
-					goalArgs_ = new ArrayList<String>(1);
-					allBlocks.removeAll(highestBlocks);
-					if (allBlocks.isEmpty())
-						return false;
-					goalArgs_.add((char) ('a' + allBlocks
-							.get(PolicyGenerator.random_.nextInt(allBlocks
-									.size())))
-							+ "");
-				} else
-					goalArgs_ = new ArrayList<String>();
-			}
-
-			// Add the goal
-			StateSpec.getInstance().assertGoalPred(goalArgs_, rete_);
+			if (!assertFacts(blocksState, rete_))
+				return false;
 			rete_.run();
 
 			// Adding the valid actions
@@ -397,6 +343,82 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		return true;
+	}
+
+	/**
+	 * Assert the fact to the rete object.
+	 * 
+	 * @param blocksState
+	 *            The blocks state to use for creating assertions.
+	 * @param rete
+	 *            The rete object.
+	 * @return True if the state is able to be validly formed.
+	 * @throws Exception If something goes awry...
+	 */
+	protected boolean assertFacts(BlocksState blocksState, Rete rete)
+			throws Exception {
+		// Assert the floor
+		rete.assertString("(floor floor)");
+
+		Integer[] intState = blocksState.getState();
+
+		// Scanning through, making predicates (On, OnFloor, and Highest)
+		int[] heightMap = new int[blocksState.length];
+		int maxHeight = 0;
+		List<Integer> highestBlocks = new ArrayList<Integer>();
+		List<Integer> allBlocks = new ArrayList<Integer>();
+		for (int i = 0; i < blocksState.length; i++) {
+			// On the floor
+			if (intState[i] == 0) {
+				rete.assertString("(on " + (char) ('a' + i) + " floor)");
+			} else {
+				// On another block
+				rete.assertString("(on " + (char) ('a' + i) + " "
+						+ (char) ('a' + intState[i] - 1) + ")");
+			}
+			allBlocks.add(i);
+
+			// Finding the heights
+			int blockHeight = heightMap[i];
+			if (blockHeight == 0) {
+				blockHeight = recurseHeight(i, heightMap, intState);
+			}
+			if (blockHeight > maxHeight) {
+				maxHeight = blockHeight;
+				highestBlocks.clear();
+			}
+			if (blockHeight == maxHeight) {
+				highestBlocks.add(i);
+			}
+
+			// Assert the blocks
+			rete.assertString("(block " + (char) ('a' + i) + ")");
+		}
+
+		// Add the highest block/s
+		for (Integer block : highestBlocks) {
+			rete.assertString("(highest " + (char) ('a' + block) + ")");
+		}
+
+		// Asserting the highest goal
+		if (goalArgs_ == null) {
+			if (StateSpec.getInstance().getGoalName().equals("highestA")) {
+				goalArgs_ = new ArrayList<String>(1);
+				allBlocks.removeAll(highestBlocks);
+				if (allBlocks.isEmpty())
+					return false;
+				goalArgs_
+						.add((char) ('a' + allBlocks
+								.get(PolicyGenerator.random_.nextInt(allBlocks
+										.size())))
+								+ "");
+			} else
+				goalArgs_ = new ArrayList<String>();
+		}
+
+		// Add the goal
+		StateSpec.getInstance().assertGoalPred(goalArgs_, rete);
 		return true;
 	}
 
@@ -430,7 +452,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	 * @return The minimal number of steps to take for solving.
 	 */
 	private int optimalSteps() {
-		RelationalPolicy optimalPolicy = StateSpec.getInstance().getHandCodedPolicy();
+		RelationalPolicy optimalPolicy = StateSpec.getInstance()
+				.getHandCodedPolicy();
 		steps_ = 0;
 
 		// Check it hasn't already solved the state
@@ -465,7 +488,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Return the state to normal
 		state_ = initialState;
 		actionSuccess_ = oldActionSuccess;
-		formState(state_.getState());
+		formState(state_);
 		optimalMap_.put(state_, steps_);
 		optimal_ = false;
 		return steps_;
@@ -566,8 +589,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		 *            denoting if a row has any blocks in it.
 		 * @return The new value of column (same or + 1).
 		 */
-		private int recursiveBuild(int currBlock, Integer[] blocks, int column,
-				Map<Integer, Point> posMap, char[][] blocksChars) {
+		protected int recursiveBuild(int currBlock, Integer[] blocks,
+				int column, Map<Integer, Point> posMap, char[][] blocksChars) {
 			if (!posMap.containsKey(currBlock)) {
 				if (blocks[currBlock] == 0) {
 					posMap.put(currBlock, new Point(column, 0));

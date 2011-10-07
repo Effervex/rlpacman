@@ -120,8 +120,8 @@ public class ConditionBeliefs implements Serializable {
 		// Extract the type conditions from the true facts
 		Collection<RelationalPredicate> typePredicates = new HashSet<RelationalPredicate>();
 		for (RelationalPredicate trueFact : trueFacts) {
-//			 if
-//			 (StateSpec.getInstance().isTypePredicate(trueFact.getFactName()))
+			// if
+			// (StateSpec.getInstance().isTypePredicate(trueFact.getFactName()))
 			typePredicates.add(trueFact);
 		}
 
@@ -372,8 +372,15 @@ public class ConditionBeliefs implements Serializable {
 	private boolean isUsefulRelation(RelationalPredicate relativeFact,
 			boolean isAlwaysTrue, TypedBeliefs typeBeliefs,
 			Map<String, String> typeVarReplacements) {
+		// If the predicate is a never-seen invariant, return false
+		if (AgentObservations.getInstance().getNeverSeenInvariants()
+				.contains(relativeFact.getFactName()))
+			return false;
+		
+		// If there are no type beliefs
 		if (typeBeliefs == null)
 			return true;
+
 		TypedBeliefs coreBeliefs = typedCondBeliefs_.get(cbFact_);
 		Collection<RelationalPredicate> coreCollection = (isAlwaysTrue) ? coreBeliefs.alwaysTrue_
 				: coreBeliefs.neverTrue_;
@@ -420,8 +427,8 @@ public class ConditionBeliefs implements Serializable {
 			// rules.
 			if (StateSpec.getInstance().isTypePredicate(
 					relatedFact.getFactName())) {
-				int index = RelationalPredicate.getVariableTermIndex(relatedFact
-						.getArguments()[0]);
+				int index = RelationalPredicate
+						.getVariableTermIndex(relatedFact.getArguments()[0]);
 				if (cbFact_.getArgTypes()[index].equals(relatedFact
 						.getFactName()))
 					return false;

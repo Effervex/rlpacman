@@ -7,7 +7,6 @@ import relationalFramework.StateSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 
 public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
@@ -49,8 +48,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 					StateSpec.createGoalTerm(1) };
 			result[1] = "(on " + goalBlocks[0] + " " + goalBlocks[1]
 					+ ") (active " + goalBlocks[0] + ") (active "
-					+ goalBlocks[1] + ") (not (active ?X&:(<> ?X "
-					+ goalBlocks[0] + " " + goalBlocks[1] + ")))";
+					+ goalBlocks[1] + ")";
 			return result;
 		}
 
@@ -94,29 +92,47 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
-			rules = new String[3];
+			rules = new String[6];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
+					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(block ?G_1) (not (active ?G_1)) => (toggle ?G_1)";
+			rules[2] = "("
+					+ GOALARGS_PRED
+					+ " ? ?G_0 ?G_1) "
+					+ "(block ?X&:(<> ?X ?G_0 ?G_1)) (active ?X) => (toggle ?X)";
+			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
+			rules[4] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
-			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+			rules[5] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?X) (above ?X ?G_1) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("stack")) {
-			rules = new String[1];
+			rules = new String[2];
 			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
+			rules[1] = "(block ?X) (not (active ?X)) => (toggle ?X)";
 		} else if (envParameter_.equals("unstack")) {
-			rules = new String[1];
+			rules = new String[2];
 			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
+			rules[1] = "(block ?X) (not (active ?X)) => (toggle ?X)";
 		} else if (envParameter_.equals("clearA")) {
-			rules = new String[1];
+			rules = new String[3];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(block ?X&:(<> ?X ?G_0)) (active ?X) => (toggle ?X)";
 		} else if (envParameter_.equals("highestA")) {
-			rules = new String[2];
+			rules = new String[4];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
+			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(block ?X&:(<> ?X ?G_0)) (active ?X) => (toggle ?X)";
 		}
 
 		BasicRelationalPolicy optimal = new BasicRelationalPolicy();
@@ -152,17 +168,11 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		structure[0] = "block";
 		predicates.add(new RelationalPredicate("highest", structure));
 
+		// Active predicate
+		structure = new String[1];
+		structure[0] = "block";
+		predicates.add(new RelationalPredicate("active", structure));
+
 		return predicates;
-	}
-
-	@Override
-	protected Map<String, String> initialiseTypePredicateTemplates() {
-		Map<String, String> typePreds = new HashMap<String, String>();
-
-		typePreds.put("thing", null);
-		typePreds.put("block", "thing");
-		typePreds.put("floor", "thing");
-
-		return typePreds;
 	}
 }

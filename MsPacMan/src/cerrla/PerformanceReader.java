@@ -18,6 +18,7 @@ public class PerformanceReader {
 	private static SortedMap<Integer, Float> performanceMap_;
 	private static String readableGenerator_;
 	private static String generator_;
+	private static int numSlots_;
 
 	/**
 	 * Reads a performance file and stores the values as accessible private
@@ -62,9 +63,14 @@ public class PerformanceReader {
 				generator_ += "\n" + input;
 
 			// Then read the convergence
-			buf.readLine();
-			buf.readLine();
-			buf.readLine();
+			input = buf.readLine();
+			// If the file has num slots, 
+			String numSlots = "Num slots: ";
+			if (input.startsWith(numSlots))
+				numSlots_ = Integer.parseInt(input.substring(numSlots.length()));
+			while (!input.equals("")) {
+				input = buf.readLine();
+			}	
 
 			// Then read the performance
 			while (input.equals(""))
@@ -162,6 +168,10 @@ public class PerformanceReader {
 
 	public static String getGenerator() {
 		return generator_;
+	}
+	
+	public static int getNumSlots() {
+		return numSlots_;
 	}
 
 	/**
