@@ -173,7 +173,7 @@ public class CrossEntropyRun {
 				// modules again!
 				// Checking for specific goal conditions
 				GoalCondition ruleConstants = mutated.getConstantCondition();
-				if (ruleConstants != null)
+				if (ruleConstants != null && ruleConstants.getFacts().size() == 1)
 					goalConditions.add(ruleConstants);
 
 				// Checking for general goal conditions

@@ -74,6 +74,24 @@ public class GoalCondition implements Serializable {
 	public SortedSet<RelationalPredicate> getFacts() {
 		return facts_;
 	}
+	
+	/**
+	 * Splits this goal condition into singular predicate goal conditions.
+	 * 
+	 * @return A collection of goal conditions which make up this goal condition.
+	 */
+	public Collection<GoalCondition> splitCondition() {
+		Collection<GoalCondition> goalConds = new ArrayList<GoalCondition>(facts_.size());
+		if (facts_.size() == 1) {
+			goalConds.add(this);
+			return goalConds;
+		}
+		
+		for (RelationalPredicate fact : facts_) {
+			goalConds.add(new GoalCondition(fact));
+		}
+		return goalConds;
+	}
 
 	/**
 	 * Gets the args used in this particular goal condition.
