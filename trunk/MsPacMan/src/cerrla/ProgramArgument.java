@@ -66,6 +66,8 @@ public enum ProgramArgument implements Serializable {
 			"Size of average performance sliding window"),
 	POLICY_REPEATS(3, "policyRepeats", null, ParameterType.EVALUATION,
 			"Number of times policy is repeated"),
+	RETEST_STALE_POLICIES(false, "retestStale", null, ParameterType.SAMPLING,
+			"If stale policies should be immediately retested."),
 	RHO(0.1, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
 	SLOT_THRESHOLD(0.5, "slotThreshold", null, ParameterType.SPECIALISATION,
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),

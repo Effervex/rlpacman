@@ -362,24 +362,25 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 
 	@Override
 	public int compareTo(RelationalPredicate sf) {
+		// Compare by negation
 		if (negated_ != sf.negated_) {
 			if (!negated_)
 				return -1;
 			else
 				return 1;
 		}
-
-		// Compare by number of arguments (complexity)
-		int result = Double.compare(arguments_.length, sf.arguments_.length);
-		if (result != 0)
-			return result;
-
-		// Type predicates trump regular predicates
+		
+		// Type predicates trump non-type predicates
 		if (StateSpec.getInstance().isTypePredicate(factName_)) {
 			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
 				return -1;
 		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
 			return 1;
+
+		// Compare by number of arguments (complexity)
+		int result = Double.compare(arguments_.length, sf.arguments_.length);
+		if (result != 0)
+			return result;
 
 		result = factName_.compareTo(sf.factName_);
 		if (result != 0)

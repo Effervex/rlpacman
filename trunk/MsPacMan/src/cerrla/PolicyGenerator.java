@@ -222,8 +222,6 @@ public final class PolicyGenerator implements Serializable {
 		// Only selecting the top elite samples
 		Map<Slot, Double> slotMean = new HashMap<Slot, Double>();
 		for (PolicyValue pv : subElites) {
-			// Note which slots were used in this policy
-			Collection<Slot> policySlotCounts = new HashSet<Slot>();
 			double weight = pv.getValue() * gradient + offset;
 			CoveringRelationalPolicy eliteSolution = pv.getPolicy();
 
@@ -672,8 +670,14 @@ public final class PolicyGenerator implements Serializable {
 		// TODO Trial immediate slot creation
 		rule = rule.groundModular();
 		RelationalRule match = currentRules_.findMatch(rule);
-		if (match == null) {
+		// If there is no match, or the matched rule isn't a seed rule, create a new slot.
+		if (match == null/* || !match.getSlot().getSeedRule().equals(match)*/) {
 			createSeededSlot(rule);
+			/*if (match != null) {
+				ProbabilityDistribution<RelationalRule> ruleGenerator = match.getSlot().getGenerator();
+				ruleGenerator.remove(match);
+				ruleGenerator.normaliseProbs();
+			}*/
 			match = rule;
 		}
 
@@ -1113,6 +1117,7 @@ public final class PolicyGenerator implements Serializable {
 			try {
 				covered = ruleCreation_.rlggState(state, validActions,
 						goalReplacements, moduleGoal_);
+				currentRules_.clear();
 				currentRules_.addAll(covered);
 			} catch (Exception e) {
 				e.printStackTrace();

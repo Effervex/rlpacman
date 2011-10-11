@@ -416,7 +416,7 @@ public class PolicyActor implements AgentInterface {
 		try {
 			Collection<RelationalPredicate> fact = new ArrayList<RelationalPredicate>(
 					1);
-			fact.add(goalCondition_.getFact());
+			fact.addAll(goalCondition_.getFacts());
 			RelationalRule gr = new RelationalRule(
 					new TreeSet<RelationalPredicate>(fact), null, null);
 			gr.expandConditions();

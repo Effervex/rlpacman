@@ -172,10 +172,9 @@ public class CrossEntropyRun {
 				// TODO Could probably go back to learning combined
 				// modules again!
 				// Checking for specific goal conditions
-				Collection<GoalCondition> ruleConstants = mutated
-						.getConstantConditions();
+				GoalCondition ruleConstants = mutated.getConstantCondition();
 				if (ruleConstants != null)
-					goalConditions.addAll(ruleConstants);
+					goalConditions.add(ruleConstants);
 
 				// Checking for general goal conditions
 				// Run through the conditions, adding non-general invariants
@@ -311,7 +310,6 @@ public class CrossEntropyRun {
 			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
 		}
 		// Check elite bounding
-		// TODO Elites bounding may not necessarily have to affect the alpha'
 		if (ProgramArgument.BOUNDED_ELITES.booleanValue())
 			numElites = Math.max(numElites, policyGenerator.getGenerator()
 					.size());
@@ -511,48 +509,46 @@ public class CrossEntropyRun {
 	 * @param elites
 	 *            The policy values to modify.
 	 * @param numElite
-	 *            The number of elite samples to use when updating. The size
-	 *            policy values should be.
+	 *            The minimum number of elite samples.
+	 * @param staleValue
+	 *            The number of policies a sample hangs around for.
+	 * @param minValue
+	 *            The minimum observed value.
 	 * @return The policy values that were removed.
 	 */
 	private SortedSet<PolicyValue> preUpdateModification(
 			SortedSet<PolicyValue> elites, int numElite, int staleValue,
-			PolicyGenerator localPolicy) {
-		// Firstly, remove any policy values that have been around for more than
-		// N steps
-		// TODO Only remove stuff if the elites are a representative solution
-		int iteration = localPolicy.getPoliciesEvaluated();
+			float minValue) {
+		numElite = checkEliteBounding(numElite);
+
+		// Firstly, remove any policy values that have been around for more
+		// than N steps
+
+		// Only remove stuff if the elites are a representative solution
+		// if (neValue.getValue() > minValue) {
+		int iteration = policyGenerator_.getPoliciesEvaluated();
 		for (Iterator<PolicyValue> iter = elites.iterator(); iter.hasNext();) {
 			PolicyValue pv = iter.next();
 			if (iteration - pv.getIteration() >= staleValue) {
-				//localPolicy.retestPolicy(pv.getPolicy());
+				if (ProgramArgument.RETEST_STALE_POLICIES.booleanValue())
+					policyGenerator_.retestPolicy(pv.getPolicy());
 				iter.remove();
 			}
 		}
+		// }
 
-		// Remove any values worse than the value at numElites
 		SortedSet<PolicyValue> tailSet = null;
-		numElite = checkEliteBounding(numElite);
 		if (elites.size() > numElite) {
 			// Find the N_E value
 			Iterator<PolicyValue> pvIter = elites.iterator();
 			PolicyValue currentPV = null;
 			for (int i = 0; i < numElite; i++)
 				currentPV = pvIter.next();
-			PolicyValue neValue = currentPV;
+
 			// Iter at N_E value. Remove any values less than N_E's value
-			do {
-				if (pvIter.hasNext())
-					currentPV = pvIter.next();
-				else
-					currentPV = null;
-			} while (currentPV != null
-					&& currentPV.getValue() == neValue.getValue());
-			// Remove the tail set
-			if (currentPV != null) {
-				tailSet = new TreeSet<PolicyValue>(elites.tailSet(currentPV));
-				elites.removeAll(tailSet);
-			}
+			tailSet = new TreeSet<PolicyValue>(elites.tailSet(new PolicyValue(
+					null, currentPV.getValue(), -1)));
+			elites.removeAll(tailSet);
 		}
 
 		return tailSet;
@@ -829,7 +825,7 @@ public class CrossEntropyRun {
 			float minReward) {
 		// Clean up the policy values
 		SortedSet<PolicyValue> removed = preUpdateModification(elites,
-				numElites, population, localPolicy);
+				numElites, population, minReward);
 
 		localPolicy.updateDistributions(elites,
 				ProgramArgument.ALPHA.doubleValue(), population, numElites,
