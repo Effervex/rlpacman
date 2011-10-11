@@ -79,28 +79,30 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 		GoalCondition constantCondition = rule.getConstantCondition();
 		if (constantCondition == null)
 			return;
-		if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
-				.equals(constantCondition.toString())) {
-			Module module = Module.loadModule(StateSpec.getInstance()
-					.getEnvironmentName(), constantCondition.toString());
-			// If the module exists
-			if (module != null) {
-				// Put the parameters into an arraylist
-				ArrayList<String> parameters = new ArrayList<String>(
-						constantCondition.getConstantArgs());
+		for (GoalCondition gc : constantCondition.splitCondition()) {
+			if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
+					.equals(gc.toString())) {
+				Module module = Module.loadModule(StateSpec.getInstance()
+						.getEnvironmentName(), gc.toString());
+				// If the module exists
+				if (module != null) {
+					// Put the parameters into an arraylist
+					ArrayList<String> parameters = new ArrayList<String>(
+							gc.getConstantArgs());
 
-				// Add the module rules.
-				for (RelationalRule gr : module.getModuleRules()) {
-					gr.setModularParameters(parameters);
-					checkModular(gr);
-					// Get/create the corresponding rule in the generator
-					gr = CrossEntropyRun.getPolicyGenerator()
-							.getCreateCorrespondingRule(gr);
-					if (!policyRules_.contains(gr)) {
-						gr.setQueryParams(null);
-						modularRules_.add(gr);
-						policyRules_.add(gr);
-						policySize_++;
+					// Add the module rules.
+					for (RelationalRule gr : module.getModuleRules()) {
+						gr.setModularParameters(parameters);
+						checkModular(gr);
+						// Get/create the corresponding rule in the generator
+						gr = CrossEntropyRun.getPolicyGenerator()
+								.getCreateCorrespondingRule(gr);
+						if (!policyRules_.contains(gr)) {
+							gr.setQueryParams(null);
+							modularRules_.add(gr);
+							policyRules_.add(gr);
+							policySize_++;
+						}
 					}
 				}
 			}
