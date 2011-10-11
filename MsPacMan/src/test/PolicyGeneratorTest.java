@@ -152,7 +152,7 @@ public class PolicyGeneratorTest {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
 		sut_ = new PolicyGenerator(0);
-		AgentObservations.loadAgentObservations("blah");
+		AgentObservations.loadAgentObservations("levelmax");
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -169,7 +169,7 @@ public class PolicyGeneratorTest {
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, null, activatedActions);
+				validActions, new HashMap<String, String>(), activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -184,8 +184,8 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+				new HashMap<String, String>(), activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -199,8 +199,8 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions, null,
-				activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(state, validActions,
+				new HashMap<String, String>(), activatedActions);
 		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
@@ -213,6 +213,6 @@ public class PolicyGeneratorTest {
 
 		// Test the state of the slot generator
 		Collection<Slot> slotGenerator = sut_.getGenerator();
-		assertEquals(slotGenerator.size(), 17);
+		assertEquals(slotGenerator.size(), 10);
 	}
 }

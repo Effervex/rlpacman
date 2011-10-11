@@ -42,7 +42,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	private int ancestryCount_;
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
-	private Collection<GoalCondition> constantConditions_;
+	private GoalCondition constantCondition_;
 
 	/** If this rule has spawned any mutant rules yet. */
 	private Integer hasSpawned_ = null;
@@ -186,7 +186,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * Finds the constants in the rule conditions.
 	 */
 	private void findConstants() {
-		List<GoalCondition> constants = new ArrayList<GoalCondition>();
+		List<RelationalPredicate> constants = new ArrayList<RelationalPredicate>();
 		for (RelationalPredicate cond : ruleConditions_) {
 			// If the condition isn't a type predicate or test
 			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
@@ -207,15 +207,15 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				}
 
 				if (isConstant) {
-					constants.add(new GoalCondition(cond));
+					constants.add(cond);
 				}
 			}
 		}
 
 		if (constants.isEmpty())
-			constantConditions_ = null;
+			constantCondition_ = null;
 		else
-			constantConditions_ = constants;
+			constantCondition_ = new GoalCondition(constants);
 	}
 
 	/**
@@ -425,8 +425,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		return new TreeSet<RelationalPredicate>(ruleConditions_);
 	}
 
-	public Collection<GoalCondition> getConstantConditions() {
-		return constantConditions_;
+	public GoalCondition getConstantCondition() {
+		return constantCondition_;
 	}
 
 	/**

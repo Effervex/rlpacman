@@ -76,42 +76,31 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 *            The rule being checked.
 	 */
 	private void checkModular(RelationalRule rule) {
-		Collection<GoalCondition> constantConditions = rule
-				.getConstantConditions();
-		if (constantConditions == null)
+		GoalCondition constantCondition = rule.getConstantCondition();
+		if (constantCondition == null)
 			return;
-		// Load every necessary module
-		for (GoalCondition constantCondition : constantConditions) {
-			if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
-					.equals(constantCondition.toString())) {
-				Module module = Module.loadModule(StateSpec.getInstance()
-						.getEnvironmentName(), constantCondition.toString());
-				// If the module exists
-				if (module != null) {
-					// Put the parameters into an arraylist
-					ArrayList<String> parameters = new ArrayList<String>();
-					RelationalPredicate cond = constantCondition.getFact();
-					// Extract the parameters used in the constant
-					// conditions
-					for (String arg : cond.getArguments()) {
-						// If modules are recursive, set up the parameters
-						// accordingly.
-						parameters.add(arg);
-					}
+		if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
+				.equals(constantCondition.toString())) {
+			Module module = Module.loadModule(StateSpec.getInstance()
+					.getEnvironmentName(), constantCondition.toString());
+			// If the module exists
+			if (module != null) {
+				// Put the parameters into an arraylist
+				ArrayList<String> parameters = new ArrayList<String>(
+						constantCondition.getConstantArgs());
 
-					// Add the module rules.
-					for (RelationalRule gr : module.getModuleRules()) {
-						gr.setModularParameters(parameters);
-						checkModular(gr);
-						// Get/create the corresponding rule in the generator
-						gr = CrossEntropyRun.getPolicyGenerator()
-								.getCreateCorrespondingRule(gr);
-						if (!policyRules_.contains(gr)) {
-							gr.setQueryParams(null);
-							modularRules_.add(gr);
-							policyRules_.add(gr);
-							policySize_++;
-						}
+				// Add the module rules.
+				for (RelationalRule gr : module.getModuleRules()) {
+					gr.setModularParameters(parameters);
+					checkModular(gr);
+					// Get/create the corresponding rule in the generator
+					gr = CrossEntropyRun.getPolicyGenerator()
+							.getCreateCorrespondingRule(gr);
+					if (!policyRules_.contains(gr)) {
+						gr.setQueryParams(null);
+						modularRules_.add(gr);
+						policyRules_.add(gr);
+						policySize_++;
 					}
 				}
 			}

@@ -2,12 +2,13 @@ package relationalFramework.agentObservations;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.StateSpec;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
-
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * A class for representing a possible goal state to use (i.e. one that has
@@ -22,7 +23,7 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 	private Map<String, String> args_;
 
 	/** The goal facts defined by the arguments. */
-	private RelationalPredicate goalFact_;
+	private SortedSet<RelationalPredicate> goalFacts_;
 
 	/**
 	 * Constructor for a new GoalState.
@@ -36,8 +37,12 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 		args_ = args;
 
 		// Replace the arguments and set the goal.
-		goalFact_ = new RelationalPredicate(currentGoal.getFact());
-		goalFact_.replaceArguments(args, true, false);
+		goalFacts_ = new TreeSet<RelationalPredicate>();
+		for (RelationalPredicate fact : currentGoal.getFacts()) {
+			RelationalPredicate replFact = new RelationalPredicate(fact);
+			replFact.replaceArguments(args, true, false);
+			goalFacts_.add(replFact);
+		}
 	}
 
 	/**
@@ -51,10 +56,13 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 		if (invariants.isEmpty())
 			return false;
 
-		// Don't check type preds, as they are generally always true.
-		if (!StateSpec.getInstance().isTypePredicate(goalFact_.getFactName())
-				&& invariants.contains(goalFact_))
-			return true;
+		// Run through each arg, ensuring it doesn't include any invariant facts
+		// (e.g. (floor floor))
+		for (RelationalPredicate fact : goalFacts_) {
+			// Don't check type preds, as they are generally always true.
+			if (invariants.contains(fact))
+				return true;
+		}
 		return false;
 	}
 
@@ -94,11 +102,22 @@ public class GoalArg implements Comparable<GoalArg>, Serializable {
 
 	@Override
 	public String toString() {
-		return goalFact_.toString();
+		return goalFacts_.toString();
 	}
 
 	@Override
 	public int compareTo(GoalArg arg0) {
-		return goalFact_.compareTo(arg0.goalFact_);
+		int result = Double.compare(goalFacts_.size(), arg0.goalFacts_.size());
+		if (result != 0)
+			return result;
+		
+		Iterator<RelationalPredicate> thisIter = goalFacts_.iterator();
+		Iterator<RelationalPredicate> thatIter = arg0.goalFacts_.iterator();
+		while (thisIter.hasNext()) {
+			result = thisIter.next().compareTo(thatIter.next());
+			if (result != 0)
+				return result;
+		}
+		return 0;
 	}
 }

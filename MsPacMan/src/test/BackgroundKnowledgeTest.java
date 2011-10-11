@@ -72,17 +72,17 @@ public class BackgroundKnowledgeTest {
 	public void testSimplifyC() {
 		// Positive case
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(block ?X) <=> (above ?X ?)", false);
+				"(above ?X ?) <=> (block ?X)", false);
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
-		ruleConds.add(StateSpec.toRelationalPredicate("(above b ?)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block b)"));
 		boolean result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
-				.toRelationalPredicate("(block b)")));
+				.toRelationalPredicate("(above b ?)")));
 
 		// Negative case
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(above b c)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above b ?)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
 	}

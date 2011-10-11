@@ -3,12 +3,15 @@ package relationalFramework;
 import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
+import util.ConditionComparator;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  * A small class representing a possible goal condition for the agent to pursue.
@@ -19,13 +22,13 @@ public class GoalCondition implements Serializable {
 	private static final long serialVersionUID = 578463340574407596L;
 
 	/** The string for joining predicates. */
-	private static final String MODULE_JOIN = "&";
+	private static final String MODULE_JOIN = "";
 
 	/** A sorted list of facts using only constant terms */
-	private RelationalPredicate fact_;
+	private SortedSet<RelationalPredicate> facts_;
 
 	/** The number of arguments the goal condition has. */
-	private int numArgs_;
+	private ArrayList<String> goalArgs_;
 
 	/** The name of the goal. */
 	private String goalName_;
@@ -37,20 +40,52 @@ public class GoalCondition implements Serializable {
 	 *            The single fact.
 	 */
 	public GoalCondition(RelationalPredicate fact) {
-		fact_ = new RelationalPredicate(fact);
-		Set<String> seenArgs = new HashSet<String>();
-		for (String arg : fact.getArguments())
-			seenArgs.add(arg);
-		numArgs_ = seenArgs.size();
-		goalName_ = formName(fact_);
+		facts_ = new TreeSet<RelationalPredicate>(
+				ConditionComparator.getInstance());
+		facts_.add(new RelationalPredicate(fact));
+		goalArgs_ = new ArrayList<String>();
+		for (String arg : fact.getArguments()) {
+			if (!goalArgs_.contains(arg))
+				goalArgs_.add(arg);
+		}
+		goalName_ = formName(facts_);
 	}
 
-	public RelationalPredicate getFact() {
-		return fact_;
+	/**
+	 * A goal condition for a single fact goal.
+	 * 
+	 * @param facts
+	 *            A collection of facts.
+	 */
+	public GoalCondition(Collection<RelationalPredicate> facts) {
+		facts_ = new TreeSet<RelationalPredicate>(
+				ConditionComparator.getInstance());
+		goalArgs_ = new ArrayList<String>();
+		for (RelationalPredicate fact : facts) {
+			facts_.add(new RelationalPredicate(fact));
+			for (String arg : fact.getArguments()) {
+				if (!goalArgs_.contains(arg))
+					goalArgs_.add(arg);
+			}
+		}
+		goalName_ = formName(facts_);
+	}
+
+	public SortedSet<RelationalPredicate> getFacts() {
+		return facts_;
+	}
+
+	/**
+	 * Gets the args used in this particular goal condition.
+	 * 
+	 * @return The args used in these goal conditions.
+	 */
+	public ArrayList<String> getConstantArgs() {
+		return goalArgs_;
 	}
 
 	public int getNumArgs() {
-		return numArgs_;
+		return goalArgs_.size();
 	}
 
 	/**
@@ -60,11 +95,13 @@ public class GoalCondition implements Serializable {
 	public void normaliseArgs() {
 		Map<String, String> replacements = new HashMap<String, String>();
 		int i = 0;
-		for (String arg : fact_.getArguments()) {
-			if (!replacements.containsKey(arg))
-				replacements.put(arg, StateSpec.createGoalTerm(i++));
+		for (RelationalPredicate fact : facts_) {
+			for (String arg : fact.getArguments()) {
+				if (!replacements.containsKey(arg))
+					replacements.put(arg, StateSpec.createGoalTerm(i++));
+			}
+			fact.replaceArguments(replacements, false, false);
 		}
-		fact_.replaceArguments(replacements, false, false);
 	}
 
 	@Override
@@ -101,25 +138,48 @@ public class GoalCondition implements Serializable {
 	/**
 	 * Forms the name of a module file.
 	 * 
+	 * @param facts
+	 *            The facts to create a name for.
+	 * @return A String representing the filename of the module.
+	 */
+	public static String formName(SortedSet<RelationalPredicate> facts) {
+		StringBuffer buffer = new StringBuffer();
+		boolean first = true;
+		Map<String, Character> argMapping = new HashMap<String, Character>();
+		int i = 0;
+		for (RelationalPredicate fact : facts) {
+			if (!first)
+				buffer.append(MODULE_JOIN);
+			buffer.append(fact.getFactName());
+			for (String arg : fact.getArguments()) {
+				if (!argMapping.containsKey(arg))
+					argMapping.put(arg, (char) ('A' + i++));
+				buffer.append(argMapping.get(arg));
+			}
+
+			first = false;
+		}
+
+		return buffer.toString();
+	}
+
+	/**
+	 * Forms the name of a module file.
+	 * 
 	 * @param fact
 	 *            The fact to create a name for.
 	 * @return A String representing the filename of the module.
 	 */
 	public static String formName(RelationalPredicate fact) {
 		StringBuffer buffer = new StringBuffer();
-		boolean first = true;
 		Map<String, Character> argMapping = new HashMap<String, Character>();
 		int i = 0;
-		if (!first)
-			buffer.append(MODULE_JOIN);
 		buffer.append(fact.getFactName());
 		for (String arg : fact.getArguments()) {
 			if (!argMapping.containsKey(arg))
 				argMapping.put(arg, (char) ('A' + i++));
 			buffer.append(argMapping.get(arg));
 		}
-
-		first = false;
 
 		return buffer.toString();
 	}

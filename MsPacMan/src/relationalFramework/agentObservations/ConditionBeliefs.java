@@ -328,7 +328,7 @@ public class ConditionBeliefs implements Serializable {
 					// useful (not an obvious type relation)
 					if (isUsefulRelation(alwaysTrue, true, typeBeliefs,
 							typeVarReplacements)
-							&& shouldCreateRelation(alwaysTrue))
+							&& shouldCreateRelation(cbFact_, alwaysTrue))
 						relationRules
 								.putAll(createRelation(type, alwaysTrue, true,
 										conditionBeliefs,
@@ -376,7 +376,7 @@ public class ConditionBeliefs implements Serializable {
 		if (AgentObservations.getInstance().getNeverSeenInvariants()
 				.contains(relativeFact.getFactName()))
 			return false;
-		
+
 		// If there are no type beliefs
 		if (typeBeliefs == null)
 			return true;
@@ -410,17 +410,20 @@ public class ConditionBeliefs implements Serializable {
 	 * If a relation should be created. Ignore relations that are simply
 	 * themselves (A -> A) and ignore obvious type relations.
 	 * 
+	 * @param thisFact
+	 *            The current fact being examined.
 	 * @param relatedFact
 	 *            The related fact.
 	 * @return True if the relation should be created, false otherwise.
 	 */
-	private boolean shouldCreateRelation(RelationalPredicate relatedFact) {
+	private static boolean shouldCreateRelation(RelationalPredicate thisFact,
+			RelationalPredicate relatedFact) {
 		// Don't make rules to itself.
-		if (cbFact_.equals(relatedFact))
+		if (thisFact.equals(relatedFact))
 			return false;
 
 		// If the fact is a type predicate, go for it.
-		if (StateSpec.getInstance().isTypePredicate(cbFact_.getFactName()))
+		if (StateSpec.getInstance().isTypePredicate(thisFact.getFactName()))
 			return true;
 		else {
 			// If the rule is a normal predicate, don't make obvious type
@@ -429,7 +432,7 @@ public class ConditionBeliefs implements Serializable {
 					relatedFact.getFactName())) {
 				int index = RelationalPredicate
 						.getVariableTermIndex(relatedFact.getArguments()[0]);
-				if (cbFact_.getArgTypes()[index].equals(relatedFact
+				if (thisFact.getArgTypes()[index].equals(relatedFact
 						.getFactName()))
 					return false;
 			}
@@ -490,7 +493,7 @@ public class ConditionBeliefs implements Serializable {
 		// Create an equivalence relation if possible.
 
 		// Don't bother with self-condition relations
-		if (!otherCond.getFactName().equals(condition_)) {
+		if (!otherCond.getFactName().equals(condition_) && shouldCreateRelation(right, left)) {
 			// Replace arguments for this fact to match those seen in the
 			// otherCond (anonymise variables)
 			BidiMap replacementMap = new DualHashBidiMap();

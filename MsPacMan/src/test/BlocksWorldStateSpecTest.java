@@ -7,6 +7,7 @@ import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.SortedSet;
 
@@ -50,8 +51,9 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		Collection<GoalCondition> constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		GoalCondition constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test for a constant
@@ -65,13 +67,13 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block a)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor a)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor a)"));
+		constants = rule.getConstantCondition();
 		RelationalPredicate strFact = StateSpec.getInstance().getPredicates()
 				.get("clear");
-		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
-				new String[] { "a" }))));
-		assertEquals(constants.size(), 1);
+		assertEquals(constants, new GoalCondition(new RelationalPredicate(
+				strFact, new String[] { "a" })));
 
 		// Test for constants (no inequals)
 		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
@@ -88,14 +90,16 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block b)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor a)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor a)"));
+		constants = rule.getConstantCondition();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
-				new String[] { "a" }))));
-		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
-				new String[] { "b" }))));
-		assertEquals(constants.size(), 2);
+		Collection<RelationalPredicate> constantConds = new ArrayList<RelationalPredicate>();
+		constantConds
+				.add(new RelationalPredicate(strFact, new String[] { "a" }));
+		constantConds
+				.add(new RelationalPredicate(strFact, new String[] { "b" }));
+		assertEquals(constants, new GoalCondition(constantConds));
 
 		// Multiple conditions, one term
 		rule = new RelationalRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
@@ -109,8 +113,9 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(highest ?X)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Multiple conditions, two terms
@@ -132,8 +137,9 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Variables and constants
@@ -161,8 +167,9 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test anonymous variable
@@ -178,8 +185,9 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(on ?X ?)")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test anonymous variables
@@ -205,8 +213,9 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test type predicate
@@ -214,8 +223,9 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getConditions(false).size(), 1);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test inequal type predicates
@@ -227,8 +237,9 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(test (<> ?Y ?X))")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(move ?X ?Y)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(move ?X ?Y)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test existing type predicate
@@ -238,8 +249,9 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantConditions();
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Test inequals parsing
@@ -256,16 +268,18 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?Y)")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(move ?X ?Y)"));
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(move ?X ?Y)"));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
-		constants = rule.getConstantConditions();
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Testing module syntax
-		rule = new RelationalRule("(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
+		rule = new RelationalRule(
+				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
@@ -276,9 +290,10 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(test (<> ?_MOD_a ?X))")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 5);
-		constants = rule.getConstantConditions();
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Testing module constants
@@ -293,36 +308,39 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?G_0)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantConditions();
+		constants = rule.getConstantCondition();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertTrue(constants.contains(new GoalCondition(new RelationalPredicate(strFact,
-				new String[] { "?G_0" }))));
-		assertEquals(constants.size(), 1);
+		assertEquals(constants, new GoalCondition(new RelationalPredicate(
+				strFact, new String[] { "?G_0" })));
 
 		// Testing negation
-		rule = new RelationalRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		rule = new RelationalRule(
+				"(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (highest ?X))")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantConditions();
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 
 		// Testing negation (with extra terms)
-		rule = new RelationalRule("(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
+		rule = new RelationalRule(
+				"(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (highest ?X))")));
-		assertEquals(rule.getAction(), StateSpec.toRelationalPredicate("(moveFloor ?X)"));
+		assertEquals(rule.getAction(),
+				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantConditions();
+		constants = rule.getConstantCondition();
 		assertNull(constants);
 	}
 
