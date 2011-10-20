@@ -419,6 +419,13 @@ public final class AgentObservations implements Serializable {
 				buf.write(conditionObservations_.conditionBeliefs_
 						.get(condition) + "\n");
 			}
+			for (String condition : conditionObservations_.negatedConditionBeliefs_
+					.keySet()) {
+				Map<IntegerArray, ConditionBeliefs> negCBs = conditionObservations_.negatedConditionBeliefs_
+						.get(condition);
+				for (IntegerArray negCB : negCBs.keySet())
+					buf.write(negCBs.get(negCB) + "\n");
+			}
 			buf.write("\n");
 			buf.write("Background Knowledge\n");
 			for (BackgroundKnowledge bk : conditionObservations_.learnedEnvironmentRules_) {
@@ -1129,14 +1136,12 @@ public final class AgentObservations implements Serializable {
 
 			// Run through every condition in the beliefs
 			// Form equivalence (<=>) relations wherever possible
+			NonRedundantBackgroundKnowledge currentKnowledge = new NonRedundantBackgroundKnowledge();
 			for (String cond : conditionBeliefs_.keySet()) {
 				ConditionBeliefs cb = conditionBeliefs_.get(cond);
 
-				MultiMap<String, BackgroundKnowledge> relations = cb
-						.createRelationRules(conditionBeliefs_,
-								negatedConditionBeliefs_);
-				backgroundKnowledge.addAll(relations.values());
-				mappedEnvironmentRules_.putAll(relations);
+				cb.createRelationRules(conditionBeliefs_,
+						negatedConditionBeliefs_, currentKnowledge);
 			}
 
 			// Create the negated condition beliefs (only for the !A => B
@@ -1144,13 +1149,13 @@ public final class AgentObservations implements Serializable {
 			for (String cond : negatedConditionBeliefs_.keySet()) {
 				for (ConditionBeliefs negCB : negatedConditionBeliefs_
 						.get(cond).values()) {
-					MultiMap<String, BackgroundKnowledge> relations = negCB
-							.createRelationRules(conditionBeliefs_,
-									negatedConditionBeliefs_);
-					backgroundKnowledge.addAll(relations.values());
-					mappedEnvironmentRules_.putAll(relations);
+					negCB.createRelationRules(conditionBeliefs_,
+							negatedConditionBeliefs_, currentKnowledge);
 				}
 			}
+			backgroundKnowledge.addAll(currentKnowledge
+					.getAllBackgroundKnowledge());
+			mappedEnvironmentRules_.putAll(currentKnowledge.getPredicateMappedRules());
 			return backgroundKnowledge;
 		}
 

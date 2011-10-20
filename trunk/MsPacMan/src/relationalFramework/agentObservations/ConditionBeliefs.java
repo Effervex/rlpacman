@@ -42,10 +42,10 @@ public class ConditionBeliefs implements Serializable {
 	 * The set of conditions with predicate condition that are more general
 	 * version of this condition.
 	 */
-	private Collection<RelationalPredicate> disallowed_;
+	private Set<RelationalPredicate> disallowed_;
 
 	/** More general (and same) versions of this rule. */
-	private Collection<RelationalPredicate> generalities_;
+	private Set<RelationalPredicate> generalities_;
 
 	/**
 	 * The argument index for the condition belief. Only used for negated
@@ -117,17 +117,9 @@ public class ConditionBeliefs implements Serializable {
 	public boolean noteTrueRelativeFacts(
 			Collection<RelationalPredicate> trueFacts,
 			Collection<RelationalPredicate> untrueFacts, boolean addGeneralities) {
-		// Extract the type conditions from the true facts
-		Collection<RelationalPredicate> typePredicates = new HashSet<RelationalPredicate>();
-		for (RelationalPredicate trueFact : trueFacts) {
-			// if
-			// (StateSpec.getInstance().isTypePredicate(trueFact.getFactName()))
-			typePredicates.add(trueFact);
-		}
-
 		// For each type fact
 		boolean changed = false;
-		for (RelationalPredicate typeCond : typePredicates) {
+		for (RelationalPredicate typeCond : trueFacts) {
 			if (typeCond.equals(cbFact_))
 				typeCond = cbFact_;
 			if (!typedCondBeliefs_.containsKey(typeCond))
@@ -138,7 +130,7 @@ public class ConditionBeliefs implements Serializable {
 		}
 
 		// Note the combined condition beliefs (typeless)
-		if (!typePredicates.contains(cbFact_)) {
+		if (!trueFacts.contains(cbFact_)) {
 			if (!typedCondBeliefs_.containsKey(cbFact_))
 				typedCondBeliefs_.put(cbFact_, new TypedBeliefs());
 			TypedBeliefs coreBelief = typedCondBeliefs_.get(cbFact_);
@@ -181,7 +173,7 @@ public class ConditionBeliefs implements Serializable {
 		}
 
 		// Removing the base condition fact itself
-		if (pred.equals(condition_)) {
+		if (args_ == null && pred.equals(condition_)) {
 			String[] baseArgs = new String[predFact.getArguments().length];
 			for (int i = 0; i < baseArgs.length; i++)
 				baseArgs[i] = RelationalPredicate.getVariableTermString(i);
@@ -296,15 +288,13 @@ public class ConditionBeliefs implements Serializable {
 	 *            The other condition beliefs.
 	 * @param negatedConditionBeliefs
 	 *            The other negated condition beliefs.
-	 * @return A {@link MultiMap} of rules, indexed by (major/non-important
-	 *         type) predicates used within each rule.
+	 * @param currentKnowledge
+	 *            The existing background knowledge.
 	 */
-	public MultiMap<String, BackgroundKnowledge> createRelationRules(
+	public void createRelationRules(
 			Map<String, ConditionBeliefs> conditionBeliefs,
-			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs) {
-		MultiMap<String, BackgroundKnowledge> relationRules = MultiMap
-				.createSortedSetMultiMap();
-
+			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs,
+			NonRedundantBackgroundKnowledge currentKnowledge) {
 		// Create relations for each type
 		for (RelationalPredicate type : typedCondBeliefs_.keySet()) {
 			// Only note types that aren't inherently always true
@@ -329,10 +319,9 @@ public class ConditionBeliefs implements Serializable {
 					if (isUsefulRelation(alwaysTrue, true, typeBeliefs,
 							typeVarReplacements)
 							&& shouldCreateRelation(cbFact_, alwaysTrue))
-						relationRules
-								.putAll(createRelation(type, alwaysTrue, true,
-										conditionBeliefs,
-										negatedConditionBeliefs));
+						createRelation(type, alwaysTrue, true,
+								conditionBeliefs, negatedConditionBeliefs,
+								currentKnowledge);
 				}
 
 				if (args_ == null) {
@@ -343,14 +332,13 @@ public class ConditionBeliefs implements Serializable {
 						// and isn't already realised by the type itself.
 						if (isUsefulRelation(neverTrue, false, typeBeliefs,
 								typeVarReplacements))
-							relationRules.putAll(createRelation(type,
-									neverTrue, false, conditionBeliefs,
-									negatedConditionBeliefs));
+							createRelation(type, neverTrue, false,
+									conditionBeliefs, negatedConditionBeliefs,
+									currentKnowledge);
 					}
 				}
 			}
 		}
-		return relationRules;
 	}
 
 	/**
@@ -456,46 +444,36 @@ public class ConditionBeliefs implements Serializable {
 	 *            The set of all positive condition beliefs.
 	 * @param negatedConditionBeliefs
 	 *            The set of all negated condition beliefs.
-	 * @return The relations created.
+	 * @param currentKnowledge
+	 *            The current background knowledge to add to.
+	 * @return If any relations were created.
 	 */
 	@SuppressWarnings("unchecked")
-	private MultiMap<String, BackgroundKnowledge> createRelation(
+	private boolean createRelation(
 			RelationalPredicate extraCond,
 			RelationalPredicate otherCond,
 			boolean negationType,
 			Map<String, ConditionBeliefs> conditionBeliefs,
-			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs) {
-		MultiMap<String, BackgroundKnowledge> relations = MultiMap
-				.createSortedSetMultiMap();
+			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs,
+			NonRedundantBackgroundKnowledge currentKnowledge) {
 		RelationalPredicate left = new RelationalPredicate(cbFact_);
 		RelationalPredicate right = new RelationalPredicate(otherCond);
 		if (left.equals(right) || otherCond.equals(extraCond))
-			return relations;
-		String relation = " => ";
+			return false;
 
-		// Create the basic inference relation
-		BackgroundKnowledge bckKnow = null;
-		// Adding a type condition
 		SortedSet<RelationalPredicate> leftConds = new TreeSet<RelationalPredicate>();
 		leftConds.add(left);
 		if (extraCond != null)
 			leftConds.add(extraCond);
-		String leftSide = StateSpec.conditionsToString(leftConds);
-
-		if (negationType)
-			bckKnow = new BackgroundKnowledge(leftSide + relation + right,
-					false);
-		else
-			bckKnow = new BackgroundKnowledge(leftSide + relation + "(not "
-					+ right + ")", false);
-		relations.putContains(left.getFactName(), bckKnow);
-
 		// Create an equivalence relation if possible.
+		if (!otherCond.getFactName().equals(condition_)) {
+			// Get these always true conditions
+			// TODO May have to do FULL comparsions against all 3 sets of
+			// always/never and sometimes true.
+			Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
+			Set<RelationalPredicate> thisSometimesTrue = getOccasionallyTrue(extraCond);
 
-		// Don't bother with self-condition relations
-		if (!otherCond.getFactName().equals(condition_) && shouldCreateRelation(right, left)) {
-			// Replace arguments for this fact to match those seen in the
-			// otherCond (anonymise variables)
+			// Get the other always true conditions
 			BidiMap replacementMap = new DualHashBidiMap();
 			String[] otherArgs = otherCond.getArguments();
 			for (int i = 0; i < otherArgs.length; i++) {
@@ -504,92 +482,164 @@ public class ConditionBeliefs implements Serializable {
 							RelationalPredicate.getVariableTermString(i));
 			}
 
-			RelationalPredicate modCond = new RelationalPredicate(cbFact_);
-			modCond.replaceArguments(replacementMap, false, false);
-
-			// Get the relations to use for equivalency comparisons
 			RelationalPredicate modExtraCond = null;
 			if (extraCond != null) {
 				modExtraCond = new RelationalPredicate(extraCond);
 				modExtraCond.replaceArguments(replacementMap, false, false);
 			}
-			Collection<RelationalPredicate> otherRelations = getOtherConditionRelations(
-					otherCond, negationType, modExtraCond, conditionBeliefs,
-					negatedConditionBeliefs);
 
-			// If the fact is present, then there is an equivalency!
-			if (otherRelations != null && otherRelations.contains(modCond)) {
-				// Change the modArg back to its original arguments (though
-				// not changing anonymous values). HOWEVER, if there is an extra
-				// condition, then this will be on the right side of the
-				// relation, so the conditions should be grounded to the
-				// otherCond.
-				if (extraCond == null)
-					modCond.replaceArguments(replacementMap.inverseBidiMap(),
-							false, false);
-				else {
-					extraCond = modExtraCond;
+			// Get the other condition beliefs based on negation type.
+			ConditionBeliefs otherCBs = getOtherConditionRelations(otherCond,
+					negationType, conditionBeliefs, negatedConditionBeliefs);
+			Set<RelationalPredicate> thatAlwaysTrue = otherCBs
+					.getAlwaysTrue(modExtraCond);
+			Set<RelationalPredicate> thatSometimesTrue = otherCBs
+					.getOccasionallyTrue(modExtraCond);
+
+			// Shape the sets if variables don't match (but cannot purge negated
+			// predicates)
+			// TODO Gone a little far here. Need to still apply replacements
+			int variableNumComparison = Double.compare(
+					cbFact_.getArgTypes().length,
+					otherCond.getArgTypes().length);
+			if (variableNumComparison < 0) {
+				// Other conds always true set has to be shaped
+				thatAlwaysTrue = shapeFacts(thatAlwaysTrue,
+						replacementMap.inverseBidiMap(), negationType);
+				thatSometimesTrue = shapeFacts(thatSometimesTrue,
+						replacementMap.inverseBidiMap(), negationType);
+			} else if (variableNumComparison > 0) {
+				// This conds always true set has to be shaped
+				thisAlwaysTrue = shapeFacts(thisAlwaysTrue, replacementMap,
+						!cbFact_.isNegated());
+				thisSometimesTrue = shapeFacts(thisSometimesTrue,
+						replacementMap, !cbFact_.isNegated());
+			}
+
+			// If the sets are equal, the relations are equivalent!
+			if (thisAlwaysTrue.equals(thatAlwaysTrue)
+					&& thisSometimesTrue.equals(thatSometimesTrue)) {
+				// Swap the facts if the otherCond is simpler
+				if (negationType && cbFact_.compareTo(otherCond) > 0) {
+					left.safeReplaceArgs(replacementMap);
 					right.replaceArguments(replacementMap, false, false);
-				}
+					// Swap left and right if left is negated
+					if (left.isNegated() && extraCond == null) {
+						RelationalPredicate backup = left;
+						left = right;
+						right = backup;
+					}
 
-				left = modCond;
-				relation = " <=> ";
-
-				// Adding a type condition
-				String rightSide = (negationType) ? right.toString() : "(not "
-						+ right + ")";
-				if (extraCond != null) {
 					leftConds.clear();
 					leftConds.add(left);
-					leftConds.add(extraCond);
-					leftSide = StateSpec.conditionsToString(leftConds);
-					bckKnow = new BackgroundKnowledge(leftSide + relation
-							+ rightSide, false);
-				} else {
-					// Order the two facts with the simplest fact on the LHS
-					if (negationType && modCond.compareTo(otherCond) > 0) {
-						left = otherCond;
-						right = modCond;
-					}
-					rightSide = (negationType) ? right.toString() : "(not "
-							+ right + ")";
-					bckKnow = new BackgroundKnowledge(left + relation
-							+ rightSide, false);
+					if (extraCond != null)
+						leftConds.add(modExtraCond);
 				}
-				relations.putContains(left.getFactName(), bckKnow);
-				relations.putContains(right.getFactName(), bckKnow);
+
+				return createBackgroundRule(leftConds, right, negationType,
+						true, currentKnowledge);
 			}
 		}
-		return relations;
+
+		// Create the basic inference relation
+		return createBackgroundRule(leftConds, right, negationType, false,
+				currentKnowledge);
 	}
 
 	/**
-	 * Gets the relations or the other condition's condition beliefs to
-	 * cross-compare between the sets for equivalence checking.
+	 * Creates the actual background knowledge rule if the rule isn't superceded
+	 * by an existing rule. Returns the mapping to the rule.
+	 * 
+	 * @param leftConds
+	 *            The left side conditions of the rule.
+	 * @param right
+	 *            The right side condition of the rule.
+	 * @param negationType
+	 *            If the right side is negated.
+	 * @param isEquivalenceRule
+	 *            If true: equivalence rule, false: inference rule.
+	 * @param currentKnowledge
+	 *            The current background knowledge to add to/evaluate against.
+	 * @return If the background rule was created.
+	 */
+	private boolean createBackgroundRule(
+			SortedSet<RelationalPredicate> leftConds,
+			RelationalPredicate right, boolean negationType,
+			boolean isEquivalenceRule,
+			NonRedundantBackgroundKnowledge currentKnowledge) {
+		// Create the rule
+		String leftSide = StateSpec.conditionsToString(leftConds);
+		String rightSide = (negationType) ? right.toString() : "(not " + right
+				+ ")";
+		String relation = (isEquivalenceRule) ? " <=> " : " => ";
+		BackgroundKnowledge bckKnow = new BackgroundKnowledge(leftSide
+				+ relation + rightSide, false);
+
+		// Add the rule to current knowledge
+		return currentKnowledge.addBackgroundKnowledge(bckKnow);
+	}
+
+	/**
+	 * Removes facts from a set of facts which aren't contained in the
+	 * keptFacts. The remaining facts are also replaced.
+	 * 
+	 * @param factSet
+	 *            The set of facts to cut down.
+	 * @param keptFacts
+	 *            The valid arguments to keep (and replace).
+	 * @param removeFacts
+	 *            If the facts present should be removed at all.
+	 * @return A cloned set of the factSet with less facts.
+	 */
+	private Set<RelationalPredicate> shapeFacts(
+			Set<RelationalPredicate> factSet, Map<String, String> keptFacts,
+			boolean removeFacts) {
+		Set<RelationalPredicate> newFactSet = new HashSet<RelationalPredicate>();
+		for (RelationalPredicate fact : factSet) {
+			boolean keepFact = true;
+			for (String arg : fact.getArguments()) {
+				// If the arg isn't anonymous and isn't a valid variable, don't
+				// note it.
+				if (!arg.equals("?") && !keptFacts.containsKey(arg)) {
+					keepFact = false;
+					break;
+				}
+			}
+
+			if (keepFact || !removeFacts) {
+				fact = new RelationalPredicate(fact);
+				fact.replaceArguments(keptFacts, true, false);
+				newFactSet.add(fact);
+			}
+		}
+
+		return newFactSet;
+	}
+
+	/**
+	 * Gets the set of condition beliefs for a given condition and negation
+	 * type.
 	 * 
 	 * @param otherCond
 	 *            The other condition.
 	 * @param negationType
 	 *            The state of negation: true if not negated, false if negated.
-	 * @param extraCond
-	 *            The extra cond associated with the relation.
 	 * @param conditionBeliefs
 	 *            The other condition beliefs.
 	 * @param negatedConditionBeliefs
 	 *            The other negated condition beliefs.
 	 * @return The set of facts used for comparing with equivalence.
 	 */
-	private Collection<RelationalPredicate> getOtherConditionRelations(
+	private ConditionBeliefs getOtherConditionRelations(
 			RelationalPredicate otherCond,
 			boolean negationType,
-			RelationalPredicate extraCond,
 			Map<String, ConditionBeliefs> conditionBeliefs,
 			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs) {
 		String factName = otherCond.getFactName();
 		if (negationType) {
 			// No negation - simply return the set given by the fact name
 			if (conditionBeliefs.containsKey(factName))
-				return conditionBeliefs.get(factName).getAlwaysTrue(extraCond);
+				return conditionBeliefs.get(factName);
 		} else {
 			// Negation - return the appropriate conjunction of condition
 			// beliefs
@@ -599,7 +649,7 @@ public class ConditionBeliefs implements Serializable {
 				IntegerArray argState = AgentObservations
 						.determineArgState(otherCond);
 				if (negatedCBs.containsKey(argState))
-					return negatedCBs.get(argState).getAlwaysTrue(extraCond);
+					return negatedCBs.get(argState);
 			}
 		}
 		return null;
@@ -609,24 +659,22 @@ public class ConditionBeliefs implements Serializable {
 		return condition_;
 	}
 
-	public Collection<RelationalPredicate> getAlwaysTrue(
-			RelationalPredicate type) {
+	public Set<RelationalPredicate> getAlwaysTrue(RelationalPredicate type) {
 		if (type != null && typedCondBeliefs_.containsKey(type))
 			return typedCondBeliefs_.get(type).alwaysTrue_;
 		else
 			return typedCondBeliefs_.get(cbFact_).alwaysTrue_;
 	}
 
-	public Collection<RelationalPredicate> getNeverTrue(RelationalPredicate type) {
-		if (type != null)
+	public Set<RelationalPredicate> getNeverTrue(RelationalPredicate type) {
+		if (type != null && typedCondBeliefs_.containsKey(type))
 			return typedCondBeliefs_.get(type).neverTrue_;
 		else
 			return typedCondBeliefs_.get(cbFact_).neverTrue_;
 	}
 
-	public Collection<RelationalPredicate> getOccasionallyTrue(
-			RelationalPredicate type) {
-		if (type != null)
+	public Set<RelationalPredicate> getOccasionallyTrue(RelationalPredicate type) {
+		if (type != null && typedCondBeliefs_.containsKey(type))
 			return typedCondBeliefs_.get(type).occasionallyTrue_;
 		else
 			return typedCondBeliefs_.get(cbFact_).occasionallyTrue_;
@@ -744,13 +792,13 @@ public class ConditionBeliefs implements Serializable {
 		 * The set of conditions that are always true when this condition is
 		 * true.
 		 */
-		private Collection<RelationalPredicate> alwaysTrue_;
+		private Set<RelationalPredicate> alwaysTrue_;
 
 		/**
 		 * The set of conditions that are never true when this condition is
 		 * true.
 		 */
-		private Collection<RelationalPredicate> neverTrue_;
+		private Set<RelationalPredicate> neverTrue_;
 
 		/** A flag to note if the never true values have been initialised yet. */
 		private boolean firstState_ = true;
@@ -759,10 +807,10 @@ public class ConditionBeliefs implements Serializable {
 		 * The set of conditions that are occasionally true when this condition
 		 * is true.
 		 */
-		private Collection<RelationalPredicate> occasionallyTrue_;
+		private Set<RelationalPredicate> occasionallyTrue_;
 
 		/** The total facts (a union of all three). */
-		private Collection<RelationalPredicate> totalFacts_;
+		private Set<RelationalPredicate> totalFacts_;
 
 		public TypedBeliefs() {
 			alwaysTrue_ = new HashSet<RelationalPredicate>();
@@ -872,8 +920,7 @@ public class ConditionBeliefs implements Serializable {
 				return false;
 
 			// Run through every possible string fact and add those not present
-			// in
-			// the other lists.
+			// in the other lists.
 			MultiMap<String, String> possibleTerms = createActionTerms(StateSpec
 					.getInstance().getStringFact(condition_));
 

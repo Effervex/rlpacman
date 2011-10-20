@@ -228,6 +228,17 @@ public class RuleCreationTest {
 		RelationalRule mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?Y) (block ?X) (block ?Y) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
+		
+		// Where has on X G_0 gone?
+		rule = new RelationalRule(
+				"(clear ?X) (clear ?Y) (block ?X) => (move ?X ?Y)");
+		results = sut_.specialiseRule(rule);
+		mutant = new RelationalRule(
+				"(clear ?X) (clear ?Y) (above ?X ?G_0) (block ?X) => (move ?X ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (clear ?Y) (on ?X ?G_0) (block ?X) => (move ?X ?Y)");
+		assertTrue(results.contains(mutant));
 	}
 
 	@Test
@@ -566,6 +577,55 @@ public class RuleCreationTest {
 		assertNotNull(results);
 		assertTrue(results.isEmpty());
 
+		// Disallowing an illegal rule
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(above ?X ?Y)"), true);
+		assertNull(results);
+
+		// Floor simplification
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?G_0)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
+		results = sut_.simplifyRule(ruleConds, null, false);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(floor ?Y)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(above ?X ?G_0)")));
+		assertEquals(results.size(), 3);
+
+		// On X G0 Simplification
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(thing ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(thing ?Y)"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(on ?X ?G_0)"), true);
+		assertNotNull(results);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(clear ?X)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(on ?X ?G_0)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(block ?X)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(thing ?X)")));
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(thing ?Y)")));
+		assertEquals(results.size(), 6);
+		
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
@@ -579,16 +639,6 @@ public class RuleCreationTest {
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
-
-		// Disallowing an illegal rule
-		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
-		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
-		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
-		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
-		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(above ?X ?Y)"), true);
-		assertNull(results);
 	}
 
 	@Test

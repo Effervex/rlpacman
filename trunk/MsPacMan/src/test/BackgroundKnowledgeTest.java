@@ -24,7 +24,7 @@ public class BackgroundKnowledgeTest {
 	@Test
 	public void testSimplifyA() {
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(clear ?X) (above ? ?X) <=> (floor ?X)", false);
+				"(floor ?X) <=> (clear ?X) (above ? ?X)", false);
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ? a)"));
@@ -43,6 +43,15 @@ public class BackgroundKnowledgeTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above b a)"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
+		
+		// Different rule
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above b a)"));
+		bk = new BackgroundKnowledge(
+				"(floor ?X) <=> (clear ?X) (above ?Y ?X)", false);
 		result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec

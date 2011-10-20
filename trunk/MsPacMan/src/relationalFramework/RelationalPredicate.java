@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 
 import cerrla.Unification;
@@ -182,6 +183,38 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	/**
+	 * Replaces the args of a predicate with the replacement args, but replaces
+	 * any existing args with other variables so as not to compromise the
+	 * structure of the fact.
+	 * 
+	 * @param replacementMap
+	 */
+	public void safeReplaceArgs(Map<String, String> replacementMap) {
+		Map<String, String> tempRepl = new HashMap<String, String>(
+				arguments_.length);
+		int tempCounter = 0;
+		// Run through each argument, swapping existing args with unbound temp
+		// variables.
+		for (int i = 0; i < arguments_.length; i++) {
+			// Increment tempCounter to an unbound variable
+			while (replacementMap.containsValue(RelationalPredicate
+					.getVariableTermString(tempCounter)))
+				tempCounter++;
+
+			String arg = arguments_[i];
+			if (replacementMap.containsKey(arg))
+				arguments_[i] = replacementMap.get(arg);
+			else if (tempRepl.containsKey(arg))
+				arguments_[i] = tempRepl.get(arg);
+			else if (!arg.equals("?")) {
+				tempRepl.put(arg, RelationalPredicate
+						.getVariableTermString(tempCounter++));
+				arguments_[i] = tempRepl.get(arg);
+			}
+		}
+	}
+
+	/**
 	 * Only retains the arguments in the array and modifies all other arguments
 	 * to anonymous terms.
 	 * 
@@ -207,9 +240,9 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 *            If the fully anonymous sub-fact should be created.
 	 * @return A collection of all sub-facts.
 	 */
-	public Collection<RelationalPredicate> createSubFacts(boolean generateArgs,
+	public Set<RelationalPredicate> createSubFacts(boolean generateArgs,
 			boolean includeFullyAnonymous) {
-		Collection<RelationalPredicate> generalities = new TreeSet<RelationalPredicate>();
+		Set<RelationalPredicate> generalities = new TreeSet<RelationalPredicate>();
 
 		int permutations = (int) Math.pow(2, arguments_.length);
 		if (!includeFullyAnonymous)
@@ -253,10 +286,12 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i])
 					|| formNumericalReplacement) {
-				if (!arguments_[i].equals("?") || !ignoreAnonymous)
-					replacementMap.put(arguments_[i],
-							getVariableTermString(i));
-			} else
+				if (!arguments_[i].equals("?") || !ignoreAnonymous) {
+					if (!replacementMap.containsKey(arguments_[i]))
+						replacementMap.put(arguments_[i],
+								getVariableTermString(i));
+				}
+			} else if (!replacementMap.containsKey(arguments_[i]))
 				replacementMap.put(arguments_[i], arguments_[i]);
 		}
 		return replacementMap;
@@ -369,7 +404,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			else
 				return 1;
 		}
-		
+
 		// Type predicates trump non-type predicates
 		if (StateSpec.getInstance().isTypePredicate(factName_)) {
 			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))

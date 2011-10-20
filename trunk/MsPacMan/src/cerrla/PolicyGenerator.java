@@ -198,7 +198,8 @@ public final class PolicyGenerator implements Serializable {
 	private int countRules(SortedSet<PolicyValue> elites, ElitesData ed,
 			float minValue) {
 		// If no samples better than others, return null
-		if (elites == null || elites.isEmpty() || elites.first().getValue() == minValue)
+		if (elites == null || elites.isEmpty()
+				|| elites.first().getValue() == minValue)
 			return 0;
 
 		// Sub-elites remove any minimally valued samples (useless updates).
@@ -670,14 +671,15 @@ public final class PolicyGenerator implements Serializable {
 		// TODO Trial immediate slot creation
 		rule = rule.groundModular();
 		RelationalRule match = currentRules_.findMatch(rule);
-		// If there is no match, or the matched rule isn't a seed rule, create a new slot.
-		if (match == null/* || !match.getSlot().getSeedRule().equals(match)*/) {
+		// If there is no match, or the matched rule isn't a seed rule, create a
+		// new slot.
+		if (match == null/* || !match.getSlot().getSeedRule().equals(match) */) {
 			createSeededSlot(rule);
-			/*if (match != null) {
-				ProbabilityDistribution<RelationalRule> ruleGenerator = match.getSlot().getGenerator();
-				ruleGenerator.remove(match);
-				ruleGenerator.normaliseProbs();
-			}*/
+			/*
+			 * if (match != null) { ProbabilityDistribution<RelationalRule>
+			 * ruleGenerator = match.getSlot().getGenerator();
+			 * ruleGenerator.remove(match); ruleGenerator.normaliseProbs(); }
+			 */
 			match = rule;
 		}
 
@@ -1115,9 +1117,9 @@ public final class PolicyGenerator implements Serializable {
 						validActions, activatedActions)) {
 			List<RelationalRule> covered = null;
 			try {
+				currentRules_.removeAll(rlggRules_.values());
 				covered = ruleCreation_.rlggState(state, validActions,
 						goalReplacements, moduleGoal_);
-				currentRules_.clear();
 				currentRules_.addAll(covered);
 			} catch (Exception e) {
 				e.printStackTrace();
