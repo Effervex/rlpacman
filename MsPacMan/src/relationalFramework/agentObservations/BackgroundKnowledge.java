@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -29,9 +30,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	/** Precendence constants. */
 	private final int LEFT_SIDE = -1;
 	private final int RIGHT_SIDE = 1;
-
-	/** The JESS compatible assertion string. */
-	private String assertionString_;
 
 	private boolean jessAssert_;
 
@@ -56,7 +54,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            If this rule is to be asserted in JESS or not.
 	 */
 	public BackgroundKnowledge(String assertion, boolean jessAssert) {
-		assertionString_ = assertion;
 		jessAssert_ = jessAssert;
 		String splitter = StateSpec.INFERS_ACTION;
 		equivalentRule_ = false;
@@ -66,15 +63,24 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			splitter = StateSpec.EQUIVALENT_RULE;
 		}
 		String[] split = assertion.split(splitter);
-		preConds_ = RelationalRule.splitConditions(split[0]);
+		preConds_ = RelationalRule.splitConditions(split[0], false);
 
 		split[1] = split[1].trim();
 		String assertStr = "(assert ";
 		if (split[1].contains(assertStr))
+			// Parsing an 'assert' fact
 			postCondition_ = StateSpec.toRelationalPredicate(split[1]
 					.substring(assertStr.length(), split[1].length() - 1));
-		else
-			postCondition_ = StateSpec.toRelationalPredicate(split[1].trim());
+		else {
+			// Post cond may in fact be a pre-cond
+			SortedSet<RelationalPredicate> postFacts = RelationalRule
+					.splitConditions(split[1], false);
+			if (postFacts.size() > 1) {
+				postCondition_ = preConds_.iterator().next();
+				preConds_ = postFacts;
+			} else
+				postCondition_ = postFacts.first();
+		}
 
 		// Determine precendence if equivalent rule
 		if (equivalentRule_) {
@@ -83,6 +89,29 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			if (preConds_.size() > 1 && !postCondition_.isNegated())
 				precendence_ = RIGHT_SIDE;
 		}
+
+		normaliseRuleArgs();
+	}
+
+	/**
+	 * Normalises the rule arguments such that the right side only concerns ?X.
+	 */
+	private void normaliseRuleArgs() {
+		Map<String, String> replacementMap = null;
+		if (precendence_ == LEFT_SIDE)
+			replacementMap = postCondition_.createVariableTermReplacementMap(
+					false, true);
+		else
+			replacementMap = preConds_.iterator().next()
+					.createVariableTermReplacementMap(false, true);
+		postCondition_.safeReplaceArgs(replacementMap);
+		Collection<RelationalPredicate> newPreConds = new ArrayList<RelationalPredicate>(
+				preConds_.size());
+		for (RelationalPredicate preCond : preConds_) {
+			preCond.safeReplaceArgs(replacementMap);
+			newPreConds.add(preCond);
+		}
+		preConds_ = newPreConds;
 	}
 
 	/**
@@ -239,7 +268,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * 
 	 * @return True if the conditions are illegal.
 	 */
-	public boolean checkIllegalRule(SortedSet<RelationalPredicate> ruleConds, boolean fixRule) {
+	public boolean checkIllegalRule(SortedSet<RelationalPredicate> ruleConds,
+			boolean fixRule) {
 		// Check for illegal rules
 		BidiMap replacementTerms = new DualHashBidiMap();
 		int result = Unification.getInstance().unifyStates(
@@ -275,11 +305,21 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	@Override
 	public String toString() {
 		// Output the rule differently if precendence is on the right side
+		String left = StateSpec.conditionsToString(preConds_);
+		String right = postCondition_.toString();
 		if (precendence_ == RIGHT_SIDE) {
-			String[] split = assertionString_.split(" <=> ");
-			return split[1] + " <=> " + split[0];
+			String backup = left;
+			left = right;
+			right = backup;
 		}
-		return assertionString_;
+
+		String relation = " => ";
+		if (equivalentRule_)
+			relation = " <=> ";
+
+		if (jessAssert_)
+			return left + relation + "(assert " + right + ")";
+		return left + relation + right;
 	}
 
 	@Override
@@ -329,11 +369,25 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_ != other.equivalentRule_) {
 			return (equivalentRule_) ? -1 : 1;
 		}
+		
+		// Compare by preferred facts
+		Iterator<RelationalPredicate> thisIter = getPreferredFacts().iterator();
+		Iterator<RelationalPredicate> otherIter = other.getPreferredFacts().iterator();
+		while (thisIter.hasNext() || otherIter.hasNext()) {
+			// If either ruleset is smaller, return that as the smaller one.
+			if (!thisIter.hasNext())
+				return -1;
+			if (!otherIter.hasNext())
+				return 1;
 
-		// Compare by pre conds
-		Iterator<RelationalPredicate> thisIter = preConds_.iterator();
-		Iterator<RelationalPredicate> otherIter = other.preConds_.iterator();
-		// Iterate through the rules, until all matched, or a mismatch
+			result = thisIter.next().compareTo(otherIter.next());
+			if (result != 0)
+				return result;
+		}
+		
+		// Compare by non-preferred facts
+		thisIter = getNonPreferredFacts().iterator();
+		otherIter = other.getNonPreferredFacts().iterator();
 		while (thisIter.hasNext() || otherIter.hasNext()) {
 			// If either ruleset is smaller, return that as the smaller one.
 			if (!thisIter.hasNext())
@@ -346,11 +400,38 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				return result;
 		}
 
-		// Compare by postCond
-		result = postCondition_.compareTo(other.postCondition_);
-		if (result != 0)
-			return result;
-
 		return 0;
+	}
+
+	/**
+	 * Gets the fact(s) on the non-preferred side of the rule, that is, the
+	 * right side when the rule is printed.
+	 * 
+	 * @return The fact(s) that are to be removed using the opposite side.
+	 */
+	public Collection<RelationalPredicate> getNonPreferredFacts() {
+		if (precendence_ == LEFT_SIDE) {
+			Collection<RelationalPredicate> nonPreferred = new ArrayList<RelationalPredicate>();
+			nonPreferred.add(postCondition_);
+			return nonPreferred;
+		} else {
+			return preConds_;
+		}
+	}
+
+	/**
+	 * Gets the fact(s) on the preferred side of the rule, that is, the left
+	 * side when the rule is printed.
+	 * 
+	 * @return The fact(s) that take precedence or a swapped in.
+	 */
+	public Collection<RelationalPredicate> getPreferredFacts() {
+		if (precendence_ == LEFT_SIDE) {
+			return preConds_;
+		} else {
+			Collection<RelationalPredicate> nonPreferred = new ArrayList<RelationalPredicate>();
+			nonPreferred.add(postCondition_);
+			return nonPreferred;
+		}
 	}
 }

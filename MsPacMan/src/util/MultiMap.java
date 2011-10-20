@@ -316,6 +316,17 @@ public class MultiMap<K, V> implements Serializable {
 	}
 
 	/**
+	 * Puts all values from a map into this multi-map, but not overwriting.
+	 * 
+	 * @param map
+	 *            The map to add.
+	 */
+	public void putAll(Map<? extends K, ? extends V> map) {
+		for (K key : map.keySet())
+			put(key, map.get(key));
+	}
+
+	/**
 	 * Puts all values from a multi-map into this multi-map, but not
 	 * overwriting.
 	 * 

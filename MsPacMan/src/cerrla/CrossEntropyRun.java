@@ -169,11 +169,13 @@ public class CrossEntropyRun {
 		Collection<String> generalConditions = new HashSet<String>();
 		for (RelationalRule mutated : currentPolicyGenerator.getMutatedRules()) {
 			if (!checkedModuleRules_.contains(mutated)) {
-				// TODO Could probably go back to learning combined
-				// modules again!
 				// Checking for specific goal conditions
 				GoalCondition ruleConstants = mutated.getConstantCondition();
-				if (ruleConstants != null && ruleConstants.getFacts().size() == 1)
+				// Only learn modules that are appropriate for the multi-module
+				// predicate.
+				if (ruleConstants != null
+						&& (ProgramArgument.MULTI_MODULES.booleanValue() || ruleConstants
+								.getFacts().size() == 1))
 					goalConditions.add(ruleConstants);
 
 				// Checking for general goal conditions
@@ -309,12 +311,9 @@ public class CrossEntropyRun {
 			// Elites is equal to the total number of rules (KL sized)
 			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
 		}
+		
 		// Check elite bounding
-		if (ProgramArgument.BOUNDED_ELITES.booleanValue())
-			numElites = Math.max(numElites, policyGenerator.getGenerator()
-					.size());
-
-		return checkEliteBounding((int) numElites);
+		return checkEliteBounding((int) Math.ceil(numElites));
 	}
 
 	/**

@@ -143,7 +143,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 */
 	public RelationalRule(String ruleString) {
 		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
-		ruleConditions_ = splitConditions(split[0]);
+		ruleConditions_ = splitConditions(split[0], true);
 		if (split.length == 2)
 			ruleAction_ = StateSpec.toRelationalPredicate(split[1].trim());
 		slot_ = null;
@@ -264,7 +264,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/**
 	 * Clone this rule.
 	 * 
-	 * @param cloneInternalMembers If internal counters should also be cloned.
+	 * @param cloneInternalMembers
+	 *            If internal counters should also be cloned.
 	 * @return A clone of this rule.
 	 */
 	public RelationalRule clone(boolean cloneInternalMembers) {
@@ -274,7 +275,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		RelationalRule clone = new RelationalRule(cloneConds, ruleAction_);
 		if (!cloneInternalMembers)
 			return clone;
-		
+
 		clone.hasSpawned_ = hasSpawned_;
 		clone.statesSeen_ = statesSeen_;
 		clone.mutant_ = mutant_;
@@ -516,7 +517,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				groundAction, null);
 		groundRule.expandConditions();
 		groundRule.findConstants();
-		
+
 		return groundRule;
 	}
 
@@ -865,12 +866,18 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * 
 	 * @param conditionString
 	 *            The condition string to be split.
+	 * @param useConditionComparator
+	 *            If the split should use a condition comparator.
 	 * @return The facts of the string in segments.
 	 */
 	public static SortedSet<RelationalPredicate> splitConditions(
-			String conditionString) {
-		SortedSet<RelationalPredicate> conds = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
+			String conditionString, boolean useConditionComparator) {
+		SortedSet<RelationalPredicate> conds = null;
+		if (useConditionComparator)
+			conds = new TreeSet<RelationalPredicate>(
+					ConditionComparator.getInstance());
+		else
+			conds = new TreeSet<RelationalPredicate>();
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
 		Matcher m = p.matcher(conditionString);
 		while (m.find()) {
