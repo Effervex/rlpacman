@@ -133,13 +133,14 @@ public class CrossEntropyRun {
 			episodeMeans.put(numEpisodes, mean);
 			episodeSDs.put(numEpisodes, sd.evaluate(vals));
 
-			DecimalFormat formatter = new DecimalFormat("#0.00");
-			System.out.println(formatter.format(convergedCount_ * 100.0
-					/ convergedSteps)
-					+ "% converged at value: "
-					+ formatter.format(mean)
-					+ " "
-					+ SD_SYMBOL + " " + meanDeviation);
+			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+				DecimalFormat formatter = new DecimalFormat("#0.00");
+				System.out.println(formatter.format(convergedCount_ * 100.0
+						/ convergedSteps)
+						+ "% converged at value: "
+						+ formatter.format(mean)
+						+ " " + SD_SYMBOL + " " + meanDeviation);
+			}
 
 			if (convergedCount_ > convergedSteps
 					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
@@ -299,19 +300,27 @@ public class CrossEntropyRun {
 		}
 
 		double numElites = 1;
-		if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_AV_RULES) {
+		switch (ProgramArgument.ELITES_SIZE.intValue()) {
+		case ProgramArgument.ELITES_SIZE_SUM_SLOTS:
+			// Elites is equal to the sum of the slot means
+			numElites = sumSlotMean;
+			break;
+		case ProgramArgument.ELITES_SIZE_SUM_RULES:
+			// Elites is equal to the total number of rules (KL sized)
+			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
+			break;
+		case ProgramArgument.ELITES_SIZE_MAX_RULES:
+			// Elites is equal to the maximum slot size
+			numElites = maxWeightedRuleCount / maxSlotMean;
+			break;
+		case ProgramArgument.ELITES_SIZE_AV_RULES:
+		default:
 			// Elites is equal to the average number of rules in high mean
 			// slots.
 			numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
 					sumSlotMean);
-		} else if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_SUM_SLOTS) {
-			// Elites is equal to the sum of the slot means
-			numElites = sumSlotMean;
-		} else if (ProgramArgument.ELITES_SIZE.intValue() == ProgramArgument.ELITES_SIZE_SUM_RULES) {
-			// Elites is equal to the total number of rules (KL sized)
-			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
 		}
-		
+
 		// Check elite bounding
 		return checkEliteBounding((int) Math.ceil(numElites));
 	}
@@ -345,6 +354,9 @@ public class CrossEntropyRun {
 	private void estimateETA(double klDivergence, double convergenceValue,
 			int run, int maxRuns, long startTime, int numElites,
 			int actualNumElites, float bestElite, float worstElite) {
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+			return;
+
 		long currentTime = System.currentTimeMillis();
 
 		long elapsedTime = currentTime - startTime;
@@ -411,6 +423,9 @@ public class CrossEntropyRun {
 	 */
 	private void estimateTestTime(double percentComplete, double expProg,
 			long startTime) {
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+			return;
+
 		// Test time elapsed, with static learning time
 		long testElapsedTime = System.currentTimeMillis() - startTime;
 		String elapsed = "Elapsed: "
@@ -635,12 +650,14 @@ public class CrossEntropyRun {
 		wr = new FileWriter(rawNumbers);
 		buf = new BufferedWriter(wr);
 
-		System.out.println("Average episode scores:");
-		for (Integer episode : episodeMeans.keySet()) {
-			buf.write(episode + "\t" + episodeMeans.get(episode) + "\t"
-					+ episodeSDs.get(episode) + "\n");
-			System.out.println(episode + "\t" + episodeMeans.get(episode)
-					+ "\t" + SD_SYMBOL + "\t" + episodeSDs.get(episode));
+		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+			System.out.println("Average episode scores:");
+			for (Integer episode : episodeMeans.keySet()) {
+				buf.write(episode + "\t" + episodeMeans.get(episode) + "\t"
+						+ episodeSDs.get(episode) + "\n");
+				System.out.println(episode + "\t" + episodeMeans.get(episode)
+						+ "\t" + SD_SYMBOL + "\t" + episodeSDs.get(episode));
+			}
 		}
 
 		buf.close();
@@ -703,6 +720,8 @@ public class CrossEntropyRun {
 			System.out.println("Beginning ensemble testing for episode " + t
 					+ ".");
 		System.out.println();
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+			System.out.println("Testing...");
 
 		long startTime = System.currentTimeMillis();
 
@@ -728,9 +747,11 @@ public class CrossEntropyRun {
 			@SuppressWarnings("unchecked")
 			Pair<CoveringRelationalPolicy, Double> pol = (Pair<CoveringRelationalPolicy, Double>) ObjectObservations
 					.getInstance().objectArray[0];
-			if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-				System.out.println("Policy consistency: " + pol.objB_);
-			System.out.println(currentEpisode_ + ": " + scores[i] + "\n");
+			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+				if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+					System.out.println("Policy consistency: " + pol.objB_);
+				System.out.println(currentEpisode_ + ": " + scores[i] + "\n");
+			}
 		}
 
 		// Post-testing unfixing
@@ -740,9 +761,15 @@ public class CrossEntropyRun {
 
 		// Episode performance output
 		Mean mean = new Mean();
-		episodeMeans.put(currentEpisode_, mean.evaluate(scores));
+		double testScore = mean.evaluate(scores);
+		episodeMeans.put(currentEpisode_, testScore);
 		StandardDeviation sd = new StandardDeviation();
 		episodeSDs.put(currentEpisode_, sd.evaluate(scores));
+
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+			System.out.println("Run " + run + ", test result: "
+					+ currentEpisode_ + ": " + testScore);
+		}
 
 		// Save the results at each episode
 		try {
@@ -798,9 +825,7 @@ public class CrossEntropyRun {
 			savePerformance(episodeMeans, episodeSDs, tempPerf, finalWrite);
 		}
 		policyGenerator_.savePolicyGenerator(new File(tempPerf + ".ser"));
-		if (!Module.saveAtEnd_)
-			AgentObservations.getInstance().saveAgentObservations(
-					policyGenerator_);
+		AgentObservations.getInstance().saveAgentObservations(policyGenerator_);
 	}
 
 	/**
@@ -819,7 +844,7 @@ public class CrossEntropyRun {
 	 *            The minimum observed reward.
 	 * @return True if the elites should be cleared and restarted.
 	 */
-	protected void updateDistributions(PolicyGenerator localPolicy,
+	protected boolean updateDistributions(PolicyGenerator localPolicy,
 			SortedSet<PolicyValue> elites, int population, int numElites,
 			float minReward) {
 		// Clean up the policy values
@@ -836,10 +861,11 @@ public class CrossEntropyRun {
 					removed);
 
 		// Run the post update operations
-		localPolicy.postUpdateOperations(numElites);
+		boolean distChanged = localPolicy.postUpdateOperations(numElites);
 
 		// Clear the restart
 		localPolicy.shouldRestart();
+		return distChanged;
 	}
 
 	/**
@@ -950,11 +976,15 @@ public class CrossEntropyRun {
 				Pair<CoveringRelationalPolicy, Double> policy = (Pair<CoveringRelationalPolicy, Double>) ObjectObservations
 						.getInstance().objectArray[0];
 				score /= ProgramArgument.POLICY_REPEATS.doubleValue();
-				System.out.println();
-				// System.out.println(policy.objA_);
-				if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-					System.out.println("Policy consistency: " + policy.objB_);
-				System.out.println(currentEpisode_ + ": " + score);
+
+				if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+					System.out.println();
+					// System.out.println(policy.objA_);
+					if (ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+						System.out.println("Policy consistency: "
+								+ policy.objB_);
+					System.out.println(currentEpisode_ + ": " + score);
+				}
 
 				float worst = (!pvs.isEmpty()) ? pvs.last().getValue()
 						: Float.NaN;
@@ -963,7 +993,7 @@ public class CrossEntropyRun {
 				pvs.add(thisPolicy);
 				policyGenerator_.incrementPoliciesEvaluated();
 
-				if (worst == Float.NaN)
+				if (Float.isNaN(worst))
 					worst = pvs.first().getValue();
 
 				// Give an ETA
@@ -999,15 +1029,20 @@ public class CrossEntropyRun {
 				}
 
 				// Update the distributions
-				updateDistributions(policyGenerator_, pvs, population,
-						numElites, minReward);
-
+				boolean resetElites = updateDistributions(policyGenerator_,
+						pvs, population, numElites, minReward);
+				float bestElite = pvs.first().getValue();
+				if (resetElites && ProgramArgument.RESET_ELITES.booleanValue()) {
+					pvs.clear();
+					bestElite = Float.NaN;
+					worst = Float.NaN;
+				}
 				estimateETA(policyGenerator_.getKLDivergence(),
 						policyGenerator_.getConvergenceValue(), run
 								- repetitionsStart, repetitionsEnd
 								- repetitionsStart,
 						experimentController_.getExperimentStart(), numElites,
-						pvs.size(), pvs.first().getValue(), worst);
+						pvs.size(), bestElite, worst);
 				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,
 						valueQueue, averageValues, currentEpisode_, population);
 
@@ -1024,6 +1059,21 @@ public class CrossEntropyRun {
 					try {
 						saveFiles(run, episodeMeans, episodeSDs, pvs,
 								!hasUpdated, false);
+
+						// Basic update of run
+						if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+							if (hasUpdated) {
+								System.out.println("Run "
+										+ run
+										+ ", learning: "
+										+ currentEpisode_
+										+ ": "
+										+ episodeMeans.get(episodeMeans
+												.lastKey()));
+								System.out.println("Learning...");
+							} else
+								System.out.println("Learning...");
+						}
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -1034,16 +1084,15 @@ public class CrossEntropyRun {
 
 				isConverged |= policyGenerator_.isConverged();
 
-				System.out.println();
-				System.out.println();
+				if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+					System.out.println();
+					System.out.println();
+				}
 			} else {
 				filterPolicyValues(pvs, policyGenerator_);
 				policyGenerator_.setPoliciesEvaluated(pvs.size());
 			}
 		}
-
-		// TODO Perform one last update to fix the probabilities to those of the
-		// elites?
 
 		// Perform a final test
 		if (!prelimRun)

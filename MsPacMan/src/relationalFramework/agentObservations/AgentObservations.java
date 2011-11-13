@@ -285,6 +285,29 @@ public final class AgentObservations implements Serializable {
 		return rlggRules;
 	}
 
+	/**
+	 * Gets the RLGG conditions for a given action.
+	 * 
+	 * @param ruleAction
+	 *            The action to get the RLGG conditions for. Note the action
+	 *            arguments.
+	 * @return The conditions for that action's RLGG.
+	 */
+	public Collection<RelationalPredicate> getRLGGConditions(
+			RelationalPredicate action) {
+		SortedSet<RelationalPredicate> rlggConds = actionBasedObservations_
+				.get(action.getFactName()).getRLGGRule().getConditions(true);
+		Collection<RelationalPredicate> termSwappedConds = new TreeSet<RelationalPredicate>(
+				rlggConds.comparator());
+		String[] actionTerms = action.getArguments();
+		for (RelationalPredicate rlggCond : rlggConds) {
+			rlggCond = new RelationalPredicate(rlggCond);
+			rlggCond.replaceArguments(actionTerms);
+			termSwappedConds.add(rlggCond);
+		}
+		return termSwappedConds;
+	}
+
 	public Collection<RelationalPredicate> getSpecialisationConditions(
 			String actionPred) {
 		if (!actionBasedObservations_.containsKey(actionPred))
@@ -849,9 +872,7 @@ public final class AgentObservations implements Serializable {
 			for (RelationalPredicate condition : variants) {
 				// Check the non-negated version
 				condition = simplifyCondition(condition);
-				if (condition != null) {
-					specialisations.add(condition);
-
+				if (condition != null && specialisations.add(condition)) {
 					// Check the negated version (only for non-types)
 					if (checkNegated
 							&& !StateSpec.getInstance().isTypePredicate(
@@ -1155,7 +1176,8 @@ public final class AgentObservations implements Serializable {
 			}
 			backgroundKnowledge.addAll(currentKnowledge
 					.getAllBackgroundKnowledge());
-			mappedEnvironmentRules_.putAll(currentKnowledge.getPredicateMappedRules());
+			mappedEnvironmentRules_.putAll(currentKnowledge
+					.getPredicateMappedRules());
 			return backgroundKnowledge;
 		}
 

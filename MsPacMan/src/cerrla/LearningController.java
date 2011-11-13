@@ -505,8 +505,6 @@ public class LearningController {
 				break;
 		}
 
-		Module.saveAllModules();
-
 		RLGlue.RL_cleanup();
 
 		if (repetitionsStart_ == 0 && !ProgramArgument.TESTING.booleanValue()) {

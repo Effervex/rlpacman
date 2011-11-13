@@ -93,7 +93,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * Inserts the rules from the given goal condition module into the policy
 	 * (if the module exists). Also, doesn't insert duplicate rules.
 	 * 
-	 * @param gc The goal condition to load.
+	 * @param gc
+	 *            The goal condition to load.
 	 */
 	private void insertModuleRules(GoalCondition gc) {
 		if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
@@ -149,7 +150,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 		if (!policyRules_.contains(rule)) {
 			// Check if the rule contains constant facts that could invoke
 			// modular rules.
-			if (ProgramArgument.USE_MODULES.booleanValue())
+			if (ProgramArgument.USE_MODULES.booleanValue()
+					&& !ProgramArgument.SEED_MODULE_RULES.booleanValue())
 				checkModular(rule);
 			policyRules_.add(rule);
 			policySize_++;

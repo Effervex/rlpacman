@@ -467,13 +467,7 @@ public class ConditionBeliefs implements Serializable {
 			leftConds.add(extraCond);
 		// Create an equivalence relation if possible.
 		if (!otherCond.getFactName().equals(condition_)) {
-			// Get these always true conditions
-			// TODO May have to do FULL comparsions against all 3 sets of
-			// always/never and sometimes true.
-			Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
-			Set<RelationalPredicate> thisSometimesTrue = getOccasionallyTrue(extraCond);
-
-			// Get the other always true conditions
+			// Form the anti
 			BidiMap replacementMap = new DualHashBidiMap();
 			String[] otherArgs = otherCond.getArguments();
 			for (int i = 0; i < otherArgs.length; i++) {
@@ -482,43 +476,9 @@ public class ConditionBeliefs implements Serializable {
 							RelationalPredicate.getVariableTermString(i));
 			}
 
-			RelationalPredicate modExtraCond = null;
-			if (extraCond != null) {
-				modExtraCond = new RelationalPredicate(extraCond);
-				modExtraCond.replaceArguments(replacementMap, false, false);
-			}
-
-			// Get the other condition beliefs based on negation type.
-			ConditionBeliefs otherCBs = getOtherConditionRelations(otherCond,
-					negationType, conditionBeliefs, negatedConditionBeliefs);
-			Set<RelationalPredicate> thatAlwaysTrue = otherCBs
-					.getAlwaysTrue(modExtraCond);
-			Set<RelationalPredicate> thatSometimesTrue = otherCBs
-					.getOccasionallyTrue(modExtraCond);
-
-			// Shape the sets if variables don't match (but cannot purge negated
-			// predicates)
-			// TODO Gone a little far here. Need to still apply replacements
-			int variableNumComparison = Double.compare(
-					cbFact_.getArgTypes().length,
-					otherCond.getArgTypes().length);
-			if (variableNumComparison < 0) {
-				// Other conds always true set has to be shaped
-				thatAlwaysTrue = shapeFacts(thatAlwaysTrue,
-						replacementMap.inverseBidiMap(), negationType);
-				thatSometimesTrue = shapeFacts(thatSometimesTrue,
-						replacementMap.inverseBidiMap(), negationType);
-			} else if (variableNumComparison > 0) {
-				// This conds always true set has to be shaped
-				thisAlwaysTrue = shapeFacts(thisAlwaysTrue, replacementMap,
-						!cbFact_.isNegated());
-				thisSometimesTrue = shapeFacts(thisSometimesTrue,
-						replacementMap, !cbFact_.isNegated());
-			}
-
 			// If the sets are equal, the relations are equivalent!
-			if (thisAlwaysTrue.equals(thatAlwaysTrue)
-					&& thisSometimesTrue.equals(thatSometimesTrue)) {
+			if (isEquivalentConditions(extraCond, otherCond, negationType,
+					conditionBeliefs, negatedConditionBeliefs, replacementMap)) {
 				// Swap the facts if the otherCond is simpler
 				if (negationType && cbFact_.compareTo(otherCond) > 0) {
 					left.safeReplaceArgs(replacementMap);
@@ -532,8 +492,13 @@ public class ConditionBeliefs implements Serializable {
 
 					leftConds.clear();
 					leftConds.add(left);
-					if (extraCond != null)
+					if (extraCond != null) {
+						RelationalPredicate modExtraCond = new RelationalPredicate(
+								extraCond);
+						modExtraCond.replaceArguments(replacementMap, false,
+								false);
 						leftConds.add(modExtraCond);
+					}
 				}
 
 				return createBackgroundRule(leftConds, right, negationType,
@@ -544,6 +509,62 @@ public class ConditionBeliefs implements Serializable {
 		// Create the basic inference relation
 		return createBackgroundRule(leftConds, right, negationType, false,
 				currentKnowledge);
+	}
+
+	/**
+	 * Checks if this condition is equivalent to another by comparing the facts
+	 * seen by each of them (taking into account optional extra conditions).
+	 * 
+	 * @param extraCond
+	 *            The optional extra condition.
+	 * @param otherCond
+	 *            The condition to check against.
+	 * @param negationType
+	 *            The negated state of the other condition.
+	 * @param conditionBeliefs
+	 *            The global condition beliefs.
+	 * @param negatedConditionBeliefs
+	 *            The global negated condition beliefs.
+	 * @param replacementMap
+	 *            The replacement map to normalise this fact to the other fact.
+	 * @return True if this condition (with extra condition) is equivalent to
+	 *         the other condition.
+	 */
+	@SuppressWarnings("unchecked")
+	private boolean isEquivalentConditions(
+			RelationalPredicate extraCond,
+			RelationalPredicate otherCond,
+			boolean negationType,
+			Map<String, ConditionBeliefs> conditionBeliefs,
+			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs,
+			BidiMap replacementMap) {
+		// Get the conditions for this cond.
+		Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
+		Set<RelationalPredicate> thisSometimesTrue = getOccasionallyTrue(extraCond);
+
+		// Get the other condition beliefs based on negation type.
+		ConditionBeliefs otherCBs = getOtherConditionRelations(otherCond,
+				negationType, conditionBeliefs, negatedConditionBeliefs);
+		Set<RelationalPredicate> thatAlwaysTrue = otherCBs.getAlwaysTrue(null);
+		Set<RelationalPredicate> thatSometimesTrue = otherCBs
+				.getOccasionallyTrue(null);
+
+		// Shape the sets if variables don't match (but cannot purge negated
+		// predicates)
+		// Other conds always true set has to be shaped
+		thatAlwaysTrue = shapeFacts(thatAlwaysTrue,
+				replacementMap.inverseBidiMap(), negationType, true);
+		thatSometimesTrue = shapeFacts(thatSometimesTrue,
+				replacementMap.inverseBidiMap(), negationType, true);
+
+		// This conds always true set has to be shaped
+		thisAlwaysTrue = shapeFacts(thisAlwaysTrue, replacementMap,
+				!cbFact_.isNegated(), false);
+		thisSometimesTrue = shapeFacts(thisSometimesTrue, replacementMap,
+				!cbFact_.isNegated(), false);
+
+		return thisAlwaysTrue.equals(thatAlwaysTrue)
+				&& thisSometimesTrue.equals(thatSometimesTrue);
 	}
 
 	/**
@@ -585,22 +606,25 @@ public class ConditionBeliefs implements Serializable {
 	 * 
 	 * @param factSet
 	 *            The set of facts to cut down.
-	 * @param keptFacts
+	 * @param keptArgs
 	 *            The valid arguments to keep (and replace).
 	 * @param removeFacts
 	 *            If the facts present should be removed at all.
+	 * @param replaceArgs
+	 *            If the args should also be replaced or just used as a retainer
+	 *            set.
 	 * @return A cloned set of the factSet with less facts.
 	 */
 	private Set<RelationalPredicate> shapeFacts(
-			Set<RelationalPredicate> factSet, Map<String, String> keptFacts,
-			boolean removeFacts) {
+			Set<RelationalPredicate> factSet, Map<String, String> keptArgs,
+			boolean removeFacts, boolean replaceArgs) {
 		Set<RelationalPredicate> newFactSet = new HashSet<RelationalPredicate>();
 		for (RelationalPredicate fact : factSet) {
 			boolean keepFact = true;
 			for (String arg : fact.getArguments()) {
 				// If the arg isn't anonymous and isn't a valid variable, don't
 				// note it.
-				if (!arg.equals("?") && !keptFacts.containsKey(arg)) {
+				if (!arg.equals("?") && !keptArgs.containsKey(arg)) {
 					keepFact = false;
 					break;
 				}
@@ -608,7 +632,8 @@ public class ConditionBeliefs implements Serializable {
 
 			if (keepFact || !removeFacts) {
 				fact = new RelationalPredicate(fact);
-				fact.replaceArguments(keptFacts, true, false);
+				if (replaceArgs)
+					fact.replaceArguments(keptArgs, true, false);
 				newFactSet.add(fact);
 			}
 		}

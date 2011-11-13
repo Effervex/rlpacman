@@ -119,8 +119,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 				ruleGenerator_.add(guidedRule, averageProb);
 				ruleGenerator_.normaliseProbs();
 			}
-			guidedRule.setSlot(this);
 		}
+		guidedRule.setSlot(this);
 	}
 
 	@Override

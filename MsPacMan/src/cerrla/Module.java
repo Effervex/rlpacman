@@ -238,14 +238,6 @@ public class Module {
 	}
 
 	/**
-	 * Saves all modules in the currently loaded modules
-	 */
-	public static void saveAllModules() {
-		for (Module module : loadedModules_.values())
-			saveModule(module);
-	}
-
-	/**
 	 * Function to check if a module exists.
 	 * 
 	 * @param environmentName

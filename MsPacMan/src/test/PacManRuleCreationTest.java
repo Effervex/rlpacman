@@ -155,6 +155,7 @@ public class PacManRuleCreationTest {
 		RelationalRule rule = new RelationalRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (pacman player) => (toGhost ?X ?__Num6)");
 		Set<RelationalRule> specialisations = sut_.specialiseRule(rule);
+		// TODO Adding the RLGG during specialisation for numerical ranges doesn't work.
 		RelationalRule mutant = new RelationalRule(
 				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (blinking ?X) (pacman player) => (toGhost ?X ?__Num6)");
 		assertTrue(specialisations.contains(mutant));
