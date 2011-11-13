@@ -34,7 +34,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	private boolean jessAssert_;
 
 	/** The preconditions for the background knowledge. */
-	private Collection<RelationalPredicate> preConds_;
+	private SortedSet<RelationalPredicate> preConds_;
 
 	/** The postcondition (asserted value) for the background knowledge. */
 	private RelationalPredicate postCondition_;
@@ -95,6 +95,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 	/**
 	 * Normalises the rule arguments such that the right side only concerns ?X.
+	 * Also cleans up equivalencies such that the left side doesn't introduce
+	 * any further variables not seen in the right side.
 	 */
 	private void normaliseRuleArgs() {
 		Map<String, String> replacementMap = null;
@@ -105,10 +107,13 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			replacementMap = preConds_.iterator().next()
 					.createVariableTermReplacementMap(false, true);
 		postCondition_.safeReplaceArgs(replacementMap);
-		Collection<RelationalPredicate> newPreConds = new ArrayList<RelationalPredicate>(
-				preConds_.size());
+		SortedSet<RelationalPredicate> newPreConds = new TreeSet<RelationalPredicate>(
+				preConds_.comparator());
 		for (RelationalPredicate preCond : preConds_) {
-			preCond.safeReplaceArgs(replacementMap);
+			if (equivalentRule_ && precendence_ == LEFT_SIDE)
+				preCond.replaceArguments(replacementMap, false, false);
+			else
+				preCond.safeReplaceArgs(replacementMap);
 			newPreConds.add(preCond);
 		}
 		preConds_ = newPreConds;
@@ -243,7 +248,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 							abortAnonymous = true;
 							break;
 						}
-						resultFact.replaceArguments(replacementTerms, true,
+						resultFact.replaceArguments(replacementTerms, false,
 								false);
 						if (!ruleConds.contains(resultFact))
 							ruleConds.add(resultFact);
@@ -369,10 +374,11 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_ != other.equivalentRule_) {
 			return (equivalentRule_) ? -1 : 1;
 		}
-		
+
 		// Compare by preferred facts
 		Iterator<RelationalPredicate> thisIter = getPreferredFacts().iterator();
-		Iterator<RelationalPredicate> otherIter = other.getPreferredFacts().iterator();
+		Iterator<RelationalPredicate> otherIter = other.getPreferredFacts()
+				.iterator();
 		while (thisIter.hasNext() || otherIter.hasNext()) {
 			// If either ruleset is smaller, return that as the smaller one.
 			if (!thisIter.hasNext())
@@ -384,7 +390,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			if (result != 0)
 				return result;
 		}
-		
+
 		// Compare by non-preferred facts
 		thisIter = getNonPreferredFacts().iterator();
 		otherIter = other.getNonPreferredFacts().iterator();

@@ -378,7 +378,7 @@ public class GameModel {
 
 		// Make the fruit available for the level
 		m_fruit.m_bAvailable = true;
-		m_fruit.m_nTicks2Show = 15000 / m_pacMan.m_delay;
+		m_fruit.m_nTicks2Show = -15000 / m_pacMan.m_delay;
 
 		// Recalculate the back off time of the ghost
 		if (m_stage == 1) {

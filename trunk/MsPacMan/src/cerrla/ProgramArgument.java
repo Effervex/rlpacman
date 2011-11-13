@@ -68,11 +68,17 @@ public enum ProgramArgument implements Serializable {
 			"Size of average performance sliding window"),
 	POLICY_REPEATS(3, "policyRepeats", null, ParameterType.EVALUATION,
 			"Number of times policy is repeated"),
+	RESET_ELITES(false, "resetElites", null, ParameterType.UPDATING,
+			"If the entire elites are reset when a new slot is created."),
 	RETEST_STALE_POLICIES(true, "retestStale", null, ParameterType.SAMPLING,
 			"If stale policies should be immediately retested."),
 	RHO(0.1, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
+	SEED_MODULE_RULES(false, "seedModuleRules", null, ParameterType.SAMPLING,
+			"If module rules should just be loaded & seeded _once_."),
 	SLOT_THRESHOLD(0.5, "slotThreshold", null, ParameterType.SPECIALISATION,
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),
+	SYSTEM_OUTPUT(true, "systemOutput", "-sysOut", ParameterType.EVALUATION,
+			"If the console should output data during execution."),
 	TEST_ITERATIONS(100, "testIterations", null, ParameterType.EVALUATION,
 			"Number of iterations to test the final testing for"),
 	TESTING(false, "test", "-t", ParameterType.EVALUATION,
@@ -86,6 +92,7 @@ public enum ProgramArgument implements Serializable {
 	public static final int ELITES_SIZE_AV_RULES = 0;
 	public static final int ELITES_SIZE_SUM_SLOTS = 1;
 	public static final int ELITES_SIZE_SUM_RULES = 2;
+	public static final int ELITES_SIZE_MAX_RULES = 3;
 	private Boolean booleanValue_;
 	private String comment_;
 	private Object defaultValue_;

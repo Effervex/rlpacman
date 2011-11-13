@@ -1,7 +1,6 @@
 package msPacManVsGhosts;
 
 import game.controllers.GhostController;
-import game.controllers.examples.Legacy;
 import game.controllers.examples.Legacy2TheReckoning;
 import game.core.G;
 import game.core.GameView;

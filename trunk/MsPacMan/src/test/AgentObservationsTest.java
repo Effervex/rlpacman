@@ -1222,7 +1222,7 @@ public class AgentObservationsTest {
 		// Basic test
 		Collection<BackgroundKnowledge> backgroundKnowledge = sut_
 				.getLearnedBackgroundKnowledge();
-		BackgroundKnowledge bk = new BackgroundKnowledge("(highest ?X) => (above ?X ?)", false);
+		BackgroundKnowledge bk = new BackgroundKnowledge("(highest ?X) => (clear ?X)", false);
 		assertTrue(backgroundKnowledge.contains(bk));
 		
 		// Basic equivalence

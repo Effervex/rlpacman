@@ -228,6 +228,7 @@ public final class PolicyGenerator implements Serializable {
 
 			// Count the occurrences of rules and slots in the policy
 			Set<RelationalRule> firingRules = eliteSolution.getFiringRules();
+			Set<Slot> meanNotedSlots = new HashSet<Slot>();
 			int firedRuleIndex = 0;
 			for (RelationalRule rule : eliteSolution.getPolicyRules()) {
 				if (firingRules.contains(rule)) {
@@ -245,10 +246,13 @@ public final class PolicyGenerator implements Serializable {
 					ed.addRuleCount(rule, weight);
 
 					// Note which slots were active in this policy
-					Double val = slotMean.get(ruleSlot);
-					if (val == null)
-						val = 0.0;
-					slotMean.put(ruleSlot, val + 1);
+					if (!meanNotedSlots.contains(ruleSlot)) {
+						Double val = slotMean.get(ruleSlot);
+						if (val == null)
+							val = 0.0;
+						slotMean.put(ruleSlot, val + 1);
+						meanNotedSlots.add(ruleSlot);
+					}
 				}
 			}
 		}
@@ -273,7 +277,8 @@ public final class PolicyGenerator implements Serializable {
 	private void createSeededSlot(RelationalRule rule) {
 		currentRules_.add(rule);
 		// Create a new slot with that rule in it (Min level 2)
-		Slot newSlot = new Slot(rule, false, 2);
+		// TODO Test level 0 new seeded slots.
+		Slot newSlot = new Slot(rule, false, 0);
 		mutateRule(rule, newSlot, -1);
 		slotGenerator_.add(newSlot);
 	}
@@ -358,6 +363,21 @@ public final class PolicyGenerator implements Serializable {
 			for (RelationalRule rr : mutants) {
 				// Only add if not already in there
 				ruleSlot.addNewRule(rr);
+				currentRules_.add(rr);
+				
+				// TODO Code for inserting module rules ONCE
+				if (ProgramArgument.SEED_MODULE_RULES.booleanValue()) {
+					GoalCondition ruleConstants = rr.getConstantCondition();
+					if (ruleConstants != null) {
+						if (ProgramArgument.MULTI_MODULES.booleanValue())
+							insertModuleRules(ruleConstants);
+						else {
+							for (GoalCondition gc : ruleConstants
+									.splitCondition())
+								insertModuleRules(gc);
+						}
+					}
+				}
 
 				if (debugMode_) {
 					if (previousChildren != null
@@ -369,7 +389,6 @@ public final class PolicyGenerator implements Serializable {
 					}
 				}
 			}
-			currentRules_.addAll(mutants);
 			baseRule.setChildren(mutants);
 			noteMutationTree(baseRule, CrossEntropyRun.getInstance()
 					.getCurrentEpisode());
@@ -382,6 +401,27 @@ public final class PolicyGenerator implements Serializable {
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+			}
+		}
+	}
+
+	/**
+	 * Loads the module rules and adds them to the current CERRLA process with
+	 * the correct parameters.
+	 * 
+	 * @param ruleConstants
+	 *            The goal condition module to load.
+	 */
+	private void insertModuleRules(GoalCondition ruleConstants) {
+		Module module = Module.loadModule(StateSpec.getInstance()
+				.getEnvironmentName(), ruleConstants.toString());
+		if (module != null) {
+			// Put the parameters into an arraylist
+			ArrayList<String> parameters = new ArrayList<String>(
+					ruleConstants.getConstantArgs());
+			for (RelationalRule modRule : module.getModuleRules()) {
+				modRule.setModularParameters(parameters);
+				getCreateCorrespondingRule(modRule);
 			}
 		}
 	}
@@ -673,13 +713,18 @@ public final class PolicyGenerator implements Serializable {
 		RelationalRule match = currentRules_.findMatch(rule);
 		// If there is no match, or the matched rule isn't a seed rule, create a
 		// new slot.
-		if (match == null/* || !match.getSlot().getSeedRule().equals(match) */) {
+		if (match == null
+				|| (ProgramArgument.SEED_MODULE_RULES.booleanValue() && !match
+						.getSlot().getSeedRule().equals(match))) {
 			createSeededSlot(rule);
-			/*
-			 * if (match != null) { ProbabilityDistribution<RelationalRule>
-			 * ruleGenerator = match.getSlot().getGenerator();
-			 * ruleGenerator.remove(match); ruleGenerator.normaliseProbs(); }
-			 */
+
+			if (match != null) {
+				ProbabilityDistribution<RelationalRule> ruleGenerator = match
+						.getSlot().getGenerator();
+				ruleGenerator.remove(match);
+				ruleGenerator.normaliseProbs();
+			}
+
 			match = rule;
 		}
 
@@ -767,7 +812,8 @@ public final class PolicyGenerator implements Serializable {
 
 		// For each slot
 		Collection<Slot> newSlots = new ArrayList<Slot>();
-		for (Slot slot : slotGenerator_) {
+		for (Object oSlot : slotGenerator_.toArray()) {
+			Slot slot = (Slot) oSlot;
 			if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
 				if (!slot.isFixed()) {
 					ProbabilityDistribution<RelationalRule> distribution = slot
@@ -940,6 +986,9 @@ public final class PolicyGenerator implements Serializable {
 	 *            The file to serialize to.
 	 */
 	public void savePolicyGenerator(File serFile) throws Exception {
+		if (moduleGenerator_ && Module.saveAtEnd_)
+			return;
+
 		FileOutputStream fos = new FileOutputStream(serFile);
 		ObjectOutputStream oos = new ObjectOutputStream(fos);
 
@@ -1053,7 +1102,8 @@ public final class PolicyGenerator implements Serializable {
 				RelationalRule seedRule = new RelationalRule(input);
 				SortedSet<RelationalPredicate> ruleConds = seedRule
 						.getConditions(false);
-				ruleConds = ruleCreation_.simplifyRule(ruleConds, null, false);
+				ruleConds = ruleCreation_.simplifyRule(ruleConds, null,
+						seedRule.getAction(), false);
 				seedRule.setConditions(ruleConds, false);
 				createSeededSlot(seedRule);
 			}
@@ -1182,6 +1232,7 @@ public final class PolicyGenerator implements Serializable {
 			double alpha, int population, int numElites, float minValue) {
 		// Keep count of the rules seen (and slots used)
 		ElitesData ed = new ElitesData();
+		// TODO The observed mean is fucked up. It's going above 1.0.
 		int numEliteSamples = countRules(elites, ed, minValue);
 		double modAlpha = (1.0 * numEliteSamples) / numElites;
 		if (modAlpha < 1) {
@@ -1253,16 +1304,7 @@ public final class PolicyGenerator implements Serializable {
 
 					// If the slot is ready for updates.
 					if (negAlpha != 0) {
-						// Calculate the update appropriation based on how
-						// influential the rule is within the slot.
-						double ruleProb = slot.getGenerator().getProb(gr);
-						double ruleRatio = ruleProb * slot.size();
-						ruleRatio /= (ruleRatio + 1);
-
-						slot.updateSlotValues(slot.getOrdering(), 0, negAlpha
-								* (1 - ruleRatio));
-						slot.getGenerator().updateElement(gr, 1, 0,
-								negAlpha * ruleRatio);
+						slot.getGenerator().updateElement(gr, 1, 0, negAlpha);
 						slot.getGenerator().normaliseProbs();
 					}
 				}

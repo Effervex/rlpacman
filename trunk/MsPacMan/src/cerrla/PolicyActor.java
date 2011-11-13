@@ -258,12 +258,14 @@ public class PolicyActor implements AgentInterface {
 		}
 
 		policy_ = new PolicyEnsemble(policies);
-		if (ensembleSize_ > 1)
-			System.out.println("Num policies: " + policy_.numPolicies());
-		if (isResampled)
-			System.out.println("RESAMPLED POLICY: " + policy_);
-		else
-			System.out.println(policy_);
+		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+			if (ensembleSize_ > 1)
+				System.out.println("Num policies: " + policy_.numPolicies());
+			if (isResampled)
+				System.out.println("RESAMPLED POLICY: " + policy_);
+			else
+				System.out.println(policy_);
+		}
 
 		// Reset the state observations
 		resampleProb_ = 0;

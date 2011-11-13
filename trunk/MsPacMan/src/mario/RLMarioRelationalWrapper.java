@@ -1,7 +1,6 @@
 package mario;
 
 import relationalFramework.FiredAction;
-import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalWrapper;
@@ -805,17 +804,19 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to move to the object
 	 */
-	private boolean[] pickup(float startX, float startY, float currentX, float currentY, float shellX,
-			float shellY, boolean bigMario) {
+	private boolean[] pickup(float startX, float startY, float currentX,
+			float currentY, float shellX, float shellY, boolean bigMario) {
 		boolean[] actionArray = new boolean[Environment.numberOfKeys];
-		
+
 		// Pickup behaviour
-		if (currentEndDiffs_[0] < CELL_SIZE && Math.abs(currentEndDiffs_[1]) < CELL_SIZE) {
+		if (currentEndDiffs_[0] < CELL_SIZE
+				&& Math.abs(currentEndDiffs_[1]) < CELL_SIZE) {
 			actionArray[Mario.KEY_SPEED] = true;
 			actionArray[direction_] = true;
 			return actionArray;
 		} else
-			return move(startX, startY, currentX, currentY, shellX, shellY, bigMario);
+			return move(startX, startY, currentX, currentY, shellX, shellY,
+					bigMario);
 	}
 
 	/**
@@ -1127,86 +1128,72 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 	}
 
 	@Override
-	public Rete formObservations(Object... args) {
-		Rete rete = StateSpec.getInstance().getRete();
-		try {
-			rete.reset();
-			MarioEnvironment environment = (MarioEnvironment) args[0];
+	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
+		MarioEnvironment environment = (MarioEnvironment) args[0];
 
-			initialiseExtraEnvironmentObservations(environment);
+		initialiseExtraEnvironmentObservations(environment);
 
-			// Player
-			rete.assertString("(mario player))");
-			// Mario state
-			switch (environment.getMarioMode()) {
-			case 2:
-				rete.assertString("(marioPower fire))");
-				break;
-			case 1:
-				rete.assertString("(marioPower large))");
-				break;
-			case 0:
-				rete.assertString("(marioPower small))");
-				break;
-			}
-
-			// Run through the level observations
-			byte[][] levelObs = environment.getLevelSceneObservationZ(1);
-			byte[][] enemyObs = environment.getEnemiesObservationZ(0);
-			float[] enemyPos = environment.getEnemiesFloatPos();
-
-			// Assert the level objects
-			for (byte y = 0; y < levelObs.length; y++) {
-				for (byte x = 0; x < levelObs[y].length; x++) {
-					// Level objects, like coins and solid objects
-					assertLevelObjects(rete, environment, levelObs, enemyObs,
-							x, y);
-				}
-				if (PolicyGenerator.debugMode_)
-					System.out.println();
-			}
-
-			// Reassert static objects
-			if (isMarioInAir_)
-				for (String fact : staticObjectFacts_)
-					rete.assertString(fact);
-
-			// Assert the enemies
-			Collection<String> currentShells = new HashSet<String>();
-			for (int e = 0; e < enemyPos.length; e++) {
-				float enemyType = enemyPos[e++];
-				float x = enemyPos[e++];
-				float y = enemyPos[e];
-				// Check it's not stuck in geometry
-				if (!stuckInGeometry(x, y, levelObs, enemyType)) {
-					// Enemy objects, like fireFlower, mushroom, all enemies and
-					// projectiles
-					String isShell = assertEnemyObjects(rete, environment,
-							enemyType, x, y, levelObs);
-					if (isShell != null)
-						currentShells.add(isShell);
-				}
-			}
-			shellPositions_ = currentShells;
-
-			// Ever present goal
-			rete.assertString("(flag goal))");
-			rete.assertString("(distance goal " + marioCentreX_
-					* LevelScene.cellSize + ")");
-			rete.assertString("(canJumpOn goal)");
-			rete.assertString("(heightDiff goal 0)");
-
-			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(),
-					rete);
-			rete.run();
-
-			// Adding the valid actions
-			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete);
-
-		} catch (Exception e) {
-			e.printStackTrace();
+		// Player
+		rete.assertString("(mario player))");
+		// Mario state
+		switch (environment.getMarioMode()) {
+		case 2:
+			rete.assertString("(marioPower fire))");
+			break;
+		case 1:
+			rete.assertString("(marioPower large))");
+			break;
+		case 0:
+			rete.assertString("(marioPower small))");
+			break;
 		}
+
+		// Run through the level observations
+		byte[][] levelObs = environment.getLevelSceneObservationZ(1);
+		byte[][] enemyObs = environment.getEnemiesObservationZ(0);
+		float[] enemyPos = environment.getEnemiesFloatPos();
+
+		// Assert the level objects
+		for (byte y = 0; y < levelObs.length; y++) {
+			for (byte x = 0; x < levelObs[y].length; x++) {
+				// Level objects, like coins and solid objects
+				assertLevelObjects(rete, environment, levelObs, enemyObs, x, y);
+			}
+			if (PolicyGenerator.debugMode_)
+				System.out.println();
+		}
+
+		// Reassert static objects
+		if (isMarioInAir_)
+			for (String fact : staticObjectFacts_)
+				rete.assertString(fact);
+
+		// Assert the enemies
+		Collection<String> currentShells = new HashSet<String>();
+		for (int e = 0; e < enemyPos.length; e++) {
+			float enemyType = enemyPos[e++];
+			float x = enemyPos[e++];
+			float y = enemyPos[e];
+			// Check it's not stuck in geometry
+			if (!stuckInGeometry(x, y, levelObs, enemyType)) {
+				// Enemy objects, like fireFlower, mushroom, all enemies and
+				// projectiles
+				String isShell = assertEnemyObjects(rete, environment,
+						enemyType, x, y, levelObs);
+				if (isShell != null)
+					currentShells.add(isShell);
+			}
+		}
+		shellPositions_ = currentShells;
+
+		// Ever present goal
+		rete.assertString("(flag goal))");
+		rete.assertString("(distance goal " + marioCentreX_
+				* LevelScene.cellSize + ")");
+		rete.assertString("(canJumpOn goal)");
+		rete.assertString("(heightDiff goal 0)");
+
+		StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
 
 		// Send the state of the system
 		return rete;

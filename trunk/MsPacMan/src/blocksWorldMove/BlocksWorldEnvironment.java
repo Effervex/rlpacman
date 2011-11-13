@@ -1,16 +1,14 @@
 package blocksWorldMove;
 
-import relationalFramework.FiredAction;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalWrapper;
 import relationalFramework.StateSpec;
+import util.Pair;
 
-import java.awt.Point;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +20,8 @@ import org.rlcommunity.rlglue.codec.EnvironmentInterface;
 import org.rlcommunity.rlglue.codec.types.Action;
 import org.rlcommunity.rlglue.codec.types.Observation;
 import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
+
+import blocksWorld.BlocksState;
 
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
@@ -48,7 +48,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	protected BlocksState state_;
 
 	/** The state of the blocks world in base predicates. */
-	protected Rete rete_;
+	protected RelationalWrapper wrapper_;
 
 	/** The number of steps taken. */
 	private int steps_;
@@ -70,12 +70,13 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public void env_cleanup() {
-		rete_ = null;
+		wrapper_ = null;
 		state_ = null;
 	}
 
 	// @Override
 	public String env_init() {
+		wrapper_ = new BlocksWorldRelationalWrapper();
 		return null;
 	}
 
@@ -105,7 +106,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 	// @Override
 	public Observation env_start() {
-		rete_ = StateSpec.getInstance().getRete();
 		// Generate a random blocks world
 		state_ = initialiseWorld(numBlocks_);
 		optimalSteps_ = optimalSteps();
@@ -126,37 +126,36 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private Observation formObs_Start() {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-		ObjectObservations.getInstance().predicateKB = rete_;
+		ObjectObservations.getInstance().predicateKB = wrapper_
+				.formObservations(state_, goalArgs_);
 		ObjectObservations.getInstance().earlyExit = false;
 		return obs;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Reward_observation_terminal env_step(Action arg0) {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
 		// Check for an early exit
-		if (ObjectObservations.getInstance().earlyExit) {
+		if (ObjectObservations.getInstance().earlyExit)
 			return new Reward_observation_terminal(0, obs, true);
-		}
-
-		Collection<FiredAction> firedActions = ((PolicyActions) ObjectObservations
-				.getInstance().objectArray[0]).getFirstActionList();
-		RelationalPredicate action = null;
-		if (firedActions != null) {
-			List<FiredAction> actions = new ArrayList<FiredAction>(firedActions);
-			FiredAction selectedAction = actions.get(PolicyGenerator.random_
-					.nextInt(actions.size()));
-			selectedAction.triggerRule();
-			action = selectedAction.getAction();
-		}
 
 		// Action can fail
 		BlocksState newState = state_;
 		boolean actionFailed = false;
-		if (PolicyGenerator.random_.nextDouble() < actionSuccess_)
-			newState = actOnAction(action, state_);
-		else
+		RelationalPredicate action = null;
+		if (PolicyGenerator.random_.nextDouble() < actionSuccess_) {
+			Object result = wrapper_
+					.groundActions(
+							(PolicyActions) ObjectObservations.getInstance().objectArray[0],
+							state_);
+			if (result instanceof Pair) {
+				action = (RelationalPredicate) ((Pair<BlocksState, RelationalPredicate>) result).objB_;
+				newState = ((Pair<BlocksState, RelationalPredicate>) result).objA_;
+			} else
+				newState = (BlocksState) result;
+		} else
 			actionFailed = true;
 
 		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
@@ -169,7 +168,8 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
 			state_ = newState;
-			formState(state_);
+			ObjectObservations.getInstance().predicateKB = wrapper_
+					.formObservations(state_, goalArgs_);
 		} else if (!actionFailed) {
 			// If the agent caused the state to remain the same, exit the
 			// episode with max negative reward.
@@ -178,12 +178,10 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		}
 
 		steps_++;
-		ObjectObservations.getInstance().predicateKB = rete_;
 
 		double reward = 0;
-		boolean isGoal = StateSpec.getInstance().isGoal(rete_)
-				|| ObjectObservations.getInstance().earlyExit;
-		if (isGoal || steps_ == maxSteps_) {
+		int isGoal = wrapper_.isTerminal();
+		if (isGoal == 1 || steps_ == maxSteps_) {
 			if (optimalSteps_ >= maxSteps_)
 				reward = 0;
 			else
@@ -197,51 +195,6 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 				reward, obs, isGoal);
 
 		return rot;
-	}
-
-	/**
-	 * Acts on the action given. (e.g. 'move a b' 'moveFloor z')
-	 * 
-	 * @param action
-	 *            The action to act upon.
-	 * @param worldState
-	 *            The old state of the world, before the action.
-	 * @return The state of the new world.
-	 */
-	protected BlocksState actOnAction(RelationalPredicate action,
-			BlocksState worldState) {
-		if (action == null)
-			return worldState;
-
-		Integer[] newState = new Integer[worldState.length];
-
-		// Finding the block objects
-		int[] indices = new int[2];
-
-		// Convert the blocks to indices
-		Integer[] stateArray = worldState.getState();
-		for (int i = 0; i < indices.length; i++) {
-			if (action.getArguments()[i].equals("floor")) {
-				indices[i] = -1;
-				// Cannot move the floor
-				if (i == 0)
-					return worldState;
-			} else
-				indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
-			// In order to do either action, both blocks must be free
-			for (int j = 0; j < stateArray.length; j++) {
-				newState[j] = stateArray[j];
-				// If something is on that index/block (except the floor),
-				// return the unchanged state
-				if (indices[i] != -1 && stateArray[j] == indices[i] + 1)
-					return worldState;
-			}
-		}
-
-		// Perform the action
-		newState[indices[0]] = indices[1] + 1;
-
-		return new BlocksState(newState);
 	}
 
 	/**
@@ -314,136 +267,11 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 
 		// Check this isn't the goal state
 		BlocksState blocksState = new BlocksState(worldState);
-		boolean validWorld = formState(blocksState);
-		if (!validWorld)
+		Rete rete = wrapper_.formObservations(blocksState, goalArgs_);
+		if (rete == null)
 			return initialiseWorld(numBlocks);
 
 		return blocksState;
-	}
-
-	/**
-	 * Forms the knowledge base of the state using the int array approximation.
-	 * 
-	 * @param blocksState
-	 *            The state of the world in int form.
-	 * @return True if the state is not the goal.
-	 */
-	private boolean formState(BlocksState blocksState) {
-		try {
-			// Clear the old state
-			rete_.reset();
-
-			if (!assertFacts(blocksState, rete_))
-				return false;
-			rete_.run();
-
-			// Adding the valid actions
-			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete_);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return true;
-	}
-
-	/**
-	 * Assert the fact to the rete object.
-	 * 
-	 * @param blocksState
-	 *            The blocks state to use for creating assertions.
-	 * @param rete
-	 *            The rete object.
-	 * @return True if the state is able to be validly formed.
-	 * @throws Exception If something goes awry...
-	 */
-	protected boolean assertFacts(BlocksState blocksState, Rete rete)
-			throws Exception {
-		// Assert the floor
-		rete.assertString("(floor floor)");
-
-		Integer[] intState = blocksState.getState();
-
-		// Scanning through, making predicates (On, OnFloor, and Highest)
-		int[] heightMap = new int[blocksState.length];
-		int maxHeight = 0;
-		List<Integer> highestBlocks = new ArrayList<Integer>();
-		List<Integer> allBlocks = new ArrayList<Integer>();
-		for (int i = 0; i < blocksState.length; i++) {
-			// On the floor
-			if (intState[i] == 0) {
-				rete.assertString("(on " + (char) ('a' + i) + " floor)");
-			} else {
-				// On another block
-				rete.assertString("(on " + (char) ('a' + i) + " "
-						+ (char) ('a' + intState[i] - 1) + ")");
-			}
-			allBlocks.add(i);
-
-			// Finding the heights
-			int blockHeight = heightMap[i];
-			if (blockHeight == 0) {
-				blockHeight = recurseHeight(i, heightMap, intState);
-			}
-			if (blockHeight > maxHeight) {
-				maxHeight = blockHeight;
-				highestBlocks.clear();
-			}
-			if (blockHeight == maxHeight) {
-				highestBlocks.add(i);
-			}
-
-			// Assert the blocks
-			rete.assertString("(block " + (char) ('a' + i) + ")");
-		}
-
-		// Add the highest block/s
-		for (Integer block : highestBlocks) {
-			rete.assertString("(highest " + (char) ('a' + block) + ")");
-		}
-
-		// Asserting the highest goal
-		if (goalArgs_ == null) {
-			if (StateSpec.getInstance().getGoalName().equals("highestA")) {
-				goalArgs_ = new ArrayList<String>(1);
-				allBlocks.removeAll(highestBlocks);
-				if (allBlocks.isEmpty())
-					return false;
-				goalArgs_
-						.add((char) ('a' + allBlocks
-								.get(PolicyGenerator.random_.nextInt(allBlocks
-										.size())))
-								+ "");
-			} else
-				goalArgs_ = new ArrayList<String>();
-		}
-
-		// Add the goal
-		StateSpec.getInstance().assertGoalPred(goalArgs_, rete);
-		return true;
-	}
-
-	/**
-	 * Finds the height of a block recursively by following a path. Stores the
-	 * values.
-	 * 
-	 * @param start
-	 *            The starting index to check.
-	 * @param heightMap
-	 *            The stored heightMap.
-	 * @param worldState
-	 *            The state of the world in block links.
-	 * @return The maximum height of the block stack.
-	 */
-	private int recurseHeight(int start, int[] heightMap, Integer[] worldState) {
-		if (worldState[start] == 0) {
-			heightMap[start] = 1;
-			return 1;
-		}
-
-		int below = worldState[start] - 1;
-		recurseHeight(below, heightMap, worldState);
-		heightMap[start] = heightMap[below] + 1;
-		return heightMap[start];
 	}
 
 	/**
@@ -488,127 +316,9 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		// Return the state to normal
 		state_ = initialState;
 		actionSuccess_ = oldActionSuccess;
-		formState(state_);
+		// formState(state_);
 		optimalMap_.put(state_, steps_);
 		optimal_ = false;
 		return steps_;
-	}
-
-	/**
-	 * A wrapper class for blocks world states
-	 * 
-	 * @author Samuel J. Sarjant
-	 */
-	public class BlocksState {
-		private Integer[] intState_;
-		public int length;
-
-		public BlocksState(Integer[] state) {
-			intState_ = state;
-			length = state.length;
-		}
-
-		public Integer[] getState() {
-			return intState_;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if ((obj != null) && (obj instanceof BlocksState)) {
-				BlocksState other = (BlocksState) obj;
-				if (Arrays.equals(intState_, other.intState_))
-					return true;
-			}
-			return false;
-		}
-
-		@Override
-		public int hashCode() {
-			int sum = 0;
-			for (int i = 0; i < intState_.length; i++) {
-				sum += intState_[i] * 6451;
-			}
-			return sum;
-		}
-
-		@Override
-		public BlocksState clone() {
-			Integer[] cloneState = new Integer[intState_.length];
-			for (int i = 0; i < intState_.length; i++) {
-				cloneState[i] = intState_[i];
-			}
-			return new BlocksState(cloneState);
-		}
-
-		@Override
-		public String toString() {
-			// The last column of the blocksChars denotes if there is a block in
-			// the row.
-			char[][] blocksChars = new char[numBlocks_ + 1][numBlocks_];
-			Map<Integer, Point> posMap = new HashMap<Integer, Point>();
-			int column = 0;
-			int i = 0;
-			while (posMap.size() < numBlocks_) {
-				column = recursiveBuild(i, intState_, column, posMap,
-						blocksChars);
-				i++;
-			}
-
-			// Print the char map
-			StringBuffer buffer = new StringBuffer();
-			for (int y = numBlocks_ - 1; y >= 0; y--) {
-				if (blocksChars[numBlocks_][y] == '+') {
-					buffer.append("\t\t");
-					for (int x = 0; x < column; x++) {
-						if (blocksChars[x][y] == 0)
-							buffer.append("   ");
-						else
-							buffer.append("[" + blocksChars[x][y] + "]");
-					}
-
-					if (y != 0)
-						buffer.append("\n");
-				}
-			}
-			return buffer.toString();
-		}
-
-		/**
-		 * Builds the blocks state recursively.
-		 * 
-		 * @param currBlock
-		 *            The current block index.
-		 * @param blocks
-		 *            The locations of the blocks, in block index form.
-		 * @param column
-		 *            The first empty column
-		 * @param posMap
-		 *            The position mapping for each block.
-		 * @param blocksChars
-		 *            The output character map, with an extra column for
-		 *            denoting if a row has any blocks in it.
-		 * @return The new value of column (same or + 1).
-		 */
-		protected int recursiveBuild(int currBlock, Integer[] blocks,
-				int column, Map<Integer, Point> posMap, char[][] blocksChars) {
-			if (!posMap.containsKey(currBlock)) {
-				if (blocks[currBlock] == 0) {
-					posMap.put(currBlock, new Point(column, 0));
-					blocksChars[column][0] = (char) ('a' + currBlock);
-					blocksChars[blocks.length][0] = '+';
-					column++;
-				} else {
-					int underBlock = blocks[currBlock] - 1;
-					column = recursiveBuild(underBlock, blocks, column, posMap,
-							blocksChars);
-					Point pos = new Point(posMap.get(underBlock));
-					pos.y++;
-					posMap.put(currBlock, pos);
-					blocksChars[pos.x][pos.y] = (char) ('a' + currBlock);
-					blocksChars[blocks.length][pos.y] = '+';
-				}
-			}
-			return column;
-		}
 	}
 }

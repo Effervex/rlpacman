@@ -4,7 +4,6 @@ import game.core.Game;
 import game.core.Game.DM;
 import game.core._G_;
 import relationalFramework.FiredAction;
-import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalWrapper;
@@ -83,8 +82,8 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
 					true, DM.PATH) + 1, index);
 		} else if (action.getFactName().equals("moveFrom")) {
-//			result = new Pair<Integer, Integer>(-game.getNextPacManDir(index,
-//					true, DM.PATH) - 1, index);
+			// result = new Pair<Integer, Integer>(-game.getNextPacManDir(index,
+			// true, DM.PATH) - 1, index);
 			result = new Pair<Integer, Integer>(game.getNextPacManDir(index,
 					false, DM.PATH) + 1, index);
 		}
@@ -116,152 +115,135 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 	}
 
 	@Override
-	public Rete formObservations(Object... args) {
-		Rete rete = StateSpec.getInstance().getRete();
-		try {
-			rete.reset();
-			Game game = (Game) args[0];
+	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
+		Game game = (Game) args[0];
 
-			int pacPos = game.getCurPacManLoc();
+		int pacPos = game.getCurPacManLoc();
 
-			// Calculate closest junctions
-			int[] closestJuncs = new int[4];
-			Arrays.fill(closestJuncs, -1);
-			int[] juncDists = new int[4];
-			Arrays.fill(juncDists, Integer.MAX_VALUE);
-			for (int junc : game.getJunctionIndices()) {
-				// If Pac-Man is already at this junction, disregard it
-				if (pacPos != junc) {
-					// Find the direction and distance to a junction
-					int dir = game.getNextPacManDir(junc, true, DM.PATH);
-					int dist = game.getPathDistance(pacPos, junc);
-					// Find closest junction
-					if (dist < juncDists[dir]) {
-						juncDists[dir] = dist;
-						closestJuncs[dir] = junc;
-					}
+		// Calculate closest junctions
+		int[] closestJuncs = new int[4];
+		Arrays.fill(closestJuncs, -1);
+		int[] juncDists = new int[4];
+		Arrays.fill(juncDists, Integer.MAX_VALUE);
+		for (int junc : game.getJunctionIndices()) {
+			// If Pac-Man is already at this junction, disregard it
+			if (pacPos != junc) {
+				// Find the direction and distance to a junction
+				int dir = game.getNextPacManDir(junc, true, DM.PATH);
+				int dist = game.getPathDistance(pacPos, junc);
+				// Find closest junction
+				if (dist < juncDists[dir]) {
+					juncDists[dir] = dist;
+					closestJuncs[dir] = junc;
 				}
 			}
-
-			// Ghosts
-			int[] juncSafety = new int[4];
-			Arrays.fill(juncSafety, Integer.MAX_VALUE);
-			// int numActiveGhosts = 0;
-			// double centreX = 0;
-			// double centreY = 0;
-			for (int g = 0; g < Game.NUM_GHOSTS; g++) {
-				int ghostPos = game.getCurGhostLoc(g);
-				if (game.getLairTime(g) == 0) {
-					String ghost = ghostNames[g];
-					rete.assertString("(ghost " + ghost + ")");
-
-					int pacGhostDist = game.getPathDistance(pacPos, ghostPos);
-					distanceAssertion(ghost, pacGhostDist, rete);
-
-					// If edible, add assertion
-					if (game.isEdible(g)) {
-						rete.assertString("(edible " + ghost + ")");
-
-						// If flashing, add assertion
-						if (game.getEdibleTime(g) <= _G_.EDIBLE_ALERT) {
-							rete.assertString("(blinking " + ghost + ")");
-						}
-					} else {
-						// Calculating junction safety
-						for (int j = 0; j < closestJuncs.length; j++) {
-							if (closestJuncs[j] != -1) {
-								int ghostDistance = game.getGhostPathDistance(
-										g, closestJuncs[j]);
-								int thisGhostDist = ghostDistance
-										- juncDists[j];
-								// Special case for when a ghost is between
-								// PacMan and the junction
-								int ghostJuncDist = game.getPathDistance(
-										ghostPos, closestJuncs[j]);
-								if (pacGhostDist <= ghostJuncDist
-										&& game.getNextPacManDir(ghostPos,
-												true, DM.PATH) == game
-												.getNextPacManDir(
-														closestJuncs[j], true,
-														DM.PATH))
-									thisGhostDist = ghostJuncDist
-											- juncDists[j];
-
-								juncSafety[j] = Math.min(juncSafety[j],
-										thisGhostDist / 4);
-							}
-						}
-					}
-				}
-			}
-
-			// Asserting junctions
-			for (int j = 0; j < closestJuncs.length; j++) {
-				if (closestJuncs[j] != -1) {
-					String junc = "junc_" + closestJuncs[j];
-					rete.assertString("(junction " + junc + ")");
-					if (juncSafety[j] == Integer.MAX_VALUE)
-						juncSafety[j] = 1;
-					rete.assertString("(junctionSafety " + junc + " "
-							+ juncSafety[j] + ")");
-				}
-			}
-
-			// Asserting ghost centre
-			// if (numActiveGhosts > 0) {
-			// centreX /= numActiveGhosts;
-			// centreY /= numActiveGhosts;
-			// double dist = Point2D.distance(game.getX(pacPos),
-			// game.getY(pacPos), centreX, centreY);
-			// String gc = "ghostCentre_"
-			// + (int) (Math.round(centreY) + Math
-			// .round(centreX));
-			// rete_.assertString("(ghostCentre " + gc + ")");
-			// distanceAssertion(gc, (int) Math.round(dist));
-			// }
-
-			// Dots
-			int[] dots = game.getPillIndices();
-			for (int i = 0; i < dots.length; i++) {
-				if (game.checkPill(i)) {
-					String dotName = "dot_" + dots[i];
-					rete.assertString("(dot " + dotName + ")");
-
-					// Distances
-					int dist = game.getPathDistance(pacPos, dots[i]);
-					distanceAssertion(dotName, dist, rete);
-				}
-			}
-
-			// PowerDots
-			int[] powerDots = game.getPowerPillIndices();
-			for (int i = 0; i < powerDots.length; i++) {
-				if (game.checkPowerPill(i)) {
-					String pDotName = "powerDot_" + powerDots[i];
-					rete.assertString("(powerDot " + pDotName + ")");
-
-					// Distances
-					distanceAssertion(pDotName,
-							game.getPathDistance(pacPos, powerDots[i]), rete);
-				}
-			}
-
-			// Score, level, lives, highscore...
-			rete.assertString("(level " + game.getCurLevel() + ")");
-			rete.assertString("(lives " + game.getLivesRemaining() + ")");
-			rete.assertString("(score " + game.getScore() + ")");
-
-			StateSpec.getInstance().assertGoalPred(new ArrayList<String>(),
-					rete);
-			rete.run();
-			// rete_.eval("(facts)");
-
-			// Adding the valid actions
-			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete);
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
+
+		// Ghosts
+		int[] juncSafety = new int[4];
+		Arrays.fill(juncSafety, Integer.MAX_VALUE);
+		// int numActiveGhosts = 0;
+		// double centreX = 0;
+		// double centreY = 0;
+		for (int g = 0; g < Game.NUM_GHOSTS; g++) {
+			int ghostPos = game.getCurGhostLoc(g);
+			if (game.getLairTime(g) == 0) {
+				String ghost = ghostNames[g];
+				rete.assertString("(ghost " + ghost + ")");
+
+				int pacGhostDist = game.getPathDistance(pacPos, ghostPos);
+				distanceAssertion(ghost, pacGhostDist, rete);
+
+				// If edible, add assertion
+				if (game.isEdible(g)) {
+					rete.assertString("(edible " + ghost + ")");
+
+					// If flashing, add assertion
+					if (game.getEdibleTime(g) <= _G_.EDIBLE_ALERT) {
+						rete.assertString("(blinking " + ghost + ")");
+					}
+				} else {
+					// Calculating junction safety
+					for (int j = 0; j < closestJuncs.length; j++) {
+						if (closestJuncs[j] != -1) {
+							int ghostDistance = game.getGhostPathDistance(g,
+									closestJuncs[j]);
+							int thisGhostDist = ghostDistance - juncDists[j];
+							// Special case for when a ghost is between
+							// PacMan and the junction
+							int ghostJuncDist = game.getPathDistance(ghostPos,
+									closestJuncs[j]);
+							if (pacGhostDist <= ghostJuncDist
+									&& game.getNextPacManDir(ghostPos, true,
+											DM.PATH) == game.getNextPacManDir(
+											closestJuncs[j], true, DM.PATH))
+								thisGhostDist = ghostJuncDist - juncDists[j];
+
+							juncSafety[j] = Math.min(juncSafety[j],
+									thisGhostDist / 4);
+						}
+					}
+				}
+			}
+		}
+
+		// Asserting junctions
+		for (int j = 0; j < closestJuncs.length; j++) {
+			if (closestJuncs[j] != -1) {
+				String junc = "junc_" + closestJuncs[j];
+				rete.assertString("(junction " + junc + ")");
+				if (juncSafety[j] == Integer.MAX_VALUE)
+					juncSafety[j] = 1;
+				rete.assertString("(junctionSafety " + junc + " "
+						+ juncSafety[j] + ")");
+			}
+		}
+
+		// Asserting ghost centre
+		// if (numActiveGhosts > 0) {
+		// centreX /= numActiveGhosts;
+		// centreY /= numActiveGhosts;
+		// double dist = Point2D.distance(game.getX(pacPos),
+		// game.getY(pacPos), centreX, centreY);
+		// String gc = "ghostCentre_"
+		// + (int) (Math.round(centreY) + Math
+		// .round(centreX));
+		// rete_.assertString("(ghostCentre " + gc + ")");
+		// distanceAssertion(gc, (int) Math.round(dist));
+		// }
+
+		// Dots
+		int[] dots = game.getPillIndices();
+		for (int i = 0; i < dots.length; i++) {
+			if (game.checkPill(i)) {
+				String dotName = "dot_" + dots[i];
+				rete.assertString("(dot " + dotName + ")");
+
+				// Distances
+				int dist = game.getPathDistance(pacPos, dots[i]);
+				distanceAssertion(dotName, dist, rete);
+			}
+		}
+
+		// PowerDots
+		int[] powerDots = game.getPowerPillIndices();
+		for (int i = 0; i < powerDots.length; i++) {
+			if (game.checkPowerPill(i)) {
+				String pDotName = "powerDot_" + powerDots[i];
+				rete.assertString("(powerDot " + pDotName + ")");
+
+				// Distances
+				distanceAssertion(pDotName,
+						game.getPathDistance(pacPos, powerDots[i]), rete);
+			}
+		}
+
+		// Score, level, lives, highscore...
+		rete.assertString("(level " + game.getCurLevel() + ")");
+		rete.assertString("(lives " + game.getLivesRemaining() + ")");
+		rete.assertString("(score " + game.getScore() + ")");
+
+		StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
 
 		return rete;
 	}
@@ -333,9 +315,7 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 
 	@Override
 	public int isTerminal(Object... args) {
-		if (((Game) args[0]).gameOver()
-				|| StateSpec.getInstance().isGoal(
-						StateSpec.getInstance().getRete()))
+		if (((Game) args[0]).gameOver() || super.isTerminal(args) == 1)
 			return 1;
 		return 0;
 	}

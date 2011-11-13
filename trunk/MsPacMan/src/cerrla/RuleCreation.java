@@ -310,6 +310,8 @@ public class RuleCreation implements Serializable {
 	 * @param condition
 	 *            The optional condition to be added to the rule conditions.
 	 *            Useful for quickly checking duplicates/negations.
+	 * @param ruleAction
+	 *            The optional action for the rule being simplified.
 	 * @param exitIfIllegalRule
 	 *            If the conditions need to be tested for illegal combinations
 	 *            as well (use background knowledge in conjugated form)
@@ -318,9 +320,13 @@ public class RuleCreation implements Serializable {
 	 */
 	public SortedSet<RelationalPredicate> simplifyRule(
 			SortedSet<RelationalPredicate> ruleConds,
-			RelationalPredicate condition, boolean exitIfIllegalRule) {
+			RelationalPredicate condition, RelationalPredicate ruleAction,
+			boolean exitIfIllegalRule) {
 		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(
 				ruleConds);
+		if (ruleAction != null)
+			simplified.addAll(AgentObservations.getInstance()
+					.getRLGGConditions(ruleAction));
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
@@ -393,7 +399,7 @@ public class RuleCreation implements Serializable {
 
 			// Check for the regular condition
 			SortedSet<RelationalPredicate> specConditions = simplifyRule(
-					conditions, condition, true);
+					conditions, condition, action, true);
 			if (specConditions != null) {
 				RelationalRule specialisation = new RelationalRule(
 						specConditions, action, rule);
@@ -447,9 +453,12 @@ public class RuleCreation implements Serializable {
 				// For every action term
 				for (int i = 0; i < oldTerms.length; i++) {
 					// If the term is already a goal term, can't swap
-					if (!oldTerms[i].startsWith(StateSpec.GOAL_VARIABLE_PREFIX))
-						swapRuleTerm(rule, mutants, goalPredicates, oldTerms,
-								i, goalTerm);
+					if (!oldTerms[i].startsWith(StateSpec.GOAL_VARIABLE_PREFIX)) {
+						RelationalRule swappedRule = swapRuleTerm(rule,
+								goalPredicates, oldTerms, i, goalTerm);
+						if (swappedRule != null)
+							mutants.add(swappedRule);
+					}
 				}
 		}
 
@@ -465,8 +474,6 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param rule
 	 *            The rule.
-	 * @param mutants
-	 *            The mutants to add to.
 	 * @param goalPredicates
 	 *            The goal predicate replacement map.
 	 * @param oldTerms
@@ -475,8 +482,9 @@ public class RuleCreation implements Serializable {
 	 *            The action term index.
 	 * @param goalTerm
 	 *            The goal term to replace in.
+	 * @return The swapped rule term (if valid).
 	 */
-	private void swapRuleTerm(RelationalRule rule, Set<RelationalRule> mutants,
+	private RelationalRule swapRuleTerm(RelationalRule rule,
 			MultiMap<String, RelationalPredicate> goalPredicates,
 			String[] oldTerms, int i, String goalTerm) {
 		String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
@@ -519,8 +527,9 @@ public class RuleCreation implements Serializable {
 					new RelationalPredicate(rule.getAction(), newTerms), rule);
 			mutant.setQueryParams(rule.getQueryParameters());
 			mutant.expandConditions();
-			mutants.add(mutant);
+			return mutant;
 		}
+		return null;
 	}
 
 	/**
