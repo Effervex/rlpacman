@@ -23,77 +23,8 @@ public class PacManGeneralRuleCreationTest {
 		sut_ = new RuleCreation();
 
 		// Set up the allowable conditions
-		assertTrue("No loaded agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations("blah"));
+		AgentObservations.loadAgentObservations("blah");
 	}
-
-	// @Test
-	// public void testSpecialiseToPreGoal() {
-	// // Test typed and constant specialising
-	// List<StringFact> pregoal = new ArrayList<StringFact>();
-	// pregoal.add(StateSpec.toStringFact("(ghost blinky)"));
-	// pregoal.add(StateSpec.toStringFact("(thing blinky)"));
-	// pregoal.add(StateSpec.toStringFact("(edible blinky)"));
-	// pregoal.add(StateSpec.toStringFact("(distance blinky 2)"));
-	// AgentObservations.getInstance()
-	// .setPreGoal(
-	// "moveTo",
-	// new PreGoalInformation(pregoal, new String[] {
-	// "blinky", "2" }));
-	//
-	// GuidedRule rule = new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(dot ?X) => (moveTo ?X ?__Num3)");
-	// Set<GuidedRule> results = sut_.specialiseToPreGoal(rule);
-	//
-	// // The 4 mutants (including the point).
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 18.0)) "
-	// + "(dot ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 18.0 36.0)) "
-	// + "(dot ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 9.0 27.0)) "
-	// + "(dot ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule("(distance ?X 2.0) "
-	// + "(dot ?X) => (moveTo ?X 2.0)", rule)));
-	// assertFalse(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(edible ?X) (dot ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertFalse(results.contains(new GuidedRule(
-	// "(distance blinky ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(dot blinky) => (moveTo blinky ?__Num3)", rule)));
-	// assertEquals(results.size(), 4);
-	//
-	// // Valid specialisations
-	// rule = new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(ghost ?X) => (moveTo ?X ?__Num3)");
-	// results = sut_.specialiseToPreGoal(rule);
-	//
-	// // The 5 mutants (adding edible condition)
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 18.0)) "
-	// + "(ghost ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 18.0 36.0)) "
-	// + "(ghost ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 9.0 27.0)) "
-	// + "(ghost ?X) => (moveTo ?X ?__Num3)", rule)));
-	// assertTrue(results.contains(new GuidedRule("(distance ?X 2.0) "
-	// + "(ghost ?X) => (moveTo ?X 2.0)", rule)));
-	// assertTrue(results
-	// .contains(new GuidedRule(
-	// "(distance ?X ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(edible ?X) (ghost ?X) => (moveTo ?X ?__Num3)",
-	// rule)));
-	// assertTrue(results.contains(new GuidedRule(
-	// "(distance blinky ?__Num3&:(betweenRange ?__Num3 0.0 36.0)) "
-	// + "(ghost blinky) => (moveTo blinky ?__Num3)", rule)));
-	// assertEquals(results.size(), 6);
-	// }
 
 	@Test
 	public void testSpecialiseRule() {

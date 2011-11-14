@@ -365,7 +365,6 @@ public final class PolicyGenerator implements Serializable {
 				ruleSlot.addNewRule(rr);
 				currentRules_.add(rr);
 				
-				// TODO Code for inserting module rules ONCE
 				if (ProgramArgument.SEED_MODULE_RULES.booleanValue()) {
 					GoalCondition ruleConstants = rr.getConstantCondition();
 					if (ruleConstants != null) {

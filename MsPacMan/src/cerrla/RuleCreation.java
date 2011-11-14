@@ -324,9 +324,15 @@ public class RuleCreation implements Serializable {
 			boolean exitIfIllegalRule) {
 		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(
 				ruleConds);
-		if (ruleAction != null)
-			simplified.addAll(AgentObservations.getInstance()
-					.getRLGGConditions(ruleAction));
+		// Add the RLGG conditions to assist in simplification (don't add
+		// numerical predicates)
+		if (ruleAction != null) {
+			for (RelationalPredicate rlggPred : AgentObservations.getInstance()
+					.getRLGGConditions(ruleAction)) {
+				if (!rlggPred.isNumerical())
+					simplified.add(rlggPred);
+			}
+		}
 
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {

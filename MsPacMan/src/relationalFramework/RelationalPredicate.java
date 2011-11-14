@@ -10,8 +10,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-
-import cerrla.Unification;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A class containing the definitions/instantiations of a relational predicate,
@@ -28,6 +28,8 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	private static final char MODULO_LETTERS = 26;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
+	/** The prefix for range variables. */
+	public static final String RANGE_VARIABLE_PREFIX = "__Num";
 	private final int CONST = 0;
 	private final int VAR = 1;
 	private final int ANON = 2;
@@ -358,6 +360,19 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return true;
 	}
 
+	/**
+	 * If the predicate contains numerical args.
+	 * 
+	 * @return True if the predicate contains numerical args
+	 */
+	public boolean isNumerical() {
+		for (String type : factTypes_) {
+			if (StateSpec.isNumberType(type))
+				return true;
+		}
+		return false;
+	}
+
 	@Override
 	public String toString() {
 		StringBuffer buffer = new StringBuffer();
@@ -373,7 +388,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	/**
-	 * Formats the string as a nice string (includes goal args).
+	 * Formats the predicate as a nice string (includes goal args).
 	 * 
 	 * @return The StringFact as a nice string (including goal args).
 	 */
@@ -387,7 +402,16 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			if (replacements != null && replacements.containsKey(arg))
 				arg = replacements.get(arg);
 
-			buffer.append(" " + arg);
+			// Reformat numerical ranges to look better
+			if (StateSpec.isNumberType(factTypes_[i])) {
+				String[] nums = extractNumericalRange(arg);
+				if (nums.length > 1)
+					buffer.append(" (" + nums[1] + " <= " + nums[0] + " <= "
+							+ nums[2] + ")");
+				else
+					buffer.append(" " + nums[0]);
+			} else
+				buffer.append(" " + arg);
 		}
 		buffer.append(")");
 		if (negated_)
@@ -501,7 +525,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			return -1;
 
 		// Don't swap number variables
-		if (variable.contains(Unification.RANGE_VARIABLE_PREFIX))
+		if (variable.contains(RANGE_VARIABLE_PREFIX))
 			return -1;
 
 		if (variable.contains(StateSpec.GOAL_VARIABLE_PREFIX))
@@ -524,5 +548,27 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
 				% MODULO_LETTERS);
 		return "?" + variable;
+	}
+
+	/**
+	 * Extracts a numerical range from a numerical arg.
+	 * 
+	 * @param numericalArg
+	 *            The numerical argument.
+	 * @return An array of either variable and min and max, or a single number.
+	 */
+	public static String[] extractNumericalRange(String numericalArg) {
+		Pattern rangePattern = Pattern.compile("(\\?"
+				+ Pattern.quote(RANGE_VARIABLE_PREFIX) + "[\\d]+)&:\\("
+				+ StateSpec.BETWEEN_RANGE + " \\1 ([-\\dE.]+) ([-\\dE.]+)\\)");
+		Matcher m = rangePattern.matcher(numericalArg);
+
+		if (m.find()) {
+			String[] range = { m.group(1), m.group(2), m.group(3) };
+			return range;
+		}
+
+		String[] number = { numericalArg };
+		return number;
 	}
 }
