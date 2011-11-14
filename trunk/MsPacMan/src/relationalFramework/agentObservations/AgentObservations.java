@@ -1088,6 +1088,11 @@ public final class AgentObservations implements Serializable {
 			specialisationConditions_ = new HashSet<RelationalPredicate>(
 					conditions);
 		}
+
+		@Override
+		public String toString() {
+			return action_.getFactName();
+		}
 	}
 
 	/**
@@ -1196,74 +1201,82 @@ public final class AgentObservations implements Serializable {
 				Map<String, String> goalReplacements) {
 			boolean changed = false;
 			for (RelationalPredicate baseFact : stateFacts) {
-				// Getting the ConditionBeliefs object
-				ConditionBeliefs cb = conditionBeliefs_.get(baseFact
-						.getFactName());
-				if (cb == null) {
-					cb = new ConditionBeliefs(baseFact.getFactName());
-					conditionBeliefs_.put(baseFact.getFactName(), cb);
-					observationHash_ = null;
-				}
+				if (!baseFact.isNumerical()) {
+					// Getting the ConditionBeliefs object
+					ConditionBeliefs cb = conditionBeliefs_.get(baseFact
+							.getFactName());
+					if (cb == null) {
+						cb = new ConditionBeliefs(baseFact.getFactName());
+						conditionBeliefs_.put(baseFact.getFactName(), cb);
+						observationHash_ = null;
+					}
 
-				// Create a replacement map here (excluding numerical values)
-				Map<String, String> replacementMap = baseFact
-						.createVariableTermReplacementMap(true, false);
+					// Create a replacement map here (excluding numerical
+					// values)
+					Map<String, String> replacementMap = baseFact
+							.createVariableTermReplacementMap(true, false);
 
-				// Replace facts for all relevant facts and store as condition
-				// beliefs.
-				Collection<RelationalPredicate> relativeFacts = new HashSet<RelationalPredicate>();
-				for (String term : baseFact.getArguments()) {
-					Collection<RelationalPredicate> termFacts = termMappedFacts_
-							.get(term);
-					if (termFacts != null) {
-						for (RelationalPredicate termFact : termFacts) {
-							RelationalPredicate relativeFact = new RelationalPredicate(
-									termFact);
-							relativeFact.replaceArguments(replacementMap,
-									false, false);
-							relativeFacts.add(relativeFact);
+					// Replace facts for all relevant facts and store as
+					// condition
+					// beliefs.
+					Collection<RelationalPredicate> relativeFacts = new HashSet<RelationalPredicate>();
+					for (String term : baseFact.getArguments()) {
+						Collection<RelationalPredicate> termFacts = termMappedFacts_
+								.get(term);
+						if (termFacts != null) {
+							for (RelationalPredicate termFact : termFacts) {
+								if (!termFact.isNumerical()) {
+									RelationalPredicate relativeFact = new RelationalPredicate(
+											termFact);
+									relativeFact.replaceArguments(
+											replacementMap, false, false);
+									relativeFacts.add(relativeFact);
+								}
+							}
+						}
+
+						// Note any goal terms
+						if (goalReplacements != null
+								&& goalReplacements.containsKey(term)) {
+							// Probably need to replace the term here for a
+							// parameterisable goal term
+							RelationalPredicate goalFact = new RelationalPredicate(
+									baseFact);
+							goalFact.replaceArguments(goalReplacements, false,
+									false);
+							changed |= localAgentObservations_.addGoalFact(
+									goalReplacements.get(term), goalFact);
+							// Negated fact too
+							RelationalPredicate negFact = new RelationalPredicate(
+									goalFact);
+							negFact.swapNegated();
+							changed |= localAgentObservations_.addGoalFact(
+									goalReplacements.get(term), negFact);
 						}
 					}
 
-					// Note any goal terms
-					if (goalReplacements != null
-							&& goalReplacements.containsKey(term)) {
-						// Probably need to replace the term here for a
-						// parameterisable goal term
-						RelationalPredicate goalFact = new RelationalPredicate(
-								baseFact);
-						goalFact.replaceArguments(goalReplacements, false,
-								false);
-						changed |= localAgentObservations_.addGoalFact(
-								goalReplacements.get(term), goalFact);
-						// Negated fact too
-						RelationalPredicate negFact = new RelationalPredicate(
-								goalFact);
-						negFact.swapNegated();
-						changed |= localAgentObservations_.addGoalFact(
-								goalReplacements.get(term), negFact);
+					// TODO Can use these rules to note the condition ranges
+					// So when condX is true, condY is always in range 0-50
+					// Works for self conditions too, when cond X is true, condX
+					// is in range min-max
+
+					// Note the relative facts for the main pred and for every
+					// negated pred not present
+					Collection<RelationalPredicate> notRelativeFacts = new HashSet<RelationalPredicate>();
+					if (cb.noteTrueRelativeFacts(relativeFacts,
+							notRelativeFacts, true)) {
+						changed = true;
+						observationHash_ = null;
 					}
+
+					// Form the condition beliefs for the not relative facts,
+					// using
+					// the relative facts as always true values (only for
+					// non-types
+					// predicates)
+					changed |= recordUntrueConditionAssociations(relativeFacts,
+							notRelativeFacts);
 				}
-
-				// TODO Can use these rules to note the condition ranges
-				// So when condX is true, condY is always in range 0-50
-				// Works for self conditions too, when cond X is true, condX is
-				// in range min-max
-
-				// Note the relative facts for the main pred and for every
-				// negated pred not present
-				Collection<RelationalPredicate> notRelativeFacts = new HashSet<RelationalPredicate>();
-				if (cb.noteTrueRelativeFacts(relativeFacts, notRelativeFacts,
-						true)) {
-					changed = true;
-					observationHash_ = null;
-				}
-
-				// Form the condition beliefs for the not relative facts, using
-				// the relative facts as always true values (only for non-types
-				// predicates)
-				changed |= recordUntrueConditionAssociations(relativeFacts,
-						notRelativeFacts);
 			}
 
 			if (changed) {

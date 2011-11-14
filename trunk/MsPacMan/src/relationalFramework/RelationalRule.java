@@ -804,9 +804,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				if (!standardType.contains(stringFact))
 					niceString.append(stringFact
 							.toNiceString(termReplacements_) + " ");
-			} else if (stringFact.getFactName().equals(StateSpec.GOALARGS_PRED)) {
-				// Add the goal arg pred.
-				// niceString.append(stringFact + " ");
 			} else if (!stringFact.getFactName().equals("test")) {
 				// If not a type or test, add the fact.
 				niceString.append(stringFact.toNiceString(termReplacements_)

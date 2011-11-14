@@ -5,17 +5,11 @@ import relationalFramework.StateSpec;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-
 public class Unification {
-	/** The prefix for range variables. */
-	public static final String RANGE_VARIABLE_PREFIX = "__Num";
-
 	/** The cost of a fact not unifying. */
 	private static final int NO_FACT_UNIFY = 1000;
 
@@ -493,17 +487,12 @@ public class Unification {
 		else
 			return false;
 
-		// The factValue may be a range
-		Pattern rangePattern = Pattern.compile("(\\?"
-				+ Pattern.quote(RANGE_VARIABLE_PREFIX) + "[\\d]+)&:\\("
-				+ StateSpec.BETWEEN_RANGE + " \\1 ([-\\dE.]+) ([-\\dE.]+)\\)");
-		Matcher m = rangePattern.matcher(factValue);
+		String[] numberArgs = RelationalPredicate.extractNumericalRange(factValue);
 
-		if (m.find()) {
+		if (numberArgs.length > 1) {
 			// We have a pre-existing range
-			String variableName = m.group(1);
-			double min = Double.parseDouble(m.group(2));
-			double max = Double.parseDouble(m.group(3));
+			double min = Double.parseDouble(numberArgs[1]);
+			double max = Double.parseDouble(numberArgs[2]);
 
 			// Possibly expand the range if need be
 			boolean redefine = false;
@@ -517,8 +506,8 @@ public class Unification {
 
 			// If the min or max has changed, redefine the range
 			if (redefine) {
-				unification[index] = variableName + "&:("
-						+ StateSpec.BETWEEN_RANGE + " " + variableName + " "
+				unification[index] = numberArgs[0] + "&:("
+						+ StateSpec.BETWEEN_RANGE + " " + numberArgs[0] + " "
 						+ min + " " + max + ")";
 			} else {
 				unification[index] = factValue;
@@ -536,7 +525,7 @@ public class Unification {
 			// Find the min, max, then form the range
 			double min = Math.min(factDouble, unityDouble);
 			double max = Math.max(factDouble, unityDouble);
-			String rangeVariable = "?" + RANGE_VARIABLE_PREFIX + rangeIndex_++;
+			String rangeVariable = "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + rangeIndex_++;
 			unification[index] = rangeVariable + "&:("
 					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " " + min
 					+ " " + max + ")";

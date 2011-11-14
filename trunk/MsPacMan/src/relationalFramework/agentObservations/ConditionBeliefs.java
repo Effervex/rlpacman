@@ -955,18 +955,20 @@ public class ConditionBeliefs implements Serializable {
 					.keySet());
 			predicates.addAll(StateSpec.getInstance().getPredicates().keySet());
 			for (String pred : predicates) {
-				// Run by the possible combinations within the predicates.
-				for (RelationalPredicate fact : createPossibleFacts(pred,
-						possibleTerms)) {
-					if (!alwaysTrue_.contains(fact)
-							&& !occasionallyTrue_.contains(fact))
-						neverTrue_.add(fact);
-				}
+				if (!StateSpec.getInstance().getStringFact(pred).isNumerical()) {
+					// Run by the possible combinations within the predicates.
+					for (RelationalPredicate fact : createPossibleFacts(pred,
+							possibleTerms)) {
+						if (!alwaysTrue_.contains(fact)
+								&& !occasionallyTrue_.contains(fact))
+							neverTrue_.add(fact);
+					}
 
-				// If the same pred, remove the disallowed values from always
-				// true as well.
-				if (pred.equals(condition_))
-					alwaysTrue_.removeAll(disallowed_);
+					// If the same pred, remove the disallowed values from
+					// always true as well.
+					if (pred.equals(condition_))
+						alwaysTrue_.removeAll(disallowed_);
+				}
 			}
 			firstState_ = false;
 			return true;

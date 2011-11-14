@@ -3,12 +3,9 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
 
 import org.junit.Before;
@@ -16,8 +13,6 @@ import org.junit.Test;
 
 import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
-
-import relationalFramework.agentObservations.AgentObservations;
 
 public class PacManRuleCreationTest {
 	private RuleCreation sut_;
@@ -139,29 +134,5 @@ public class PacManRuleCreationTest {
 						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 2.5 7.5)) (ghost ?Y)"
 						+ " => (moveTo ?X ?__Num0)");
 		assertEquals(specialisedRules.size(), 6);
-	}
-
-	@Test
-	public void testSpecialiseRule() {
-		// Set up the allowable conditions
-		Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>();
-		conditions.add(StateSpec.toRelationalPredicate("(edible ?X)"));
-		conditions.add(StateSpec.toRelationalPredicate("(blinking ?X)"));
-		conditions.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
-		conditions.add(StateSpec.toRelationalPredicate("(not (blinking ?X))"));
-		AgentObservations.getInstance().setActionConditions("toGhost",
-				conditions);
-
-		RelationalRule rule = new RelationalRule(
-				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (pacman player) => (toGhost ?X ?__Num6)");
-		Set<RelationalRule> specialisations = sut_.specialiseRule(rule);
-		// TODO Adding the RLGG during specialisation for numerical ranges doesn't work.
-		RelationalRule mutant = new RelationalRule(
-				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (blinking ?X) (pacman player) => (toGhost ?X ?__Num6)");
-		assertTrue(specialisations.contains(mutant));
-		mutant = new RelationalRule(
-				"(distanceGhost player ?X ?__Num6&:(betweenRange ?__Num6 0.0 52.0)) (edible ?X) (not (blinking ?X)) (pacman player) => (toGhost ?X ?__Num6)");
-		assertTrue(specialisations.contains(mutant));
-		assertEquals(specialisations.size(), 2);
 	}
 }
