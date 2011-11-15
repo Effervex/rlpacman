@@ -1,11 +1,11 @@
-package blocksWorldActive;
+package blocksWorldBounded;
 
 import org.rlcommunity.rlglue.codec.*;
 
 import cerrla.LearningController;
 import cerrla.PolicyActor;
 
-public class RunBlocksWorldActiveExperiment {
+public class RunBlocksWorldBoundedExperiment {
 	public static void main(String[] args) {
 		// Create the Agent
 		AgentInterface theAgent = new PolicyActor();

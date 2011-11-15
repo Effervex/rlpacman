@@ -1,4 +1,4 @@
-package blocksWorldActive;
+package blocksWorldBounded;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;

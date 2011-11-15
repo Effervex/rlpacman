@@ -127,12 +127,12 @@ public class RLMarioStateSpec extends StateSpec {
 		// Squashable enemies
 		bckKnowledge.put("squashableRule", new BackgroundKnowledge(
 				"(enemy ?X) (not (spiky ?X)) " + "(not (pirahnaPlant ?X)) "
-						+ "=> (assert (squashable ?X))", true));
+						+ "=> (assert (squashable ?X))", true, false));
 
 		// Blastable enemies
 		bckKnowledge.put("blastableRule", new BackgroundKnowledge(
 				"(enemy ?X) (not (spiky ?X)) " + "=> (assert (blastable ?X))",
-				true));
+				true, false));
 
 		return bckKnowledge;
 	}

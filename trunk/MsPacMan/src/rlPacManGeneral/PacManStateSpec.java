@@ -66,7 +66,7 @@ public class PacManStateSpec extends StateSpec {
 		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
 
 		bckKnowledge.put("blinkingRule", new BackgroundKnowledge(
-				"(blinking ?X) => (edible ?X)", false));
+				"(blinking ?X) => (edible ?X)", false, false));
 
 		return bckKnowledge;
 	}

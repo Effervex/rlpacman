@@ -694,42 +694,42 @@ public class RuleCreationTest {
 		// Set up the equivalence and other rules
 		SortedSet<BackgroundKnowledge> backKnow = new TreeSet<BackgroundKnowledge>();
 		backKnow.add(new BackgroundKnowledge("(above ?X ?) <=> (on ?X ?)",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(above ?X ?) <=> (not (onFloor ?X))", false));
+				"(above ?X ?) <=> (not (onFloor ?X))", false, false));
 		backKnow.add(new BackgroundKnowledge("(above ? ?Y) <=> (on ? ?Y)",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(above ? ?Y) <=> (not (clear ?Y))", false));
+				"(above ? ?Y) <=> (not (clear ?Y))", false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(clear ?X) <=> (not (above ? ?X))", false));
+				"(clear ?X) <=> (not (above ? ?X))", false, false));
 		backKnow.add(new BackgroundKnowledge("(clear ?X) <=> (not (on ? ?X))",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(on ?X ?) <=> (not (onFloor ?X))", false));
+				"(on ?X ?) <=> (not (onFloor ?X))", false, false));
 		backKnow.add(new BackgroundKnowledge("(on ? ?Y) <=> (not (clear ?Y))",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(onFloor ?X) <=> (not (above ?X ?))", false));
+				"(onFloor ?X) <=> (not (above ?X ?))", false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(onFloor ?X) <=> (not (on ?X ?))", false));
+				"(onFloor ?X) <=> (not (on ?X ?))", false, false));
 		backKnow.add(new BackgroundKnowledge("(above ?X ?Y) => (above ?X ?)",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge("(above ?X ?Y) => (above ? ?Y)",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", false));
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", false, false));
 		backKnow.add(new BackgroundKnowledge("(highest ?X) => (clear ?X)",
-				false));
+				false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", false));
-		backKnow.add(new BackgroundKnowledge("(on ?X ?Y) => (on ?X ?)", false));
-		backKnow.add(new BackgroundKnowledge("(on ?X ?Y) => (on ? ?Y)", false));
+				"(on ?X ?Y) => (assert (above ?X ?Y))", false, false));
+		backKnow.add(new BackgroundKnowledge("(on ?X ?Y) => (on ?X ?)", false, false));
+		backKnow.add(new BackgroundKnowledge("(on ?X ?Y) => (on ? ?Y)", false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(block ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false));
-		backKnow.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)", false));
+				"(block ?Z) (on ?X ?Y) => (not (on ?X ?Z))", false, false));
+		backKnow.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)", false, false));
 		backKnow.add(new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", false));
+				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", false, false));
 		AgentObservations.getInstance().setBackgroundKnowledge(backKnow);
 
 		// Basic implication test

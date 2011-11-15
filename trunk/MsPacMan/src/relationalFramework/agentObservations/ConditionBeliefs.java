@@ -594,7 +594,7 @@ public class ConditionBeliefs implements Serializable {
 				+ ")";
 		String relation = (isEquivalenceRule) ? " <=> " : " => ";
 		BackgroundKnowledge bckKnow = new BackgroundKnowledge(leftSide
-				+ relation + rightSide, false);
+				+ relation + rightSide, false, false);
 
 		// Add the rule to current knowledge
 		return currentKnowledge.addBackgroundKnowledge(bckKnow);

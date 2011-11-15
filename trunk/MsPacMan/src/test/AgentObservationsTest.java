@@ -60,7 +60,7 @@ public class AgentObservationsTest {
 			String relation) {
 		for (String[] pair : equivalencePairs) {
 			BackgroundKnowledge bk = new BackgroundKnowledge(pair[0] + relation
-					+ pair[1], false);
+					+ pair[1], false, false);
 			assertTrue(bk.toString() + " not found.", sut_
 					.getLearnedBackgroundKnowledge().contains(bk));
 			sut_.getLearnedBackgroundKnowledge().remove(bk);
@@ -1222,22 +1222,22 @@ public class AgentObservationsTest {
 		// Basic test
 		Collection<BackgroundKnowledge> backgroundKnowledge = sut_
 				.getLearnedBackgroundKnowledge();
-		BackgroundKnowledge bk = new BackgroundKnowledge("(highest ?X) => (clear ?X)", false);
+		BackgroundKnowledge bk = new BackgroundKnowledge("(highest ?X) => (clear ?X)", false, false);
 		assertTrue(backgroundKnowledge.contains(bk));
 		
 		// Basic equivalence
-		bk = new BackgroundKnowledge("(floor ?X) <=> (not (block ?X))", false);
+		bk = new BackgroundKnowledge("(floor ?X) <=> (not (block ?X))", false, false);
 		assertTrue(backgroundKnowledge.contains(bk));
 		
 		// floor/clear/above rules
-		bk = new BackgroundKnowledge("(floor ?X) <=> (clear ?X) (above ? ?X)", false);
+		bk = new BackgroundKnowledge("(floor ?X) <=> (clear ?X) (above ? ?X)", false, false);
 		assertTrue(backgroundKnowledge.contains(bk));
 		// Floor supercedes this rule
-		bk = new BackgroundKnowledge("(clear ?X) (above ? ?X) <=> (not (block ?X))", false);
+		bk = new BackgroundKnowledge("(clear ?X) (above ? ?X) <=> (not (block ?X))", false, false);
 		assertFalse(backgroundKnowledge.contains(bk));
 		
 		// Goal rule
-		bk = new BackgroundKnowledge("(floor ?X) <=> (clear ?X) (above ?Y ?X)", false);
+		bk = new BackgroundKnowledge("(floor ?X) <=> (clear ?X) (above ?Y ?X)", false, false);
 		assertTrue(backgroundKnowledge.contains(bk));
 	}
 }

@@ -219,59 +219,62 @@ public abstract class StateSpec {
 		return buffer.toString();
 	}
 
-//	/**
-//	 * Forms the non-goals by negating the non-type conditions required for the
-//	 * goal to be met.
-//	 * 
-//	 * @param goalState
-//	 *            The goal state.
-//	 * @return A negated goal state (except for the type preds).
-//	 */
-//	private String formNonGoal(String goalState) throws Exception {
-//		RelationalRule nonGoalRule = new RelationalRule(goalState_);
-//		SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
-//
-//		// Split the conds up into 2 sets: types and normal
-//		Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
-//				conds.comparator());
-//		Collection<RelationalPredicate> normal = new TreeSet<RelationalPredicate>(
-//				conds.comparator());
-//		Collection<RelationalPredicate> inequalities = new TreeSet<RelationalPredicate>(
-//				conds.comparator());
-//		for (RelationalPredicate cond : conds) {
-//			if (isTypePredicate(cond.getFactName()))
-//				types.add(cond);
-//			else if (cond.getFactName().equals("test"))
-//				inequalities.add(cond);
-//			else
-//				normal.add(cond);
-//		}
-//		// If there are no normal conds, negate the types instead (otherwise
-//		// there would be an infinite number of goals)
-//		if (normal.isEmpty()) {
-//			throw new Exception("Goal is only type conditions! Cannot negate.");
-//		}
-//
-//		// Build the string
-//		StringBuffer nonGoalStr = new StringBuffer();
-//		// Types first
-//		for (RelationalPredicate type : types)
-//			nonGoalStr.append(type + " ");
-//		// Then Inequalities
-//		for (RelationalPredicate ineq : inequalities)
-//			nonGoalStr.append(ineq + " ");
-//		// Then normals
-//		nonGoalStr.append("(not");
-//		if (normal.size() > 1)
-//			nonGoalStr.append(" (and");
-//		for (RelationalPredicate norm : normal)
-//			nonGoalStr.append(" " + norm);
-//		nonGoalStr.append(")");
-//		if (normal.size() > 1)
-//			nonGoalStr.append(")");
-//
-//		return nonGoalStr.toString();
-//	}
+	// /**
+	// * Forms the non-goals by negating the non-type conditions required for
+	// the
+	// * goal to be met.
+	// *
+	// * @param goalState
+	// * The goal state.
+	// * @return A negated goal state (except for the type preds).
+	// */
+	// private String formNonGoal(String goalState) throws Exception {
+	// RelationalRule nonGoalRule = new RelationalRule(goalState_);
+	// SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
+	//
+	// // Split the conds up into 2 sets: types and normal
+	// Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// Collection<RelationalPredicate> normal = new
+	// TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// Collection<RelationalPredicate> inequalities = new
+	// TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// for (RelationalPredicate cond : conds) {
+	// if (isTypePredicate(cond.getFactName()))
+	// types.add(cond);
+	// else if (cond.getFactName().equals("test"))
+	// inequalities.add(cond);
+	// else
+	// normal.add(cond);
+	// }
+	// // If there are no normal conds, negate the types instead (otherwise
+	// // there would be an infinite number of goals)
+	// if (normal.isEmpty()) {
+	// throw new Exception("Goal is only type conditions! Cannot negate.");
+	// }
+	//
+	// // Build the string
+	// StringBuffer nonGoalStr = new StringBuffer();
+	// // Types first
+	// for (RelationalPredicate type : types)
+	// nonGoalStr.append(type + " ");
+	// // Then Inequalities
+	// for (RelationalPredicate ineq : inequalities)
+	// nonGoalStr.append(ineq + " ");
+	// // Then normals
+	// nonGoalStr.append("(not");
+	// if (normal.size() > 1)
+	// nonGoalStr.append(" (and");
+	// for (RelationalPredicate norm : normal)
+	// nonGoalStr.append(" " + norm);
+	// nonGoalStr.append(")");
+	// if (normal.size() > 1)
+	// nonGoalStr.append(")");
+	//
+	// return nonGoalStr.toString();
+	// }
 
 	/**
 	 * The constructor for a state specification.
@@ -333,6 +336,10 @@ public abstract class StateSpec {
 			actBuf.append(")");
 			rete_.eval(actBuf.toString());
 			actionNum_ = initialiseActionsPerStep();
+			// Action rules
+			int j = 0;
+			for (String actionRule : initialiseActionRules())
+				rete_.eval("(defrule actionRule" + j++ + " " + actionRule + ")");
 
 			// Initialise the background knowledge rules
 
@@ -340,14 +347,15 @@ public abstract class StateSpec {
 			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
 			for (String name : typeAssertions.keySet())
 				backgroundRules_.put(name, new BackgroundKnowledge(
-						typeAssertions.get(name), true));
+						typeAssertions.get(name), true, false));
 
 			// State Spec rules
 			backgroundRules_.putAll(initialiseBackgroundKnowledge());
 			for (String ruleNames : backgroundRules_.keySet()) {
 				if (backgroundRules_.get(ruleNames).assertInJess())
 					rete_.eval("(defrule " + ruleNames + " "
-							+ backgroundRules_.get(ruleNames) + ")");
+							+ backgroundRules_.get(ruleNames).toJESSString()
+							+ ")");
 			}
 
 			// Initialise the betweenRange and outsideRange functions
@@ -460,6 +468,15 @@ public abstract class StateSpec {
 	 * @return The list of guided actions.
 	 */
 	protected abstract Collection<RelationalPredicate> initialiseActionTemplates();
+
+	/**
+	 * Initialises the rules that define how an action evaluates upon the state.
+	 * 
+	 * @return A collection of rules which affect the state.
+	 */
+	protected Collection<String> initialiseActionRules() {
+		return new ArrayList<String>();
+	}
 
 	/**
 	 * Initialises the background knowledge.
@@ -1107,7 +1124,8 @@ public abstract class StateSpec {
 	 *            The conditions to put into string format.
 	 * @return The JESS parseable string of the conditions.
 	 */
-	public static String conditionsToString(Collection<RelationalPredicate> conditions) {
+	public static String conditionsToString(
+			Collection<RelationalPredicate> conditions) {
 		StringBuffer buffer = new StringBuffer();
 		boolean first = true;
 		for (RelationalPredicate cond : conditions) {

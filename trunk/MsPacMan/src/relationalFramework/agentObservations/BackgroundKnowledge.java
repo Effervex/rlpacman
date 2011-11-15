@@ -45,6 +45,9 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	/** If equivalent, which side of the knowledge will be simplified to. */
 	private int precendence_;
 
+	/** If the rule is logical. */
+	private boolean logical_;
+
 	/**
 	 * A constructor for the background knowledge.
 	 * 
@@ -52,9 +55,13 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            The assertion in JESS format.
 	 * @param jessAssert
 	 *            If this rule is to be asserted in JESS or not.
+	 * @param logical
+	 *            If the fact is a logical fact (assertions/retractions matter).
 	 */
-	public BackgroundKnowledge(String assertion, boolean jessAssert) {
+	public BackgroundKnowledge(String assertion, boolean jessAssert,
+			boolean logical) {
 		jessAssert_ = jessAssert;
+		logical_ = logical;
 		String splitter = StateSpec.INFERS_ACTION;
 		equivalentRule_ = false;
 		precendence_ = LEFT_SIDE;
@@ -322,8 +329,28 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_)
 			relation = " <=> ";
 
+		return left + relation + right;
+	}
+
+	public String toJESSString() {
+		// Output the rule differently if precendence is on the right side
+		String left = StateSpec.conditionsToString(preConds_);
+		String right = postCondition_.toString();
+		if (precendence_ == RIGHT_SIDE) {
+			String backup = left;
+			left = right;
+			right = backup;
+		}
+
+		String relation = " => ";
+		if (equivalentRule_)
+			relation = " <=> ";
+
 		if (jessAssert_)
-			return left + relation + "(assert " + right + ")";
+			right = "(assert " + right + ")";
+		if (logical_)
+			left = "(logical " + left + ")";
+
 		return left + relation + right;
 	}
 
