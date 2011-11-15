@@ -2,6 +2,7 @@ package cerrla;
 
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import util.Pair;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -9,6 +10,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,11 +90,21 @@ public class LearningController {
 				repetitionsEnd = Integer.parseInt(repetitionsStr[1]);
 			}
 			Integer episodes = Integer.parseInt(bf.readLine());
+
+			// Attempt to read in given filenames
 			String elitesFile = bf.readLine();
-			String performanceFile = bf.readLine();
+			String performanceFile = null;
+			String extraArgs = null;
+			// If there are file paths, use them
+			if (elitesFile != null && elitesFile.endsWith(".txt")) {
+				performanceFile = bf.readLine();
+				extraArgs = bf.readLine();
+			} else {
+				extraArgs = elitesFile;
+				elitesFile = null;
+			}
 
 			ArrayList<String> extraArgsList = new ArrayList<String>();
-			String extraArgs = bf.readLine();
 			if (extraArgs != null) {
 				Pattern p = Pattern.compile("((\".+?\")|\\w+)");
 				Matcher m = p.matcher(extraArgs);
@@ -109,10 +122,7 @@ public class LearningController {
 			bf.close();
 			reader.close();
 
-			initialise(environmentClass, repetitionsStart, repetitionsEnd,
-					episodes, elitesFile, performanceFile,
-					extraArgsList.toArray(new String[extraArgsList.size()]));
-
+			ArrayList<String> handledArgs = new ArrayList<String>();
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
 					// Enable debug mode
@@ -130,13 +140,65 @@ public class LearningController {
 					ruleFile_ = new File(args[i]);
 				} else {
 					// Handle the argument
-					i = ProgramArgument.handleArg(i, args);
+					Pair<Integer, String> handled = ProgramArgument.handleArg(
+							i, args);
+					i = handled.objA_;
+					handledArgs.add(handled.objB_);
 				}
 			}
 
+			initialise(environmentClass, repetitionsStart, repetitionsEnd,
+					episodes, elitesFile, performanceFile, handledArgs,
+					extraArgsList.toArray(new String[extraArgsList.size()]));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Generates the filenames for the elites and performance files.
+	 * 
+	 * @param handledArgs
+	 *            The args added to the run begin.
+	 * @return The filenames for elites and performance.
+	 */
+	private String[] generateFileNames(ArrayList<String> handledArgs) {
+		String[] filenames = new String[2];
+		StringBuffer buffer = new StringBuffer();
+		// First part: date
+		DateFormat dateFormat = new SimpleDateFormat("yyMMdd");
+		Date date = new Date();
+		buffer.append(dateFormat.format(date));
+		// Environment name
+		buffer.append(StateSpec.getInstance().getEnvironmentName());
+
+		// Last part: params
+		StringBuffer argsBuffer = new StringBuffer();
+		for (String arg : handledArgs)
+			argsBuffer.append(arg);
+		if (handledArgs.isEmpty())
+			argsBuffer.append("Control");
+
+		File tempFile = null;
+		// Modify filename if the file already exists
+		int i = 0;
+		do {
+			String extension = ".txt";
+			if (i > 0)
+				extension = "(" + i + ").txt";
+			filenames[0] = buffer.toString() + "Elites" + argsBuffer.toString()
+					+ extension;
+			String goalName = StateSpec.getInstance().getGoalName();
+			filenames[1] = buffer.toString()
+					+ goalName.substring(0, 1).toUpperCase()
+					+ goalName.substring(1) + argsBuffer.toString() + extension;
+
+			// Check if the performance filename exists.
+			tempFile = new File(TEMP_FOLDER, filenames[1] + "0");
+			i++;
+		} while (tempFile.exists());
+
+		return filenames;
 	}
 
 	/**
@@ -391,18 +453,18 @@ public class LearningController {
 	 *            The output file for the best policy.
 	 * @param performanceFile
 	 *            The output file for the agent's performance.
+	 * @param handledArgs
+	 *            The handled arguments added to the command line.
 	 * @param extraArgs
 	 *            The extra arguments for the environment to take.
 	 */
 	private void initialise(String environmentClass, int repetitionsStart,
 			int repetitionsEnd, int episodeCount, String elitesFile,
-			String performanceFile, String[] extraArgs) {
+			String performanceFile, ArrayList<String> handledArgs,
+			String[] extraArgs) {
 		repetitionsStart_ = repetitionsStart;
 		repetitionsEnd_ = repetitionsEnd;
 		maxEpisodes_ = episodeCount;
-
-		elitesFile_ = new File(elitesFile);
-		performanceFile_ = new File(performanceFile);
 
 		// Create temp folder
 		try {
@@ -418,6 +480,14 @@ public class LearningController {
 
 		// Initialise the state spec.
 		StateSpec.initInstance(environmentClass, goalArg);
+
+		// If the elites and performance file are null, generate filenames
+		String[] fileNames = generateFileNames(handledArgs);
+		elitesFile = fileNames[0];
+		performanceFile = fileNames[1];
+
+		elitesFile_ = new File(elitesFile);
+		performanceFile_ = new File(performanceFile);
 	}
 
 	@SuppressWarnings("unused")

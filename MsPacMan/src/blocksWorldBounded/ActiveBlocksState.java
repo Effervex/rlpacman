@@ -1,4 +1,4 @@
-package blocksWorldActive;
+package blocksWorldBounded;
 
 import java.awt.Point;
 import java.util.Arrays;

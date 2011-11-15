@@ -7,6 +7,7 @@ import java.util.List;
 import blocksWorld.BlocksState;
 
 import cerrla.PolicyGenerator;
+import jess.Fact;
 import jess.Rete;
 import relationalFramework.FiredAction;
 import relationalFramework.ObjectObservations;
@@ -17,8 +18,18 @@ import relationalFramework.StateSpec;
 import util.Pair;
 
 public class BlocksWorldRelationalWrapper extends RelationalWrapper {
+	private Fact action_;
+
 	@Override
 	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
+		if (!isFirstStateInEpisode()) {
+			// Apply the action
+			rete.run();
+			// Retract the action assertion
+			rete.retract(action_);
+			return rete;
+		}
+
 		BlocksState blocksState = (BlocksState) args[0];
 		@SuppressWarnings("unchecked")
 		List<String> goalArgs = (List<String>) args[1];
@@ -120,8 +131,15 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 					.get(PolicyGenerator.random_.nextInt(actionsList.size()));
 			selectedAction.triggerRule();
 			action = selectedAction.getAction();
+
+			// Assert the action to the Rete object.
+			try {
+				action_ = StateSpec.getInstance().getRete().assertString(action.toString());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
-		
+
 		BlocksState blocksState = (BlocksState) args[0];
 
 		if (action == null)
@@ -155,7 +173,8 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 		// Perform the action
 		newState[indices[0]] = indices[1] + 1;
 
-		return new Pair<BlocksState, RelationalPredicate>(new BlocksState(newState), action);
+		return new Pair<BlocksState, RelationalPredicate>(new BlocksState(
+				newState), action);
 	}
 
 	@Override
@@ -165,5 +184,4 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 			return 1;
 		return 0;
 	}
-
 }

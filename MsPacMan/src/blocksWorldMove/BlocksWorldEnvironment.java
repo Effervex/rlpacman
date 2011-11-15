@@ -126,6 +126,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 	private Observation formObs_Start() {
 		Observation obs = new Observation();
 		obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
+		wrapper_.newEpisode();
 		ObjectObservations.getInstance().predicateKB = wrapper_
 				.formObservations(state_, goalArgs_);
 		ObjectObservations.getInstance().earlyExit = false;
@@ -213,6 +214,7 @@ public class BlocksWorldEnvironment implements EnvironmentInterface {
 		contourState.add(0d);
 		List<Integer> blocksLeft = new ArrayList<Integer>();
 		goalArgs_ = null;
+		wrapper_.newEpisode();
 		for (int i = 1; i <= numBlocks; i++) {
 			blocksLeft.add(i);
 		}

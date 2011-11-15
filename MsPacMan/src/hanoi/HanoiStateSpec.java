@@ -49,29 +49,29 @@ public class HanoiStateSpec extends StateSpec {
 		// Block(Y) & !On(X,Y) -> Clear(Y)
 		bkMap.put("clearTileRule", new BackgroundKnowledge(
 				"(tile ?Y) (tower ?T) (on ?Y ? ?T) (not (on ? ?Y ?T)) "
-						+ "=> (assert (clear ?Y ?T))", true));
+						+ "=> (assert (clear ?Y ?T))", true, false));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))", true));
+				"(on ?X ?Y ?T) => (assert (above ?X ?Y ?T))", true, false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
 				"(on ?X ?Y ?T) (above ?Y ?Z ?T) => (assert (above ?X ?Z ?T))",
-				true));
+				true, false));
 
 		// Smaller(X,Y) rule A
 		bkMap.put("smallerRule1", new BackgroundKnowledge(
 				"(tile ?X) (not (towerBase ?X)) (tile ?Y&:(< ?X ?Y)) "
-						+ "=> (assert (smaller ?X ?Y))", true));
+						+ "=> (assert (smaller ?X ?Y))", true, false));
 		// Smaller(X,Y) rule B
 		bkMap.put("smallerRule2", new BackgroundKnowledge(
 				"(tile ?X) (not (towerBase ?X)) (towerBase ?Y) "
-						+ "=> (assert (smaller ?X ?Y))", true));
+						+ "=> (assert (smaller ?X ?Y))", true, false));
 
 		// Tile(Z) & On(X,Y) -> !On(X,Z)
 		bkMap.put("onRule", new BackgroundKnowledge(
-				"(tile ?Z) (on ?X ?Y ?T) => (not (on ?X ?Z ?T))", false));
+				"(tile ?Z) (on ?X ?Y ?T) => (not (on ?X ?Z ?T))", false, false));
 
 		return bkMap;
 	}

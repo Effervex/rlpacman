@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import util.Pair;
+
 public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, ParameterType.UPDATING, "Step size update"),
 	BETA(0.0001, "beta", null, ParameterType.CONVERGENCE,
@@ -190,23 +192,32 @@ public enum ProgramArgument implements Serializable {
 	 *            The arguments given at command-line.
 	 * @return The index after handling.
 	 */
-	public static int handleArg(int i, String[] args) {
+	public static Pair<Integer, String> handleArg(int i, String[] args) {
 		boolean argFound = false;
+		String paramName = "";
 		if (args[i].equals("-slotProb")) {
 			i++;
-			if (args[i].equals("dynamic"))
+			if (args[i].equals("dynamic")) {
 				INITIAL_SLOT_MEAN.setDoubleValue(-1);
-			else
+				paramName = "dynamicSlotProb";
+			} else {
 				INITIAL_SLOT_MEAN.setDoubleValue(Double.parseDouble(args[i]));
+				paramName = "slotProb" + args[i];
+			}
 			argFound = true;
 		} else if (args[i].equals("-ensemble")) {
 			ENSEMBLE_EVALUATION.setBooleanValue(true);
 			i++;
 			ENSEMBLE_SIZE.setDoubleValue(Integer.parseInt(args[i]));
+			paramName = "ensemble";
 			argFound = true;
 		} else if (args[i].equals("-dynamicSlots")) {
 			i++;
 			DYNAMIC_SLOTS.setValue(args[i]);
+			if (DYNAMIC_SLOTS.booleanValue())
+				paramName = "dynamicSlots";
+			else
+				paramName = "staticSlots";
 			argFound = true;
 		} else if (args[i].charAt(0) == '-') {
 			// Check the arg against the rest of the program args
@@ -218,6 +229,15 @@ public enum ProgramArgument implements Serializable {
 					i++;
 					pa.setValue(args[i]);
 					argFound = true;
+					Object value = pa.getValue();
+					if (value instanceof Boolean) {
+						if (((Boolean) value).booleanValue())
+							paramName = pa.getName();
+						else
+							paramName = "NO" + pa.getName();
+					} else {
+						paramName = pa.getName() + value;
+					}
 					break;
 				}
 			}
@@ -227,7 +247,8 @@ public enum ProgramArgument implements Serializable {
 		if (!argFound) {
 			System.err.println("Invalid arguments! " + Arrays.toString(args));
 		}
-		return i;
+		return new Pair<Integer, String>(i, paramName.substring(0, 1)
+				.toUpperCase() + paramName.substring(1));
 	}
 
 	/**

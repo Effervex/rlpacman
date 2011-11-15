@@ -44,24 +44,35 @@ public class BlocksWorldStateSpec extends StateSpec {
 	}
 
 	@Override
+	protected Collection<String> initialiseActionRules() {
+		Collection<String> actionRules = new ArrayList<String>();
+		// Block to block movement
+		actionRules.add("(move ?X ?Y) (clear ?X) (clear ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
+				+ " => (assert (on ?X ?Y)) (retract ?oldOn)");
+		return actionRules;
+	}
+
+	@Override
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
 
 		// Block(Y) & !On(?,Y) -> Clear(Y)
 		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
+				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))",
+				true, true));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
+				"(on ?X ?Y) => (assert (above ?X ?Y))", true, true));
 
 		// Floor is always clear
 		bkMap.put("floorClear", new BackgroundKnowledge(
-				"(floor ?X) => (assert (clear ?X))", true));
+				"(floor ?X) => (assert (clear ?X))", true, false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))",
+				true, true));
 
 		return bkMap;
 	}
