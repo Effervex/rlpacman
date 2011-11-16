@@ -21,8 +21,8 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 	private final int GOAL = -1;
 	private final int BASE = 0;
 	private final int TYPE = 1;
-	private final int NEG = 2;
-	private final int INEQ = 3;
+	private final int NEG = 3;
+	private final int INEQ = 2;
 
 	private ConditionComparator() {
 

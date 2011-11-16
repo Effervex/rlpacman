@@ -4,6 +4,7 @@ import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.BackgroundKnowledge;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -17,7 +18,9 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 				.initialiseActionPreconditions();
 
 		// Activates or deactivates a block
-		actionPreconditions.put("toggle", "(block ?X)");
+		actionPreconditions.put("bind",
+				"(on ?X ?Y) (clear ?X) (block ?Y) (not (bound ?X ?Y))");
+		actionPreconditions.put("unbind", "(bound ?X ?Y) (clear ?X)");
 
 		return actionPreconditions;
 	}
@@ -28,11 +31,47 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 				.initialiseActionTemplates();
 
 		// Move action
-		String[] structure = new String[1];
+		String[] structure = new String[2];
 		structure[0] = "block";
-		actions.add(new RelationalPredicate("toggle", structure));
+		structure[1] = "block";
+		actions.add(new RelationalPredicate("bind", structure));
+
+		structure = new String[2];
+		structure[0] = "block";
+		structure[1] = "block";
+		actions.add(new RelationalPredicate("unbind", structure));
 
 		return actions;
+	}
+	
+	@Override
+	protected Collection<String> initialiseActionRules() {
+		Collection<String> actionRules = new ArrayList<String>();
+		// Bound block movement
+		actionRules.add("?action <- (move ?X ?Y) (bound ?X ?Z)"
+				+ " => (assert (move ?Z ?Y)) (retract ?action)");
+		// Unbound block to block movement
+		actionRules.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y)) (not (bound ?X ?Z))"
+				+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
+		
+		// Binding
+		actionRules.add("?action <- (bind ?X ?Y)"
+				+ " => (assert (bound ?X ?Y)) (retract ?action)");
+		
+		// Unbinding
+		actionRules.add("?action <- (unbind ?X ?Y) ?bound <- (bound ?X ?Y)"
+				+ " => (retract ?bound ?action)");
+		return actionRules;
+	}
+	
+	@Override
+	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
+		Map<String, BackgroundKnowledge> bckKnow = super.initialiseBackgroundKnowledge();
+		bckKnow.put("bindRule", new BackgroundKnowledge(
+				"(bound ?X ?Y) (bound ?Y ?Z)) => (assert (bound ?X ?Z))",
+				true, true));
+		
+		return bckKnow;
 	}
 
 	@Override
@@ -47,23 +86,21 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 			String[] goalBlocks = { StateSpec.createGoalTerm(0),
 					StateSpec.createGoalTerm(1) };
 			result[1] = "(on " + goalBlocks[0] + " " + goalBlocks[1]
-					+ ") (active " + goalBlocks[0] + ") (active "
-					+ goalBlocks[1] + ")";
+					+ ") (bound " + goalBlocks[0] + " " + goalBlocks[1] + ")";
 			return result;
 		}
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(forall (block ?X) (clear ?X) (active ?X))";
+			result[1] = "(forall (block ?X) (clear ?X))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X))) "
-					+ "(forall (block ?A) (active ?A))";
+			result[1] = "(forall (block ?X) (or (bound ?X ?Y) (bound ?Y ?X)))";
 			return result;
 		}
 
@@ -72,8 +109,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 			result[0] = "clearA";
 			String goalBlock = StateSpec.createGoalTerm(0);
 			result[1] = "(clear " + goalBlock + ") (block " + goalBlock
-					+ ") (active " + goalBlock + ") (not (active ?X&:(<> ?X "
-					+ goalBlock + ")))";
+					+ ") (not (bound " + goalBlock + " ?))";
 			return result;
 		}
 
@@ -81,7 +117,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 			result[0] = "highestA";
 			String goalBlock = StateSpec.createGoalTerm(0);
 			result[1] = "(highest " + goalBlock + ") (active " + goalBlock
-					+ ") (not (active ?X&:(<> ?X " + goalBlock + ")))";
+					+ ") (not (bound " + goalBlock + " ?))";
 			return result;
 		}
 		return null;
@@ -92,47 +128,37 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
-			rules = new String[6];
+			rules = new String[4];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
+					+ "(on ?G_0 ?G_1) => (bind ?G_0 ?G_1)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(block ?G_1) (not (active ?G_1)) => (toggle ?G_1)";
-			rules[2] = "("
-					+ GOALARGS_PRED
-					+ " ? ?G_0 ?G_1) "
-					+ "(block ?X&:(<> ?X ?G_0 ?G_1)) (active ?X) => (toggle ?X)";
-			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
-			rules[4] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
-			rules[5] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
+			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?X) (above ?X ?G_1) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[2];
-			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
-			rules[1] = "(block ?X) (not (active ?X)) => (toggle ?X)";
+			rules[0] = "(on ?X ?Y) (clear ?X) (block ?Y) (not (bound ?X ?Y)) => (bind ?X ?Y)";
+			rules[1] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[2];
-			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
-			rules[1] = "(block ?X) (not (active ?X)) => (toggle ?X)";
+			rules[0] = "(bound ?X ?Y) (clear ?X) => (unbind ?X ?Y)";
+			rules[1] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
 		} else if (envParameter_.equals("clearA")) {
+			rules = new String[2];
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
+					+ "(clear ?G_0) (bound ?G_0 ?Y) => (unbind ?X ?Y)";
+		} else if (envParameter_.equals("highestA")) {
 			rules = new String[3];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
+					+ "(clear ?G_0) (bound ?G_0 ?Y) => (unbind ?X ?Y)";
 			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(block ?X&:(<> ?X ?G_0)) (active ?X) => (toggle ?X)";
-		} else if (envParameter_.equals("highestA")) {
-			rules = new String[4];
-			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
-			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
-			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(block ?G_0) (not (active ?G_0)) => (toggle ?G_0)";
-			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(block ?X&:(<> ?X ?G_0)) (active ?X) => (toggle ?X)";
 		}
 
 		BasicRelationalPolicy optimal = new BasicRelationalPolicy();
@@ -144,34 +170,13 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 
 	@Override
 	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
-		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
-
-		// On predicate
-		String[] structure = new String[2];
-		structure[0] = "block";
-		structure[1] = "thing";
-		predicates.add(new RelationalPredicate("on", structure));
-
-		// Clear predicate
-		structure = new String[1];
-		structure[0] = "thing";
-		predicates.add(new RelationalPredicate("clear", structure));
-
-		// Above predicate
-		structure = new String[2];
-		structure[0] = "block";
-		structure[1] = "thing";
-		predicates.add(new RelationalPredicate("above", structure));
-
-		// Highest predicate
-		structure = new String[1];
-		structure[0] = "block";
-		predicates.add(new RelationalPredicate("highest", structure));
+		Collection<RelationalPredicate> predicates = super.initialisePredicateTemplates();
 
 		// Active predicate
-		structure = new String[1];
+		String[] structure = new String[2];
 		structure[0] = "block";
-		predicates.add(new RelationalPredicate("active", structure));
+		structure[1] = "block";
+		predicates.add(new RelationalPredicate("bound", structure));
 
 		return predicates;
 	}

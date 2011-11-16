@@ -231,10 +231,12 @@ public enum ProgramArgument implements Serializable {
 					argFound = true;
 					Object value = pa.getValue();
 					if (value instanceof Boolean) {
-						if (((Boolean) value).booleanValue())
-							paramName = pa.getName();
-						else
-							paramName = "NO" + pa.getName();
+						paramName = pa.getName();
+						if (!((Boolean) value).booleanValue()) {
+							paramName = "No"
+									+ paramName.substring(0, 1).toUpperCase()
+									+ paramName.substring(1);
+						}
 					} else {
 						paramName = pa.getName() + value;
 					}

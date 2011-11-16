@@ -4,14 +4,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import blocksWorld.BlocksState;
-
-import jess.Rete;
-
 import cerrla.PolicyGenerator;
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
+import relationalFramework.StateSpec;
 import util.Pair;
 
 public class BlocksWorldRelationalWrapper extends
@@ -27,67 +24,48 @@ public class BlocksWorldRelationalWrapper extends
 					.get(PolicyGenerator.random_.nextInt(actionsList.size()));
 			selectedAction.triggerRule();
 			action = selectedAction.getAction();
+
+			// Assert the action to the Rete object.
+			try {
+				StateSpec.getInstance().getRete()
+						.assertString(action.toString());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
-		ActiveBlocksState blocksState = ((ActiveBlocksState) args[0]).clone();
-
 		if (action == null)
-			return blocksState;
+			return args[0];
 
-		Integer[] newState = blocksState.getState();
-		boolean[] activeBlocks = blocksState.getActiveBlocks();
+		BoundedBlocksState newState = ((BoundedBlocksState) args[0]).clone();
 
 		if (action.getFactName().equals("move")) {
 			// Finding the block objects
 			int[] indices = new int[2];
 
 			// Convert the blocks to indices
-			Integer[] stateArray = blocksState.getState();
 			for (int i = 0; i < indices.length; i++) {
-				if (action.getArguments()[i].equals("floor")) {
+				if (action.getArguments()[i].equals("floor"))
 					indices[i] = -1;
-					// Cannot move the floor
-					if (i == 0)
-						return blocksState;
-				} else
+				else {
 					indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
-				// In order to do either action, both blocks must be free
-				for (int j = 0; j < stateArray.length; j++) {
-					// If something is on that index/block (except the floor),
-					// return the unchanged state
-					if (indices[i] != -1 && stateArray[j] == indices[i] + 1)
-						return blocksState;
+					while (newState.getBoundBlocks()[indices[i]] != 0)
+						indices[i] = newState.getBoundBlocks()[indices[i]];
 				}
 			}
 
 			// Perform the action
-			newState[indices[0]] = indices[1] + 1;
-		} else if (action.getFactName().equals("toggle")) {
-			int index = action.getArguments()[0].charAt(0) - 'a';
-			activeBlocks[index] = !activeBlocks[index];
+			newState.getState()[indices[0]] = indices[1] + 1;
+		} else if (action.getFactName().equals("bind")) {
+			int indexA = action.getArguments()[0].charAt(0) - 'a';
+			int indexB = action.getArguments()[1].charAt(0) - 'a';
+			newState.getBoundBlocks()[indexA] = indexB;
+		} else if (action.getFactName().equals("unbind")) {
+			int indexA = action.getArguments()[0].charAt(0) - 'a';
+			newState.getBoundBlocks()[indexA] = 0;
 		}
 
-		return new Pair<ActiveBlocksState, RelationalPredicate>(
-				new ActiveBlocksState(newState, activeBlocks), action);
-	}
-	
-	@Override
-	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
-		rete = super.assertStateFacts(rete, args);
-		BlocksState blocksState = (BlocksState) args[0];
-		
-		if (blocksState instanceof ActiveBlocksState) {
-			ActiveBlocksState activeBlocksState = (ActiveBlocksState) blocksState;
-			try {
-				for (int i = 0; i < activeBlocksState.getActiveBlocks().length; i++) {
-					if (activeBlocksState.getActiveBlocks()[i])
-						rete.assertString("(active " + (char) ('a' + i) + ")");
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-		
-		return rete;
+		return new Pair<BoundedBlocksState, RelationalPredicate>(newState,
+				action);
 	}
 }
