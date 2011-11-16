@@ -47,8 +47,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Collection<String> initialiseActionRules() {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
-		actionRules.add("(move ?X ?Y) (clear ?X) (clear ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
-				+ " => (assert (on ?X ?Y)) (retract ?oldOn)");
+		actionRules.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
+				+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 

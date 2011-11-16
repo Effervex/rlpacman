@@ -12,28 +12,28 @@ import blocksWorld.BlocksState;
  * 
  * @author Sam Sarjant
  */
-public class ActiveBlocksState extends BlocksState {
-	private boolean[] activeBlocks_;
+public class BoundedBlocksState extends BlocksState {
+	private int[] boundBlocks_;
 
-	public ActiveBlocksState(Integer[] state) {
+	public BoundedBlocksState(Integer[] state) {
 		super(state);
-		activeBlocks_ = new boolean[state.length];
+		boundBlocks_ = new int[state.length];
 	}
 
-	public ActiveBlocksState(Integer[] state, boolean[] activeBlocks) {
+	public BoundedBlocksState(Integer[] state, int[] boundBlocks) {
 		super(state);
-		activeBlocks_ = activeBlocks;
+		boundBlocks_ = boundBlocks;
 	}
 	
-	public boolean[] getActiveBlocks() {
-		return activeBlocks_;
+	public int[] getBoundBlocks() {
+		return boundBlocks_;
 	}
 
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = super.hashCode();
-		result = prime * result + Arrays.hashCode(activeBlocks_);
+		result = prime * result + Arrays.hashCode(boundBlocks_);
 		return result;
 	}
 
@@ -45,19 +45,19 @@ public class ActiveBlocksState extends BlocksState {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		ActiveBlocksState other = (ActiveBlocksState) obj;
-		if (!Arrays.equals(activeBlocks_, other.activeBlocks_))
+		BoundedBlocksState other = (BoundedBlocksState) obj;
+		if (!Arrays.equals(boundBlocks_, other.boundBlocks_))
 			return false;
 		return true;
 	}
 
 	@Override
-	public ActiveBlocksState clone() {
+	public BoundedBlocksState clone() {
 		BlocksState bs = super.clone();
-		boolean[] activeClone = new boolean[activeBlocks_.length];
-		for (int i = 0; i < activeBlocks_.length; i++)
-			activeClone[i] = activeBlocks_[i];
-		return new ActiveBlocksState(bs.getState(), activeClone);
+		int[] boundClone = new int[boundBlocks_.length];
+		for (int i = 0; i < boundBlocks_.length; i++)
+			boundClone[i] = boundBlocks_[i];
+		return new BoundedBlocksState(bs.getState(), boundClone);
 	}
 
 	@Override
@@ -81,9 +81,10 @@ public class ActiveBlocksState extends BlocksState {
 				for (int x = 0; x < column; x++) {
 					if (blocksChars[x][y] == 0)
 						buffer.append("   ");
-					else if (activeBlocks_[blocksChars[x][y] - 'a'])
-						buffer.append("<" + blocksChars[x][y] + ">");
-					else
+					else if (boundBlocks_[blocksChars[x][y] - 'a'] != 0) {
+						char boundBlock = (char) (boundBlocks_[blocksChars[x][y] - 'a'] + 'a');
+						buffer.append("" + boundBlock + blocksChars[x][y] + boundBlock);
+					} else
 						buffer.append("[" + blocksChars[x][y] + "]");
 				}
 

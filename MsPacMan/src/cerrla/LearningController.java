@@ -185,7 +185,7 @@ public class LearningController {
 		do {
 			String extension = ".txt";
 			if (i > 0)
-				extension = "(" + i + ").txt";
+				extension = "." + i + ".txt";
 			filenames[0] = buffer.toString() + "Elites" + argsBuffer.toString()
 					+ extension;
 			String goalName = StateSpec.getInstance().getGoalName();
@@ -482,9 +482,11 @@ public class LearningController {
 		StateSpec.initInstance(environmentClass, goalArg);
 
 		// If the elites and performance file are null, generate filenames
-		String[] fileNames = generateFileNames(handledArgs);
-		elitesFile = fileNames[0];
-		performanceFile = fileNames[1];
+		if (elitesFile == null || performanceFile == null) {
+			String[] fileNames = generateFileNames(handledArgs);
+			elitesFile = fileNames[0];
+			performanceFile = fileNames[1];
+		}
 
 		elitesFile_ = new File(elitesFile);
 		performanceFile_ = new File(performanceFile);
