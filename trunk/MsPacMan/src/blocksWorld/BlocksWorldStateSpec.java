@@ -55,15 +55,15 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Block(Y) & !On(?,Y) -> Clear(Y)
 		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true, false));
+				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", false));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true, false));
+				"(on ?X ?Y) => (assert (above ?X ?Y))", false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true, false));
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", false));
 
 		return bkMap;
 	}

@@ -69,25 +69,6 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 			rete.assertString("(block " + (char) ('a' + i) + ")");
 		}
 
-		// Add the highest block/s
-		for (Integer block : highestBlocks) {
-			rete.assertString("(highest " + (char) ('a' + block) + ")");
-		}
-
-		// Asserting the highest goal
-		if (goalArgs == null) {
-			if (StateSpec.getInstance().getGoalName().equals("highestA")) {
-				goalArgs = new ArrayList<String>(1);
-				allBlocks.removeAll(highestBlocks);
-				if (allBlocks.isEmpty())
-					return null;
-				goalArgs.add((char) ('a' + allBlocks
-						.get(PolicyGenerator.random_.nextInt(allBlocks.size())))
-						+ "");
-			} else
-				goalArgs = new ArrayList<String>();
-		}
-
 		// Add the goal
 		StateSpec.getInstance().assertGoalPred(goalArgs, rete);
 		return rete;

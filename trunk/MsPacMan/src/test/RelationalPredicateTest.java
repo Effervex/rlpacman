@@ -74,5 +74,4 @@ public class RelationalPredicateTest {
 		assertEquals(strFact1.compareTo(strFact2), -1);
 		assertEquals(strFact2.compareTo(strFact1), 1);
 	}
-
 }

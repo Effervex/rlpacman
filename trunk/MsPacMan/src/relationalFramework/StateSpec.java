@@ -37,34 +37,6 @@ import jess.ValueVector;
  * @author Sam Sarjant
  */
 public abstract class StateSpec {
-	/**
-	 * A basic class which holds parent-child data for a given type predicate.
-	 * 
-	 * @author Sam Sarjant
-	 */
-	private class ParentChildren {
-		private Collection<String> children_;
-		private String parent_;
-
-		public void addChild(String child) {
-			if (children_ == null)
-				children_ = new HashSet<String>();
-			children_.add(child);
-		}
-
-		public Collection<String> getChildren() {
-			return children_;
-		}
-
-		public String getParent() {
-			return parent_;
-		}
-
-		public void setParent(String parent) {
-			parent_ = parent;
-		}
-	}
-
 	/** The singleton instance. */
 	private static StateSpec instance_;
 
@@ -219,63 +191,6 @@ public abstract class StateSpec {
 		return buffer.toString();
 	}
 
-	// /**
-	// * Forms the non-goals by negating the non-type conditions required for
-	// the
-	// * goal to be met.
-	// *
-	// * @param goalState
-	// * The goal state.
-	// * @return A negated goal state (except for the type preds).
-	// */
-	// private String formNonGoal(String goalState) throws Exception {
-	// RelationalRule nonGoalRule = new RelationalRule(goalState_);
-	// SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
-	//
-	// // Split the conds up into 2 sets: types and normal
-	// Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// Collection<RelationalPredicate> normal = new
-	// TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// Collection<RelationalPredicate> inequalities = new
-	// TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// for (RelationalPredicate cond : conds) {
-	// if (isTypePredicate(cond.getFactName()))
-	// types.add(cond);
-	// else if (cond.getFactName().equals("test"))
-	// inequalities.add(cond);
-	// else
-	// normal.add(cond);
-	// }
-	// // If there are no normal conds, negate the types instead (otherwise
-	// // there would be an infinite number of goals)
-	// if (normal.isEmpty()) {
-	// throw new Exception("Goal is only type conditions! Cannot negate.");
-	// }
-	//
-	// // Build the string
-	// StringBuffer nonGoalStr = new StringBuffer();
-	// // Types first
-	// for (RelationalPredicate type : types)
-	// nonGoalStr.append(type + " ");
-	// // Then Inequalities
-	// for (RelationalPredicate ineq : inequalities)
-	// nonGoalStr.append(ineq + " ");
-	// // Then normals
-	// nonGoalStr.append("(not");
-	// if (normal.size() > 1)
-	// nonGoalStr.append(" (and");
-	// for (RelationalPredicate norm : normal)
-	// nonGoalStr.append(" " + norm);
-	// nonGoalStr.append(")");
-	// if (normal.size() > 1)
-	// nonGoalStr.append(")");
-	//
-	// return nonGoalStr.toString();
-	// }
-
 	/**
 	 * The constructor for a state specification.
 	 */
@@ -347,16 +262,13 @@ public abstract class StateSpec {
 			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
 			for (String name : typeAssertions.keySet())
 				backgroundRules_.put(name, new BackgroundKnowledge(
-						typeAssertions.get(name), true, false));
+						typeAssertions.get(name), false));
 
 			// State Spec rules
 			backgroundRules_.putAll(initialiseBackgroundKnowledge());
-			for (String ruleNames : backgroundRules_.keySet()) {
-				if (backgroundRules_.get(ruleNames).assertInJess())
-					rete_.eval("(defrule " + ruleNames + " "
-							+ backgroundRules_.get(ruleNames).toJESSString()
-							+ ")");
-			}
+			for (String ruleNames : backgroundRules_.keySet())
+				rete_.eval("(defrule " + ruleNames + " "
+						+ backgroundRules_.get(ruleNames) + ")");
 
 			// Initialise the betweenRange and outsideRange functions
 			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
@@ -408,6 +320,63 @@ public abstract class StateSpec {
 		}
 	}
 
+	// /**
+	// * Forms the non-goals by negating the non-type conditions required for
+	// the
+	// * goal to be met.
+	// *
+	// * @param goalState
+	// * The goal state.
+	// * @return A negated goal state (except for the type preds).
+	// */
+	// private String formNonGoal(String goalState) throws Exception {
+	// RelationalRule nonGoalRule = new RelationalRule(goalState_);
+	// SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
+	//
+	// // Split the conds up into 2 sets: types and normal
+	// Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// Collection<RelationalPredicate> normal = new
+	// TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// Collection<RelationalPredicate> inequalities = new
+	// TreeSet<RelationalPredicate>(
+	// conds.comparator());
+	// for (RelationalPredicate cond : conds) {
+	// if (isTypePredicate(cond.getFactName()))
+	// types.add(cond);
+	// else if (cond.getFactName().equals("test"))
+	// inequalities.add(cond);
+	// else
+	// normal.add(cond);
+	// }
+	// // If there are no normal conds, negate the types instead (otherwise
+	// // there would be an infinite number of goals)
+	// if (normal.isEmpty()) {
+	// throw new Exception("Goal is only type conditions! Cannot negate.");
+	// }
+	//
+	// // Build the string
+	// StringBuffer nonGoalStr = new StringBuffer();
+	// // Types first
+	// for (RelationalPredicate type : types)
+	// nonGoalStr.append(type + " ");
+	// // Then Inequalities
+	// for (RelationalPredicate ineq : inequalities)
+	// nonGoalStr.append(ineq + " ");
+	// // Then normals
+	// nonGoalStr.append("(not");
+	// if (normal.size() > 1)
+	// nonGoalStr.append(" (and");
+	// for (RelationalPredicate norm : normal)
+	// nonGoalStr.append(" " + norm);
+	// nonGoalStr.append(")");
+	// if (normal.size() > 1)
+	// nonGoalStr.append(")");
+	//
+	// return nonGoalStr.toString();
+	// }
+
 	/**
 	 * Recurse through the parent types.
 	 * 
@@ -456,6 +425,15 @@ public abstract class StateSpec {
 	protected abstract Map<String, String> initialiseActionPreconditions();
 
 	/**
+	 * Initialises the rules that define how an action evaluates upon the state.
+	 * 
+	 * @return A collection of rules which affect the state.
+	 */
+	protected Collection<String> initialiseActionRules() {
+		return new ArrayList<String>();
+	}
+
+	/**
 	 * Initialises the number of actions to take per time step.
 	 * 
 	 * @return The number of actions to take per step.
@@ -468,15 +446,6 @@ public abstract class StateSpec {
 	 * @return The list of guided actions.
 	 */
 	protected abstract Collection<RelationalPredicate> initialiseActionTemplates();
-
-	/**
-	 * Initialises the rules that define how an action evaluates upon the state.
-	 * 
-	 * @return A collection of rules which affect the state.
-	 */
-	protected Collection<String> initialiseActionRules() {
-		return new ArrayList<String>();
-	}
 
 	/**
 	 * Initialises the background knowledge.
@@ -634,10 +603,6 @@ public abstract class StateSpec {
 		return actions_;
 	}
 
-	public Collection<BackgroundKnowledge> getBackgroundKnowledgeConditions() {
-		return backgroundRules_.values();
-	}
-
 	public Collection<String> getConstants() {
 		return constants_;
 	}
@@ -682,6 +647,30 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Gets or creates a rule query for a fact (an anonymous fact which only
+	 * matches the existence of the fact).
+	 * 
+	 * @param fact
+	 *            The anonymous fact.
+	 * @return The query from the rule (possibly newly created).
+	 */
+	public String getRuleQuery(RelationalPredicate fact) {
+		String result = queryNames_.get(fact);
+		if (result == null) {
+			try {
+				result = POLICY_QUERY_PREFIX + queryCount_++;
+				// Create the query
+				rete_.eval("(defquery " + result + " " + fact + ")");
+				queryNames_.put(fact, result);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		return result;
+	}
+
+	/**
 	 * Gets or creates a rule query for a guided rule.
 	 * 
 	 * @param gr
@@ -714,30 +703,6 @@ public abstract class StateSpec {
 							+ gr.getStringConditions() + ")");
 				}
 				queryNames_.put(ruleQuery, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets or creates a rule query for a fact (an anonymous fact which only
-	 * matches the existence of the fact).
-	 * 
-	 * @param fact
-	 *            The anonymous fact.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(RelationalPredicate fact) {
-		String result = queryNames_.get(fact);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// Create the query
-				rete_.eval("(defquery " + result + " " + fact + ")");
-				queryNames_.put(fact, result);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -897,6 +862,27 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Basic method that converts a Collection of conditions into a neat JESS
+	 * parseable String.
+	 * 
+	 * @param conditions
+	 *            The conditions to put into string format.
+	 * @return The JESS parseable string of the conditions.
+	 */
+	public static String conditionsToString(
+			Collection<RelationalPredicate> conditions) {
+		StringBuffer buffer = new StringBuffer();
+		boolean first = true;
+		for (RelationalPredicate cond : conditions) {
+			if (!first)
+				buffer.append(" ");
+			buffer.append(cond.toString());
+			first = false;
+		}
+		return buffer.toString();
+	}
+
+	/**
 	 * Creates a variable representing a goal term at a given index.
 	 * 
 	 * @param i
@@ -951,6 +937,24 @@ public abstract class StateSpec {
 	}
 
 	/**
+	 * Creates a numerical range expression (JESS-readable) for a variable
+	 * ('&:') to bound numerical values.
+	 * 
+	 * @param numericalVariable
+	 *            The variable to numerically bound.
+	 * @param lowerBound
+	 *            The lower bound.
+	 * @param upperBound
+	 *            The upper bound.
+	 * @return The JESS parsable range expression.
+	 */
+	public static String createNumericalRange(String numericalVariable,
+			double lowerBound, double upperBound) {
+		return numericalVariable + "&:(<= " + lowerBound + " "
+				+ numericalVariable + " " + upperBound + ")";
+	}
+
+	/**
 	 * Extracts a collection of facts from the state.
 	 * 
 	 * @param state
@@ -965,6 +969,27 @@ public abstract class StateSpec {
 		}
 
 		return facts;
+	}
+
+	/**
+	 * Extracts a numerical range from a numerical arg.
+	 * 
+	 * @param numericalArg
+	 *            The numerical argument.
+	 * @return An array of either: variable, min and max, or a single number.
+	 */
+	public static String[] extractNumericalRange(String numericalArg) {
+		Pattern rangePattern = Pattern
+				.compile("(.+)&:\\(<= ([\\dE.-]+) \\1 ([\\dE.-]+)\\)");
+		Matcher m = rangePattern.matcher(numericalArg);
+
+		if (m.find()) {
+			String[] range = { m.group(1), m.group(2), m.group(3) };
+			return range;
+		}
+
+		String[] number = { numericalArg };
+		return number;
 	}
 
 	/**
@@ -1106,35 +1131,53 @@ public abstract class StateSpec {
 	 * @return A string array of the facts.
 	 */
 	public static String[] splitFact(String fact) {
-		Pattern p = Pattern
-				.compile("(?:[^()\\s:]|(?:\\?.+&:\\(.+?\\)))+(?= |\\)|$)");
-		Matcher m = p.matcher(fact);
-		ArrayList<String> matches = new ArrayList<String>();
-		while (m.find())
-			matches.add(m.group());
-
-		return matches.toArray(new String[matches.size()]);
-	}
-
-	/**
-	 * Basic method that converts a Collection of conditions into a neat JESS
-	 * parseable String.
-	 * 
-	 * @param conditions
-	 *            The conditions to put into string format.
-	 * @return The JESS parseable string of the conditions.
-	 */
-	public static String conditionsToString(
-			Collection<RelationalPredicate> conditions) {
-		StringBuffer buffer = new StringBuffer();
-		boolean first = true;
-		for (RelationalPredicate cond : conditions) {
-			if (!first)
-				buffer.append(" ");
-			buffer.append(cond.toString());
-			first = false;
+		fact = fact.trim();
+		ArrayList<String> elements = new ArrayList<String>();
+		int bracketCount = 0;
+		int elementStart = -1;
+		// Run through the fact, char-by-char, recording each element
+		for (int i = 0; i < fact.length(); i++) {
+			char ch = fact.charAt(i);
+			switch (ch) {
+			case '(':
+				// Capturing brackets (except the beginning one).
+				if (i > 0) {
+					bracketCount++;
+					if (elementStart == -1)
+						elementStart = i;
+				}
+				break;
+			case ' ':
+				// Separating facts by space (if not capturing an internal fact)
+				if (bracketCount == 0) {
+					elements.add(fact.substring(elementStart, i));
+					elementStart = -1;
+				}
+				break;
+			case ')':
+				// Capturing internal facts and finishing this fact
+				if (bracketCount > 0)
+					bracketCount--;
+				else if (bracketCount == 0) {
+					elements.add(fact.substring(elementStart, i));
+					elementStart = -1;
+				}
+				break;
+			case ':':
+				// Dealing with JESS modules.
+				if (fact.charAt(i - 1) == ':')
+					elementStart = -1;
+				break;
+			default:
+				// Capture element
+				if (elementStart == -1)
+					elementStart = i;
+			}
 		}
-		return buffer.toString();
+		if (elementStart != -1)
+			elements.add(fact.substring(elementStart));
+
+		return elements.toArray(new String[elements.size()]);
 	}
 
 	/**
@@ -1148,31 +1191,44 @@ public abstract class StateSpec {
 		String[] condSplit = StateSpec.splitFact(fact);
 		if (condSplit[0].equals("initial-fact"))
 			return null;
-		int offset = 1;
 		boolean negated = false;
 		// Negated case
 		if (condSplit[0].equals("not")) {
-			offset = 2;
 			negated = true;
+			condSplit = StateSpec.splitFact(condSplit[1]);
 		}
-		// Test case
-		if (condSplit[0].equals("test")) {
-			StringBuffer testedGroup = new StringBuffer("(");
-			boolean first = true;
-			for (int i = 1; i < condSplit.length; i++) {
-				if (!first)
-					testedGroup.append(" ");
-				testedGroup.append(condSplit[i]);
-				first = false;
-			}
-			testedGroup.append(")");
-			condSplit = new String[2];
-			condSplit[0] = "test";
-			condSplit[1] = testedGroup.toString();
+
+		String[] arguments = new String[condSplit.length - 1];
+		System.arraycopy(condSplit, 1, arguments, 0, arguments.length);
+		return new RelationalPredicate(getInstance()
+				.getStringFact(condSplit[0]), arguments, negated);
+	}
+
+	/**
+	 * A basic class which holds parent-child data for a given type predicate.
+	 * 
+	 * @author Sam Sarjant
+	 */
+	private class ParentChildren {
+		private Collection<String> children_;
+		private String parent_;
+
+		public void addChild(String child) {
+			if (children_ == null)
+				children_ = new HashSet<String>();
+			children_.add(child);
 		}
-		String[] arguments = new String[condSplit.length - offset];
-		System.arraycopy(condSplit, offset, arguments, 0, arguments.length);
-		return new RelationalPredicate(getInstance().getStringFact(
-				condSplit[offset - 1]), arguments, negated);
+
+		public Collection<String> getChildren() {
+			return children_;
+		}
+
+		public String getParent() {
+			return parent_;
+		}
+
+		public void setParent(String parent) {
+			parent_ = parent;
+		}
 	}
 }

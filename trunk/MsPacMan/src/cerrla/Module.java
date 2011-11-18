@@ -227,7 +227,7 @@ public class Module {
 					+ "in order with variables replaced by parameters.");
 			for (RelationalRule gr : newModule.moduleRules_) {
 				gr.removeParameters();
-				bf.write("\n" + gr.toNiceString());
+				bf.write("\n" + gr.toString());
 			}
 
 			bf.close();

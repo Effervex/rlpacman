@@ -127,7 +127,8 @@ public class Unification {
 		if (oldState.isEmpty()) {
 			oldState.addAll(oldStateClone);
 			return -1;
-		} else if (oldState.containsAll(oldStateClone) && oldStateClone.containsAll(oldState))
+		} else if (oldState.containsAll(oldStateClone)
+				&& oldStateClone.containsAll(oldState))
 			return 0;
 		else
 			return 1;
@@ -487,7 +488,8 @@ public class Unification {
 		else
 			return false;
 
-		String[] numberArgs = RelationalPredicate.extractNumericalRange(factValue);
+		String[] numberArgs = StateSpec
+				.extractNumericalRange(factValue);
 
 		if (numberArgs.length > 1) {
 			// We have a pre-existing range
@@ -506,9 +508,8 @@ public class Unification {
 
 			// If the min or max has changed, redefine the range
 			if (redefine) {
-				unification[index] = numberArgs[0] + "&:("
-						+ StateSpec.BETWEEN_RANGE + " " + numberArgs[0] + " "
-						+ min + " " + max + ")";
+				unification[index] = StateSpec.createNumericalRange(
+						numberArgs[0], min, max);
 			} else {
 				unification[index] = factValue;
 			}
@@ -525,10 +526,10 @@ public class Unification {
 			// Find the min, max, then form the range
 			double min = Math.min(factDouble, unityDouble);
 			double max = Math.max(factDouble, unityDouble);
-			String rangeVariable = "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + rangeIndex_++;
-			unification[index] = rangeVariable + "&:("
-					+ StateSpec.BETWEEN_RANGE + " " + rangeVariable + " " + min
-					+ " " + max + ")";
+			String rangeVariable = "?"
+					+ RelationalPredicate.RANGE_VARIABLE_PREFIX + rangeIndex_++;
+			unification[index] = StateSpec.createNumericalRange(rangeVariable,
+					min, max);
 
 			// Change the action terms as well.
 			for (int i = 0; i < factTerms.length; i++) {

@@ -24,7 +24,7 @@ public class BackgroundKnowledgeTest {
 	@Test
 	public void testSimplifyA() {
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(floor ?X) <=> (clear ?X) (above ? ?X)", false, false);
+				"(floor ?X) <=> (clear ?X) (above ? ?X)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ? a)"));
@@ -51,7 +51,7 @@ public class BackgroundKnowledgeTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above b a)"));
 		bk = new BackgroundKnowledge(
-				"(floor ?X) <=> (clear ?X) (above ?Y ?X)", false, false);
+				"(floor ?X) <=> (clear ?X) (above ?Y ?X)");
 		result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
@@ -62,7 +62,7 @@ public class BackgroundKnowledgeTest {
 	public void testSimplifyB() {
 		// Other equivalent rule
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(above ?X ?) <=> (on ?X ?)", false, false);
+				"(above ?X ?) <=> (on ?X ?)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on b ?)"));
 		boolean result = bk.simplify(ruleConds);
@@ -81,7 +81,7 @@ public class BackgroundKnowledgeTest {
 	public void testSimplifyC() {
 		// Positive case
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(above ?X ?) <=> (block ?X)", false, false);
+				"(above ?X ?) <=> (block ?X)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(block b)"));
 		boolean result = bk.simplify(ruleConds);

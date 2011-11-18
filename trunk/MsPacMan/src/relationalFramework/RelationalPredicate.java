@@ -10,8 +10,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * A class containing the definitions/instantiations of a relational predicate,
@@ -404,7 +402,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 
 			// Reformat numerical ranges to look better
 			if (StateSpec.isNumberType(factTypes_[i])) {
-				String[] nums = extractNumericalRange(arg);
+				String[] nums = StateSpec.extractNumericalRange(arg);
 				if (nums.length > 1)
 					buffer.append(" (" + nums[1] + " <= " + nums[0] + " <= "
 							+ nums[2] + ")");
@@ -548,27 +546,5 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
 				% MODULO_LETTERS);
 		return "?" + variable;
-	}
-
-	/**
-	 * Extracts a numerical range from a numerical arg.
-	 * 
-	 * @param numericalArg
-	 *            The numerical argument.
-	 * @return An array of either variable and min and max, or a single number.
-	 */
-	public static String[] extractNumericalRange(String numericalArg) {
-		Pattern rangePattern = Pattern.compile("(\\?"
-				+ Pattern.quote(RANGE_VARIABLE_PREFIX) + "[\\d]+)&:\\("
-				+ StateSpec.BETWEEN_RANGE + " \\1 ([-\\dE.]+) ([-\\dE.]+)\\)");
-		Matcher m = rangePattern.matcher(numericalArg);
-
-		if (m.find()) {
-			String[] range = { m.group(1), m.group(2), m.group(3) };
-			return range;
-		}
-
-		String[] number = { numericalArg };
-		return number;
 	}
 }

@@ -1,6 +1,7 @@
 package blocksWorldMove;
 
 import relationalFramework.BasicRelationalPolicy;
+import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -47,8 +48,9 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Collection<String> initialiseActionRules() {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
-		actionRules.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
-				+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
+		actionRules
+				.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
+						+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 
@@ -58,21 +60,33 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Block(Y) & !On(?,Y) -> Clear(Y)
 		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))",
-				true, true));
+				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true, true));
+				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
 
 		// Floor is always clear
-		bkMap.put("floorClear", new BackgroundKnowledge(
-				"(floor ?X) => (assert (clear ?X))", true, false));
+		bkMap.put("floorTruthA", new BackgroundKnowledge(
+				"(floor ?X) => (assert (clear ?X))", false));
+
+		// Floor is at height 0
+		bkMap.put("floorTruthB", new BackgroundKnowledge(
+				"(floor ?X) => (assert (height ?X 0))", false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))",
-				true, true));
+				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
+
+		// Height of individual blocks (for highest calcs)
+		bkMap.put("heightRule", new BackgroundKnowledge(
+				"(on ?X ?Y) (height ?Y ?N) => (assert (height ?X (+ ?N 1)))",
+				true));
+
+		// Highest rule
+		bkMap.put("highestRule", new BackgroundKnowledge(
+				"(height ?X ?N) (forall (thing ?Y) (height ?Y ?M&:(<= ?M ?N)))"
+						+ " => (assert (highest ?X))", true));
 
 		return bkMap;
 	}
@@ -180,6 +194,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 		structure[0] = "block";
 		structure[1] = "thing";
 		predicates.add(new RelationalPredicate("above", structure));
+
+		// Height predicate
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("height", structure));
 
 		// Highest predicate
 		structure = new String[1];

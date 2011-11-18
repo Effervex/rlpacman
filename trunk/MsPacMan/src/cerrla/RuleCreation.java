@@ -93,9 +93,8 @@ public class RuleCreation implements Serializable {
 		String replacementTerm;
 		// If a range, make a range, otherwise make a point.
 		if (lowerBound != upperBound)
-			replacementTerm = rangeVariable + "&:(" + StateSpec.BETWEEN_RANGE
-					+ " " + rangeVariable + " " + lowerBound + " " + upperBound
-					+ ")";
+			replacementTerm = StateSpec.createNumericalRange(rangeVariable,
+					lowerBound, upperBound);
 		else
 			replacementTerm = lowerBound + "";
 
@@ -123,14 +122,8 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
-	 * @param preGoalFact
-	 *            The possibly null pre-goal split condition.
-	 * @param preGoalIndex
-	 *            The index of the range in the pre-goal split.
 	 * @param subranges
 	 *            The collection of rules to add to.
-	 * @param c
-	 *            The condition index.
 	 * @param condition
 	 *            The original condition being mutated.
 	 * @param condArgIndex
@@ -141,11 +134,12 @@ public class RuleCreation implements Serializable {
 	 *            The minimum value of the range.
 	 * @param max
 	 *            The maximum value of the range.
+	 * @param c
+	 *            The condition index.
 	 * @param rangeSplit
 	 *            The size of the subranges.
 	 */
 	private void createRangeSpecialisations(RelationalRule baseRule,
-			RelationalPredicate preGoalFact, int preGoalIndex,
 			Set<RelationalRule> subranges, RelationalPredicate condition,
 			int condArgIndex, String rangeVariable, double min, double max) {
 		if (min != max) {
@@ -171,37 +165,6 @@ public class RuleCreation implements Serializable {
 				subranges.add(createRangedSpecialisation(baseRule, condition,
 						condArgIndex, rangeVariable, 0, max));
 			}
-
-			// If the pre-goal has a range of different size, create
-			// that too.
-			if (preGoalFact != null
-					&& condition.getFactName()
-							.equals(preGoalFact.getFactName())) {
-				// Check that the size differs
-				String preGoalTerm = preGoalFact.getArguments()[preGoalIndex];
-				if (preGoalTerm.contains(StateSpec.BETWEEN_RANGE)) {
-					// Mutate to a pre-goal range
-					int preGoalSuchThatIndex = preGoalTerm.indexOf("&:");
-					String[] preGoalRangeSplit = StateSpec
-							.splitFact(preGoalTerm
-									.substring(preGoalSuchThatIndex + 2));
-					double startPoint = Double
-							.parseDouble(preGoalRangeSplit[2]);
-					double endPoint = Double.parseDouble(preGoalRangeSplit[3]);
-
-					// Make sure the sizes differ otherwise it's just creating
-					// the same range
-					if (startPoint != min || endPoint != max)
-						subranges.add(createRangedSpecialisation(baseRule,
-								condition, condArgIndex, rangeVariable,
-								startPoint, endPoint));
-				} else {
-					double point = Double.parseDouble(preGoalTerm);
-					subranges.add(createRangedSpecialisation(baseRule,
-							condition, condArgIndex, rangeVariable, point,
-							point));
-				}
-			}
 		}
 	}
 
@@ -212,19 +175,11 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
-	 * @param preGoalFact
-	 *            The split term in the pre-goal matching a ranged condition in
-	 *            the rule. Can be null.
-	 * @param preGoalIndex
-	 *            The index in the pre-goal split of the numerical value. Not
-	 *            used if preGoalSplit is null.
 	 * @param isRuleMutant
 	 *            If the rule is a mutant or not.
-	 * 
 	 * @return A collection of any sub-ranged mutants created from the rule.
 	 */
 	private Set<RelationalRule> splitRanges(RelationalRule baseRule,
-			RelationalPredicate preGoalFact, int preGoalIndex,
 			boolean isRuleMutant) {
 		Set<RelationalRule> subranges = new HashSet<RelationalRule>();
 
@@ -236,15 +191,15 @@ public class RuleCreation implements Serializable {
 
 				// We have a range
 				if (suchThatIndex != -1) {
+					// TODO Could be a problem here...
 					String[] betweenRangeSplit = StateSpec.splitFact(arg
 							.substring(suchThatIndex + 2));
 					// Find the values
-					double min = Double.parseDouble(betweenRangeSplit[2]);
+					double min = Double.parseDouble(betweenRangeSplit[1]);
 					double max = Double.parseDouble(betweenRangeSplit[3]);
 
-					createRangeSpecialisations(baseRule, preGoalFact,
-							preGoalIndex, subranges, condition, i,
-							betweenRangeSplit[1], min, max);
+					createRangeSpecialisations(baseRule, subranges, condition,
+							i, betweenRangeSplit[1], min, max);
 				}
 			}
 		}
@@ -469,7 +424,7 @@ public class RuleCreation implements Serializable {
 		}
 
 		// Split any ranges up
-		mutants.addAll(splitRanges(rule, null, 0, rule.isMutant()));
+		mutants.addAll(splitRanges(rule, rule.isMutant()));
 
 		return mutants;
 	}

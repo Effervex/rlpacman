@@ -31,7 +31,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	private final int LEFT_SIDE = -1;
 	private final int RIGHT_SIDE = 1;
 
-	private boolean jessAssert_;
+	/** The string of the rule, if asserted through the environment. */
+	private String[] ruleString_;
 
 	/** The preconditions for the background knowledge. */
 	private SortedSet<RelationalPredicate> preConds_;
@@ -49,45 +50,59 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	private boolean logical_;
 
 	/**
-	 * A constructor for the background knowledge.
+	 * A constructor for environment asserted background knowledge. The facts of
+	 * the rule will not attempt to be parsed.
 	 * 
 	 * @param assertion
 	 *            The assertion in JESS format.
-	 * @param jessAssert
-	 *            If this rule is to be asserted in JESS or not.
 	 * @param logical
 	 *            If the fact is a logical fact (assertions/retractions matter).
 	 */
-	public BackgroundKnowledge(String assertion, boolean jessAssert,
-			boolean logical) {
-		jessAssert_ = jessAssert;
+	public BackgroundKnowledge(String assertion, boolean logical) {
 		logical_ = logical;
-		String splitter = StateSpec.INFERS_ACTION;
-		equivalentRule_ = false;
-		precendence_ = LEFT_SIDE;
-		if (assertion.contains(StateSpec.EQUIVALENT_RULE)) {
-			equivalentRule_ = true;
-			splitter = StateSpec.EQUIVALENT_RULE;
+		ruleString_ = assertion.split(" <=> ");
+		equivalentRule_ = true;
+		if (ruleString_.length == 1) {
+			ruleString_ = assertion.split(" => ");
+			equivalentRule_ = false;
 		}
-		String[] split = assertion.split(splitter);
-		preConds_ = RelationalRule.splitConditions(split[0], false);
+	}
 
-		split[1] = split[1].trim();
-		String assertStr = "(assert ";
-		if (split[1].contains(assertStr))
-			// Parsing an 'assert' fact
-			postCondition_ = StateSpec.toRelationalPredicate(split[1]
-					.substring(assertStr.length(), split[1].length() - 1));
-		else {
-			// Post cond may in fact be a pre-cond
-			SortedSet<RelationalPredicate> postFacts = RelationalRule
-					.splitConditions(split[1], false);
-			if (postFacts.size() > 1) {
-				postCondition_ = preConds_.iterator().next();
-				preConds_ = postFacts;
-			} else
-				postCondition_ = postFacts.first();
-		}
+	/**
+	 * Creates background knowledge using left side relations, a relation and a
+	 * right side relation.
+	 * 
+	 * @param leftRelations
+	 *            The left side conditions.
+	 * @param isEquivalenceRule
+	 *            The relation (equivalent or inference).
+	 * @param rightRelation
+	 *            The right side relation.
+	 */
+	public BackgroundKnowledge(SortedSet<RelationalPredicate> leftRelations,
+			boolean isEquivalenceRule, RelationalPredicate rightRelation) {
+		initialise(leftRelations, isEquivalenceRule, rightRelation);
+	}
+
+	/**
+	 * Initialises the pre, post and relation members.
+	 * 
+	 * @param leftRelations
+	 *            The left side conditions.
+	 * @param isEquivalenceRule
+	 *            The relation (equivalent or inference).
+	 * @param rightRelation
+	 *            The right side relation.
+	 */
+	private void initialise(SortedSet<RelationalPredicate> leftRelations,
+			boolean isEquivalenceRule, RelationalPredicate rightRelation) {
+		equivalentRule_ = isEquivalenceRule;
+		precendence_ = LEFT_SIDE;
+
+		preConds_ = new TreeSet<RelationalPredicate>();
+		for (RelationalPredicate leftCond : leftRelations)
+			preConds_.add(new RelationalPredicate(leftCond));
+		postCondition_ = new RelationalPredicate(rightRelation);
 
 		// Determine precendence if equivalent rule
 		if (equivalentRule_) {
@@ -98,6 +113,25 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		}
 
 		normaliseRuleArgs();
+	}
+
+	/**
+	 * Creates agent learned background knowledge from a String. Should really
+	 * only be needed for tests.
+	 * 
+	 * @param rule
+	 *            The rule to parse.
+	 */
+	public BackgroundKnowledge(String rule) {
+		String[] split = rule.split(" <=> ");
+		equivalentRule_ = true;
+		if (ruleString_.length == 1) {
+			split = rule.split(" => ");
+			equivalentRule_ = false;
+		}
+
+		initialise(RelationalRule.splitConditions(split[0], false),
+				equivalentRule_, StateSpec.toRelationalPredicate(split[1]));
 	}
 
 	/**
@@ -304,52 +338,30 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		return equivalentRule_;
 	}
 
-	/**
-	 * If this rule should be asserted in JESS. Otherwise, the rule is just used
-	 * for clarifying illegal rules.
-	 * 
-	 * @return The state of this rule being asserted in JESS.
-	 */
-	public boolean assertInJess() {
-		return jessAssert_;
-	}
-
 	@Override
 	public String toString() {
-		// Output the rule differently if precendence is on the right side
-		String left = StateSpec.conditionsToString(preConds_);
-		String right = postCondition_.toString();
-		if (precendence_ == RIGHT_SIDE) {
-			String backup = left;
-			left = right;
-			right = backup;
+		String left, right = null;
+		if (ruleString_ == null) {
+			// Agent created rule
+			// Output the rule differently if precendence is on the right side
+			left = StateSpec.conditionsToString(preConds_);
+			right = postCondition_.toString();
+			if (precendence_ == RIGHT_SIDE) {
+				String backup = left;
+				left = right;
+				right = backup;
+			}
+		} else {
+			// Environment created rule
+			left = ruleString_[0];
+			right = ruleString_[1];
+			if (logical_)
+				left = "(logical " + left + ")";
 		}
 
 		String relation = " => ";
 		if (equivalentRule_)
 			relation = " <=> ";
-
-		return left + relation + right;
-	}
-
-	public String toJESSString() {
-		// Output the rule differently if precendence is on the right side
-		String left = StateSpec.conditionsToString(preConds_);
-		String right = postCondition_.toString();
-		if (precendence_ == RIGHT_SIDE) {
-			String backup = left;
-			left = right;
-			right = backup;
-		}
-
-		String relation = " => ";
-		if (equivalentRule_)
-			relation = " <=> ";
-
-		if (jessAssert_)
-			right = "(assert " + right + ")";
-		if (logical_)
-			left = "(logical " + left + ")";
 
 		return left + relation + right;
 	}
