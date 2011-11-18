@@ -589,12 +589,10 @@ public class ConditionBeliefs implements Serializable {
 			boolean isEquivalenceRule,
 			NonRedundantBackgroundKnowledge currentKnowledge) {
 		// Create the rule
-		String leftSide = StateSpec.conditionsToString(leftConds);
-		String rightSide = (negationType) ? right.toString() : "(not " + right
-				+ ")";
-		String relation = (isEquivalenceRule) ? " <=> " : " => ";
-		BackgroundKnowledge bckKnow = new BackgroundKnowledge(leftSide
-				+ relation + rightSide, false, false);
+		if (!negationType)
+			right.swapNegated();
+		BackgroundKnowledge bckKnow = new BackgroundKnowledge(leftConds,
+				isEquivalenceRule, right);
 
 		// Add the rule to current knowledge
 		return currentKnowledge.addBackgroundKnowledge(bckKnow);

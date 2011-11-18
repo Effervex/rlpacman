@@ -434,10 +434,14 @@ public class BlocksWorldStateSpecTest {
 
 		// Test condition
 		result = StateSpec.splitFact("(test (<> ?X hat))");
-		assertArrayEquals(new String[] { "test", "<>", "?X", "hat" }, result);
+		assertArrayEquals(new String[] { "test", "(<> ?X hat)" }, result);
 
 		// Not condition
 		result = StateSpec.splitFact("(not (clear ?X))");
-		assertArrayEquals(new String[] { "not", "clear", "?X" }, result);
+		assertArrayEquals(new String[] { "not", "(clear ?X)" }, result);
+		
+		// Add condition
+		result = StateSpec.splitFact("(height ?X (+ ?N 1))");
+		assertArrayEquals(new String[] { "height", "?X", "(+ ?N 1)" }, result);
 	}
 }
