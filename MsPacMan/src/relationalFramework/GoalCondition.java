@@ -2,7 +2,6 @@ package relationalFramework;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.StateSpec;
 import util.ConditionComparator;
 
 import java.io.Serializable;
@@ -116,7 +115,7 @@ public class GoalCondition implements Serializable {
 		for (RelationalPredicate fact : facts_) {
 			for (String arg : fact.getArguments()) {
 				if (!replacements.containsKey(arg))
-					replacements.put(arg, StateSpec.createGoalTerm(i++));
+					replacements.put(arg, RelationalArgument.createGoalTerm(i++));
 			}
 			fact.replaceArguments(replacements, false, false);
 		}

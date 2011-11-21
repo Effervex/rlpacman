@@ -3,6 +3,7 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
@@ -63,12 +64,12 @@ public class PacManUnificationTest {
 		assertTrue(oldState
 				.contains(StateSpec
 						.toRelationalPredicate("(distanceDot a b ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 2.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Range addition (reversed)
 		oldState.clear();
@@ -88,12 +89,12 @@ public class PacManUnificationTest {
 		assertTrue(oldState
 				.contains(StateSpec
 						.toRelationalPredicate("(distanceDot a b ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 2.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Negative range addition
 		oldState.clear();
@@ -112,12 +113,12 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 						+ " -1.0 2.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Tiny value range addition
 		oldState.clear();
@@ -136,12 +137,12 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 						+ " -1.0 2.567483E-64))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Regular variable unification with numerical values too
 		oldState.clear();
@@ -160,24 +161,24 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot ?X ? ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 						+ " -1.0 2.0))")));
 		assertEquals(oldTerms[0], "?X");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Unification under an existing range term
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
 		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
-		oldTerms[1] = "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0";
+		oldTerms[1] = "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0";
 		newTerms = new String[2];
 		newTerms[0] = "a";
 		newTerms[1] = "2";
@@ -186,23 +187,23 @@ public class PacManUnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0");
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0");
 
 		// Unification under an existing range term (extension)
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		newState.clear();
 		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
-		oldTerms[1] = "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0";
+		oldTerms[1] = "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0";
 		newTerms = new String[2];
 		newTerms[0] = "a";
 		newTerms[1] = "-2";
@@ -211,11 +212,11 @@ public class PacManUnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0");
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0");
 
 		// Multiple numerical terms
 		oldState.clear();
@@ -236,31 +237,31 @@ public class PacManUnificationTest {
 		index++;
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 						+ " -2.0 1.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 		index++;
 		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(level a ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
 
 		// Multiple numerical terms with existing range term
 		oldState.clear();
 		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 1.0 3.0))"));
 		oldState.add(StateSpec.toRelationalPredicate("(level a 1)"));
 		newState.clear();
 		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
 		newState.add(StateSpec.toRelationalPredicate("(level a 3)"));
 		oldTerms = new String[2];
 		oldTerms[0] = "a";
-		oldTerms[1] = "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0";
+		oldTerms[1] = "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0";
 		newTerms = new String[2];
 		newTerms[0] = "a";
 		newTerms[1] = "-2";
@@ -269,16 +270,16 @@ public class PacManUnificationTest {
 		assertEquals(2, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(distanceDot a b ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0&:("
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0&:("
 						+ StateSpec.BETWEEN_RANGE + " ?"
-						+ RelationalPredicate.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 -2.0 3.0))")));
 		assertEquals(oldTerms[0], "a");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + "0");
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0");
 		index++;
 		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(level a ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + "&:("
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + "&:("
 				+ StateSpec.BETWEEN_RANGE + " ?"
-				+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
+				+ RelationalArgument.RANGE_VARIABLE_PREFIX + index + " 1.0 3.0))")));
 
 		// Variables and numerical unification (differing distance)
 		oldState.clear();
@@ -302,13 +303,13 @@ public class PacManUnificationTest {
 		assertTrue(oldState
 				.contains(StateSpec
 						.toRelationalPredicate("(distanceDot ? ?X ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (out-of-range distance)
 		oldState.clear();
@@ -333,13 +334,13 @@ public class PacManUnificationTest {
 		assertTrue(oldState
 				.contains(StateSpec
 						.toRelationalPredicate("(distanceDot ? ?X ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 
 		// Variables and numerical unification (same distance)
 		oldState.clear();
@@ -363,13 +364,13 @@ public class PacManUnificationTest {
 		assertTrue(oldState
 				.contains(StateSpec
 						.toRelationalPredicate("(distanceDot ? ?X ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ "&:(" + StateSpec.BETWEEN_RANGE + " ?"
-								+ RelationalPredicate.RANGE_VARIABLE_PREFIX + index
+								+ RelationalArgument.RANGE_VARIABLE_PREFIX + index
 								+ " 1.0 5.0))")));
 		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(dot ?X)")));
 		assertEquals(oldTerms[0], "?X");
-		assertEquals(oldTerms[1], "?" + RelationalPredicate.RANGE_VARIABLE_PREFIX + index);
+		assertEquals(oldTerms[1], "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + index);
 	}
 
 }

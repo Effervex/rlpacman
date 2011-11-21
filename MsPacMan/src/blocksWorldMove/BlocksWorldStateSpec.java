@@ -2,6 +2,7 @@ package blocksWorldMove;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -100,10 +101,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
 			result[0] = "onAB";
-			result[1] = "(on " + StateSpec.createGoalTerm(0) + " "
-					+ StateSpec.createGoalTerm(1) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ") (block "
-					+ StateSpec.createGoalTerm(1) + ")";
+			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
+					+ RelationalArgument.createGoalTerm(1) + ") (block "
+					+ RelationalArgument.createGoalTerm(0) + ") (block "
+					+ RelationalArgument.createGoalTerm(1) + ")";
 			return result;
 		}
 
@@ -124,14 +125,15 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
 			result[0] = "clearA";
-			result[1] = "(clear " + StateSpec.createGoalTerm(0) + ") (block "
-					+ StateSpec.createGoalTerm(0) + ")";
+			result[1] = "(clear " + RelationalArgument.createGoalTerm(0)
+					+ ") (block " + RelationalArgument.createGoalTerm(0) + ")";
 			return result;
 		}
 
 		if (envParameter_.equals("highestA")) {
 			result[0] = "highestA";
-			result[1] = "(highest " + StateSpec.createGoalTerm(0) + ")";
+			result[1] = "(highest " + RelationalArgument.createGoalTerm(0)
+					+ ")";
 			return result;
 		}
 		return null;

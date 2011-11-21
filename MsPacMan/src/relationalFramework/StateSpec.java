@@ -43,29 +43,14 @@ public abstract class StateSpec {
 	/** The suffix for an action precondition. */
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
 
-	/** The anonymous variable symbol. */
-	public static final String ANONYMOUS = "?";
-
-	/** The between a range of values function name. */
-	public static final String BETWEEN_RANGE = "betweenRange";
-
-	/** The equivalent symbol. */
-	public static final String EQUIVALENT_RULE = "<=>";
-
 	/** The goal query name */
 	public static final String GOAL_QUERY = "isGoal";
-
-	/** The goal variable prefix. */
-	public static final String GOAL_VARIABLE_PREFIX = "?G_";
 
 	/** The goal predicate. */
 	public static final String GOALARGS_PRED = "goalArgs";
 
 	/** The infers symbol. */
 	public static final String INFERS_ACTION = "=>";
-
-	/** The outside a range of values function name. */
-	public static final String OUTSIDE_RANGE = "outsideRange";
 
 	/** The policy rule prefix. */
 	public static final String POLICY_QUERY_PREFIX = "polRule";
@@ -145,15 +130,11 @@ public abstract class StateSpec {
 		Pattern p = Pattern.compile(" ([?\\w].*?)(?=\\)| |&)");
 		Matcher m = p.matcher(goalState);
 		while (m.find()) {
-			String term = m.group(1);
-			if (!constants.contains(term)) {
+			RelationalArgument term = new RelationalArgument(m.group(1));
+			if (!constants.contains(term.toString())) {
 				// If the fact is a constant (not a number)
-				if (term.charAt(0) != '?' && !isNumber(term))
-					constants.add(term);
-				// If the fact is a parameterisable goal constant
-				if (term.contains(GOAL_VARIABLE_PREFIX)) {
-					constants.add(term);
-				}
+				if (term.isConstant())
+					constants.add(term.toString());
 			}
 		}
 
@@ -171,7 +152,7 @@ public abstract class StateSpec {
 	private List<String> formActionTerms(RelationalPredicate action) {
 		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
 		for (int i = 0; i < action.getArgTypes().length; i++)
-			terms.add(RelationalPredicate.getVariableTermString(i).substring(1));
+			terms.add(RelationalArgument.getVariableTermArg(i).toString().substring(1));
 		return terms;
 	}
 
@@ -269,14 +250,6 @@ public abstract class StateSpec {
 			for (String ruleNames : backgroundRules_.keySet())
 				rete_.eval("(defrule " + ruleNames + " "
 						+ backgroundRules_.get(ruleNames) + ")");
-
-			// Initialise the betweenRange and outsideRange functions
-			rete_.eval("(deffunction " + BETWEEN_RANGE + " (?val ?low ?high) "
-					+ "(if (and (>= ?val ?low) (<= ?val ?high)) then "
-					+ "return TRUE))");
-			rete_.eval("(deffunction " + OUTSIDE_RANGE + " (?val ?low ?high) "
-					+ "(if (or (< ?val ?low) (> ?val ?high)) then "
-					+ "return TRUE))");
 
 			// Initialise the goal state rules
 			String[] goal = initialiseGoalState();
@@ -512,7 +485,7 @@ public abstract class StateSpec {
 		int i = 0;
 		for (String goalTerm : goalArgs) {
 			if (!goalReplacements.containsKey(goalTerm))
-				goalReplacements.put(goalTerm, StateSpec.createGoalTerm(i));
+				goalReplacements.put(goalTerm, RelationalArgument.createGoalTerm(i));
 			i++;
 		}
 		ObjectObservations.getInstance().goalReplacements = goalReplacements;
@@ -883,17 +856,6 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates a variable representing a goal term at a given index.
-	 * 
-	 * @param i
-	 *            The index of the goal condition.
-	 * @return The variable goal condition.
-	 */
-	public static String createGoalTerm(int i) {
-		return GOAL_VARIABLE_PREFIX + i;
-	}
-
-	/**
 	 * Creates the inequals tests from the terms given. Note anonymous terms are
 	 * special in that they aren't inequal to one-another.
 	 * 
@@ -937,24 +899,6 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates a numerical range expression (JESS-readable) for a variable
-	 * ('&:') to bound numerical values.
-	 * 
-	 * @param numericalVariable
-	 *            The variable to numerically bound.
-	 * @param lowerBound
-	 *            The lower bound.
-	 * @param upperBound
-	 *            The upper bound.
-	 * @return The JESS parsable range expression.
-	 */
-	public static String createNumericalRange(String numericalVariable,
-			double lowerBound, double upperBound) {
-		return numericalVariable + "&:(<= " + lowerBound + " "
-				+ numericalVariable + " " + upperBound + ")";
-	}
-
-	/**
 	 * Extracts a collection of facts from the state.
 	 * 
 	 * @param state
@@ -969,27 +913,6 @@ public abstract class StateSpec {
 		}
 
 		return facts;
-	}
-
-	/**
-	 * Extracts a numerical range from a numerical arg.
-	 * 
-	 * @param numericalArg
-	 *            The numerical argument.
-	 * @return An array of either: variable, min and max, or a single number.
-	 */
-	public static String[] extractNumericalRange(String numericalArg) {
-		Pattern rangePattern = Pattern
-				.compile("(.+)&:\\(<= ([\\dE.-]+) \\1 ([\\dE.-]+)\\)");
-		Matcher m = rangePattern.matcher(numericalArg);
-
-		if (m.find()) {
-			String[] range = { m.group(1), m.group(2), m.group(3) };
-			return range;
-		}
-
-		String[] number = { numericalArg };
-		return number;
 	}
 
 	/**
@@ -1043,22 +966,6 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Checks if this String can be parsed into a double.
-	 * 
-	 * @param unityValue
-	 *            The value being checked.
-	 * @return True if the String can be put into a numerical form.
-	 */
-	public static boolean isNumber(String string) {
-		try {
-			Double.parseDouble(string);
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-
-	/**
 	 * Checks if a type name represents a number.
 	 * 
 	 * @param type
@@ -1072,29 +979,6 @@ public abstract class StateSpec {
 		} catch (IllegalArgumentException iae) {
 		}
 		return false;
-	}
-
-	/**
-	 * Reforms a fact back together again from a split array.
-	 * 
-	 * @param factSplit
-	 *            The split fact.
-	 * @return A string representation of the fact.
-	 */
-	public static String reformFact(String[] factSplit) {
-		StringBuffer buffer = new StringBuffer("(" + factSplit[0]);
-		// Reforming negation
-		if (factSplit[0].equals("not"))
-			return buffer.toString()
-					+ " "
-					+ reformFact(Arrays.copyOfRange(factSplit, 1,
-							factSplit.length)) + ")";
-
-		for (int i = 1; i < factSplit.length; i++) {
-			buffer.append(" " + factSplit[i]);
-		}
-		buffer.append(")");
-		return buffer.toString();
 	}
 
 	public static void reinitInstance() {

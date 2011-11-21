@@ -4,6 +4,7 @@ import relationalFramework.GoalCondition;
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.CoveringRelationalPolicy;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -444,7 +445,7 @@ public class PolicyActor implements AgentInterface {
 					// met.
 					boolean isGoal = (goalArgs_ == null) ? false : true;
 					for (int i = 0; i < goalCondition_.getNumArgs(); i++) {
-						String goalTerm = StateSpec.createGoalTerm(i);
+						String goalTerm = RelationalArgument.createGoalTerm(i);
 						String term = results.getSymbol(goalTerm.substring(1));
 						goalReplacements.put(goalTerm, term);
 						// Check if these are the goal args

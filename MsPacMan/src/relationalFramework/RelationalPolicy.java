@@ -73,7 +73,7 @@ public abstract class RelationalPolicy implements Serializable {
 			} else {
 				// Use anonymous placeholder
 				for (int i = 0; i < rule.getQueryParameters().size(); i++)
-					vv.add(StateSpec.ANONYMOUS);
+					vv.add(RelationalArgument.ANONYMOUS.toString());
 			}
 		}
 		QueryResult results = state.runQueryStar(query, vv);
@@ -157,7 +157,7 @@ public abstract class RelationalPolicy implements Serializable {
 		if (goalArgs != null) {
 			params = new ArrayList<String>();
 			for (int i = 0; i < goalArgs.size(); i++)
-				params.add(goalArgs.get(StateSpec.createGoalTerm(i)));
+				params.add(goalArgs.get(RelationalArgument.createGoalTerm(i)));
 		}
 
 		// Set the parameters for the policy rules.

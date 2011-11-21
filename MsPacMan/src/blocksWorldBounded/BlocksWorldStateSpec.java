@@ -1,9 +1,9 @@
 package blocksWorldBounded;
 
 import relationalFramework.BasicRelationalPolicy;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 import java.util.ArrayList;
@@ -83,8 +83,8 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
 			result[0] = "onAB";
-			String[] goalBlocks = { StateSpec.createGoalTerm(0),
-					StateSpec.createGoalTerm(1) };
+			String[] goalBlocks = { RelationalArgument.createGoalTerm(0),
+					RelationalArgument.createGoalTerm(1) };
 			result[1] = "(on " + goalBlocks[0] + " " + goalBlocks[1]
 					+ ") (bound " + goalBlocks[0] + " " + goalBlocks[1] + ")";
 			return result;
@@ -107,7 +107,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
 			result[0] = "clearA";
-			String goalBlock = StateSpec.createGoalTerm(0);
+			String goalBlock = RelationalArgument.createGoalTerm(0);
 			result[1] = "(clear " + goalBlock + ") (block " + goalBlock
 					+ ") (not (bound " + goalBlock + " ?))";
 			return result;
@@ -115,8 +115,8 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 
 		if (envParameter_.equals("highestA")) {
 			result[0] = "highestA";
-			String goalBlock = StateSpec.createGoalTerm(0);
-			result[1] = "(highest " + goalBlock + ") (active " + goalBlock
+			String goalBlock = RelationalArgument.createGoalTerm(0);
+			result[1] = "(highest " + goalBlock + ") (block " + goalBlock
 					+ ") (not (bound " + goalBlock + " ?))";
 			return result;
 		}

@@ -1,6 +1,7 @@
 package cerrla;
 
 import relationalFramework.GoalCondition;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -16,8 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import relationalFramework.agentObservations.AgentObservations;
 import util.MultiMap;
@@ -90,16 +89,11 @@ public class RuleCreation implements Serializable {
 			RelationalPredicate condition, int condArgIndex,
 			String rangeVariable, double lowerBound, double upperBound) {
 		// Create the replacement term.
-		String replacementTerm;
-		// If a range, make a range, otherwise make a point.
-		if (lowerBound != upperBound)
-			replacementTerm = StateSpec.createNumericalRange(rangeVariable,
-					lowerBound, upperBound);
-		else
-			replacementTerm = lowerBound + "";
+		RelationalArgument subrangeArg = new RelationalArgument(rangeVariable,
+				lowerBound, upperBound);
 
-		String[] mutantArgs = condition.getArguments();
-		mutantArgs[condArgIndex] = replacementTerm;
+		RelationalArgument[] mutantArgs = condition.getRelationalArguments();
+		mutantArgs[condArgIndex] = subrangeArg;
 		RelationalPredicate mutantFact = new RelationalPredicate(condition,
 				mutantArgs);
 		SortedSet<RelationalPredicate> cloneConds = baseRule
@@ -109,10 +103,6 @@ public class RuleCreation implements Serializable {
 
 		RelationalRule mutant = new RelationalRule(cloneConds,
 				baseRule.getAction(), baseRule);
-		// If just a point, change the action.
-		if (lowerBound == upperBound)
-			mutant.getAction().replaceArguments(rangeVariable, lowerBound + "",
-					true);
 		mutant.setQueryParams(baseRule.getQueryParameters());
 		return mutant;
 	}
@@ -128,29 +118,23 @@ public class RuleCreation implements Serializable {
 	 *            The original condition being mutated.
 	 * @param condArgIndex
 	 *            The index of the mutation.
-	 * @param rangeVariable
-	 *            the range variable.
-	 * @param min
-	 *            The minimum value of the range.
-	 * @param max
-	 *            The maximum value of the range.
-	 * @param c
-	 *            The condition index.
-	 * @param rangeSplit
-	 *            The size of the subranges.
+	 * @param rangeArg
+	 *            The actual ranged argument itself.
 	 */
 	private void createRangeSpecialisations(RelationalRule baseRule,
 			Set<RelationalRule> subranges, RelationalPredicate condition,
-			int condArgIndex, String rangeVariable, double min, double max) {
-		if (min != max) {
+			int condArgIndex, RelationalArgument rangeArg) {
+		double[] ranges = rangeArg.getRangeArg();
+		String rangeVariable = rangeArg.getStringArg();
+		if (ranges[0] != ranges[1]) {
 			// Create 3 ranges, the min and max split in two and a range
 			// overlapping each centred about the middle.
-			double halfVal = min + (max - min) / 2;
-			double quarterAmount = (max - min) / 4;
+			double halfVal = ranges[0] + (ranges[1] - ranges[0]) / 2;
+			double quarterAmount = (ranges[1] - ranges[0]) / 4;
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, min, halfVal));
+					condArgIndex, rangeVariable, ranges[0], halfVal));
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, halfVal, max));
+					condArgIndex, rangeVariable, halfVal, ranges[1]));
 			subranges.add(createRangedSpecialisation(baseRule, condition,
 					condArgIndex, rangeVariable, halfVal - quarterAmount,
 					halfVal + quarterAmount));
@@ -159,19 +143,17 @@ public class RuleCreation implements Serializable {
 		if (!baseRule.isMutant()) {
 			// If the ranges go through 0 and this rule isn't a
 			// mutant, split at 0
-			if (min * max < 0) {
+			if (ranges[0] * ranges[1] < 0) {
 				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, min, 0));
+						condArgIndex, rangeVariable, ranges[0], 0));
 				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, 0, max));
+						condArgIndex, rangeVariable, 0, ranges[1]));
 			}
 		}
 	}
 
 	/**
 	 * Splits any ranges in a rule into a number of smaller uniform sub-ranges.
-	 * Only mutates rules which are either covered rules, or mutants with ranges
-	 * equal to the covered rules.
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
@@ -186,20 +168,10 @@ public class RuleCreation implements Serializable {
 		// Run through each condition
 		for (RelationalPredicate condition : baseRule.getConditions(false)) {
 			for (int i = 0; i < condition.getArguments().length; i++) {
-				String arg = condition.getArguments()[i];
-				int suchThatIndex = arg.indexOf("&:");
-
-				// We have a range
-				if (suchThatIndex != -1) {
-					// TODO Could be a problem here...
-					String[] betweenRangeSplit = StateSpec.splitFact(arg
-							.substring(suchThatIndex + 2));
-					// Find the values
-					double min = Double.parseDouble(betweenRangeSplit[1]);
-					double max = Double.parseDouble(betweenRangeSplit[3]);
-
+				RelationalArgument arg = condition.getRelationalArguments()[i];
+				if (arg.isRange()) {
 					createRangeSpecialisations(baseRule, subranges, condition,
-							i, betweenRangeSplit[1], min, max);
+							i, arg);
 				}
 			}
 		}
@@ -251,7 +223,7 @@ public class RuleCreation implements Serializable {
 			numGoalArgs = goalReplacements.size();
 		List<String> queryTerms = new ArrayList<String>(numGoalArgs);
 		for (int i = 0; i < numGoalArgs; i++)
-			queryTerms.add(StateSpec.createGoalTerm(i));
+			queryTerms.add(RelationalArgument.createGoalTerm(i));
 		return AgentObservations.getInstance().getRLGGActionRules(queryTerms);
 	}
 
@@ -292,9 +264,10 @@ public class RuleCreation implements Serializable {
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
 			condition.swapNegated();
+			// TODO Create a unifyFact method which only accepts a fact and a
+			// collection of facts.
 			Collection<UnifiedFact> negUnification = Unification.getInstance()
-					.unifyFact(condition, ruleConds, new DualHashBidiMap(),
-							new DualHashBidiMap(), new String[0], false, false);
+					.unifyFact(condition, ruleConds, null, null, false, false);
 			condition.swapNegated();
 			if (!negUnification.isEmpty())
 				return null;
@@ -325,7 +298,7 @@ public class RuleCreation implements Serializable {
 			replacementMap.put(goalTerm, goalTerm);
 
 		for (RelationalPredicate sf : simplified)
-			if (!isValidGoalCondition(sf, goalPreds, replacementMap))
+			if (!isValidGoalCondition(sf, goalPreds.values(), replacementMap))
 				return null;
 
 		return simplified;
@@ -373,7 +346,7 @@ public class RuleCreation implements Serializable {
 					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
 							|| AgentObservations.getInstance().getNumGoalArgs() == 0
 							|| specConditions.toString().contains(
-									StateSpec.GOAL_VARIABLE_PREFIX))
+									RelationalArgument.GOAL_VARIABLE_PREFIX))
 						specialisations.add(specialisation);
 				}
 			}
@@ -414,7 +387,7 @@ public class RuleCreation implements Serializable {
 				// For every action term
 				for (int i = 0; i < oldTerms.length; i++) {
 					// If the term is already a goal term, can't swap
-					if (!oldTerms[i].startsWith(StateSpec.GOAL_VARIABLE_PREFIX)) {
+					if (!RelationalArgument.isGoalCondition(oldTerms[i])) {
 						RelationalRule swappedRule = swapRuleTerm(rule,
 								goalPredicates, oldTerms, i, goalTerm);
 						if (swappedRule != null)
@@ -456,7 +429,7 @@ public class RuleCreation implements Serializable {
 				ruleConditions.comparator());
 		// Form the replacement map
 		Map<String, String> replacementMap = new HashMap<String, String>();
-		replacementMap.put(oldTerms[i], goalTerm);
+		replacementMap.put(oldTerms[i], newTerms[i]);
 		for (String gTerm : goalPredicates.keySet()) {
 			replacementMap.put(gTerm, gTerm);
 		}
@@ -466,7 +439,8 @@ public class RuleCreation implements Serializable {
 		boolean validRule = true;
 		for (RelationalPredicate cond : ruleConditions) {
 			// Check if the condition is a valid goal condition.
-			if (isValidGoalCondition(cond, goalPredicates, replacementMap)) {
+			if (isValidGoalCondition(cond, goalPredicates.values(),
+					replacementMap)) {
 				// If the replacement is valid, then add a replaced
 				// fact (retaining other args) to the specialised
 				// conditions.
@@ -501,7 +475,7 @@ public class RuleCreation implements Serializable {
 	 * @param cond
 	 *            The condition to check.
 	 * @param goalPredicates
-	 *            The goal predicate map.
+	 *            The observed goal predicates.
 	 * @param replacementMap
 	 *            The replacement map to use. Must not have variables as values
 	 *            (only as keys).
@@ -509,12 +483,12 @@ public class RuleCreation implements Serializable {
 	 * @return True if the condition is valid, false otherwise.
 	 */
 	private boolean isValidGoalCondition(RelationalPredicate cond,
-			MultiMap<String, RelationalPredicate> goalPredicates,
+			Collection<RelationalPredicate> goalPredicates,
 			Map<String, String> replacementMap) {
 		RelationalPredicate checkedCond = new RelationalPredicate(cond);
 		boolean notAnonymous = checkedCond.replaceArguments(replacementMap,
 				false, false);
-		return goalPredicates.values().contains(checkedCond) || !notAnonymous
+		return goalPredicates.contains(checkedCond) || !notAnonymous
 				|| cond.getFactName().equals(StateSpec.GOALARGS_PRED);
 	}
 }

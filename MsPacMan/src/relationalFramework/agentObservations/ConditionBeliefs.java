@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
@@ -90,7 +91,8 @@ public class ConditionBeliefs implements Serializable {
 		String[] arguments = new String[cbFact_.getArguments().length];
 		for (int i = 0; i < arguments.length; i++) {
 			if (args_ == null)
-				arguments[i] = RelationalPredicate.getVariableTermString(i);
+				arguments[i] = RelationalArgument.getVariableTermArg(i)
+						.toString();
 			else
 				arguments[i] = args_[i];
 		}
@@ -176,7 +178,8 @@ public class ConditionBeliefs implements Serializable {
 		if (args_ == null && pred.equals(condition_)) {
 			String[] baseArgs = new String[predFact.getArguments().length];
 			for (int i = 0; i < baseArgs.length; i++)
-				baseArgs[i] = RelationalPredicate.getVariableTermString(i);
+				baseArgs[i] = RelationalArgument.getVariableTermArg(i)
+						.toString();
 			shapedFacts.remove(new RelationalPredicate(predFact, baseArgs));
 		}
 
@@ -203,7 +206,8 @@ public class ConditionBeliefs implements Serializable {
 				if (args_ != null)
 					varName = args_[i];
 				else
-					varName = RelationalPredicate.getVariableTermString(i);
+					varName = RelationalArgument.getVariableTermArg(i)
+							.toString();
 				if (!varName.equals("?")) {
 					actionTerms.putContains(argTypes[i], varName);
 					// Also put any parent type of the given type
@@ -418,8 +422,8 @@ public class ConditionBeliefs implements Serializable {
 			// rules.
 			if (StateSpec.getInstance().isTypePredicate(
 					relatedFact.getFactName())) {
-				int index = RelationalPredicate
-						.getVariableTermIndex(relatedFact.getArguments()[0]);
+				int index = relatedFact.getRelationalArguments()[0]
+						.getVariableTermIndex();
 				if (thisFact.getArgTypes()[index].equals(relatedFact
 						.getFactName()))
 					return false;
@@ -472,8 +476,8 @@ public class ConditionBeliefs implements Serializable {
 			String[] otherArgs = otherCond.getArguments();
 			for (int i = 0; i < otherArgs.length; i++) {
 				if (!otherArgs[i].equals("?"))
-					replacementMap.put(otherArgs[i],
-							RelationalPredicate.getVariableTermString(i));
+					replacementMap.put(otherArgs[i], RelationalArgument
+							.getVariableTermArg(i).toString());
 			}
 
 			// If the sets are equal, the relations are equivalent!
