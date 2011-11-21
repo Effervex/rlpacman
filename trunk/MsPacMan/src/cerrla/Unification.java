@@ -314,8 +314,8 @@ public class Unification {
 			return (RelationalArgument) unityReplacementMap.get(unityTerm);
 
 		// If we're allowing flexible replacements, create a replacement and use
-		// the replacement
-		if (flexibleReplacement) {
+		// the replacement (not for numbers)
+		if (flexibleReplacement && !unityTerm.isNumber()) {
 			// If the fact term hasn't already been mapped to another unity term
 			if ((unityReplacementMap == null || !unityReplacementMap
 					.containsValue(factTerm))

@@ -264,8 +264,6 @@ public class RuleCreation implements Serializable {
 		// If we have an optional added condition, check for duplicates/negation
 		if (condition != null) {
 			condition.swapNegated();
-			// TODO Create a unifyFact method which only accepts a fact and a
-			// collection of facts.
 			Collection<UnifiedFact> negUnification = Unification.getInstance()
 					.unifyFact(condition, ruleConds, null, null, false, false);
 			condition.swapNegated();
