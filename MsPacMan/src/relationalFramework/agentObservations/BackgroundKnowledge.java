@@ -195,7 +195,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param replacementTerms
 	 *            The replacement terms to swap the terms with.
 	 */
-	@SuppressWarnings("unchecked")
 	private RelationalPredicate getPostCond(BidiMap replacementTerms) {
 		RelationalPredicate replacedFact = new RelationalPredicate(
 				postCondition_);
@@ -228,7 +227,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            The rule conditions to simplify.
 	 * @return True if the conditions were simplified.
 	 */
-	@SuppressWarnings("unchecked")
 	public boolean simplify(SortedSet<RelationalPredicate> ruleConds) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();

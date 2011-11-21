@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
@@ -16,8 +17,6 @@ import jess.Rete;
 
 import org.junit.Before;
 import org.junit.Test;
-
-import blocksWorld.BlocksWorldStateSpec;
 
 import cerrla.PolicyGenerator;
 
@@ -478,13 +477,13 @@ public class AgentObservationsTest {
 		Collection<Fact> facts = StateSpec.extractFacts(state);
 
 		Map<String, String> goalReplacements = new HashMap<String, String>();
-		goalReplacements.put("a", StateSpec.createGoalTerm(0));
-		goalReplacements.put("b", StateSpec.createGoalTerm(1));
+		goalReplacements.put("a", RelationalArgument.createGoalTerm(0));
+		goalReplacements.put("b", RelationalArgument.createGoalTerm(1));
 		sut_.scanState(facts, goalReplacements);
 		MultiMap<String, RelationalPredicate> goalPredicates = sut_
 				.getGoalPredicateMap();
 		Collection<RelationalPredicate> goalTermPreds = goalPredicates
-				.get(StateSpec.createGoalTerm(0));
+				.get(RelationalArgument.createGoalTerm(0));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toRelationalPredicate("(on ? ?G_0)")));
 		assertTrue(goalTermPreds.contains(StateSpec
@@ -504,7 +503,7 @@ public class AgentObservationsTest {
 				.toRelationalPredicate("(not (block ?G_0))")));
 		assertEquals(goalTermPreds.size(), 8);
 
-		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
+		goalTermPreds = goalPredicates.get(RelationalArgument.createGoalTerm(1));
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toRelationalPredicate("(on ? ?G_1)")));
 		assertTrue(goalTermPreds.contains(StateSpec
@@ -529,11 +528,11 @@ public class AgentObservationsTest {
 
 		// Different goal terms
 		goalReplacements.clear();
-		goalReplacements.put("e", StateSpec.createGoalTerm(0));
-		goalReplacements.put("c", StateSpec.createGoalTerm(1));
+		goalReplacements.put("e", RelationalArgument.createGoalTerm(0));
+		goalReplacements.put("c", RelationalArgument.createGoalTerm(1));
 		sut_.scanState(facts, goalReplacements);
 		goalPredicates = sut_.getGoalPredicateMap();
-		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(0));
+		goalTermPreds = goalPredicates.get(RelationalArgument.createGoalTerm(0));
 		// OLD ONES
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toRelationalPredicate("(on ? ?G_0)")));
@@ -555,7 +554,7 @@ public class AgentObservationsTest {
 		// Include negated too
 		assertEquals(goalTermPreds.size(), 16);
 
-		goalTermPreds = goalPredicates.get(StateSpec.createGoalTerm(1));
+		goalTermPreds = goalPredicates.get(RelationalArgument.createGoalTerm(1));
 		// OLD ONES
 		assertTrue(goalTermPreds.contains(StateSpec
 				.toRelationalPredicate("(on ? ?G_1)")));
@@ -1130,8 +1129,8 @@ public class AgentObservationsTest {
 		// [f][a][c]
 		// Goal terms
 		Map<String, String> goalReplacements = new HashMap<String, String>();
-		goalReplacements.put("f", StateSpec.createGoalTerm(0));
-		goalReplacements.put("c", StateSpec.createGoalTerm(1));
+		goalReplacements.put("f", RelationalArgument.createGoalTerm(0));
+		goalReplacements.put("c", RelationalArgument.createGoalTerm(1));
 		relevantFacts = sut_
 				.gatherActionFacts(
 						StateSpec.toRelationalPredicate("(move e c)"),
@@ -1153,7 +1152,7 @@ public class AgentObservationsTest {
 				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toRelationalPredicate("(above ?X "
-						+ StateSpec.createGoalTerm(0) + ")")));
+						+ RelationalArgument.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toRelationalPredicate("(above ?Y ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
@@ -1167,8 +1166,8 @@ public class AgentObservationsTest {
 		// [f][a][c]
 		// Goal terms
 		goalReplacements.clear();
-		goalReplacements.put("b", StateSpec.createGoalTerm(0));
-		goalReplacements.put("d", StateSpec.createGoalTerm(1));
+		goalReplacements.put("b", RelationalArgument.createGoalTerm(0));
+		goalReplacements.put("d", RelationalArgument.createGoalTerm(1));
 		relevantFacts = sut_
 				.gatherActionFacts(
 						StateSpec.toRelationalPredicate("(move e c)"),
@@ -1190,9 +1189,10 @@ public class AgentObservationsTest {
 				.toRelationalPredicate("(above ?X ?)")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toRelationalPredicate("(above ?X "
-						+ StateSpec.createGoalTerm(0) + ")")));
+						+ RelationalArgument.createGoalTerm(0) + ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
-				.toRelationalPredicate("(on ?X " + StateSpec.createGoalTerm(0)
+				.toRelationalPredicate("(on ?X "
+						+ RelationalArgument.createGoalTerm(0)
 						+ ")")));
 		assertTrue(specialisationConditions.contains(StateSpec
 				.toRelationalPredicate("(above ?Y ?)")));
