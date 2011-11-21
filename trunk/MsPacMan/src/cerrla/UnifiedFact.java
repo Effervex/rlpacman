@@ -1,5 +1,6 @@
 package cerrla;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 
 import org.apache.commons.collections.BidiMap;
@@ -15,7 +16,7 @@ public class UnifiedFact {
 	private RelationalPredicate resultFact_;
 
 	/** The action terms associated with the result fact. */
-	private String[] factTerms_;
+	private RelationalArgument[] factTerms_;
 
 	/** The fact used for the unification. */
 	private RelationalPredicate unityFact_;
@@ -26,7 +27,7 @@ public class UnifiedFact {
 	/** The generalisation of this unification. */
 	private int generalisation_;
 
-	public UnifiedFact(RelationalPredicate resultFact, String[] factTerms,
+	public UnifiedFact(RelationalPredicate resultFact, RelationalArgument[] factTerms,
 			RelationalPredicate unityFact, BidiMap replacements,
 			int generalisation) {
 		resultFact_ = resultFact;
@@ -40,7 +41,7 @@ public class UnifiedFact {
 		return resultFact_;
 	}
 
-	public String[] getFactTerms() {
+	public RelationalArgument[] getFactTerms() {
 		return factTerms_;
 	}
 

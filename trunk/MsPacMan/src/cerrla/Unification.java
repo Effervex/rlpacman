@@ -1,7 +1,7 @@
 package cerrla;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.StateSpec;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -24,46 +24,6 @@ public class Unification {
 	}
 
 	/**
-	 * Unifies two states together. This is more than simply a retainAll
-	 * operation, as it can also generalise constants into variables during the
-	 * unification process. This process does not keep useless facts around
-	 * (facts using only anonymous terms). It also removes facts known to
-	 * already by true (on ?X ?Y) implies (on ?X ?) is also true.
-	 * 
-	 * This process performs special unification on numerical variables, by
-	 * creating a range function under which the variables fall.
-	 * 
-	 * @param oldState
-	 *            The old state to be unified with. May contain constants,
-	 *            variables and anonymous values. This may be modified.
-	 * @param newState
-	 *            The new state being unified with. Will only contain constant
-	 *            terms and facts.
-	 * @param oldTerms
-	 *            The terms for the actions on the old state. Should be for the
-	 *            same action as newTerms. This may be modified.
-	 * @param newTerms
-	 *            The terms for the actions on the new state. Should be for the
-	 *            same action as oldTerms.
-	 * @return 1 if the old state changed from the unification, 0 if the state
-	 *         remained the same, -1 if the states did not unify and returned
-	 *         the empty set.
-	 */
-	public int unifyStates(Collection<RelationalPredicate> oldState,
-			Collection<RelationalPredicate> newState, String[] oldTerms,
-			String[] newTerms) {
-		// If the terms don't match up, create a replacement map
-		BidiMap oldReplacementMap = new DualHashBidiMap();
-		BidiMap newReplacementMap = new DualHashBidiMap();
-		if (!createReplacementMaps(oldTerms, newTerms, oldReplacementMap,
-				newReplacementMap))
-			return -1;
-
-		return unifyStates(oldState, newState, oldTerms, false,
-				oldReplacementMap, newReplacementMap);
-	}
-
-	/**
 	 * Unifies two states together but in this method neither state has terms
 	 * affiliated with it. This method attempts to unify the new state with the
 	 * old state by dynamically replacing terms with old state terms for
@@ -76,53 +36,17 @@ public class Unification {
 	 * @param newState
 	 *            The flexible new state which can have terms replaced.
 	 * @param replacementMap
-	 *            The replacement map to fill.
+	 *            The replacement map to fill with RelationalArguments.
 	 * @return -1 if the states cannot unify, 0 if they unified perfectly, 1 if
 	 *         they unified but the old state was changed. In the two latter
 	 *         cases, the replacement map will contain replacement terms.
 	 */
 	public int unifyStates(Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState, BidiMap replacementMap) {
-		return unifyStates(oldState, newState, new String[0], true,
-				new DualHashBidiMap(), replacementMap);
-	}
-
-	/**
-	 * The actual unify state method used by the two outer methods. This method
-	 * has a some guarantees:
-	 * 
-	 * The unified old state can only ever get more general - either by losing
-	 * predicates or making terms more general. Which means that the number of
-	 * preds in the post-unified state will only be <= the old state.
-	 * 
-	 * The unification process may not be the most ideal one, it is a single
-	 * pass process, but it does try to unify with the most specific terms in
-	 * the new state. Each term in the new state can only be unified with once.
-	 * 
-	 * @param oldState
-	 *            The old state to be unified with.
-	 * @param newState
-	 *            The new state for unifying. May possibly have flexible terms.
-	 * @param oldTerms
-	 *            The terms used in the old state, if any.
-	 * @param flexibleReplacement
-	 *            If the replacement map can be modified dynamically to match
-	 *            the old state.
-	 * @param oldReplacementMap
-	 *            The replacement map for the old state.
-	 * @param newReplacementMap
-	 *            The replacement map for the new state. May be flexible.
-	 * @return -1 if no unification possible, 0 if perfect unification, 1 if
-	 *         unification with old state changed.
-	 */
-	private int unifyStates(Collection<RelationalPredicate> oldState,
-			Collection<RelationalPredicate> newState, String[] oldTerms,
-			boolean flexibleReplacement, BidiMap oldReplacementMap,
-			BidiMap newReplacementMap) {
 		Collection<RelationalPredicate> oldStateClone = new HashSet<RelationalPredicate>(
 				oldState);
-		recursivelyUnify(oldState, newState, oldTerms, oldReplacementMap,
-				newReplacementMap, flexibleReplacement);
+		recursivelyUnify(oldState, newState, new RelationalArgument[0],
+				replacementMap);
 
 		if (oldState.isEmpty()) {
 			oldState.addAll(oldStateClone);
@@ -144,8 +68,6 @@ public class Unification {
 	 *            The new state for use in unification.
 	 * @param oldTerms
 	 *            The terms the old state uses. This is modified in the process.
-	 * @param oldReplacementMap
-	 *            The replacement map for the old state.
 	 * @param newReplacementMap
 	 *            The replacement map for the new state.
 	 * @param flexibleReplacement
@@ -154,9 +76,8 @@ public class Unification {
 	 */
 	@SuppressWarnings("unchecked")
 	private int recursivelyUnify(Collection<RelationalPredicate> oldState,
-			Collection<RelationalPredicate> newState, String[] oldTerms,
-			BidiMap oldReplacementMap, BidiMap newReplacementMap,
-			boolean flexibleReplacement) {
+			Collection<RelationalPredicate> newState,
+			RelationalArgument[] oldTerms, BidiMap newReplacementMap) {
 		// Base condition.
 		if (oldState.isEmpty())
 			return 0;
@@ -164,8 +85,7 @@ public class Unification {
 		// For each item in the old state, see if it is present in the new state
 		for (RelationalPredicate oldStateFact : oldState) {
 			Collection<UnifiedFact> modFacts = unifyFact(oldStateFact,
-					newState, oldReplacementMap, newReplacementMap, oldTerms,
-					flexibleReplacement, false);
+					newState, newReplacementMap, oldTerms, true, false);
 
 			// If the fact didn't unify, remove it and continue the recursion.
 			if (modFacts.isEmpty()) {
@@ -174,9 +94,7 @@ public class Unification {
 				reducedOldState.remove(oldStateFact);
 
 				int generalisationValue = recursivelyUnify(reducedOldState,
-						newState, oldTerms, oldReplacementMap,
-						newReplacementMap, flexibleReplacement)
-						+ NO_FACT_UNIFY;
+						newState, oldTerms, newReplacementMap) + NO_FACT_UNIFY;
 				oldState.clear();
 				oldState.addAll(reducedOldState);
 				return generalisationValue;
@@ -184,7 +102,7 @@ public class Unification {
 				// Recursively step into each fact unification path
 				int bestGeneralisation = Integer.MAX_VALUE;
 				Collection<RelationalPredicate> bestOldState = null;
-				String[] bestOldTerms = null;
+				RelationalArgument[] bestOldTerms = null;
 				BidiMap bestReplacements = null;
 				for (UnifiedFact modFact : modFacts) {
 					Collection<RelationalPredicate> reducedNewState = new HashSet<RelationalPredicate>(
@@ -194,13 +112,13 @@ public class Unification {
 							oldState);
 					reducedOldState.remove(oldStateFact);
 
-					String[] recursiveOldTerms = modFact.getFactTerms();
+					RelationalArgument[] recursiveOldTerms = modFact
+							.getFactTerms();
 					BidiMap recursiveReplacements = modFact
 							.getResultReplacements();
 
 					int generalisationValue = recursivelyUnify(reducedOldState,
-							newState, recursiveOldTerms, oldReplacementMap,
-							recursiveReplacements, flexibleReplacement)
+							newState, recursiveOldTerms, recursiveReplacements)
 							+ modFact.getGeneralisation();
 
 					// Note the best unification
@@ -227,52 +145,6 @@ public class Unification {
 	}
 
 	/**
-	 * Creates replacement maps if necessary. Also, if replacements are
-	 * impossible, unification is impossible, so return false.
-	 * 
-	 * @param oldTerms
-	 *            The old terms.
-	 * @param newTerms
-	 *            The new terms.
-	 * @param oldReplacementMap
-	 *            The replacement map for the old terms.
-	 * @param newReplacementMap
-	 *            The replacement map for the new terms.
-	 * @return False if replacement is impossible, true otherwise.
-	 */
-	private boolean createReplacementMaps(String[] oldTerms, String[] newTerms,
-			BidiMap oldReplacementMap, BidiMap newReplacementMap) {
-		for (int i = 0; i < oldTerms.length; i++) {
-			// If this index of terms don't match up
-			String oldTerm = oldTerms[i];
-			String newTerm = newTerms[i];
-			// If the terms don't match and aren't numbers, create a replacement
-			if (!oldTerm.equals(newTerm) && !StateSpec.isNumber(oldTerm)
-					&& !StateSpec.isNumber(newTerm)) {
-				boolean bothVariables = true;
-				String variable = RelationalPredicate.getVariableTermString(i);
-				// Replace old term if necessary
-				if ((oldTerm.charAt(0) != '?')
-						|| (oldTerm.contains(StateSpec.GOAL_VARIABLE_PREFIX))) {
-					oldReplacementMap.put(oldTerm, variable);
-					bothVariables = false;
-				}
-				if ((newTerm.charAt(0) != '?')
-						|| (newTerm.contains(StateSpec.GOAL_VARIABLE_PREFIX))) {
-					newReplacementMap.put(newTerm, variable);
-					bothVariables = false;
-				}
-
-				// Check that both slots aren't inequal variables
-				if (bothVariables) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}
-
-	/**
 	 * Unifies a single fact by searching for the term itself or a generalised
 	 * form of the term within a collection. The search is special because it
 	 * can generalise terms to anonymous terms if necessary for unification. It
@@ -282,12 +154,11 @@ public class Unification {
 	 *            The fact being searched for in the unity collection.
 	 * @param unityFacts
 	 *            The collection of facts to search through for unification.
-	 * @param factReplacementMap
-	 *            The replacement map to apply to the fact.
 	 * @param unityReplacementMap
-	 *            The replacement map to apply to the unity collection.
-	 * @param factTerms
-	 *            The terms of the action.
+	 *            The replacement map to apply to the unity collection. If null,
+	 *            then the replacements are ignored.
+	 * @param actionTerms
+	 *            The terms of the action. (possibly null).
 	 * @param flexibleReplacement
 	 *            If the replacement maps can be filled dynamically to match
 	 *            terms.
@@ -300,13 +171,18 @@ public class Unification {
 	@SuppressWarnings("unchecked")
 	public Collection<UnifiedFact> unifyFact(RelationalPredicate fact,
 			Collection<RelationalPredicate> unityFacts,
-			BidiMap factReplacementMap, BidiMap unityReplacementMap,
-			String[] factTerms, boolean flexibleReplacement,
-			boolean noGeneralisations) {
+			BidiMap unityReplacementMap, RelationalArgument[] actionTerms,
+			boolean flexibleReplacement, boolean noGeneralisations) {
 		Collection<UnifiedFact> unifiedFacts = new HashSet<UnifiedFact>();
 
-		String[] newTerms = new String[factTerms.length];
-		System.arraycopy(factTerms, 0, newTerms, 0, factTerms.length);
+		RelationalArgument[] newActionTerms = null;
+		if (actionTerms == null)
+			newActionTerms = new RelationalArgument[0];
+		else {
+			newActionTerms = new RelationalArgument[actionTerms.length];
+			System.arraycopy(actionTerms, 0, newActionTerms, 0,
+					actionTerms.length);
+		}
 
 		// Maintain a check on what is the best unification (should better ones
 		// be present)
@@ -327,9 +203,11 @@ public class Unification {
 					noGeneralisations = true;
 				}
 
-				String[] factArguments = fact.getArguments();
-				String[] unityArguments = unityFact.getArguments();
-				String[] unification = new String[factArguments.length];
+				RelationalArgument[] factArguments = fact
+						.getRelationalArguments();
+				RelationalArgument[] unityArguments = unityFact
+						.getRelationalArguments();
+				RelationalArgument[] unification = new RelationalArgument[factArguments.length];
 				int thisGeneralness = 0;
 				boolean validFact = false;
 				BidiMap tempUnityReplacementMap = new DualHashBidiMap();
@@ -337,10 +215,8 @@ public class Unification {
 				// Unify each term
 				for (int i = 0; i < factArguments.length; i++) {
 					// Apply the replacements
-					String factTerm = (String) ((factReplacementMap
-							.containsKey(factArguments[i])) ? factReplacementMap
-							.get(factArguments[i]) : factArguments[i]);
-					String unityTerm = findUnityReplacement(
+					RelationalArgument factTerm = factArguments[i];
+					RelationalArgument unityTerm = findUnityReplacement(
 							unityReplacementMap, unityArguments[i],
 							flexibleReplacement, tempUnityReplacementMap,
 							factTerm, noGeneralisations);
@@ -356,9 +232,10 @@ public class Unification {
 					// so good
 					if (factTerm.equals(unityTerm)) {
 						unification[i] = factTerm;
-						validFact |= !factTerm.equals(StateSpec.ANONYMOUS);
+						validFact |= !factTerm
+								.equals(RelationalArgument.ANONYMOUS);
 					} else if (!numericalValueCheck(factArguments[i],
-							unityArguments[i], unification, i, newTerms)) {
+							unityArguments[i], unification, i, newActionTerms)) {
 						// Not a number, we have differing terms here. Use
 						// anonymous
 						if (noGeneralisations) {
@@ -366,10 +243,10 @@ public class Unification {
 							validFact = false;
 							break;
 						}
-						unification[i] = StateSpec.ANONYMOUS;
+						unification[i] = RelationalArgument.ANONYMOUS;
 						thisGeneralness++;
 						// Check if the term was an action term
-						for (String actionTerm : factTerms) {
+						for (RelationalArgument actionTerm : newActionTerms) {
 							if (factTerm.equals(actionTerm))
 								thisGeneralness++;
 						}
@@ -387,16 +264,11 @@ public class Unification {
 					if (thisGeneralness == generalisation) {
 						RelationalPredicate unifact = new RelationalPredicate(
 								fact, unification, fact.isNegated());
-						for (int i = 0; i < newTerms.length; i++) {
-							for (Object factKey : factReplacementMap.keySet())
-								if (newTerms[i].equals(factKey))
-									newTerms[i] = (String) factReplacementMap
-											.get(factKey);
-						}
-						tempUnityReplacementMap.putAll(unityReplacementMap);
+						if (unityReplacementMap != null)
+							tempUnityReplacementMap.putAll(unityReplacementMap);
 						UnifiedFact unifiedFact = new UnifiedFact(unifact,
-								newTerms, unityFact, tempUnityReplacementMap,
-								thisGeneralness);
+								newActionTerms, unityFact,
+								tempUnityReplacementMap, thisGeneralness);
 						unifiedFacts.add(unifiedFact);
 					}
 				}
@@ -428,27 +300,29 @@ public class Unification {
 	 * @return The replacement term, or the same term if no replacement
 	 *         used/created.
 	 */
-	private String findUnityReplacement(BidiMap unityReplacementMap,
-			String unityTerm, boolean flexibleReplacement,
-			BidiMap tempUnityReplacementMap, String factTerm,
-			boolean noGeneralisations) {
+	private RelationalArgument findUnityReplacement(
+			BidiMap unityReplacementMap, RelationalArgument unityTerm,
+			boolean flexibleReplacement, BidiMap tempUnityReplacementMap,
+			RelationalArgument factTerm, boolean noGeneralisations) {
 		// CHECK THE REPLACEMENT MAPS FIRST
 		// If the temp already has a replacement, then replace.
 		if (tempUnityReplacementMap.containsKey(unityTerm))
-			return (String) tempUnityReplacementMap.get(unityTerm);
+			return (RelationalArgument) tempUnityReplacementMap.get(unityTerm);
 		// If the unity map already has a replacement, then replace
-		if (unityReplacementMap.containsKey(unityTerm))
-			return (String) unityReplacementMap.get(unityTerm);
+		if (unityReplacementMap != null
+				&& unityReplacementMap.containsKey(unityTerm))
+			return (RelationalArgument) unityReplacementMap.get(unityTerm);
 
 		// If we're allowing flexible replacements, create a replacement and use
 		// the replacement
 		if (flexibleReplacement) {
 			// If the fact term hasn't already been mapped to another unity term
-			if (!unityReplacementMap.containsValue(factTerm)
+			if ((unityReplacementMap == null || !unityReplacementMap
+					.containsValue(factTerm))
 					&& !tempUnityReplacementMap.containsValue(factTerm)) {
 				// If the fact isn't anonymous, assign it as the replacement
-				if (!factTerm.equals(StateSpec.ANONYMOUS)
-						&& !unityTerm.equals(StateSpec.ANONYMOUS)) {
+				if (!factTerm.equals(RelationalArgument.ANONYMOUS)
+						&& !unityTerm.equals(RelationalArgument.ANONYMOUS)) {
 					tempUnityReplacementMap.put(unityTerm, factTerm);
 					return factTerm;
 				}
@@ -479,65 +353,32 @@ public class Unification {
 	 * @return True if the two are numerical and could be unified into a ranged
 	 *         variable.
 	 */
-	private boolean numericalValueCheck(String factValue, String unityValue,
-			String[] unification, int index, String[] factTerms) {
+	private boolean numericalValueCheck(RelationalArgument factValue,
+			RelationalArgument unityValue, RelationalArgument[] unification,
+			int index, RelationalArgument[] factTerms) {
 		// Check the unity is a number
-		double unityDouble = 0;
-		if (StateSpec.isNumber(unityValue))
-			unityDouble = Double.parseDouble(unityValue);
-		else
+		if (!factValue.isNumber() || !unityValue.isNumber())
 			return false;
 
-		String[] numberArgs = StateSpec
-				.extractNumericalRange(factValue);
-
-		if (numberArgs.length > 1) {
-			// We have a pre-existing range
-			double min = Double.parseDouble(numberArgs[1]);
-			double max = Double.parseDouble(numberArgs[2]);
-
-			// Possibly expand the range if need be
-			boolean redefine = false;
-			if (unityDouble < min) {
-				min = unityDouble;
-				redefine = true;
-			} else if (unityDouble > max) {
-				max = unityDouble;
-				redefine = true;
-			}
-
-			// If the min or max has changed, redefine the range
-			if (redefine) {
-				unification[index] = StateSpec.createNumericalRange(
-						numberArgs[0], min, max);
-			} else {
-				unification[index] = factValue;
-			}
-
-			return true;
-		} else {
-			// Check that the fact value is a number
-			double factDouble = 0;
-			if (StateSpec.isNumber(factValue))
-				factDouble = Double.parseDouble(factValue);
-			else
-				return false;
-
-			// Find the min, max, then form the range
-			double min = Math.min(factDouble, unityDouble);
-			double max = Math.max(factDouble, unityDouble);
-			String rangeVariable = "?"
-					+ RelationalPredicate.RANGE_VARIABLE_PREFIX + rangeIndex_++;
-			unification[index] = StateSpec.createNumericalRange(rangeVariable,
-					min, max);
-
-			// Change the action terms as well.
-			for (int i = 0; i < factTerms.length; i++) {
-				if (factTerms[i].equals(factValue))
-					factTerms[i] = rangeVariable;
-			}
+		// Expand the range if need be.
+		double min = Math.min(factValue.getRangeArg()[0],
+				unityValue.getRangeArg()[0]);
+		double max = Math.max(factValue.getRangeArg()[1],
+				unityValue.getRangeArg()[0]);
+		if (min == max || min == factValue.getRangeArg()[0] && max == factValue.getRangeArg()[1]) {
+			unification[index] = factValue;
 			return true;
 		}
+
+		String variable = (factValue.isVariable()) ? factValue.getStringArg()
+				: "?" + RelationalArgument.RANGE_VARIABLE_PREFIX
+						+ rangeIndex_++;
+
+		RelationalArgument unifiedArg = new RelationalArgument(variable, min,
+				max);
+		unification[index] = unifiedArg;
+
+		return true;
 	}
 
 	public void resetRangeIndex() {

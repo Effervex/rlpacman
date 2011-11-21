@@ -2,6 +2,7 @@ package cerrla;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.CoveringRelationalPolicy;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -72,7 +73,7 @@ public class Module {
 		// Run through the facts (probably only 1)
 		modulePredicate_ = modName;
 		for (int i = 0; i < numArgs; i++)
-			parameterTerms_.add(StateSpec.createGoalTerm(i));
+			parameterTerms_.add(RelationalArgument.createGoalTerm(i));
 
 		// Add the rules by taking the most likely rule from the ordered slots.
 		List<RelationalRule> policyRules = bestPolicy.getPolicyRules();

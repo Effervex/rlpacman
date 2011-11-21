@@ -1,6 +1,7 @@
 package relationalFramework.agentObservations;
 
 import relationalFramework.GoalCondition;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -163,10 +164,10 @@ public final class AgentObservations implements Serializable {
 		Set<RelationalPredicate> actionConds = new HashSet<RelationalPredicate>();
 		Set<RelationalPredicate> goalActionConds = new HashSet<RelationalPredicate>();
 		// Gather facts for each (non-number) action argument
-		for (String argument : action.getArguments()) {
-			if (!StateSpec.isNumber(argument)) {
+		for (RelationalArgument argument : action.getRelationalArguments()) {
+			if (!argument.isNumber()) {
 				Collection<RelationalPredicate> termFacts = termMappedFacts_
-						.get(argument);
+						.get(argument.toString());
 				// Modify the term facts, retaining constants, replacing terms
 				for (RelationalPredicate termFact : termFacts) {
 					RelationalPredicate notedFact = new RelationalPredicate(
@@ -571,10 +572,12 @@ public final class AgentObservations implements Serializable {
 					generalStateFacts.add(strFact.getFactName());
 
 					// Run through the arguments and index the fact by term
-					for (String arg : strFact.getArguments()) {
+					for (RelationalArgument arg : strFact
+							.getRelationalArguments()) {
 						// Ignore numerical terms
-						if (!StateSpec.isNumber(arg))
-							termMappedFacts_.putContains(arg, strFact);
+						if (!arg.isNumber())
+							termMappedFacts_.putContains(arg.toString(),
+									strFact);
 					}
 				}
 			}
@@ -785,7 +788,7 @@ public final class AgentObservations implements Serializable {
 		 */
 		private boolean intersectActionConditions(
 				Collection<RelationalPredicate> actionConds,
-				String[] actionArgs,
+				RelationalArgument[] actionArgs,
 				Collection<RelationalPredicate> invariants,
 				Collection<RelationalPredicate> variants) {
 			boolean changed = false;
@@ -795,8 +798,8 @@ public final class AgentObservations implements Serializable {
 			for (RelationalPredicate invFact : invariants) {
 				// Merge any numerical ranges
 				Collection<UnifiedFact> mergedFacts = Unification.getInstance()
-						.unifyFact(invFact, actionConds, new DualHashBidiMap(),
-								new DualHashBidiMap(), actionArgs, false, true);
+						.unifyFact(invFact, actionConds, null, actionArgs,
+								false, true);
 				if (mergedFacts != null && !mergedFacts.isEmpty()) {
 					for (UnifiedFact uf : mergedFacts) {
 						changed |= !invFact.equals(uf.getResultFact());
@@ -819,7 +822,7 @@ public final class AgentObservations implements Serializable {
 			for (RelationalPredicate variant : variants) {
 				Collection<UnifiedFact> mergedFacts = Unification.getInstance()
 						.unifyFact(variant, actionConds, new DualHashBidiMap(),
-								new DualHashBidiMap(), actionArgs, false, true);
+								actionArgs, false, true);
 				if (mergedFacts != null && !mergedFacts.isEmpty()) {
 					for (UnifiedFact uf : mergedFacts) {
 						changed |= !variant.equals(uf.getResultFact());
@@ -968,7 +971,7 @@ public final class AgentObservations implements Serializable {
 
 			// Sort the invariant and variant conditions, making a special case
 			// for numerical conditions.
-			String[] actionArgs = action_.getArguments();
+			RelationalArgument[] actionArgs = action_.getRelationalArguments();
 			changed |= intersectActionConditions(actionConds, actionArgs,
 					invariantActionConditions_, variantActionConditions_);
 			Collection<RelationalPredicate> localInvariants = localAgentObservations_
@@ -980,14 +983,14 @@ public final class AgentObservations implements Serializable {
 
 			// Generalise the action if necessary
 			for (int i = 0; i < actionArgs.length; i++) {
-				String argument = actionArgs[i];
+				RelationalArgument argument = actionArgs[i];
 
 				// If the action isn't variable, but doesn't match with the
 				// current action, generalise it.
-				if ((argument.charAt(0) != '?')
-						&& (!argument.equals(action.getArguments()[i]))) {
-					actionArgs[i] = RelationalPredicate
-							.getVariableTermString(i);
+				if (!argument.isVariable()
+						&& (!argument
+								.equals(action.getRelationalArguments()[i]))) {
+					actionArgs[i] = RelationalArgument.getVariableTermArg(i);
 					changed = true;
 				}
 			}
@@ -1311,8 +1314,8 @@ public final class AgentObservations implements Serializable {
 					if (!untrueFactArgs[i].equals("?")) {
 						if (!replacementMap.containsKey(untrueFactArgs[i]))
 							replacementMap.put(untrueFactArgs[i],
-									RelationalPredicate
-											.getVariableTermString(i));
+									RelationalArgument.getVariableTermArg(i)
+											.toString());
 						untrueFactArgs[i] = replacementMap
 								.get(untrueFactArgs[i]);
 					}

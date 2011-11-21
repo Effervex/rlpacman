@@ -195,12 +195,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				// If the condition doesn't contain variables - except modular
 				// variables
 				boolean isConstant = true;
-				for (String argument : cond.getArguments()) {
+				for (RelationalArgument argument : cond.getRelationalArguments()) {
 					// If the arg isn't a constant or a goal term, the condition
 					// isn't a constant condition.
-					if (argument.startsWith("?")
-							&& !argument
-									.startsWith(StateSpec.GOAL_VARIABLE_PREFIX)) {
+					if (!argument.isConstant()) {
 						isConstant = false;
 						break;
 					}
@@ -728,7 +726,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		if (queryParams_ == null) {
 			queryParams_ = new ArrayList<String>();
 			for (int i = 0; i < parameters_.size(); i++)
-				queryParams_.add(StateSpec.createGoalTerm(i));
+				queryParams_.add(RelationalArgument.createGoalTerm(i));
 			findConstants();
 		}
 	}
@@ -746,7 +744,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			queryParams_ = new ArrayList<String>(parameterMap.size());
 		parameters_ = new ArrayList<String>(parameterMap.size());
 		for (int i = 0; i < parameterMap.size(); i++) {
-			String goalTerm = StateSpec.createGoalTerm(i);
+			String goalTerm = RelationalArgument.createGoalTerm(i);
 			if (!hasQueryParams)
 				queryParams_.add(goalTerm);
 			parameters_.add(parameterMap.get(goalTerm));
