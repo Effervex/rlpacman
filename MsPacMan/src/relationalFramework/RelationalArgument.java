@@ -17,7 +17,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
 	/** The minimum possible number of chars for a range definition. */
-	private static final int MIN_RANGE = 15;
+	private static final int MIN_RANGE = 17;
 	/** The final character for variables. */
 	private static final char MODULO_LETTERS = 26;
 	/** The pattern for finding ranges. */
@@ -33,7 +33,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	/** The goal variable prefix. */
 	public static final String GOAL_VARIABLE_PREFIX = "?G_";
 	/** The prefix for range variables. */
-	public static final String RANGE_VARIABLE_PREFIX = "__Num";
+	public static final String RANGE_VARIABLE_PREFIX = "?#_";
 
 	/** Defines the arg type. */
 	private ArgType argType_;
@@ -180,10 +180,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			return -1;
 
 		// Don't swap number variables
-		if (stringArg_.contains(RANGE_VARIABLE_PREFIX))
+		if (stringArg_.startsWith(RANGE_VARIABLE_PREFIX))
 			return -1;
 
-		if (stringArg_.contains(GOAL_VARIABLE_PREFIX))
+		if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
 			return -1;
 
 		int termIndex = (stringArg_.charAt(1) + MODULO_LETTERS - STARTING_CHAR)

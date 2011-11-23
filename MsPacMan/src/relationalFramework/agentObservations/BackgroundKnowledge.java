@@ -125,7 +125,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	public BackgroundKnowledge(String rule) {
 		String[] split = rule.split(" <=> ");
 		equivalentRule_ = true;
-		if (ruleString_.length == 1) {
+		if (split.length == 1) {
 			split = rule.split(" => ");
 			equivalentRule_ = false;
 		}

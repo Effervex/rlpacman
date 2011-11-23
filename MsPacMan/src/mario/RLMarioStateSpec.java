@@ -29,21 +29,21 @@ public class RLMarioStateSpec extends StateSpec {
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
 		preconds.put("move", "(canJumpOn ?X) (thing ?X) "
-				+ "(distance ?X ?Y&:(outsideRange ?Y -16 16))");
+				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
 		preconds.put(
 				"search",
-				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(betweenRange ?D -32 32)) "
-						+ "(heightDiff ?X ?Y&:(betweenRange ?Y 16 80))");
+				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(<= -32 ?D 32)) "
+						+ "(heightDiff ?X ?Y&:(<= 16 ?Y 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
 		preconds.put("jumpOnto",
-				"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(betweenRange ?Y -160 160))");
+				"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(<= -160 ?Y 160))");
 		// Jump over entails jumping over a specific thing, moving towards it if
 		// necessary.
 		preconds.put("jumpOver", "(canJumpOver ?X) (thing ?X) "
-				+ "(distance ?X ?Y&:(betweenRange ?Y -160 160)) (width ?X ?Z)");
+				+ "(distance ?X ?Y&:(<= -160 ?Y 160)) (width ?X ?Z)");
 
 		// Pickup a shell
 		preconds.put("pickup",
@@ -51,12 +51,12 @@ public class RLMarioStateSpec extends StateSpec {
 
 		// Shoot a fireball at an enemy
 		preconds.put("shootFireball", "(marioPower ?Z&:(= ?Z fire)) "
-				+ "(distance ?X ?Y&:(outsideRange ?Y -8 8)) "
-				+ "(heightDiff ?X ?H&:(betweenRange ?H -16 16)) (enemy ?X)");
+				+ "(distance ?X ?Y) "
+				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
 
 		// Shoot a held shell at an enemy
 		preconds.put("shootShell", "(carrying ?Z) (shell ?Z) (distance ?X ?Y) "
-				+ "(heightDiff ?X ?H&:(betweenRange ?H -16 16)) (enemy ?X)");
+				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
 
 		return preconds;
 	}
@@ -122,8 +122,6 @@ public class RLMarioStateSpec extends StateSpec {
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
 
-		// TODO These rules should really be learned by the agent so remove
-		// later on.
 		// Squashable enemies
 		bckKnowledge.put("squashableRule", new BackgroundKnowledge(
 				"(enemy ?X) (not (spiky ?X)) " + "(not (pirahnaPlant ?X)) "

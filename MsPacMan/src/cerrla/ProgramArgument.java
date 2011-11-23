@@ -77,6 +77,8 @@ public enum ProgramArgument implements Serializable {
 	RHO(0.1, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
 	SEED_MODULE_RULES(false, "seedModuleRules", null, ParameterType.SAMPLING,
 			"If module rules should just be loaded & seeded _once_."),
+	SLOT_FIXING(false, "slotFixing", null, ParameterType.CONVERGENCE,
+			"If slots can be fixed."),
 	SLOT_THRESHOLD(0.5, "slotThreshold", null, ParameterType.SPECIALISATION,
 			"The slot splitting threshold. -1 means use |S|-1 threshold"),
 	SYSTEM_OUTPUT(true, "systemOutput", "-sysOut", ParameterType.EVALUATION,

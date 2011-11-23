@@ -405,9 +405,11 @@ public class CrossEntropyRun {
 	 * @return The changed number of elites (if necessary).
 	 */
 	private int checkEliteBounding(int numElites) {
-		if (ProgramArgument.BOUNDED_ELITES.booleanValue())
-			numElites = Math.max(policyGenerator_.getGenerator().size(),
-					numElites);
+		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
+			int generatorSize = policyGenerator_.getGenerator().size()
+					- policyGenerator_.getNumConvergedSlots();
+			numElites = Math.max(generatorSize, numElites);
+		}
 		return numElites;
 	}
 

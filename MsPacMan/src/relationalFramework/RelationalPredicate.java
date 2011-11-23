@@ -531,4 +531,14 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			return false;
 		return true;
 	}
+
+	/**
+	 * Removes any numerical ranges from this rule.
+	 */
+	public void clearRanges() {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isRange())
+				arguments_[i] = new RelationalArgument(arguments_[i].getStringArg());
+		}
+	}
 }

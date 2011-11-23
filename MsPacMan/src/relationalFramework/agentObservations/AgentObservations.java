@@ -15,6 +15,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -204,9 +205,16 @@ public final class AgentObservations implements Serializable {
 		return actionFacts;
 	}
 
-	// TEST METHODS
+	public Map<String, double[]> getActionRanges(String action) {
+		return actionBasedObservations_.get(action).getActionRanges();
+	}
+
 	public Map<String, ConditionBeliefs> getConditionBeliefs() {
 		return conditionObservations_.conditionBeliefs_;
+	}
+
+	public Collection<String> getGeneralInvariants() {
+		return conditionObservations_.invariants_.getGeneralInvariants();
 	}
 
 	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
@@ -321,10 +329,6 @@ public final class AgentObservations implements Serializable {
 		return conditionObservations_.invariants_.getSpecificInvariants();
 	}
 
-	public Collection<String> getGeneralInvariants() {
-		return conditionObservations_.invariants_.getGeneralInvariants();
-	}
-
 	public Collection<RelationalPredicate> getUnseenPredicates() {
 		return conditionObservations_.unseenPreds_;
 	}
@@ -431,100 +435,36 @@ public final class AgentObservations implements Serializable {
 			localEnvironmentDir.mkdir();
 
 			// Condition beliefs
-			File condBeliefFile = new File(environmentDir,
-					CONDITION_BELIEF_FILE);
-			condBeliefFile.createNewFile();
-			FileWriter wr = new FileWriter(condBeliefFile);
-			BufferedWriter buf = new BufferedWriter(wr);
-
-			// Write condition beliefs
-			for (String condition : conditionObservations_.conditionBeliefs_
-					.keySet()) {
-				buf.write(conditionObservations_.conditionBeliefs_
-						.get(condition) + "\n");
-			}
-			for (String condition : conditionObservations_.negatedConditionBeliefs_
-					.keySet()) {
-				Map<IntegerArray, ConditionBeliefs> negCBs = conditionObservations_.negatedConditionBeliefs_
-						.get(condition);
-				for (IntegerArray negCB : negCBs.keySet())
-					buf.write(negCBs.get(negCB) + "\n");
-			}
-			buf.write("\n");
-			buf.write("Background Knowledge\n");
-			for (BackgroundKnowledge bk : conditionObservations_.learnedEnvironmentRules_) {
-				buf.write(bk.toString() + "\n");
-			}
-
-			buf.write("\n");
-			buf.write("Global Invariants\n");
-			buf.write(conditionObservations_.invariants_.toString());
-
-			buf.close();
-			wr.close();
+			conditionObservations_.saveConditionBeliefs(environmentDir);
 
 			// Local condition beliefs
-			File localGoalConds = new File(localEnvironmentDir,
-					LocalAgentObservations.LOCAL_GOAL_COND_FILE);
-			wr = new FileWriter(localGoalConds);
-			buf = new BufferedWriter(wr);
-
-			MultiMap<String, RelationalPredicate> goalFacts = localAgentObservations_
-					.getGoalPredicateMap();
-			for (String term : goalFacts.keySet()) {
-				buf.write(term + ":\n  " + goalFacts.get(term) + "\n");
-			}
-
-			buf.write("\n");
-			buf.write("Local Invariants\n");
-			buf.write(localAgentObservations_.getConditionInvariants()
-					.toString());
-
-			buf.close();
-			wr.close();
+			localAgentObservations_.saveLocalObservations(localEnvironmentDir);
 
 			// Global action Conditions and ranges
 			File actionCondsFile = new File(environmentDir,
 					ACTION_CONDITIONS_FILE);
 			actionCondsFile.createNewFile();
-			wr = new FileWriter(actionCondsFile);
-			buf = new BufferedWriter(wr);
+			FileWriter wr = new FileWriter(actionCondsFile);
+			BufferedWriter buf = new BufferedWriter(wr);
 
-			// Write action conditions and ranges
-			for (String action : actionBasedObservations_.keySet()) {
-				buf.write(action + "\n");
-				ActionBasedObservations abo = actionBasedObservations_
-						.get(action);
-				buf.write("Global conditions: "
-						+ abo.recreateSpecialisations(
-								abo.variantActionConditions_, true) + "\n");
-				buf.write("\n");
-			}
-
-			buf.close();
-			wr.close();
-
-			// Local action Conditions and ranges
-			actionCondsFile = new File(localEnvironmentDir,
+			File localActionCondsFile = new File(localEnvironmentDir,
 					ACTION_CONDITIONS_FILE);
-			actionCondsFile.createNewFile();
-			wr = new FileWriter(actionCondsFile);
-			buf = new BufferedWriter(wr);
+			localActionCondsFile.createNewFile();
+			FileWriter localWR = new FileWriter(localActionCondsFile);
+			BufferedWriter localBuf = new BufferedWriter(localWR);
 
 			// Write action conditions and ranges
-			for (String action : actionBasedObservations_.keySet()) {
-				buf.write(action + "\n");
-				ActionBasedObservations abo = actionBasedObservations_
-						.get(action);
-				buf.write("Local conditions: "
-						+ abo.recreateSpecialisations(localAgentObservations_
-								.getVariantGoalActionConditions(action), false)
-						+ "\n");
-				buf.write("\n");
+			for (ActionBasedObservations abo : actionBasedObservations_
+					.values()) {
+				abo.saveActionBasedObservations(buf);
+				abo.saveLocalActionBasedObservations(localBuf);
 			}
 
 			buf.close();
 			wr.close();
+
+			localBuf.close();
+			localWR.close();
 
 			// Serialise observations
 			File serialisedFile = new File(environmentDir, SERIALISATION_FILE);
@@ -535,8 +475,6 @@ public final class AgentObservations implements Serializable {
 
 			oos.close();
 			fos.close();
-
-			localAgentObservations_.saveLocalObservations(environmentDir);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -738,13 +676,19 @@ public final class AgentObservations implements Serializable {
 	 * @author Sam Sarjant
 	 */
 	private class ActionBasedObservations implements Serializable {
-		private static final long serialVersionUID = -8610855617194241967L;
+		private static final long serialVersionUID = -2176309655989637017L;
 
 		/**
 		 * The action itself, usually expressed in variables, but possibly
 		 * constants if the action always takes a constant.
 		 */
 		private RelationalPredicate action_;
+
+		/**
+		 * Mapped by pair: fact name and range variable, observed maximal ranges
+		 * for the conditions seen in the action.
+		 */
+		private Map<String, double[]> actionRanges_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<RelationalPredicate> invariantActionConditions_;
@@ -772,6 +716,10 @@ public final class AgentObservations implements Serializable {
 			return AgentObservations.this;
 		}
 
+		public Map<String, double[]> getActionRanges() {
+			return actionRanges_;
+		}
+
 		/**
 		 * Intersects the action conditions sets, handling numerical values as a
 		 * special case.
@@ -784,13 +732,16 @@ public final class AgentObservations implements Serializable {
 		 *            Invariant action conditions. Can only get smaller.
 		 * @param variants
 		 *            Variant action conditions. Can only get bigger.
+		 * @param actionRanges
+		 *            The observed ranges for various conditions.
 		 * @return True if the action conditions changed, false otherwise.
 		 */
 		private boolean intersectActionConditions(
 				Collection<RelationalPredicate> actionConds,
 				RelationalArgument[] actionArgs,
 				Collection<RelationalPredicate> invariants,
-				Collection<RelationalPredicate> variants) {
+				Collection<RelationalPredicate> variants,
+				Map<String, double[]> actionRanges) {
 			boolean changed = false;
 			Collection<RelationalPredicate> newInvariantConditions = new HashSet<RelationalPredicate>();
 
@@ -802,11 +753,14 @@ public final class AgentObservations implements Serializable {
 								false, true);
 				if (mergedFacts != null && !mergedFacts.isEmpty()) {
 					for (UnifiedFact uf : mergedFacts) {
-						changed |= !invFact.equals(uf.getResultFact());
-						newInvariantConditions.add(uf.getResultFact());
+						RelationalPredicate unifiedFact = uf.getResultFact();
+						changed |= !invFact.equals(unifiedFact);
+						newInvariantConditions.add(unifiedFact);
 						actionConds.remove(uf.getUnityFact());
 						System.arraycopy(uf.getFactTerms(), 0, actionArgs, 0,
 								actionArgs.length);
+
+						noteRange(unifiedFact, actionRanges);
 					}
 				} else {
 					variants.add(invFact);
@@ -825,9 +779,12 @@ public final class AgentObservations implements Serializable {
 								actionArgs, false, true);
 				if (mergedFacts != null && !mergedFacts.isEmpty()) {
 					for (UnifiedFact uf : mergedFacts) {
-						changed |= !variant.equals(uf.getResultFact());
-						newVariantConditions.add(uf.getResultFact());
+						RelationalPredicate unifiedFact = uf.getResultFact();
+						changed |= !variant.equals(unifiedFact);
+						newVariantConditions.add(unifiedFact);
 						actionConds.remove(uf.getUnityFact());
+
+						noteRange(unifiedFact, actionRanges);
 					}
 				} else
 					newVariantConditions.add(variant);
@@ -837,6 +794,32 @@ public final class AgentObservations implements Serializable {
 			changed |= variants.addAll(actionConds);
 
 			return changed;
+		}
+
+		/**
+		 * Notes the range from a given fact.
+		 * 
+		 * @param numberFact
+		 *            The range fact.
+		 * @param actionRanges
+		 *            The map of facts, mapped by factName-range variable.
+		 */
+		private void noteRange(RelationalPredicate numberFact,
+				Map<String, double[]> actionRanges) {
+			if (actionRanges == null)
+				return;
+			for (RelationalArgument arg : numberFact.getRelationalArguments()) {
+				// Only note ranges
+				if (arg.isRange()) {
+					String key = arg.getStringArg();
+					double[] range = actionRanges.get(key);
+					if (range == null) {
+						range = new double[2];
+						actionRanges.put(key, range);
+					}
+					System.arraycopy(arg.getRangeArg(), 0, range, 0, 2);
+				}
+			}
 		}
 
 		/**
@@ -934,6 +917,35 @@ public final class AgentObservations implements Serializable {
 			return null;
 		}
 
+		protected void saveActionBasedObservations(BufferedWriter buf)
+				throws Exception {
+			buf.write(action_.getFactName() + "\n");
+			buf.write("RLGG conditions: " + invariantActionConditions_ + "\n");
+			buf.write("Global conditions: "
+					+ recreateSpecialisations(variantActionConditions_, true)
+					+ "\n");
+			buf.write("Observed ranges: [");
+			boolean first = true;
+			for (String rangeVariable : actionRanges_.keySet()) {
+				if (!first)
+					buf.write(", ");
+				buf.write(rangeVariable + ": "
+						+ Arrays.toString(actionRanges_.get(rangeVariable)));
+				first = false;
+			}
+			buf.write("]\n");
+		}
+
+		protected void saveLocalActionBasedObservations(BufferedWriter localBuf)
+				throws Exception {
+			localBuf.write(action_.getFactName() + "\n");
+			localBuf.write("Local conditions: "
+					+ recreateSpecialisations(localAgentObservations_
+							.getVariantGoalActionConditions(action_
+									.getFactName()), false) + "\n");
+			localBuf.write("\n");
+		}
+
 		/**
 		 * Adds action conditions to the action based observations.
 		 * 
@@ -966,6 +978,7 @@ public final class AgentObservations implements Serializable {
 				specialisationConditions_ = new HashSet<RelationalPredicate>();
 				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
+				actionRanges_ = new HashMap<String, double[]>();
 				return true;
 			}
 
@@ -973,13 +986,14 @@ public final class AgentObservations implements Serializable {
 			// for numerical conditions.
 			RelationalArgument[] actionArgs = action_.getRelationalArguments();
 			changed |= intersectActionConditions(actionConds, actionArgs,
-					invariantActionConditions_, variantActionConditions_);
+					invariantActionConditions_, variantActionConditions_,
+					actionRanges_);
 			Collection<RelationalPredicate> localInvariants = localAgentObservations_
 					.getInvariantGoalActionConditions(action.getFactName());
 			Collection<RelationalPredicate> localVariants = localAgentObservations_
 					.getVariantGoalActionConditions(action.getFactName());
 			changed |= intersectActionConditions(goalActionConds, actionArgs,
-					localInvariants, localVariants);
+					localInvariants, localVariants, null);
 
 			// Generalise the action if necessary
 			for (int i = 0; i < actionArgs.length; i++) {
@@ -1048,6 +1062,7 @@ public final class AgentObservations implements Serializable {
 							invariant);
 					if (replacements != null)
 						modFact.replaceArguments(replacements);
+					modFact.clearRanges();
 					ruleConds.add(modFact);
 				}
 
@@ -1111,6 +1126,12 @@ public final class AgentObservations implements Serializable {
 		/** The agent's beliefs about the condition inter-relations. */
 		private Map<String, ConditionBeliefs> conditionBeliefs_;
 
+		/**
+		 * A map (by fact name) of various conditions which note the maximum
+		 * bounds of observed ranges.
+		 */
+		private Map<String, RelationalPredicate> conditionRanges_;
+
 		/** The observed invariants of the environment. */
 		private InvariantObservations invariants_;
 
@@ -1138,6 +1159,7 @@ public final class AgentObservations implements Serializable {
 			negatedConditionBeliefs_ = new TreeMap<String, Map<IntegerArray, ConditionBeliefs>>();
 			learnedEnvironmentRules_ = formBackgroundKnowledge();
 			invariants_ = new InvariantObservations();
+			conditionRanges_ = new HashMap<String, RelationalPredicate>();
 
 			unseenPreds_ = new HashSet<RelationalPredicate>();
 			unseenPreds_.addAll(StateSpec.getInstance().getPredicates()
@@ -1194,7 +1216,6 @@ public final class AgentObservations implements Serializable {
 				Map<String, String> goalReplacements) {
 			boolean changed = false;
 			for (RelationalPredicate baseFact : stateFacts) {
-				// if (!baseFact.isNumerical()) {
 				// Getting the ConditionBeliefs object
 				ConditionBeliefs cb = conditionBeliefs_.get(baseFact
 						.getFactName());
@@ -1269,8 +1290,44 @@ public final class AgentObservations implements Serializable {
 				// non-types predicates)
 				changed |= recordUntrueConditionAssociations(relativeFacts,
 						notRelativeFacts);
+
+				// Note the ranges of the condition if the fact is numerical
+				if (baseFact.isNumerical()) {
+					RelationalPredicate rangeFact = conditionRanges_
+							.get(baseFact.getFactName());
+					if (rangeFact == null) {
+						rangeFact = new RelationalPredicate(baseFact);
+						rangeFact.replaceArguments(
+								new HashMap<String, String>(), false, true);
+						conditionRanges_.put(baseFact.getFactName(), rangeFact);
+					} else {
+						// Check each fact arg
+						RelationalArgument[] rangeArgs = rangeFact
+								.getRelationalArguments();
+						RelationalArgument[] baseArgs = baseFact
+								.getRelationalArguments();
+						boolean rangeChanged = false;
+						for (int i = 0; i < baseArgs.length; i++) {
+							if (baseArgs[i].isNumber()) {
+								RelationalArgument newRange = Unification
+										.getInstance().unifyRange(rangeArgs[i],
+												baseArgs[i], null);
+								if (newRange != rangeArgs[i]) {
+									rangeChanged = true;
+									rangeArgs[i] = newRange;
+								}
+							}
+						}
+
+						if (rangeChanged) {
+							rangeFact = new RelationalPredicate(rangeFact,
+									rangeArgs);
+							conditionRanges_.put(rangeFact.getFactName(),
+									rangeFact);
+						}
+					}
+				}
 			}
-			// }
 
 			if (changed) {
 				learnedEnvironmentRules_ = formBackgroundKnowledge();
@@ -1381,6 +1438,51 @@ public final class AgentObservations implements Serializable {
 			return changed;
 		}
 
+		/**
+		 * Saves the condition beliefs to a file.
+		 * 
+		 * @param environmentDir
+		 *            The directory of the beliefs.
+		 */
+		protected void saveConditionBeliefs(File environmentDir)
+				throws Exception {
+			File condBeliefFile = new File(environmentDir,
+					CONDITION_BELIEF_FILE);
+			condBeliefFile.createNewFile();
+			FileWriter wr = new FileWriter(condBeliefFile);
+			BufferedWriter buf = new BufferedWriter(wr);
+
+			// Write condition beliefs
+			for (String condition : conditionObservations_.conditionBeliefs_
+					.keySet()) {
+				buf.write(conditionObservations_.conditionBeliefs_
+						.get(condition) + "\n");
+			}
+			for (String condition : conditionObservations_.negatedConditionBeliefs_
+					.keySet()) {
+				Map<IntegerArray, ConditionBeliefs> negCBs = conditionObservations_.negatedConditionBeliefs_
+						.get(condition);
+				for (IntegerArray negCB : negCBs.keySet())
+					buf.write(negCBs.get(negCB) + "\n");
+			}
+			buf.write("\n");
+			buf.write("Background Knowledge\n");
+			for (BackgroundKnowledge bk : conditionObservations_.learnedEnvironmentRules_) {
+				buf.write(bk.toString() + "\n");
+			}
+
+			buf.write("\n");
+			buf.write("Global Invariants\n");
+			buf.write(conditionObservations_.invariants_.toString() + "\n");
+
+			buf.write("\n");
+			buf.write("Observed ranges\n");
+			buf.write(conditionRanges_.values().toString());
+
+			buf.close();
+			wr.close();
+		}
+
 		@Override
 		public boolean equals(Object obj) {
 			if (this == obj)
@@ -1438,7 +1540,8 @@ public final class AgentObservations implements Serializable {
 			changed |= localAgentObservations_.noteInvariantConditions(
 					stateFacts, goalReplacements);
 
-			// Use the term mapped facts to generate collections of true facts.
+			// Use the term mapped facts to generate collections of true
+			// facts.
 			changed |= recordConditionAssociations(stateFacts, goalReplacements);
 			return changed;
 		}

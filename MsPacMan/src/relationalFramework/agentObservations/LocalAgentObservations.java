@@ -4,9 +4,11 @@ import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -25,44 +27,44 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public class LocalAgentObservations implements Serializable {
-	private static final long serialVersionUID = -7205802892263530446L;
-
 	private static final String SERIALISATION_FILE = "localObservations.ser";
 
+	private static final long serialVersionUID = -7205802892263530446L;
+
 	public static final String LOCAL_GOAL_COND_FILE = "observedGoalFacts.txt";
-
-	/** The local goal for this particular AgentObservations object. */
-	private String localGoal_;
-
-	/** The number of arguments this goal takes. */
-	private int numGoalArgs_;
-
-	/** The action conditions orientated towards the goal. */
-	private MultiMap<String, RelationalPredicate> invariantGoalActionConditions_;
-
-	/** The action conditions orientated towards the goal. */
-	private MultiMap<String, RelationalPredicate> variantGoalActionConditions_;
-
-	/** The observed predicates mentioning goal terms that have been true. */
-	private MultiMap<String, RelationalPredicate> observedGoalPredicates_;
-
-	/** The goal arguments that have been observed. */
-	private Collection<GoalArg> observedGoalArgs_;
 
 	/** The inactivity of the goal arguments collection. */
 	private int goalArgsInactivity_ = 0;
 
+	/** The action conditions orientated towards the goal. */
+	private MultiMap<String, RelationalPredicate> invariantGoalActionConditions_;
+
 	/** The last time the goal args were noted. */
 	private int lastGoalArgsAdd_ = 0;
+
+	/** A flag which denotes if these observations were loaded. */
+	private boolean loaded_;
+
+	/** The local goal for this particular AgentObservations object. */
+	private String localGoal_;
 
 	/** The invariants relating to goal observations. */
 	private InvariantObservations localInvariants_;
 
+	/** The number of arguments this goal takes. */
+	private int numGoalArgs_;
+
+	/** The goal arguments that have been observed. */
+	private Collection<GoalArg> observedGoalArgs_;
+
+	/** The observed predicates mentioning goal terms that have been true. */
+	private MultiMap<String, RelationalPredicate> observedGoalPredicates_;
+
 	/** The goal conditions tied to the observed goal predicates. */
 	private Collection<GoalCondition> specificGoalConds_;
 
-	/** A flag which denotes if these observations were loaded. */
-	private boolean loaded_;
+	/** The action conditions orientated towards the goal. */
+	private MultiMap<String, RelationalPredicate> variantGoalActionConditions_;
 
 	/**
 	 * The constructor for a new local goal object.
@@ -81,25 +83,6 @@ public class LocalAgentObservations implements Serializable {
 	}
 
 	/**
-	 * Initialises the action conditions if necessary.
-	 * 
-	 * @param goalActionConds
-	 *            The goal action conditions to initialise with.
-	 * @return True if the collections were initialised.
-	 */
-	public boolean initLocalActionConds(String action,
-			Collection<RelationalPredicate> goalActionConds) {
-		if (!invariantGoalActionConditions_.containsKey(action)) {
-			invariantGoalActionConditions_.putCollection(action,
-					goalActionConds);
-			variantGoalActionConditions_.putCollection(action,
-					new TreeSet<RelationalPredicate>());
-			return true;
-		}
-		return false;
-	}
-
-	/**
 	 * Adds a goal fact to the observed goal facts collection.
 	 * 
 	 * @param goalTerm
@@ -113,151 +96,6 @@ public class LocalAgentObservations implements Serializable {
 				.putContains(goalTerm, goalFact);
 		if (result)
 			specificGoalConds_ = null;
-		return result;
-	}
-
-	public void saveLocalObservations(File environmentDir) throws Exception {
-		File localFile = new File(environmentDir, localGoal_
-				+ File.separatorChar);
-		localFile.mkdir();
-		File serialisedFile = new File(localFile, SERIALISATION_FILE);
-		serialisedFile.createNewFile();
-		FileOutputStream fos = new FileOutputStream(serialisedFile);
-		ObjectOutputStream oos = new ObjectOutputStream(fos);
-		oos.writeObject(this);
-
-		oos.close();
-		fos.close();
-	}
-
-	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
-		return observedGoalPredicates_;
-	}
-
-	/**
-	 * Notes the goal arguments down.
-	 * 
-	 * @param stateGoals
-	 *            The goal arguments for the state to note.
-	 */
-	public boolean noteGoalArgs(Collection<GoalArg> stateGoals) {
-		if (observedGoalArgs_.addAll(stateGoals)) {
-			lastGoalArgsAdd_ = 0;
-			goalArgsInactivity_ = 0;
-			return true;
-		} else {
-			goalArgsInactivity_++;
-			return false;
-		}
-	}
-
-	public Collection<GoalArg> getObservedGoalArgs() {
-		return observedGoalArgs_;
-	}
-
-	/**
-	 * Checks if the agent should search all goal args this step based on local
-	 * inactivity.
-	 * 
-	 * @return True if the agent should check all goal arguments.
-	 */
-	public boolean searchAllGoalArgs() {
-		boolean result = lastGoalArgsAdd_ >= (Math.pow(2, goalArgsInactivity_) - 1);
-		lastGoalArgsAdd_++;
-		if (result)
-			lastGoalArgsAdd_ = 0;
-		return result;
-	}
-
-	/**
-	 * Gets a collection of goal conditions formulated from the goal predicates
-	 * which can be possible goals to achieve.
-	 * 
-	 * @return A collection of goal conditions.
-	 */
-	public Collection<GoalCondition> getSpecificGoalConditions() {
-		if (specificGoalConds_ == null) {
-			specificGoalConds_ = new HashSet<GoalCondition>();
-			for (RelationalPredicate gc : observedGoalPredicates_.values()) {
-				// If the fact isn't an invariant, isn't negated, and isn't the
-				// goal args predicate, add it.
-				if (!localInvariants_.getSpecificInvariants().contains(gc)
-						&& !gc.isNegated()
-						&& !gc.getFactName().equals(StateSpec.GOALARGS_PRED)
-						&& gc.isFullyNotAnonymous()
-						&& !GoalCondition.formName(gc).equals(localGoal_))
-					specificGoalConds_.add(new GoalCondition(gc));
-			}
-		}
-		return specificGoalConds_;
-	}
-
-	public Collection<RelationalPredicate> getInvariantGoalActionConditions(String action) {
-		return invariantGoalActionConditions_.get(action);
-	}
-
-	public Collection<RelationalPredicate> getVariantGoalActionConditions(String action) {
-		return variantGoalActionConditions_.get(action);
-	}
-
-	public boolean invariantActionsContains(String action, RelationalPredicate fact) {
-		if (invariantGoalActionConditions_.containsKey(action))
-			return invariantGoalActionConditions_.get(action).contains(fact);
-		return false;
-	}
-
-	public boolean variantActionsContains(String action, RelationalPredicate fact) {
-		if (variantGoalActionConditions_.containsKey(action))
-			return variantGoalActionConditions_.get(action).contains(fact);
-		return false;
-	}
-
-	public boolean noteInvariantConditions(Collection<RelationalPredicate> stateFacts,
-			Map<String, String> goalReplacements) {
-		if (goalReplacements != null)
-			return localInvariants_
-					.noteInvariants(stateFacts, goalReplacements);
-		return false;
-	}
-
-	public InvariantObservations getConditionInvariants() {
-		return localInvariants_;
-	}
-
-	public String getLocalGoalName() {
-		return localGoal_;
-	}
-
-	public int getNumGoalArgs() {
-		return numGoalArgs_;
-	}
-
-	public void setNumGoalArgs(int num) {
-		numGoalArgs_ = num;
-	}
-
-	public boolean isLoaded() {
-		return loaded_;
-	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime
-				* result
-				+ ((invariantGoalActionConditions_ == null) ? 0
-						: invariantGoalActionConditions_.hashCode());
-		result = prime * result
-				+ ((localGoal_ == null) ? 0 : localGoal_.hashCode());
-		result = prime
-				* result
-				+ ((observedGoalPredicates_ == null) ? 0
-						: observedGoalPredicates_.hashCode());
-		result = prime
-				* result
-				+ ((variantGoalActionConditions_ == null) ? 0
-						: variantGoalActionConditions_.hashCode());
 		return result;
 	}
 
@@ -296,6 +134,190 @@ public class LocalAgentObservations implements Serializable {
 		return true;
 	}
 
+	public InvariantObservations getConditionInvariants() {
+		return localInvariants_;
+	}
+
+	public MultiMap<String, RelationalPredicate> getGoalPredicateMap() {
+		return observedGoalPredicates_;
+	}
+
+	public Collection<RelationalPredicate> getInvariantGoalActionConditions(String action) {
+		return invariantGoalActionConditions_.get(action);
+	}
+
+	public String getLocalGoalName() {
+		return localGoal_;
+	}
+
+	public int getNumGoalArgs() {
+		return numGoalArgs_;
+	}
+
+	public Collection<GoalArg> getObservedGoalArgs() {
+		return observedGoalArgs_;
+	}
+
+	/**
+	 * Gets a collection of goal conditions formulated from the goal predicates
+	 * which can be possible goals to achieve.
+	 * 
+	 * @return A collection of goal conditions.
+	 */
+	public Collection<GoalCondition> getSpecificGoalConditions() {
+		if (specificGoalConds_ == null) {
+			specificGoalConds_ = new HashSet<GoalCondition>();
+			for (RelationalPredicate gc : observedGoalPredicates_.values()) {
+				// If the fact isn't an invariant, isn't negated, and isn't the
+				// goal args predicate, add it.
+				if (!localInvariants_.getSpecificInvariants().contains(gc)
+						&& !gc.isNegated()
+						&& !gc.getFactName().equals(StateSpec.GOALARGS_PRED)
+						&& gc.isFullyNotAnonymous()
+						&& !GoalCondition.formName(gc).equals(localGoal_))
+					specificGoalConds_.add(new GoalCondition(gc));
+			}
+		}
+		return specificGoalConds_;
+	}
+
+	public Collection<RelationalPredicate> getVariantGoalActionConditions(String action) {
+		return variantGoalActionConditions_.get(action);
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime
+				* result
+				+ ((invariantGoalActionConditions_ == null) ? 0
+						: invariantGoalActionConditions_.hashCode());
+		result = prime * result
+				+ ((localGoal_ == null) ? 0 : localGoal_.hashCode());
+		result = prime
+				* result
+				+ ((observedGoalPredicates_ == null) ? 0
+						: observedGoalPredicates_.hashCode());
+		result = prime
+				* result
+				+ ((variantGoalActionConditions_ == null) ? 0
+						: variantGoalActionConditions_.hashCode());
+		return result;
+	}
+
+	/**
+	 * Initialises the action conditions if necessary.
+	 * 
+	 * @param goalActionConds
+	 *            The goal action conditions to initialise with.
+	 * @return True if the collections were initialised.
+	 */
+	public boolean initLocalActionConds(String action,
+			Collection<RelationalPredicate> goalActionConds) {
+		if (!invariantGoalActionConditions_.containsKey(action)) {
+			invariantGoalActionConditions_.putCollection(action,
+					goalActionConds);
+			variantGoalActionConditions_.putCollection(action,
+					new TreeSet<RelationalPredicate>());
+			return true;
+		}
+		return false;
+	}
+
+	public boolean invariantActionsContains(String action, RelationalPredicate fact) {
+		if (invariantGoalActionConditions_.containsKey(action))
+			return invariantGoalActionConditions_.get(action).contains(fact);
+		return false;
+	}
+
+	public boolean isLoaded() {
+		return loaded_;
+	}
+
+	/**
+	 * Notes the goal arguments down.
+	 * 
+	 * @param stateGoals
+	 *            The goal arguments for the state to note.
+	 */
+	public boolean noteGoalArgs(Collection<GoalArg> stateGoals) {
+		if (observedGoalArgs_.addAll(stateGoals)) {
+			lastGoalArgsAdd_ = 0;
+			goalArgsInactivity_ = 0;
+			return true;
+		} else {
+			goalArgsInactivity_++;
+			return false;
+		}
+	}
+
+	public boolean noteInvariantConditions(Collection<RelationalPredicate> stateFacts,
+			Map<String, String> goalReplacements) {
+		if (goalReplacements != null)
+			return localInvariants_
+					.noteInvariants(stateFacts, goalReplacements);
+		return false;
+	}
+
+	protected void saveLocalObservations(File localEnvironmentDir) throws Exception {
+		File localGoalConds = new File(localEnvironmentDir,
+				LocalAgentObservations.LOCAL_GOAL_COND_FILE);
+		FileWriter wr = new FileWriter(localGoalConds);
+		BufferedWriter buf = new BufferedWriter(wr);
+		
+		for (String term : observedGoalPredicates_.keySet()) {
+			buf.write(term + ":\n  " + observedGoalPredicates_.get(term) + "\n");
+		}
+
+		buf.write("\n");
+		buf.write("Local Invariants\n");
+		buf.write(localInvariants_.toString());
+
+		buf.close();
+		wr.close();
+		
+		File serialisedFile = new File(localEnvironmentDir, SERIALISATION_FILE);
+		serialisedFile.createNewFile();
+		FileOutputStream fos = new FileOutputStream(serialisedFile);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		oos.writeObject(this);
+
+		oos.close();
+		fos.close();
+	}
+
+	/**
+	 * Checks if the agent should search all goal args this step based on local
+	 * inactivity.
+	 * 
+	 * @return True if the agent should check all goal arguments.
+	 */
+	public boolean searchAllGoalArgs() {
+		boolean result = lastGoalArgsAdd_ >= (Math.pow(2, goalArgsInactivity_) - 1);
+		lastGoalArgsAdd_++;
+		if (result)
+			lastGoalArgsAdd_ = 0;
+		return result;
+	}
+
+	public void setNumGoalArgs(int num) {
+		numGoalArgs_ = num;
+	}
+
+	public boolean variantActionsContains(String action, RelationalPredicate fact) {
+		if (variantGoalActionConditions_.containsKey(action))
+			return variantGoalActionConditions_.get(action).contains(fact);
+		return false;
+	}
+
+	private static File getLocalFile(String localGoal) {
+		return new File(AgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
+				.getInstance().getEnvironmentName()
+				+ File.separatorChar
+				+ localGoal + File.separatorChar + SERIALISATION_FILE);
+	}
+
 	/**
 	 * Loads the local agent observations from serialised file if possible.
 	 * Otherwise, it just creates a new local agent observations object.
@@ -320,13 +342,6 @@ public class LocalAgentObservations implements Serializable {
 		}
 		System.out.println("No local agent observations to load.");
 		return new LocalAgentObservations(localGoal);
-	}
-
-	private static File getLocalFile(String localGoal) {
-		return new File(AgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
-				.getInstance().getEnvironmentName()
-				+ File.separatorChar
-				+ localGoal + File.separatorChar + SERIALISATION_FILE);
 	}
 
 	public static LocalAgentObservations newAgentObservations(String localGoal) {
