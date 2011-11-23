@@ -108,7 +108,7 @@ public class RuleCreation implements Serializable {
 	}
 
 	/**
-	 * Determines the ranges and creates mutants for them.
+	 * A wrapper method for ease.
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
@@ -124,17 +124,40 @@ public class RuleCreation implements Serializable {
 	private void createRangeSpecialisations(RelationalRule baseRule,
 			Set<RelationalRule> subranges, RelationalPredicate condition,
 			int condArgIndex, RelationalArgument rangeArg) {
-		double[] ranges = rangeArg.getRangeArg();
+		double[] range = rangeArg.getRangeArg();
 		String rangeVariable = rangeArg.getStringArg();
-		if (ranges[0] != ranges[1]) {
+		createRangeSpecialisations(baseRule, subranges, condition,
+				condArgIndex, rangeVariable, range);
+	}
+
+	/**
+	 * Determines the ranges and creates mutants for them.
+	 * 
+	 * @param baseRule
+	 *            The base rule to mutate.
+	 * @param subranges
+	 *            The collection of rules to add to.
+	 * @param condition
+	 *            The original condition being mutated.
+	 * @param condArgIndex
+	 *            The index of the mutation.
+	 * @param rangeVariable
+	 *            The range variable.
+	 * @param range
+	 *            The numerical range to split.
+	 */
+	private void createRangeSpecialisations(RelationalRule baseRule,
+			Set<RelationalRule> subranges, RelationalPredicate condition,
+			int condArgIndex, String rangeVariable, double[] range) {
+		if (range[0] != range[1]) {
 			// Create 3 ranges, the min and max split in two and a range
 			// overlapping each centred about the middle.
-			double halfVal = ranges[0] + (ranges[1] - ranges[0]) / 2;
-			double quarterAmount = (ranges[1] - ranges[0]) / 4;
+			double halfVal = range[0] + (range[1] - range[0]) / 2;
+			double quarterAmount = (range[1] - range[0]) / 4;
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, ranges[0], halfVal));
+					condArgIndex, rangeVariable, range[0], halfVal));
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, halfVal, ranges[1]));
+					condArgIndex, rangeVariable, halfVal, range[1]));
 			subranges.add(createRangedSpecialisation(baseRule, condition,
 					condArgIndex, rangeVariable, halfVal - quarterAmount,
 					halfVal + quarterAmount));
@@ -143,11 +166,11 @@ public class RuleCreation implements Serializable {
 		if (!baseRule.isMutant()) {
 			// If the ranges go through 0 and this rule isn't a
 			// mutant, split at 0
-			if (ranges[0] * ranges[1] < 0) {
+			if (range[0] * range[1] < 0) {
 				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, ranges[0], 0));
+						condArgIndex, rangeVariable, range[0], 0));
 				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, 0, ranges[1]));
+						condArgIndex, rangeVariable, 0, range[1]));
 			}
 		}
 	}
@@ -166,12 +189,19 @@ public class RuleCreation implements Serializable {
 		Set<RelationalRule> subranges = new HashSet<RelationalRule>();
 
 		// Run through each condition
+		Map<String, double[]> actionRanges = AgentObservations.getInstance()
+				.getActionRanges(baseRule.getActionPredicate());
 		for (RelationalPredicate condition : baseRule.getConditions(false)) {
 			for (int i = 0; i < condition.getArguments().length; i++) {
 				RelationalArgument arg = condition.getRelationalArguments()[i];
+				// If the arg is a range or represents a range, can split it
 				if (arg.isRange()) {
 					createRangeSpecialisations(baseRule, subranges, condition,
 							i, arg);
+				} else if (actionRanges.containsKey(arg.toString())) {
+					double[] range = actionRanges.get(arg.toString());
+					createRangeSpecialisations(baseRule, subranges, condition,
+							i, arg.toString(), range);
 				}
 			}
 		}
@@ -381,7 +411,7 @@ public class RuleCreation implements Serializable {
 				}
 			}
 
-			if (!termPresent)
+			if (!termPresent) {
 				// For every action term
 				for (int i = 0; i < oldTerms.length; i++) {
 					// If the term is already a goal term, can't swap
@@ -392,6 +422,7 @@ public class RuleCreation implements Serializable {
 							mutants.add(swappedRule);
 					}
 				}
+			}
 		}
 
 		// Split any ranges up

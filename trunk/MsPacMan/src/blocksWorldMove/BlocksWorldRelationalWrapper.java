@@ -21,9 +21,7 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
 		if (!isFirstStateInEpisode()) {
 			// Apply the action
-//			 rete.eval("(facts)");
 			rete.run();
-//			 rete.eval("(facts)");
 			return rete;
 		}
 
@@ -147,5 +145,10 @@ public class BlocksWorldRelationalWrapper extends RelationalWrapper {
 				|| super.isTerminal(args) == 1)
 			return 1;
 		return 0;
+	}
+
+	@Override
+	protected boolean isReteDriven() {
+		return true;
 	}
 }

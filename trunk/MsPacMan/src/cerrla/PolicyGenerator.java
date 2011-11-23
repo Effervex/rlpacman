@@ -127,7 +127,15 @@ public final class PolicyGenerator implements Serializable {
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
 
-	/** The trace of the slot splits. */
+	/** The number of slots which have both a fixed rule and a converged mean. */
+	private int convergedSlots_;
+
+	/**
+	 * The number of slot means that have converged to either 0 or 1 (+-
+	 * epsilon) private int slotMeansConverged_;
+	 * 
+	 * /** The trace of the slot splits.
+	 */
 	private SortedMap<Double, RelationalRule> mutationTree_;
 
 	/** The rule creation object. */
@@ -364,7 +372,7 @@ public final class PolicyGenerator implements Serializable {
 				// Only add if not already in there
 				ruleSlot.addNewRule(rr);
 				currentRules_.add(rr);
-				
+
 				if (ProgramArgument.SEED_MODULE_RULES.booleanValue()) {
 					GoalCondition ruleConstants = rr.getConstantCondition();
 					if (ruleConstants != null) {
@@ -695,6 +703,10 @@ public final class PolicyGenerator implements Serializable {
 	public double getConvergenceValue() {
 		return convergedValue_;
 	}
+	
+	public int getNumConvergedSlots() {
+		return convergedSlots_;
+	}
 
 	/**
 	 * Gets (if it exists) or creates a new rule and slot corresponding to a
@@ -811,8 +823,12 @@ public final class PolicyGenerator implements Serializable {
 
 		// For each slot
 		Collection<Slot> newSlots = new ArrayList<Slot>();
+		convergedSlots_ = 0;
 		for (Object oSlot : slotGenerator_.toArray()) {
 			Slot slot = (Slot) oSlot;
+			if (slot.checkSlotFixing())
+				convergedSlots_++;
+
 			if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
 				if (!slot.isFixed()) {
 					ProbabilityDistribution<RelationalRule> distribution = slot
@@ -836,8 +852,6 @@ public final class PolicyGenerator implements Serializable {
 							.getGenerator();
 					RelationalRule bestRule = ruleGenerator.getBestElement();
 					// If the best rule isn't the seed, create a new slot
-					// TODO Maybe bypass this restriction by 'removing' the best
-					// rule to see if the KL size is affected by that at all.
 					if (!bestRule.equals(slot.getSeedRule())) {
 						Slot newSlot = new Slot(bestRule, false, newSlotLevel);
 						if (slotGenerator_.contains(newSlot)) {
@@ -1231,7 +1245,6 @@ public final class PolicyGenerator implements Serializable {
 			double alpha, int population, int numElites, float minValue) {
 		// Keep count of the rules seen (and slots used)
 		ElitesData ed = new ElitesData();
-		// TODO The observed mean is fucked up. It's going above 1.0.
 		int numEliteSamples = countRules(elites, ed, minValue);
 		double modAlpha = (1.0 * numEliteSamples) / numElites;
 		if (modAlpha < 1) {

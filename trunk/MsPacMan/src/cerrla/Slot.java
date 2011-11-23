@@ -20,6 +20,9 @@ import util.ProbabilityDistribution;
 public class Slot implements Serializable, Comparable<Slot> {
 	private static final long serialVersionUID = -8194795456340834012L;
 
+	/** The convergence point for determining if a slot's mean is converged. */
+	private static final double EPSILON = 0.01;
+
 	/** The action which all rules within lead to. */
 	private String action_;
 
@@ -45,7 +48,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	private RelationalRule seedRule_;
 
 	/** The chance of this slot being selected. */
-	private double selectionProb_;
+	private double slotMean_;
 
 	/** The hashcode for the slot. */
 	private int slotHash_;
@@ -71,10 +74,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 		seedRule.setSlot(this);
 		seedRule_ = seedRule;
 		if (fixed) {
-			selectionProb_ = 1;
+			slotMean_ = 1;
 			fixedRule_ = seedRule;
 		} else {
-			selectionProb_ = ProgramArgument.INITIAL_SLOT_MEAN.doubleValue();
+			slotMean_ = ProgramArgument.INITIAL_SLOT_MEAN.doubleValue();
 			ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
 					PolicyGenerator.random_);
 			ruleGenerator_.add(seedRule);
@@ -121,6 +124,26 @@ public class Slot implements Serializable, Comparable<Slot> {
 			}
 		}
 		guidedRule.setSlot(this);
+	}
+
+	/**
+	 * Checks if this slot can fix its rule in place and checks if the slot is fully converged.
+	 * 
+	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
+	 */
+	public boolean checkSlotFixing() {
+		// If KL size is 1, then the slot can be fixed.
+		if (ProgramArgument.SLOT_FIXING.booleanValue()) {
+			if (klSize() == 1) {
+				fixed_ = true;
+				fixedRule_ = ruleGenerator_.getBestElement();
+			}
+
+			// If mean is close to 0 or 1, return true
+			if (slotMean_ - EPSILON <= 0 || (slotMean_ + EPSILON >= 1 && fixed_))
+				return true;
+		}
+		return false;
 	}
 
 	@Override
@@ -328,7 +351,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	public double getSelectionProbability() {
-		return selectionProb_;
+		return slotMean_;
 	}
 
 	/**
@@ -380,7 +403,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
 		threshold = Math.max(Math.pow(threshold, slotLevel_ + 1) * size(), 1);
-		
+
 		if (klSize() <= threshold)
 			return true;
 		return false;
@@ -428,7 +451,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	public void setSelectionProb(double prob) {
-		selectionProb_ = prob;
+		slotMean_ = prob;
 	}
 
 	public int size() {
@@ -441,9 +464,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public String toString() {
 		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
 		buffer.append(slotSplitToString());
-		buffer.append(" [MU:" + selectionProb_ + ";ORD:" + ordering_
-				+ ";KL_SIZE:" + klSize() + ";SIZE:" + size() + ";LVL:"
-				+ slotLevel_ + ";#UPDATES:" + numUpdates_ + "]");
+		buffer.append(" [MU:" + slotMean_ + ";ORD:" + ordering_ + ";KL_SIZE:"
+				+ klSize() + ";SIZE:" + size() + ";LVL:" + slotLevel_
+				+ ";#UPDATES:" + numUpdates_ + "]");
 		if (fixed_)
 			buffer.append(" " + fixedRule_.toString());
 		else
@@ -534,7 +557,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public void updateSlotValues(Double ordering, double mean, double alpha) {
 		if (ordering != null)
 			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
-		selectionProb_ = mean * alpha + (1 - alpha) * selectionProb_;
+		slotMean_ = mean * alpha + (1 - alpha) * slotMean_;
 	}
 
 	/**
@@ -545,7 +568,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * @return True if the slot should be used.
 	 */
 	public boolean useSlot(Random random) {
-		return random.nextDouble() < selectionProb_;
+		return random.nextDouble() < slotMean_;
 	}
 
 	public void resetPolicyCount() {

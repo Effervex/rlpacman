@@ -234,8 +234,13 @@ public class Unification {
 						unification[i] = factTerm;
 						validFact |= !factTerm
 								.equals(RelationalArgument.ANONYMOUS);
-					} else if (!numericalValueCheck(factArguments[i],
-							unityArguments[i], unification, i, newActionTerms)) {
+					} else if (factArguments[i].isNumber()
+							&& unityArguments[i].isNumber()) {
+						// We have two numerical terms: unify them into a range
+						// if necessary.
+						unification[i] = unifyRange(factArguments[i],
+								unityArguments[i], newActionTerms);
+					} else {
 						// Not a number, we have differing terms here. Use
 						// anonymous
 						if (noGeneralisations) {
@@ -338,47 +343,47 @@ public class Unification {
 	}
 
 	/**
-	 * Check for numerical or numerical range values for a fact.
+	 * Unify two numerical arguments together into a range.
 	 * 
-	 * @param factValue
-	 *            The term in the fact.
-	 * @param unityValue
-	 *            The term in the unity fact.
-	 * @param unification
-	 *            The unification between the two.
-	 * @param index
-	 *            The index of the unification to fill.
-	 * @param factTerms
-	 *            The terms the fact uses as action parameters.
-	 * @return True if the two are numerical and could be unified into a ranged
-	 *         variable.
+	 * @param baseValue
+	 *            The base range term.
+	 * @param unifiedValue
+	 *            The term being incorporated.
+	 * @param actionTerms
+	 *            The terms the fact uses as action parameters. Optional.
+	 * @return The unified range value of the two facts.
 	 */
-	private boolean numericalValueCheck(RelationalArgument factValue,
-			RelationalArgument unityValue, RelationalArgument[] unification,
-			int index, RelationalArgument[] factTerms) {
-		// Check the unity is a number
-		if (!factValue.isNumber() || !unityValue.isNumber())
-			return false;
-
+	public RelationalArgument unifyRange(RelationalArgument baseValue,
+			RelationalArgument unifiedValue, RelationalArgument[] actionTerms) {
 		// Expand the range if need be.
-		double min = Math.min(factValue.getRangeArg()[0],
-				unityValue.getRangeArg()[0]);
-		double max = Math.max(factValue.getRangeArg()[1],
-				unityValue.getRangeArg()[0]);
-		if (min == max || min == factValue.getRangeArg()[0] && max == factValue.getRangeArg()[1]) {
-			unification[index] = factValue;
-			return true;
+		double min = Math.min(baseValue.getRangeArg()[0],
+				unifiedValue.getRangeArg()[0]);
+		double max = Math.max(baseValue.getRangeArg()[1],
+				unifiedValue.getRangeArg()[0]);
+		if (min == max || min == baseValue.getRangeArg()[0]
+				&& max == baseValue.getRangeArg()[1]) {
+			return baseValue;
 		}
 
-		String variable = (factValue.isVariable()) ? factValue.getStringArg()
-				: "?" + RelationalArgument.RANGE_VARIABLE_PREFIX
-						+ rangeIndex_++;
+		String variable = baseValue.getStringArg();
+		// If the fact isn't a variable yet, change the action terms.
+		if (!baseValue.isVariable()) {
+			variable = RelationalArgument.RANGE_VARIABLE_PREFIX + rangeIndex_++;
+			// Changing the action terms
+			// TODO Potential problems here when dealing with multiple numerical
+			// values - could cover the wrong one.
+			// TODO A possible fix is to encode numerical ranges using unique
+			// IDs, even when the range is only a single numbered fact. OR to
+			// use Java == operator to ensure variables are the same.
+			if (actionTerms != null) {
+				for (int i = 0; i < actionTerms.length; i++)
+					if (actionTerms[i].equals(baseValue))
+						actionTerms[i] = new RelationalArgument(variable);
+			}
+		}
 
-		RelationalArgument unifiedArg = new RelationalArgument(variable, min,
-				max);
-		unification[index] = unifiedArg;
+		return new RelationalArgument(variable, min, max);
 
-		return true;
 	}
 
 	public void resetRangeIndex() {

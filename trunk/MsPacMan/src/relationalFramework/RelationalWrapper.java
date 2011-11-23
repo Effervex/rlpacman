@@ -12,9 +12,27 @@ import jess.Rete;
  * @author Sam Sarjant
  */
 public abstract class RelationalWrapper {
+	/** If this state is the first state in the episode. */
 	private boolean firstState_;
 
+	/** If the environment is updated by Rete or scanning the state. */
+	private boolean reteDriven_;
+
+	/** Notes the previous state. */
 	protected Object[] prevState_;
+
+	public RelationalWrapper() {
+		reteDriven_ = isReteDriven();
+	}
+
+	/**
+	 * Determines how the Rete object is asserted to: via interacting rules or
+	 * continual state scans.
+	 * 
+	 * @return True if the environment uses Rete rules to update state or false
+	 *         if states are updated by scans.
+	 */
+	protected abstract boolean isReteDriven();
 
 	/**
 	 * Performs the actual asserting/retracting of facts based on the args
@@ -51,8 +69,7 @@ public abstract class RelationalWrapper {
 	public final Rete formObservations(Object... args) {
 		Rete rete = StateSpec.getInstance().getRete();
 		try {
-			// TODO Change this to assert/retract rather than reset
-			if (firstState_)
+			if (!reteDriven_ || firstState_)
 				rete.reset();
 
 			rete = assertStateFacts(rete, args);
@@ -94,7 +111,7 @@ public abstract class RelationalWrapper {
 			return 1;
 		return 0;
 	}
-	
+
 	/**
 	 * A method to call when a new episode begins.
 	 */

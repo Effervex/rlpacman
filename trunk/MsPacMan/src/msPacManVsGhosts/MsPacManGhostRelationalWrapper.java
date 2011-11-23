@@ -319,4 +319,9 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 			return 1;
 		return 0;
 	}
+
+	@Override
+	protected boolean isReteDriven() {
+		return false;
+	}
 }

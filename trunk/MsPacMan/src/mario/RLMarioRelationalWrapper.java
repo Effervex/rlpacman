@@ -1290,4 +1290,9 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 		}
 		return 0;
 	}
+
+	@Override
+	protected boolean isReteDriven() {
+		return false;
+	}
 }
