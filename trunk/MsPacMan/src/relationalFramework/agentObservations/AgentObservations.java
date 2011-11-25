@@ -15,7 +15,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -205,8 +204,23 @@ public final class AgentObservations implements Serializable {
 		return actionFacts;
 	}
 
-	public Map<String, double[]> getActionRanges(String action) {
-		return actionBasedObservations_.get(action).getActionRanges();
+	/**
+	 * Gets the maximal bounds of a numerical range using a specific range
+	 * context, if such a range exists.
+	 * 
+	 * @param rangeContext
+	 *            The context of the range being selected.
+	 * @return The maximal bounds of the range.
+	 */
+	public double[] getActionRanges(RangeContext rangeContext) {
+		if (rangeContext.getAction() != null) {
+			// Get the range from the actions
+			return actionBasedObservations_.get(rangeContext.getAction())
+					.getActionRange(rangeContext);
+		} else {
+			// Get the range from the condition beliefs.
+			return conditionObservations_.conditionRanges_.get(rangeContext);
+		}
 	}
 
 	public Map<String, ConditionBeliefs> getConditionBeliefs() {
@@ -259,7 +273,7 @@ public final class AgentObservations implements Serializable {
 			num = specConditions.size();
 		// Also, if the action has numerical arguments, add them to the count
 		// too
-		for (String type : StateSpec.getInstance().getStringFact(action)
+		for (String type : StateSpec.getInstance().getPredicateByName(action)
 				.getArgTypes()) {
 			if (StateSpec.isNumberType(type))
 				num += ProgramArgument.NUM_NUMERICAL_SPLITS.doubleValue();
@@ -688,7 +702,7 @@ public final class AgentObservations implements Serializable {
 		 * Mapped by pair: fact name and range variable, observed maximal ranges
 		 * for the conditions seen in the action.
 		 */
-		private Map<String, double[]> actionRanges_;
+		private Map<RangeContext, double[]> actionRanges_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<RelationalPredicate> invariantActionConditions_;
@@ -716,8 +730,15 @@ public final class AgentObservations implements Serializable {
 			return AgentObservations.this;
 		}
 
-		public Map<String, double[]> getActionRanges() {
-			return actionRanges_;
+		/**
+		 * Gets the maximum range observed so far for a given context.
+		 * 
+		 * @param rangeContext
+		 *            The context in which the range is.
+		 * @return The observed range for a given context or null.
+		 */
+		public double[] getActionRange(RangeContext rangeContext) {
+			return actionRanges_.get(rangeContext);
 		}
 
 		/**
@@ -741,7 +762,7 @@ public final class AgentObservations implements Serializable {
 				RelationalArgument[] actionArgs,
 				Collection<RelationalPredicate> invariants,
 				Collection<RelationalPredicate> variants,
-				Map<String, double[]> actionRanges) {
+				Map<RangeContext, double[]> actionRanges) {
 			boolean changed = false;
 			Collection<RelationalPredicate> newInvariantConditions = new HashSet<RelationalPredicate>();
 
@@ -805,19 +826,20 @@ public final class AgentObservations implements Serializable {
 		 *            The map of facts, mapped by factName-range variable.
 		 */
 		private void noteRange(RelationalPredicate numberFact,
-				Map<String, double[]> actionRanges) {
-			if (actionRanges == null)
+				Map<RangeContext, double[]> actionRanges) {
+			if (actionRanges == null || !numberFact.isNumerical())
 				return;
-			for (RelationalArgument arg : numberFact.getRelationalArguments()) {
+			RelationalArgument[] factArgs = numberFact.getRelationalArguments();
+			for (int i = 0; i < factArgs.length; i++) {
 				// Only note ranges
-				if (arg.isRange()) {
-					String key = arg.getStringArg();
+				if (factArgs[i].isRange()) {
+					RangeContext key = new RangeContext(i, numberFact, action_.getFactName());
 					double[] range = actionRanges.get(key);
 					if (range == null) {
 						range = new double[2];
 						actionRanges.put(key, range);
 					}
-					System.arraycopy(arg.getRangeArg(), 0, range, 0, 2);
+					System.arraycopy(factArgs[i].getExplicitRange(), 0, range, 0, 2);
 				}
 			}
 		}
@@ -926,14 +948,13 @@ public final class AgentObservations implements Serializable {
 					+ "\n");
 			buf.write("Observed ranges: [");
 			boolean first = true;
-			for (String rangeVariable : actionRanges_.keySet()) {
+			for (RangeContext rc : actionRanges_.keySet()) {
 				if (!first)
 					buf.write(", ");
-				buf.write(rangeVariable + ": "
-						+ Arrays.toString(actionRanges_.get(rangeVariable)));
+				buf.write(rc.toString(actionRanges_.get(rc)));
 				first = false;
 			}
-			buf.write("]\n");
+			buf.write("]\n\n");
 		}
 
 		protected void saveLocalActionBasedObservations(BufferedWriter localBuf)
@@ -978,13 +999,28 @@ public final class AgentObservations implements Serializable {
 				specialisationConditions_ = new HashSet<RelationalPredicate>();
 				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
-				actionRanges_ = new HashMap<String, double[]>();
+				actionRanges_ = new HashMap<RangeContext, double[]>();
 				return true;
+			}
+
+			// Generalise the action if necessary
+			RelationalArgument[] actionArgs = action_.getRelationalArguments();
+			for (int i = 0; i < actionArgs.length; i++) {
+				RelationalArgument argument = actionArgs[i];
+
+				// If the action isn't variable, but doesn't match with the
+				// current action, generalise it.
+				if (!argument.isVariable()
+						&& !argument.isNumber()
+						&& (!argument
+								.equals(action.getRelationalArguments()[i]))) {
+					actionArgs[i] = RelationalArgument.getVariableTermArg(i);
+					changed = true;
+				}
 			}
 
 			// Sort the invariant and variant conditions, making a special case
 			// for numerical conditions.
-			RelationalArgument[] actionArgs = action_.getRelationalArguments();
 			changed |= intersectActionConditions(actionConds, actionArgs,
 					invariantActionConditions_, variantActionConditions_,
 					actionRanges_);
@@ -995,19 +1031,6 @@ public final class AgentObservations implements Serializable {
 			changed |= intersectActionConditions(goalActionConds, actionArgs,
 					localInvariants, localVariants, null);
 
-			// Generalise the action if necessary
-			for (int i = 0; i < actionArgs.length; i++) {
-				RelationalArgument argument = actionArgs[i];
-
-				// If the action isn't variable, but doesn't match with the
-				// current action, generalise it.
-				if (!argument.isVariable()
-						&& (!argument
-								.equals(action.getRelationalArguments()[i]))) {
-					actionArgs[i] = RelationalArgument.getVariableTermArg(i);
-					changed = true;
-				}
-			}
 			action_ = new RelationalPredicate(action_, actionArgs);
 
 			if (changed) {
@@ -1130,7 +1153,7 @@ public final class AgentObservations implements Serializable {
 		 * A map (by fact name) of various conditions which note the maximum
 		 * bounds of observed ranges.
 		 */
-		private Map<String, RelationalPredicate> conditionRanges_;
+		private Map<RangeContext, double[]> conditionRanges_;
 
 		/** The observed invariants of the environment. */
 		private InvariantObservations invariants_;
@@ -1159,7 +1182,7 @@ public final class AgentObservations implements Serializable {
 			negatedConditionBeliefs_ = new TreeMap<String, Map<IntegerArray, ConditionBeliefs>>();
 			learnedEnvironmentRules_ = formBackgroundKnowledge();
 			invariants_ = new InvariantObservations();
-			conditionRanges_ = new HashMap<String, RelationalPredicate>();
+			conditionRanges_ = new HashMap<RangeContext, double[]>();
 
 			unseenPreds_ = new HashSet<RelationalPredicate>();
 			unseenPreds_.addAll(StateSpec.getInstance().getPredicates()
@@ -1292,38 +1315,26 @@ public final class AgentObservations implements Serializable {
 						notRelativeFacts);
 
 				// Note the ranges of the condition if the fact is numerical
-				if (baseFact.isNumerical()) {
-					RelationalPredicate rangeFact = conditionRanges_
-							.get(baseFact.getFactName());
-					if (rangeFact == null) {
-						rangeFact = new RelationalPredicate(baseFact);
-						rangeFact.replaceArguments(
-								new HashMap<String, String>(), false, true);
-						conditionRanges_.put(baseFact.getFactName(), rangeFact);
-					} else {
-						// Check each fact arg
-						RelationalArgument[] rangeArgs = rangeFact
-								.getRelationalArguments();
-						RelationalArgument[] baseArgs = baseFact
-								.getRelationalArguments();
-						boolean rangeChanged = false;
-						for (int i = 0; i < baseArgs.length; i++) {
-							if (baseArgs[i].isNumber()) {
-								RelationalArgument newRange = Unification
-										.getInstance().unifyRange(rangeArgs[i],
-												baseArgs[i], null);
-								if (newRange != rangeArgs[i]) {
-									rangeChanged = true;
-									rangeArgs[i] = newRange;
-								}
-							}
-						}
 
-						if (rangeChanged) {
-							rangeFact = new RelationalPredicate(rangeFact,
-									rangeArgs);
-							conditionRanges_.put(rangeFact.getFactName(),
-									rangeFact);
+				if (baseFact.isNumerical()) {
+					RelationalArgument[] baseArgs = baseFact
+							.getRelationalArguments();
+					for (int i = 0; i < baseArgs.length; i++) {
+						if (baseArgs[i].isNumber()) {
+							RangeContext context = new RangeContext(i, baseFact);
+
+							double[] range = conditionRanges_.get(context);
+							double baseVal = baseArgs[i].getExplicitRange()[0];
+							if (range == null) {
+								// A new range
+								range = new double[2];
+								range[0] = range[1] = baseVal;
+								conditionRanges_.put(context, range);
+							} else {
+								// Unify existing range
+								Unification.getInstance().unifyRange(range,
+										baseVal);
+							}
 						}
 					}
 				}
@@ -1477,7 +1488,13 @@ public final class AgentObservations implements Serializable {
 
 			buf.write("\n");
 			buf.write("Observed ranges\n");
-			buf.write(conditionRanges_.values().toString());
+			boolean first = true;
+			for (RangeContext rc : conditionRanges_.keySet()) {
+				if (!first)
+					buf.write(", ");
+				buf.write(rc.toString(conditionRanges_.get(rc)));
+				first = false;
+			}
 
 			buf.close();
 			wr.close();

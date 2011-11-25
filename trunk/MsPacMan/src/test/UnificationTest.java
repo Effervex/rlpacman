@@ -155,9 +155,11 @@ public class UnificationTest {
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
 		assertEquals(1, result);
-		assertTrue(oldState
-				.contains(StateSpec
-						.toRelationalPredicate("(distance blinky ?__Num0&:(<= 5.0 ?__Num0 10.0)")));
+		assertTrue(oldState.toString(), oldState.contains(StateSpec
+				.toRelationalPredicate("(distance blinky "
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX
+						+ "0&:(<= 5.0 "
+						+ RelationalArgument.RANGE_VARIABLE_PREFIX + "0 10.0)")));
 	}
 
 	@Test
@@ -173,7 +175,8 @@ public class UnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(clear ?X)")));
-		assertEquals(replacementMap.get(new RelationalArgument("?X")), new RelationalArgument("?X"));
+		assertEquals(replacementMap.get(new RelationalArgument("?X")),
+				new RelationalArgument("?X"));
 
 		// Negation unification
 		oldState.clear();
@@ -186,7 +189,8 @@ public class UnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(not (clear ?X))")));
-		assertEquals(replacementMap.get(new RelationalArgument("?X")), new RelationalArgument("?X"));
+		assertEquals(replacementMap.get(new RelationalArgument("?X")),
+				new RelationalArgument("?X"));
 
 		// Substitution unification
 		oldState.clear();
@@ -199,7 +203,8 @@ public class UnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(clear ?X)")));
-		assertEquals(replacementMap.get(new RelationalArgument("?Y")), new RelationalArgument("?X"));
+		assertEquals(replacementMap.get(new RelationalArgument("?Y")),
+				new RelationalArgument("?X"));
 
 		// More complex substitution unification
 		oldState.clear();
@@ -216,7 +221,8 @@ public class UnificationTest {
 				.toRelationalPredicate("(clear ?X)")));
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(highest ?X)")));
-		assertEquals(replacementMap.get(new RelationalArgument("?Y")), new RelationalArgument("?X"));
+		assertEquals(replacementMap.get(new RelationalArgument("?Y")),
+				new RelationalArgument("?X"));
 
 		// Tricky complex substitution unification (could be either case)
 		oldState.clear();
@@ -231,7 +237,8 @@ public class UnificationTest {
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
 				.toRelationalPredicate("(clear ?X)")));
-		assertEquals(replacementMap.get(new RelationalArgument("?Y")), new RelationalArgument("?X"));
+		assertEquals(replacementMap.get(new RelationalArgument("?Y")),
+				new RelationalArgument("?X"));
 
 		// Unifying with a negated condition
 		oldState.clear();

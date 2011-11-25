@@ -22,11 +22,13 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import cerrla.Unification;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
+import relationalFramework.agentObservations.RangeContext;
 import util.ArgumentComparator;
 import util.MultiMap;
 import util.Pair;
 
 import jess.Fact;
+import jess.JessException;
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -39,6 +41,9 @@ import jess.ValueVector;
 public abstract class StateSpec {
 	/** The singleton instance. */
 	private static StateSpec instance_;
+
+	/** The name of the linear interpolation function. */
+	private static final String LINEAR_INTERPOLATE = "lerp";
 
 	/** The suffix for an action precondition. */
 	public static final String ACTION_PRECOND_SUFFIX = "PreCond";
@@ -54,6 +59,8 @@ public abstract class StateSpec {
 
 	/** The policy rule prefix. */
 	public static final String POLICY_QUERY_PREFIX = "polRule";
+
+	public static final String RANGE_TEST = "range";
 
 	/** The StringFact definition for the test predicate. */
 	public static final RelationalPredicate TEST_DEFINITION = new RelationalPredicate(
@@ -152,7 +159,8 @@ public abstract class StateSpec {
 	private List<String> formActionTerms(RelationalPredicate action) {
 		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
 		for (int i = 0; i < action.getArgTypes().length; i++)
-			terms.add(RelationalArgument.getVariableTermArg(i).toString().substring(1));
+			terms.add(RelationalArgument.getVariableTermArg(i).toString()
+					.substring(1));
 		return terms;
 	}
 
@@ -181,105 +189,24 @@ public abstract class StateSpec {
 
 			environment_ = this.getClass().getPackage().getName();
 
+			// Initialise any deffunctions
+			initialiseFunctions();
+
 			// Type predicates and their hierarchy background rules.
-			typePredicates_ = new HashMap<String, RelationalPredicate>();
-			Map<String, String> typeAssertions = new HashMap<String, String>();
-			Map<String, String> typeParents = initialiseTypePredicateTemplates();
-			typeHierarchy_ = new HashMap<String, ParentChildren>();
-			for (String type : typeParents.keySet()) {
-				typePredicates_.put(type, new RelationalPredicate(type,
-						new String[] { type }));
-				defineTemplate(type, rete_);
-
-				// Define background knowledge rule
-				if (typeParents.get(type) != null) {
-					String assertion = "(" + type + " ?X) " + INFERS_ACTION
-							+ " (assert (" + typeParents.get(type) + " ?X))";
-					typeAssertions.put(type + "ParentRule", assertion);
-
-					// Record the parent children relationship
-					ParentChildren thisPC = (typeHierarchy_.containsKey(type)) ? typeHierarchy_
-							.get(type) : new ParentChildren();
-					String parentType = typeParents.get(type);
-					thisPC.setParent(parentType);
-					typeHierarchy_.put(type, thisPC);
-
-					ParentChildren parentPC = (typeHierarchy_
-							.containsKey(parentType)) ? typeHierarchy_
-							.get(parentType) : new ParentChildren();
-					parentPC.addChild(type);
-					typeHierarchy_.put(parentType, parentPC);
-				}
-			}
+			Map<String, String> typeAssertions = initialiseTypePredicates();
 
 			// Main predicates
-			predicates_ = new HashMap<String, RelationalPredicate>();
-			for (RelationalPredicate pred : initialisePredicateTemplates()) {
-				predicates_.put(pred.getFactName(), pred);
-				defineTemplate(pred.getFactName(), rete_);
-			}
+			initialiseRegularPredicates();
 
-			// Set up the valid actions template
-			StringBuffer actBuf = new StringBuffer("(deftemplate "
-					+ VALID_ACTIONS);
 			// Actions
-			actions_ = new HashMap<String, RelationalPredicate>();
-			for (RelationalPredicate action : initialiseActionTemplates()) {
-				actions_.put(action.getFactName(), action);
-				defineTemplate(action.getFactName(), rete_);
-				actBuf.append(" (multislot " + action.getFactName() + ")");
-			}
-			actBuf.append(")");
-			rete_.eval(actBuf.toString());
-			actionNum_ = initialiseActionsPerStep();
-			// Action rules
-			int j = 0;
-			for (String actionRule : initialiseActionRules())
-				rete_.eval("(defrule actionRule" + j++ + " " + actionRule + ")");
+			initialiseActionPredicates();
 
 			// Initialise the background knowledge rules
 
-			// Type hierarchy rules
-			backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
-			for (String name : typeAssertions.keySet())
-				backgroundRules_.put(name, new BackgroundKnowledge(
-						typeAssertions.get(name), false));
-
-			// State Spec rules
-			backgroundRules_.putAll(initialiseBackgroundKnowledge());
-			for (String ruleNames : backgroundRules_.keySet())
-				rete_.eval("(defrule " + ruleNames + " "
-						+ backgroundRules_.get(ruleNames) + ")");
+			initialiseBackgroundRules(typeAssertions);
 
 			// Initialise the goal state rules
-			String[] goal = initialiseGoalState();
-			goalName_ = goal[0];
-			goalState_ = goal[1];
-			constants_ = extractConstants(goalState_);
-			String[] factTypes = new String[constants_.size() + 1];
-			factTypes[0] = "goalPred";
-			for (int i = 1; i < factTypes.length; i++)
-				factTypes[i] = "arg" + (i - 1);
-			goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED,
-					factTypes);
-			rete_.eval("(deftemplate goal (slot goalMet))");
-			String goalPred = formGoalPred(constants_);
-			String goalRule = "(defrule goalState " + goalPred + " "
-					+ goalState_ + " => (assert (goal (goalMet TRUE))))";
-			rete_.eval(goalRule);
-			// Initialise the goal checking query
-			rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
-
-			// Initialise the queries for determining action preconditions
-			Map<String, String> purePreConds = initialiseActionPreconditions();
-			actionPreconditions_ = MultiMap.createListMultiMap();
-			for (String action : purePreConds.keySet()) {
-				String query = "(defquery " + action + ACTION_PRECOND_SUFFIX
-						+ " " + purePreConds.get(action) + ")";
-				rete_.eval(query);
-				actionPreconditions_.putCollection(action,
-						formActionTerms(actions_.get(action)));
-			}
+			initialiseGoalRules();
 
 			// Initialise the optimal policy
 			handCodedPolicy_ = initialiseHandCodedPolicy();
@@ -291,6 +218,117 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void initialiseActionPredicates() throws JessException {
+		actions_ = new HashMap<String, RelationalPredicate>();
+		for (RelationalPredicate action : initialiseActionTemplates()) {
+			actions_.put(action.getFactName(), action);
+			defineTemplate(action.getFactName(), rete_);
+		}
+		actionNum_ = initialiseActionsPerStep();
+		// Action rules
+		int j = 0;
+		for (String actionRule : initialiseActionRules())
+			rete_.eval("(defrule actionRule" + j++ + " " + actionRule + ")");
+
+		// Initialise the queries for determining action preconditions
+		Map<String, String> purePreConds = initialiseActionPreconditions();
+		actionPreconditions_ = MultiMap.createListMultiMap();
+		for (String action : purePreConds.keySet()) {
+			String query = "(defquery " + action + ACTION_PRECOND_SUFFIX + " "
+					+ purePreConds.get(action) + ")";
+			rete_.eval(query);
+			actionPreconditions_.putCollection(action,
+					formActionTerms(actions_.get(action)));
+		}
+	}
+
+	private void initialiseBackgroundRules(Map<String, String> typeAssertions)
+			throws JessException {
+		// Type hierarchy rules
+		backgroundRules_ = new HashMap<String, BackgroundKnowledge>();
+		for (String name : typeAssertions.keySet())
+			backgroundRules_.put(name,
+					new BackgroundKnowledge(typeAssertions.get(name), false));
+
+		// State Spec rules
+		backgroundRules_.putAll(initialiseBackgroundKnowledge());
+		for (String ruleNames : backgroundRules_.keySet())
+			rete_.eval("(defrule " + ruleNames + " "
+					+ backgroundRules_.get(ruleNames) + ")");
+	}
+
+	private void initialiseFunctions() throws Exception {
+		// Define the linear interpolation function
+		rete_.eval("(deffunction " + LINEAR_INTERPOLATE
+				+ " (?val1 ?amount ?val2) "
+				+ "(return (+ ?val1 (* ?amount (- ?val2 ?val1)))))");
+		// Define the range bounding function
+		rete_.eval("(deffunction " + RANGE_TEST
+				+ " (?min ?minFrac ?var ?max ?maxFrac) " + "(return (<= ("
+				+ LINEAR_INTERPOLATE + " ?min ?minFrac ?max) ?var ("
+				+ LINEAR_INTERPOLATE + " ?min ?maxFrac ?max))))");
+	}
+
+	private void initialiseGoalRules() throws JessException {
+		String[] goal = initialiseGoalState();
+		goalName_ = goal[0];
+		goalState_ = goal[1];
+		constants_ = extractConstants(goalState_);
+		String[] factTypes = new String[constants_.size() + 1];
+		factTypes[0] = "goalPred";
+		for (int i = 1; i < factTypes.length; i++)
+			factTypes[i] = "arg" + (i - 1);
+		goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED, factTypes);
+		rete_.eval("(deftemplate goal (slot goalMet))");
+		String goalPred = formGoalPred(constants_);
+		String goalRule = "(defrule goalState " + goalPred + " " + goalState_
+				+ " => (assert (goal (goalMet TRUE))))";
+		rete_.eval(goalRule);
+		// Initialise the goal checking query
+		rete_.eval("(defquery " + GOAL_QUERY + " (goal (goalMet ?)))");
+	}
+
+	private void initialiseRegularPredicates() {
+		predicates_ = new HashMap<String, RelationalPredicate>();
+		for (RelationalPredicate pred : initialisePredicateTemplates()) {
+			predicates_.put(pred.getFactName(), pred);
+			defineTemplate(pred.getFactName(), rete_);
+		}
+	}
+
+	private Map<String, String> initialiseTypePredicates() {
+		typePredicates_ = new HashMap<String, RelationalPredicate>();
+		Map<String, String> typeAssertions = new HashMap<String, String>();
+		Map<String, String> typeParents = initialiseTypePredicateTemplates();
+		typeHierarchy_ = new HashMap<String, ParentChildren>();
+		for (String type : typeParents.keySet()) {
+			typePredicates_.put(type, new RelationalPredicate(type,
+					new String[] { type }));
+			defineTemplate(type, rete_);
+
+			// Define background knowledge rule
+			if (typeParents.get(type) != null) {
+				String assertion = "(" + type + " ?X) " + INFERS_ACTION
+						+ " (assert (" + typeParents.get(type) + " ?X))";
+				typeAssertions.put(type + "ParentRule", assertion);
+
+				// Record the parent children relationship
+				ParentChildren thisPC = (typeHierarchy_.containsKey(type)) ? typeHierarchy_
+						.get(type) : new ParentChildren();
+				String parentType = typeParents.get(type);
+				thisPC.setParent(parentType);
+				typeHierarchy_.put(type, thisPC);
+
+				ParentChildren parentPC = (typeHierarchy_
+						.containsKey(parentType)) ? typeHierarchy_
+						.get(parentType) : new ParentChildren();
+				parentPC.addChild(type);
+				typeHierarchy_.put(parentType, parentPC);
+			}
+		}
+		return typeAssertions;
 	}
 
 	// /**
@@ -485,7 +523,8 @@ public abstract class StateSpec {
 		int i = 0;
 		for (String goalTerm : goalArgs) {
 			if (!goalReplacements.containsKey(goalTerm))
-				goalReplacements.put(goalTerm, RelationalArgument.createGoalTerm(i));
+				goalReplacements.put(goalTerm,
+						RelationalArgument.createGoalTerm(i));
 			i++;
 		}
 		ObjectObservations.getInstance().goalReplacements = goalReplacements;
@@ -658,14 +697,17 @@ public abstract class StateSpec {
 			try {
 				result = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() == null
-						|| gr.getQueryParameters().isEmpty()) {
-					rete_.eval("(defquery " + result + " "
-							+ gr.getStringConditions() + ")");
-				} else {
+				if (gr.getQueryParameters() != null
+						&& !gr.getQueryParameters().isEmpty()
+						|| !gr.getRangeContexts().isEmpty()) {
 					StringBuffer declares = new StringBuffer(
 							"(declare (variables");
 
+					for (RangeContext rc : gr.getRangeContexts()) {
+						String rangeVariable = rc.getRangeVariable();
+						declares.append(" " + rangeVariable + RangeBound.MIN);
+						declares.append(" " + rangeVariable + RangeBound.MAX);
+					}
 					for (String param : gr.getQueryParameters()) {
 						declares.append(" " + param);
 					}
@@ -673,6 +715,9 @@ public abstract class StateSpec {
 
 					rete_.eval("(defquery " + result + " "
 							+ declares.toString() + " "
+							+ gr.getStringConditions() + ")");
+				} else {
+					rete_.eval("(defquery " + result + " "
 							+ gr.getStringConditions() + ")");
 				}
 				queryNames_.put(ruleQuery, result);
@@ -692,7 +737,7 @@ public abstract class StateSpec {
 	 * @return The StringFact corresponding to the fact name, or null if
 	 *         non-existant.
 	 */
-	public RelationalPredicate getStringFact(String factName) {
+	public RelationalPredicate getPredicateByName(String factName) {
 		if (predicates_.containsKey(factName))
 			return predicates_.get(factName);
 		if (actions_.containsKey(factName))
@@ -1084,8 +1129,8 @@ public abstract class StateSpec {
 
 		String[] arguments = new String[condSplit.length - 1];
 		System.arraycopy(condSplit, 1, arguments, 0, arguments.length);
-		return new RelationalPredicate(getInstance()
-				.getStringFact(condSplit[0]), arguments, negated);
+		return new RelationalPredicate(getInstance().getPredicateByName(
+				condSplit[0]), arguments, negated);
 	}
 
 	/**

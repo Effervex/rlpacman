@@ -4,6 +4,7 @@ import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.RangeContext;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -74,6 +75,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/** The query parameters associated with this rule. */
 	private List<String> queryParams_;
 
+	/** The collection of ranges contained within the rule. */
+	private SortedSet<RangeContext> rangeContexts_;
+
 	/** The guided predicate that defined the action. */
 	private RelationalPredicate ruleAction_;
 
@@ -131,7 +135,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		if (parent != null)
 			setMutant(parent);
 		slot_ = null;
-		findConstants();
+		findConstantsAndRanges();
 		ruleHash_ = hashCode();
 	}
 
@@ -149,7 +153,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		slot_ = null;
 		ancestryCount_ = 0;
 		expandConditions();
-		findConstants();
+		findConstantsAndRanges();
 	}
 
 	/**
@@ -163,7 +167,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	public RelationalRule(String ruleString, List<String> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
-		findConstants();
 	}
 
 	/**
@@ -185,8 +188,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	/**
 	 * Finds the constants in the rule conditions.
 	 */
-	private void findConstants() {
+	private void findConstantsAndRanges() {
 		List<RelationalPredicate> constants = new ArrayList<RelationalPredicate>();
+		rangeContexts_ = new TreeSet<RangeContext>();
 		for (RelationalPredicate cond : ruleConditions_) {
 			// If the condition isn't a type predicate or test
 			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
@@ -195,7 +199,8 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				// If the condition doesn't contain variables - except modular
 				// variables
 				boolean isConstant = true;
-				for (RelationalArgument argument : cond.getRelationalArguments()) {
+				for (RelationalArgument argument : cond
+						.getRelationalArguments()) {
 					// If the arg isn't a constant or a goal term, the condition
 					// isn't a constant condition.
 					if (!argument.isConstant()) {
@@ -207,6 +212,9 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				if (isConstant) {
 					constants.add(cond);
 				}
+				
+				// Checking for RangeContexts
+				rangeContexts_.addAll(cond.getRangeContexts());
 			}
 		}
 
@@ -400,6 +408,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		return ruleAction_.getArguments();
 	}
 
+	public int getAncestryCount() {
+		return ancestryCount_;
+	}
+
 	public Collection<RelationalRule> getChildrenRules() {
 		return mutantChildren_;
 	}
@@ -464,6 +476,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		return queryParams_;
 	}
 
+	public SortedSet<RangeContext> getRangeContexts() {
+		return rangeContexts_;
+	}
+
 	/**
 	 * Gets the parameter replacement for the query parameter if one exists.
 	 * 
@@ -514,7 +530,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		RelationalRule groundRule = new RelationalRule(groundConditions,
 				groundAction, null);
 		groundRule.expandConditions();
-		groundRule.findConstants();
+		groundRule.findConstantsAndRanges();
 
 		return groundRule;
 	}
@@ -657,7 +673,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 		hasSpawned_ = null;
 		ruleConditions_ = conditions;
 		ruleUses_ = 0;
-		findConstants();
+		findConstantsAndRanges();
 		return true;
 	}
 
@@ -692,10 +708,6 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			ancestryCount_ = parent.ancestryCount_ + 1;
 	}
 
-	public int getAncestryCount() {
-		return ancestryCount_;
-	}
-
 	/**
 	 * Sets temporary parameter replacements for any parameterisable terms
 	 * within. The temp parameters don't affect the rule itself, just the
@@ -727,7 +739,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			queryParams_ = new ArrayList<String>();
 			for (int i = 0; i < parameters_.size(); i++)
 				queryParams_.add(RelationalArgument.createGoalTerm(i));
-			findConstants();
+			findConstantsAndRanges();
 		}
 	}
 
@@ -750,7 +762,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			parameters_.add(parameterMap.get(goalTerm));
 		}
 		if (!hasQueryParams)
-			findConstants();
+			findConstantsAndRanges();
 	}
 
 	/**
@@ -765,7 +777,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			queryParams_ = new ArrayList<String>(queryParameters);
 		else
 			queryParams_ = null;
-		findConstants();
+		findConstantsAndRanges();
 	}
 
 	public void setSlot(Slot slot) {
@@ -815,7 +827,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 							&& !StateSpec
 									.isNumberType(stringFact.getArgTypes()[i])) {
 						RelationalPredicate type = new RelationalPredicate(
-								StateSpec.getInstance().getStringFact(
+								StateSpec.getInstance().getPredicateByName(
 										stringFact.getArgTypes()[i]),
 								new String[] { stringFact.getArguments()[i] });
 						standardType.add(type);

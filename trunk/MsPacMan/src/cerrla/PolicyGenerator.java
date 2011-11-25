@@ -47,13 +47,16 @@ import jess.Rete;
  * @author Samuel J. Sarjant
  */
 public final class PolicyGenerator implements Serializable {
-	private static final long serialVersionUID = 3157117448981353095L;
+	/** The point at which low mean slots are ignored for text output. */
+	private static final double LOW_SLOT_THRESHOLD = 0.001;
 
 	/**
 	 * The increment for an ordering value to increase when resolving ordering
 	 * value clashes.
 	 */
 	private static final double ORDER_CLASH_INCREMENT = 0.001;
+
+	private static final long serialVersionUID = 3157117448981353095L;
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
@@ -70,11 +73,11 @@ public final class PolicyGenerator implements Serializable {
 	/** The name of a module-saved policy generator serialised file. */
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
-	/** The point at which low mean slots are ignored for text output. */
-	private static final double LOW_SLOT_THRESHOLD = 0.001;
-
 	/** Policies awaiting testing. */
 	private Stack<CoveringRelationalPolicy> awaitingTest_;
+
+	/** The number of slots which have both a fixed rule and a converged mean. */
+	private int convergedSlots_;
 
 	/** The number of times in a row the updates have been convergent. */
 	private transient int convergedStrike_ = 0;
@@ -112,6 +115,14 @@ public final class PolicyGenerator implements Serializable {
 	/** The goal this generator is working towards if modular. */
 	private GoalCondition moduleGoal_;
 
+	/**
+	 * The number of slot means that have converged to either 0 or 1 (+-
+	 * epsilon) private int slotMeansConverged_;
+	 * 
+	 * /** The trace of the slot splits.
+	 */
+	private SortedMap<Double, RelationalRule> mutationTree_;
+
 	/** Total policies evaluated. */
 	private int policiesEvaluated_;
 
@@ -126,17 +137,6 @@ public final class PolicyGenerator implements Serializable {
 
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
-
-	/** The number of slots which have both a fixed rule and a converged mean. */
-	private int convergedSlots_;
-
-	/**
-	 * The number of slot means that have converged to either 0 or 1 (+-
-	 * epsilon) private int slotMeansConverged_;
-	 * 
-	 * /** The trace of the slot splits.
-	 */
-	private SortedMap<Double, RelationalRule> mutationTree_;
 
 	/** The rule creation object. */
 	protected RuleCreation ruleCreation_;
@@ -292,6 +292,27 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
+	 * Loads the module rules and adds them to the current CERRLA process with
+	 * the correct parameters.
+	 * 
+	 * @param ruleConstants
+	 *            The goal condition module to load.
+	 */
+	private void insertModuleRules(GoalCondition ruleConstants) {
+		Module module = Module.loadModule(StateSpec.getInstance()
+				.getEnvironmentName(), ruleConstants.toString());
+		if (module != null) {
+			// Put the parameters into an arraylist
+			ArrayList<String> parameters = new ArrayList<String>(
+					ruleConstants.getConstantArgs());
+			for (RelationalRule modRule : module.getModuleRules()) {
+				modRule.setModularParameters(parameters);
+				getCreateCorrespondingRule(modRule);
+			}
+		}
+	}
+
+	/**
 	 * Mutates a rule (if it hasn't spawned already, though the covered rule is
 	 * always checked) and creates and adds children to the slots.
 	 * 
@@ -413,27 +434,6 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Loads the module rules and adds them to the current CERRLA process with
-	 * the correct parameters.
-	 * 
-	 * @param ruleConstants
-	 *            The goal condition module to load.
-	 */
-	private void insertModuleRules(GoalCondition ruleConstants) {
-		Module module = Module.loadModule(StateSpec.getInstance()
-				.getEnvironmentName(), ruleConstants.toString());
-		if (module != null) {
-			// Put the parameters into an arraylist
-			ArrayList<String> parameters = new ArrayList<String>(
-					ruleConstants.getConstantArgs());
-			for (RelationalRule modRule : module.getModuleRules()) {
-				modRule.setModularParameters(parameters);
-				getCreateCorrespondingRule(modRule);
-			}
-		}
-	}
-
-	/**
 	 * Note down the mutation in the mutation tree.
 	 * 
 	 * @param baseRule
@@ -448,6 +448,37 @@ public final class PolicyGenerator implements Serializable {
 		while (mutationTree_.containsKey(episodeF))
 			episodeF += ORDER_CLASH_INCREMENT;
 		mutationTree_.put(episodeF, baseRule);
+	}
+
+	/**
+	 * Recurse through a multimap tree.
+	 * 
+	 * @param rule
+	 *            The current rule.
+	 * @param mutationTree
+	 *            The mutation tree to traverse
+	 * @param buf
+	 *            The writer to write out to.
+	 */
+	private void recurseMutationTree(
+			Pair<RelationalRule, Integer> rule,
+			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> mutationTree,
+			BufferedWriter buf) throws Exception {
+		for (int i = rule.objA_.getAncestryCount() - 1; i >= 0; i--) {
+			if (i == 0)
+				buf.append("|-");
+			else
+				buf.append(" ");
+		}
+		buf.append(rule.objA_.toNiceString() + ":" + rule.objB_ + "\n");
+
+		// Recurse through the rules
+		Collection<Pair<RelationalRule, Integer>> children = mutationTree
+				.get(rule.objA_);
+		if (children != null)
+			for (Pair<RelationalRule, Integer> childRule : mutationTree
+					.get(rule.objA_))
+				recurseMutationTree(childRule, mutationTree, buf);
 	}
 
 	/**
@@ -703,10 +734,6 @@ public final class PolicyGenerator implements Serializable {
 	public double getConvergenceValue() {
 		return convergedValue_;
 	}
-	
-	public int getNumConvergedSlots() {
-		return convergedSlots_;
-	}
 
 	/**
 	 * Gets (if it exists) or creates a new rule and slot corresponding to a
@@ -758,6 +785,18 @@ public final class PolicyGenerator implements Serializable {
 		return moduleGoal_;
 	}
 
+	public Collection<RelationalRule> getMutatedRules() {
+		return mutationTree_.values();
+	}
+
+	public int getNumConvergedSlots() {
+		return convergedSlots_;
+	}
+
+	public int getNumMutations() {
+		return mutationTree_.size();
+	}
+
 	public int getPoliciesEvaluated() {
 		return policiesEvaluated_;
 	}
@@ -768,10 +807,6 @@ public final class PolicyGenerator implements Serializable {
 
 	public void incrementPoliciesEvaluated() {
 		policiesEvaluated_++;
-	}
-
-	public int getNumMutations() {
-		return mutationTree_.size();
 	}
 
 	/**
@@ -797,6 +832,14 @@ public final class PolicyGenerator implements Serializable {
 
 	public boolean isModuleGenerator() {
 		return moduleGenerator_;
+	}
+
+	/**
+	 * Loads external agent data (AgentObservations and StateSpec).
+	 */
+	public void loadAgentData() {
+		AgentObservations.loadAgentObservations(localGoal_);
+		StateSpec.reinitInstance();
 	}
 
 	/**
@@ -993,25 +1036,6 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Saves the policy generator in a serializable format.
-	 * 
-	 * @param serFile
-	 *            The file to serialize to.
-	 */
-	public void savePolicyGenerator(File serFile) throws Exception {
-		if (moduleGenerator_ && Module.saveAtEnd_)
-			return;
-
-		FileOutputStream fos = new FileOutputStream(serFile);
-		ObjectOutputStream oos = new ObjectOutputStream(fos);
-
-		Module.saveGenerator(this);
-
-		oos.writeObject(this);
-		oos.close();
-	}
-
-	/**
 	 * Saves a trace of the mutations to file.
 	 * 
 	 * @param buf
@@ -1070,34 +1094,22 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Recurse through a multimap tree.
+	 * Saves the policy generator in a serializable format.
 	 * 
-	 * @param rule
-	 *            The current rule.
-	 * @param mutationTree
-	 *            The mutation tree to traverse
-	 * @param buf
-	 *            The writer to write out to.
+	 * @param serFile
+	 *            The file to serialize to.
 	 */
-	private void recurseMutationTree(
-			Pair<RelationalRule, Integer> rule,
-			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> mutationTree,
-			BufferedWriter buf) throws Exception {
-		for (int i = rule.objA_.getAncestryCount() - 1; i >= 0; i--) {
-			if (i == 0)
-				buf.append("|-");
-			else
-				buf.append(" ");
-		}
-		buf.append(rule.objA_.toNiceString() + ":" + rule.objB_ + "\n");
+	public void savePolicyGenerator(File serFile) throws Exception {
+		if (moduleGenerator_ && Module.saveAtEnd_)
+			return;
 
-		// Recurse through the rules
-		Collection<Pair<RelationalRule, Integer>> children = mutationTree
-				.get(rule.objA_);
-		if (children != null)
-			for (Pair<RelationalRule, Integer> childRule : mutationTree
-					.get(rule.objA_))
-				recurseMutationTree(childRule, mutationTree, buf);
+		FileOutputStream fos = new FileOutputStream(serFile);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+
+		Module.saveGenerator(this);
+
+		oos.writeObject(this);
+		oos.close();
 	}
 
 	/**
@@ -1117,7 +1129,8 @@ public final class PolicyGenerator implements Serializable {
 						.getConditions(false);
 				ruleConds = ruleCreation_.simplifyRule(ruleConds, null,
 						seedRule.getAction(), false);
-				seedRule.setConditions(ruleConds, false);
+				seedRule = new RelationalRule(ruleConds, seedRule.getAction(),
+						null);
 				createSeededSlot(seedRule);
 			}
 
@@ -1145,6 +1158,10 @@ public final class PolicyGenerator implements Serializable {
 			return true;
 		}
 		return false;
+	}
+
+	public int size() {
+		return slotGenerator_.size();
 	}
 
 	@Override
@@ -1370,21 +1387,5 @@ public final class PolicyGenerator implements Serializable {
 		PolicyGenerator loaded = modPG;
 		StateSpec.reinitInstance();
 		return loaded;
-	}
-
-	/**
-	 * Loads external agent data (AgentObservations and StateSpec).
-	 */
-	public void loadAgentData() {
-		AgentObservations.loadAgentObservations(localGoal_);
-		StateSpec.reinitInstance();
-	}
-
-	public Collection<RelationalRule> getMutatedRules() {
-		return mutationTree_.values();
-	}
-
-	public int size() {
-		return slotGenerator_.size();
 	}
 }

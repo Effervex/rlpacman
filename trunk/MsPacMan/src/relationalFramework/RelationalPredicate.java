@@ -2,6 +2,7 @@ package relationalFramework;
 
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.RangeContext;
 
 import java.io.Serializable;
 import java.util.Arrays;
@@ -9,6 +10,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
@@ -28,6 +30,8 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	private String[] factTypes_;
 	/** The actual arguments of the fact. */
 	private RelationalArgument[] arguments_;
+	/** A collection of contexts which define ranges. */
+	private SortedSet<RangeContext> rangeContexts_;
 
 	/**
 	 * A basic definition constructor.
@@ -119,16 +123,26 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	private RelationalArgument[] cloneArgs(String[] arguments) {
+		rangeContexts_ = new TreeSet<RangeContext>();
 		RelationalArgument[] newArgs = new RelationalArgument[arguments.length];
-		for (int i = 0; i < arguments.length; i++)
+		for (int i = 0; i < arguments.length; i++) {
 			newArgs[i] = new RelationalArgument(arguments[i]);
+			RangeContext rc = newArgs[i].getRangeContext();
+			if (rc != null)
+				rangeContexts_.add(rc);
+		}
 		return newArgs;
 	}
 
 	private RelationalArgument[] cloneArgs(RelationalArgument[] arguments) {
+		rangeContexts_ = new TreeSet<RangeContext>();
 		RelationalArgument[] newArgs = new RelationalArgument[arguments.length];
-		for (int i = 0; i < arguments.length; i++)
+		for (int i = 0; i < arguments.length; i++) {
 			newArgs[i] = arguments[i].clone();
+			RangeContext rc = newArgs[i].getRangeContext();
+			if (rc != null)
+				rangeContexts_.add(rc);
+		}
 		return newArgs;
 	}
 
@@ -381,6 +395,10 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	public RelationalArgument[] getRelationalArguments() {
 		return cloneArgs(arguments_);
 	}
+	
+	public SortedSet<RangeContext> getRangeContexts() {
+		return rangeContexts_;
+	}
 
 	public boolean isNegated() {
 		return negated_;
@@ -538,7 +556,8 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	public void clearRanges() {
 		for (int i = 0; i < arguments_.length; i++) {
 			if (arguments_[i].isRange())
-				arguments_[i] = new RelationalArgument(arguments_[i].getStringArg());
+				arguments_[i] = new RelationalArgument(
+						arguments_[i].getStringArg());
 		}
 	}
 }

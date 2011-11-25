@@ -22,7 +22,7 @@ public class RelationalPredicateTest {
 	@Test
 	public void testReplaceArguments() {
 		RelationalPredicate strFact = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("clear"), new String[] { "a" });
+				.getPredicateByName("clear"), new String[] { "a" });
 		assertArrayEquals(strFact.getArguments(), new String[] { "a" });
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		replacementMap.put("a", "b");
@@ -30,7 +30,7 @@ public class RelationalPredicateTest {
 		assertArrayEquals(strFact.getArguments(), new String[] { "b" });
 
 		// Swapsies
-		strFact = new RelationalPredicate(StateSpec.getInstance().getStringFact("on"),
+		strFact = new RelationalPredicate(StateSpec.getInstance().getPredicateByName("on"),
 				new String[] { "a", "b" });
 		assertArrayEquals(strFact.getArguments(), new String[] { "a", "b" });
 		replacementMap = new HashMap<String, String>();
@@ -44,32 +44,32 @@ public class RelationalPredicateTest {
 	public void testCompareTo() {
 		// Equals
 		RelationalPredicate strFact1 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("clear"));
+				.getPredicateByName("clear"));
 		RelationalPredicate strFact2 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("clear"));
+				.getPredicateByName("clear"));
 		assertEquals(strFact1.compareTo(strFact2), 0);
 		assertEquals(strFact2.compareTo(strFact1), 0);
 
 		// Inequals
 		strFact1 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("clear"));
+				.getPredicateByName("clear"));
 		strFact2 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("block"));
+				.getPredicateByName("block"));
 		assertEquals(strFact1.compareTo(strFact2), 1);
 		assertEquals(strFact2.compareTo(strFact1), -1);
 
 		// Inequal, same pred
 		strFact1 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("block"), new String[] { "b" });
+				.getPredicateByName("block"), new String[] { "b" });
 		strFact2 = new RelationalPredicate(StateSpec.getInstance()
-				.getStringFact("block"), new String[] { "a" });
+				.getPredicateByName("block"), new String[] { "a" });
 		assertEquals(strFact1.compareTo(strFact2), 1);
 		assertEquals(strFact2.compareTo(strFact1), -1);
 
 		// Inequal, same sort of arguments
-		strFact1 = new RelationalPredicate(StateSpec.getInstance().getStringFact("on"),
+		strFact1 = new RelationalPredicate(StateSpec.getInstance().getPredicateByName("on"),
 				new String[] { "a", "b" });
-		strFact2 = new RelationalPredicate(StateSpec.getInstance().getStringFact("on"),
+		strFact2 = new RelationalPredicate(StateSpec.getInstance().getPredicateByName("on"),
 				new String[] { "b", "a" });
 		assertEquals(strFact1.compareTo(strFact2), -1);
 		assertEquals(strFact2.compareTo(strFact1), 1);

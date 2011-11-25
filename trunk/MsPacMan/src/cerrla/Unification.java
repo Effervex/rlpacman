@@ -356,12 +356,11 @@ public class Unification {
 	public RelationalArgument unifyRange(RelationalArgument baseValue,
 			RelationalArgument unifiedValue, RelationalArgument[] actionTerms) {
 		// Expand the range if need be.
-		double min = Math.min(baseValue.getRangeArg()[0],
-				unifiedValue.getRangeArg()[0]);
-		double max = Math.max(baseValue.getRangeArg()[1],
-				unifiedValue.getRangeArg()[0]);
-		if (min == max || min == baseValue.getRangeArg()[0]
-				&& max == baseValue.getRangeArg()[1]) {
+		double[] baseBounds = baseValue.getExplicitRange();
+		double[] unityBounds = unifiedValue.getExplicitRange();
+		double min = Math.min(baseBounds[0], unityBounds[0]);
+		double max = Math.max(baseBounds[1], unityBounds[0]);
+		if (min == max || min == baseBounds[0] && max == baseBounds[1]) {
 			return baseValue;
 		}
 
@@ -383,7 +382,6 @@ public class Unification {
 		}
 
 		return new RelationalArgument(variable, min, max);
-
 	}
 
 	public void resetRangeIndex() {
@@ -394,5 +392,18 @@ public class Unification {
 		if (instance_ == null)
 			instance_ = new Unification();
 		return instance_;
+	}
+
+	/**
+	 * Simple min-max operation of discovering the limits of a range.
+	 * 
+	 * @param range
+	 *            The range to stretch.
+	 * @param baseVal
+	 *            The value being evaluated.
+	 */
+	public void unifyRange(double[] range, double baseVal) {
+		range[0] = Math.min(range[0], baseVal);
+		range[1] = Math.max(range[1], baseVal);
 	}
 }
