@@ -87,7 +87,7 @@ public class ConditionBeliefs implements Serializable {
 	 * Forms the {@link ConditionBeliefs} fact this represents.
 	 */
 	private void formCBFact() {
-		cbFact_ = StateSpec.getInstance().getStringFact(condition_);
+		cbFact_ = StateSpec.getInstance().getPredicateByName(condition_);
 		String[] arguments = new String[cbFact_.getArguments().length];
 		for (int i = 0; i < arguments.length; i++) {
 			if (args_ == null)
@@ -160,7 +160,7 @@ public class ConditionBeliefs implements Serializable {
 		Collection<RelationalPredicate> shapedFacts = new HashSet<RelationalPredicate>();
 
 		// Run through each base fact, shaping as it goes.
-		RelationalPredicate predFact = StateSpec.getInstance().getStringFact(
+		RelationalPredicate predFact = StateSpec.getInstance().getPredicateByName(
 				pred);
 		// Special case - if this condition is a type and the fact is a type add
 		// it simply.
@@ -869,7 +869,7 @@ public class ConditionBeliefs implements Serializable {
 			// all others are always false.
 			if (firstState_) {
 				RelationalPredicate thisFact = StateSpec.getInstance()
-						.getStringFact(condition_);
+						.getPredicateByName(condition_);
 				generalities_ = thisFact.createSubFacts(true, true);
 				alwaysTrue_.addAll(trueFacts);
 				addNeverSeenPreds();
@@ -949,7 +949,7 @@ public class ConditionBeliefs implements Serializable {
 			// Run through every possible string fact and add those not present
 			// in the other lists.
 			MultiMap<String, String> possibleTerms = createActionTerms(StateSpec
-					.getInstance().getStringFact(condition_));
+					.getInstance().getPredicateByName(condition_));
 
 			// Run by the predicates
 			Set<String> predicates = new HashSet<String>();
@@ -957,7 +957,7 @@ public class ConditionBeliefs implements Serializable {
 					.keySet());
 			predicates.addAll(StateSpec.getInstance().getPredicates().keySet());
 			for (String pred : predicates) {
-				if (!StateSpec.getInstance().getStringFact(pred).isNumerical()) {
+				if (!StateSpec.getInstance().getPredicateByName(pred).isNumerical()) {
 					// Run by the possible combinations within the predicates.
 					for (RelationalPredicate fact : createPossibleFacts(pred,
 							possibleTerms)) {

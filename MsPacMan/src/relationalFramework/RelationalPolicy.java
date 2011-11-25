@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.RangeContext;
+
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
@@ -66,6 +69,16 @@ public abstract class RelationalPolicy implements Serializable {
 		String query = StateSpec.getInstance().getRuleQuery(rule);
 		// If there are parameters, temp or concrete, insert them here
 		ValueVector vv = new ValueVector();
+		for (RangeContext rangeContext : rule.getRangeContexts()) {
+			double[] minMax = AgentObservations.getInstance().getActionRanges(rangeContext);
+			if (minMax != null) {
+				vv.add(minMax[0]);
+				vv.add(minMax[1]);
+			} else {
+				vv.add(Integer.MIN_VALUE);
+				vv.add(Integer.MAX_VALUE);
+			}
+		}
 		if (rule.getQueryParameters() != null) {
 			if (rule.getParameters() != null) {
 				for (String param : rule.getParameters())

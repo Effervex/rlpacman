@@ -1,5 +1,7 @@
 package mario;
 
+import java.util.Arrays;
+
 import relationalFramework.ObjectObservations;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPolicy;
@@ -14,16 +16,21 @@ import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
 import cerrla.PolicyActor;
 import cerrla.PolicyGenerator;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
+import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
+import ch.idsia.tools.EvaluationInfo;
 import ch.idsia.tools.MarioAIOptions;
 
 
 public class RLMarioEnvironment implements EnvironmentInterface {
+	private static final boolean[] NO_ACTION = new boolean[Environment.numberOfKeys];
+	private static final int TIMEOUT_THRESHOLD = 30;
 	private MarioAIOptions cmdLineOptions_;
 	private MarioEnvironment environment_;
 	private boolean experimentMode_ = false;
 	private int levelDifficulty_;
 	private RelationalWrapper wrapper_;
+	private int noActionCount_;
 
 	/**
 	 * Calculates the reward.
@@ -31,7 +38,13 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 	 * @return The reward received from the environment.
 	 */
 	private double calculateReward(int terminal) {
-		if (terminal == 1 || terminal == 2) {
+		if (terminal == 2) {
+			EvaluationInfo ei = environment_.getEvaluationInfo();
+			ei.timeSpent += ei.timeLeft;
+			ei.timeLeft = 0;
+			return ei.computeWeightedFitness();
+		}
+		if (terminal == 1) {
 			return environment_.getEvaluationInfo().computeWeightedFitness();
 		}
 		return 0;
@@ -115,6 +128,11 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 				.getInstance().objectArray[0];
 		boolean[] groundAction = (boolean[]) wrapper_.groundActions(actions,
 				environment_);
+		// Check for no action
+		if (Arrays.equals(groundAction, NO_ACTION))
+			noActionCount_++;
+		else
+			noActionCount_ = 0;
 		environment_.performAction(groundAction);
 		environment_.tick();
 
@@ -126,7 +144,11 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		ObjectObservations.getInstance().predicateKB = wrapper_
 				.formObservations(environment_);
 		int terminal = wrapper_.isTerminal(environment_);
+		if (noActionCount_ >= TIMEOUT_THRESHOLD)
+			terminal = 2;
 		double reward = calculateReward(terminal);
+		if (terminal == 2)
+			terminal = 1;
 
 		Reward_observation_terminal rot = new Reward_observation_terminal(
 				reward, new Observation(), terminal);
@@ -142,5 +164,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();
+		
+		noActionCount_ = 0;
 	}
 }

@@ -1066,6 +1066,7 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 		}
 
 		// TODO Mario continues to hold shell as long as possible?
+		System.out.println(action);
 		return actionArray;
 	}
 

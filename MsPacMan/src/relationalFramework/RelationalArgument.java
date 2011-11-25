@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.RangeContext;
+
 /**
  * Relational arguments are what go within relational predicates. In most cases,
  * these are just simple strings, but when dealing with numbers, they can
@@ -21,8 +24,11 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	/** The final character for variables. */
 	private static final char MODULO_LETTERS = 26;
 	/** The pattern for finding ranges. */
-	private static Pattern RANGE_PATTERN = Pattern
+	private static Pattern DEPRECATED_RANGE_PATTERN = Pattern
 			.compile("(.+)&:\\(<= ([\\dE.-]+) \\1 ([\\dE.-]+)\\)");
+	private static Pattern RANGE_PATTERN = Pattern.compile("(.+)&:\\("
+			+ StateSpec.RANGE_TEST
+			+ " (.+) ([\\d.E-]+) \\1 (.+) ([\\d.E-]+)\\)");
 	private static final long serialVersionUID = -7883241266827157231L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
@@ -42,25 +48,50 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * The range, if any. If both values are the same, then the range is a
 	 * single number.
 	 */
-	private final double[] rangeArg_ = new double[2];
+	private final double[] rangeFrac_ = new double[2];
+
+	private final RangeBound[] rangeBounds_ = new RangeBound[2];
+
+	/** The context of the range if this is a range term. */
+	private final RangeContext rangeContext_;
 
 	/** The argument represented by this arg. */
 	private String stringArg_;
 
 	/**
 	 * The constructor. This deconstructs ranges into their components.
+	 * 
+	 * @param arg
+	 *            The string argument to parse. Could be anything.
 	 */
 	public RelationalArgument(String arg) {
+		// Cannot determine range.
+		rangeContext_ = null;
+
 		// Check for a numerical range
 		if (arg.length() >= MIN_RANGE) {
 			Matcher m = RANGE_PATTERN.matcher(arg);
 
 			if (m.find()) {
 				stringArg_ = m.group(1);
-				rangeArg_[0] = Double.parseDouble(m.group(2));
-				rangeArg_[1] = Double.parseDouble(m.group(3));
+				rangeBounds_[0] = new RangeBound(m.group(2));
+				rangeFrac_[0] = Double.parseDouble(m.group(3));
+				rangeBounds_[1] = new RangeBound(m.group(4));
+				rangeFrac_[1] = Double.parseDouble(m.group(5));
 				argType_ = ArgType.NUMBER_RANGE;
 				return;
+			} else {
+				m = DEPRECATED_RANGE_PATTERN.matcher(arg);
+
+				if (m.find()) {
+					stringArg_ = m.group(1);
+					rangeBounds_[0] = new RangeBound(m.group(2));
+					rangeFrac_[0] = 0;
+					rangeBounds_[1] = new RangeBound(m.group(3));
+					rangeFrac_[1] = 1;
+					argType_ = ArgType.NUMBER_RANGE;
+					return;
+				}
 			}
 		}
 
@@ -69,8 +100,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		// The arg could still be a number
 		try {
 			double num = Double.parseDouble(arg);
-			rangeArg_[0] = num;
-			rangeArg_[1] = num;
+			rangeBounds_[0] = new RangeBound(num);
+			rangeBounds_[1] = new RangeBound(num);
 			argType_ = ArgType.NUMBER_CONST;
 			return;
 		} catch (Exception e) {
@@ -80,27 +111,67 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		if (stringArg_.charAt(0) == '?') {
 			if (stringArg_.length() == 1)
 				argType_ = ArgType.ANON;
-			argType_ = ArgType.VAR;
+			else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
+				argType_ = ArgType.CONST;
+			else
+				argType_ = ArgType.VAR;
 		} else {
 			argType_ = ArgType.CONST;
 		}
 	}
 
 	/**
-	 * A constructor for a new range.
+	 * A constructor for a new range which uses explicit bounds.
 	 * 
 	 * @param variable
 	 *            The variable of the range.
-	 * @param min
-	 *            The minimum value of the range.
-	 * @param max
-	 *            The maximum value of the range.
+	 * @param minBound
+	 *            The minimum bound.
+	 * @param maxBound
+	 *            The maximum bound.
+	 * @param context
+	 *            The given context of this range.
 	 */
-	public RelationalArgument(String variable, double min, double max) {
+	public RelationalArgument(String variable, double minBound,
+			double maxBound) {
+		rangeContext_ = null;
 		stringArg_ = variable;
-		rangeArg_[0] = min;
-		rangeArg_[1] = max;
-		if (min == max)
+		rangeBounds_[0] = new RangeBound(minBound);
+		rangeBounds_[1] = new RangeBound(maxBound);
+		rangeFrac_[0] = 0;
+		rangeFrac_[1] = 1;
+		if (minBound == maxBound)
+			argType_ = ArgType.NUMBER_CONST;
+		else
+			argType_ = ArgType.NUMBER_RANGE;
+	}
+
+	/**
+	 * A constructor for a new range with given bounds and fracs between bounds.
+	 * 
+	 * @param variable
+	 *            The variable of the range.
+	 * @param minBound
+	 *            The minimum bound.
+	 * @param minFrac
+	 *            The minimum value of the range.
+	 * @param maxBound
+	 *            The maximum bound.
+	 * @param maxFrac
+	 *            The maximum value of the range.
+	 * @param context
+	 *            The context of this range.
+	 */
+	public RelationalArgument(String variable, RangeBound minBound,
+			double minFrac, RangeBound maxBound, double maxFrac,
+			RangeContext context) {
+		rangeContext_ = context;
+		stringArg_ = variable;
+		rangeBounds_[0] = minBound;
+		rangeBounds_[1] = maxBound;
+		rangeFrac_[0] = Math.max(0, minFrac);
+		rangeFrac_[1] = Math.min(1, maxFrac);
+		if (minFrac == maxFrac && minBound == maxBound)
 			argType_ = ArgType.NUMBER_CONST;
 		else
 			argType_ = ArgType.NUMBER_RANGE;
@@ -113,7 +184,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	public RelationalArgument clone() {
 		RelationalArgument relArg = new RelationalArgument(stringArg_,
-				rangeArg_[0], rangeArg_[1]);
+				rangeBounds_[0], rangeFrac_[0], rangeBounds_[1], rangeFrac_[1],
+				rangeContext_);
 		relArg.argType_ = argType_;
 		return relArg;
 	}
@@ -126,12 +198,20 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			return result;
 
 		// Ranges
-		result = Double.compare(rangeArg_[0], ra.rangeArg_[0]);
-		if (result != 0)
-			return result;
-		result = Double.compare(rangeArg_[1], ra.rangeArg_[1]);
-		if (result != 0)
-			return result;
+		if (rangeBounds_[0] != null && rangeBounds_[1] != null) {
+			result = rangeBounds_[0].compareTo(ra.rangeBounds_[0]);
+			if (result != 0)
+				return result;
+			result = rangeBounds_[1].compareTo(ra.rangeBounds_[1]);
+			if (result != 0)
+				return result;
+			result = Double.compare(rangeFrac_[0], ra.rangeFrac_[0]);
+			if (result != 0)
+				return result;
+			result = Double.compare(rangeFrac_[1], ra.rangeFrac_[1]);
+			if (result != 0)
+				return result;
+		}
 
 		return stringArg_.compareTo(ra.stringArg_);
 	}
@@ -147,7 +227,9 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		RelationalArgument other = (RelationalArgument) obj;
 		if (argType_ != other.argType_)
 			return false;
-		if (!Arrays.equals(rangeArg_, other.rangeArg_))
+		if (!Arrays.equals(rangeBounds_, other.rangeBounds_))
+			return false;
+		if (!Arrays.equals(rangeFrac_, other.rangeFrac_))
 			return false;
 		if (stringArg_ == null) {
 			if (other.stringArg_ != null)
@@ -157,9 +239,25 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return true;
 	}
 
-	public double[] getRangeArg() {
+	public RangeBound[] getRangeBounds() {
 		if (isNumber())
-			return rangeArg_;
+			return rangeBounds_;
+		return null;
+	}
+
+	public double[] getExplicitRange() {
+		double[] explicitRange = { rangeBounds_[0].getValue(null),
+				rangeBounds_[1].getValue(null) };
+		return explicitRange;
+	}
+
+	public RangeContext getRangeContext() {
+		return rangeContext_;
+	}
+
+	public double[] getRangeFrac() {
+		if (isNumber())
+			return rangeFrac_;
 		return null;
 	}
 
@@ -176,14 +274,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	public int getVariableTermIndex() {
 		// Don't swap constants or anonymous
-		if (stringArg_.charAt(0) != '?' || stringArg_.length() < 2)
-			return -1;
-
-		// Don't swap number variables
-		if (stringArg_.startsWith(RANGE_VARIABLE_PREFIX))
-			return -1;
-
-		if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
+		if (argType_ != ArgType.VAR)
 			return -1;
 
 		int termIndex = (stringArg_.charAt(1) + MODULO_LETTERS - STARTING_CHAR)
@@ -197,7 +288,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		int result = 1;
 		result = prime * result
 				+ ((argType_ == null) ? 0 : argType_.hashCode());
-		result = prime * result + Arrays.hashCode(rangeArg_);
+		result = prime * result + Arrays.hashCode(rangeBounds_);
+		result = prime * result + Arrays.hashCode(rangeFrac_);
 		result = prime * result
 				+ ((stringArg_ == null) ? 0 : stringArg_.hashCode());
 		return result;
@@ -209,8 +301,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return
 	 */
 	public boolean isConstant() {
-		if (argType_ == ArgType.CONST
-				|| stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
+		if (argType_ == ArgType.CONST)
 			return true;
 		return false;
 	}
@@ -235,18 +326,35 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return The argument, possibly as a nice range.
 	 */
 	public String toNiceString() {
-		if (isNumber() && (rangeArg_[0] != rangeArg_[1])) {
-			return "(" + rangeArg_[0] + " <= " + stringArg_ + " <= "
-					+ rangeArg_[1] + ")";
+		// TODO Modify this to take into account min and max - need information
+		// on argument context to produce explicit numerical range
+		if (isNumber() && (rangeFrac_[0] != rangeFrac_[1])) {
+			if (rangeContext_ != null) {
+				double[] minMax = AgentObservations.getInstance()
+						.getActionRanges(rangeContext_);
+				double minBound = (rangeBounds_[0].getValue(minMax));
+				double maxBound = (rangeBounds_[1].getValue(minMax));
+				double diff = maxBound - minBound;
+				return "(" + (minBound + diff * rangeFrac_[0]) + " <= "
+						+ stringArg_ + " <= "
+						+ (minBound + diff * rangeFrac_[1]) + ")";
+			}
+			return toString();
 		}
 		return stringArg_;
 	}
 
 	@Override
 	public String toString() {
-		if (isNumber() && (rangeArg_[0] != rangeArg_[1])) {
-			return stringArg_ + "&:(<= " + rangeArg_[0] + " " + stringArg_
-					+ " " + rangeArg_[1] + ")";
+		if (isNumber() && (rangeFrac_[0] != rangeFrac_[1])) {
+			// Dealing with a X-Y range -- no fractions
+			if (rangeFrac_[0] == 0 && rangeFrac_[1] == 1) {
+				return stringArg_ + "&:(<= " + rangeBounds_[0] + " "
+						+ stringArg_ + " " + rangeBounds_[1] + ")";
+			}
+			return stringArg_ + "&:(" + StateSpec.RANGE_TEST + " "
+					+ rangeBounds_[0] + " " + rangeFrac_[0] + " " + stringArg_
+					+ " " + rangeBounds_[1] + " " + rangeFrac_[1] + ")";
 		}
 		return stringArg_;
 	}

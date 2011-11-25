@@ -1,6 +1,7 @@
 package cerrla;
 
 import relationalFramework.GoalCondition;
+import relationalFramework.RangeBound;
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -19,6 +20,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.RangeContext;
 import util.MultiMap;
 
 import jess.Rete;
@@ -87,13 +89,9 @@ public class RuleCreation implements Serializable {
 	 */
 	private RelationalRule createRangedSpecialisation(RelationalRule baseRule,
 			RelationalPredicate condition, int condArgIndex,
-			String rangeVariable, double lowerBound, double upperBound) {
-		// Create the replacement term.
-		RelationalArgument subrangeArg = new RelationalArgument(rangeVariable,
-				lowerBound, upperBound);
-
+			RelationalArgument subRangeArg) {
 		RelationalArgument[] mutantArgs = condition.getRelationalArguments();
-		mutantArgs[condArgIndex] = subrangeArg;
+		mutantArgs[condArgIndex] = subRangeArg;
 		RelationalPredicate mutantFact = new RelationalPredicate(condition,
 				mutantArgs);
 		SortedSet<RelationalPredicate> cloneConds = baseRule
@@ -112,67 +110,114 @@ public class RuleCreation implements Serializable {
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
-	 * @param subranges
-	 *            The collection of rules to add to.
 	 * @param condition
 	 *            The original condition being mutated.
 	 * @param condArgIndex
 	 *            The index of the mutation.
 	 * @param rangeArg
 	 *            The actual ranged argument itself.
+	 * @param context
+	 *            The context of the range.
+	 * @return Three subranges.
 	 */
-	private void createRangeSpecialisations(RelationalRule baseRule,
-			Set<RelationalRule> subranges, RelationalPredicate condition,
-			int condArgIndex, RelationalArgument rangeArg) {
-		double[] range = rangeArg.getRangeArg();
-		String rangeVariable = rangeArg.getStringArg();
-		createRangeSpecialisations(baseRule, subranges, condition,
-				condArgIndex, rangeVariable, range);
+	private Collection<RelationalRule> splitExistingRange(
+			RelationalRule baseRule, RelationalPredicate condition,
+			int condArgIndex, RelationalArgument rangeArg, RangeContext context) {
+		RangeBound[] rangeBounds = rangeArg.getRangeBounds();
+		double[] rangeFracs = rangeArg.getRangeFrac();
+
+		return splitIntoThree(baseRule, condition, condArgIndex,
+				rangeArg.getStringArg(), rangeBounds[0], rangeBounds[1],
+				rangeFracs[0], rangeFracs[1], context);
 	}
 
 	/**
-	 * Determines the ranges and creates mutants for them.
+	 * Splits an existing range into 3: first half, last half, and middle half.
+	 * 
+	 * @param baseRule
+	 *            The rule to insert the subrange into.
+	 * @param condition
+	 *            The condition to insert the subrange into.
+	 * @param condArgIndex
+	 *            The index of the subrange.
+	 * @param rangeVariable
+	 *            The range variable.
+	 * @param minBound
+	 *            The lower bound of the range (possibly null).
+	 * @param maxBound
+	 *            The upper bound of the range (possibly null).
+	 * @param minFrac
+	 *            The lower fraction of the range.
+	 * @param maxFrac
+	 *            The upper fraction of the range.
+	 * @param context
+	 *            The context of the range.
+	 */
+	private Collection<RelationalRule> splitIntoThree(RelationalRule baseRule,
+			RelationalPredicate condition, int condArgIndex,
+			String rangeVariable, RangeBound minBound, RangeBound maxBound,
+			double minFrac, double maxFrac, RangeContext context) {
+		Collection<RelationalRule> subranges = new HashSet<RelationalRule>();
+		double diff = maxFrac - minFrac;
+		// First half
+		RelationalArgument subrange = new RelationalArgument(rangeVariable,
+				minBound, minFrac, maxBound, minFrac + 0.5 * diff, context);
+		subranges.add(createRangedSpecialisation(baseRule, condition,
+				condArgIndex, subrange));
+
+		// Last half
+		subrange = new RelationalArgument(rangeVariable, minBound, minFrac
+				+ 0.5 * diff, maxBound, maxFrac, context);
+		subranges.add(createRangedSpecialisation(baseRule, condition,
+				condArgIndex, subrange));
+
+		// Middle half
+		subrange = new RelationalArgument(rangeVariable, minBound, minFrac
+				+ 0.25 * diff, maxBound, minFrac + 0.75 * diff, context);
+		subranges.add(createRangedSpecialisation(baseRule, condition,
+				condArgIndex, subrange));
+		return subranges;
+	}
+
+	/**
+	 * Creates a range using the minimum and maximum observed ranges.
 	 * 
 	 * @param baseRule
 	 *            The base rule to mutate.
-	 * @param subranges
-	 *            The collection of rules to add to.
 	 * @param condition
 	 *            The original condition being mutated.
 	 * @param condArgIndex
 	 *            The index of the mutation.
 	 * @param rangeVariable
 	 *            The range variable.
-	 * @param range
-	 *            The numerical range to split.
+	 * @param context
+	 *            The context of the range.
+	 * @param throughZeroRange
+	 *            If this range goes through 0 (one side is negative, the other
+	 *            positive).
+	 * @return The subranges.
 	 */
-	private void createRangeSpecialisations(RelationalRule baseRule,
-			Set<RelationalRule> subranges, RelationalPredicate condition,
-			int condArgIndex, String rangeVariable, double[] range) {
-		if (range[0] != range[1]) {
-			// Create 3 ranges, the min and max split in two and a range
-			// overlapping each centred about the middle.
-			double halfVal = range[0] + (range[1] - range[0]) / 2;
-			double quarterAmount = (range[1] - range[0]) / 4;
+	private Collection<RelationalRule> createNewSubRanges(
+			RelationalRule baseRule, RelationalPredicate condition,
+			int condArgIndex, String rangeVariable, RangeContext context,
+			boolean throughZeroRange) {
+		// Create 3 ranges, the min and max split in two and a range
+		// overlapping each centred about the middle.
+		RangeBound minBound = new RangeBound(rangeVariable, RangeBound.MIN);
+		RangeBound maxBound = new RangeBound(rangeVariable, RangeBound.MAX);
+		Collection<RelationalRule> subranges = splitIntoThree(baseRule,
+				condition, condArgIndex, rangeVariable, minBound, maxBound, 0,
+				1, context);
+		// TODO Modify this so specialisations aren't constantly being created. They need only be created once, then maybe once more for the 0 range.
+		if (!baseRule.isMutant() && throughZeroRange) {
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, range[0], halfVal));
+					condArgIndex, new RelationalArgument(rangeVariable,
+							minBound, 0d, new RangeBound(0), 1d, context)));
 			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, halfVal, range[1]));
-			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, rangeVariable, halfVal - quarterAmount,
-					halfVal + quarterAmount));
+					condArgIndex, new RelationalArgument(rangeVariable,
+							new RangeBound(0), 0d, maxBound, 1d, context)));
 		}
-
-		if (!baseRule.isMutant()) {
-			// If the ranges go through 0 and this rule isn't a
-			// mutant, split at 0
-			if (range[0] * range[1] < 0) {
-				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, range[0], 0));
-				subranges.add(createRangedSpecialisation(baseRule, condition,
-						condArgIndex, rangeVariable, 0, range[1]));
-			}
-		}
+		return subranges;
 	}
 
 	/**
@@ -189,19 +234,30 @@ public class RuleCreation implements Serializable {
 		Set<RelationalRule> subranges = new HashSet<RelationalRule>();
 
 		// Run through each condition
-		Map<String, double[]> actionRanges = AgentObservations.getInstance()
-				.getActionRanges(baseRule.getActionPredicate());
 		for (RelationalPredicate condition : baseRule.getConditions(false)) {
-			for (int i = 0; i < condition.getArguments().length; i++) {
-				RelationalArgument arg = condition.getRelationalArguments()[i];
-				// If the arg is a range or represents a range, can split it
-				if (arg.isRange()) {
-					createRangeSpecialisations(baseRule, subranges, condition,
-							i, arg);
-				} else if (actionRanges.containsKey(arg.toString())) {
-					double[] range = actionRanges.get(arg.toString());
-					createRangeSpecialisations(baseRule, subranges, condition,
-							i, arg.toString(), range);
+			if (condition.isNumerical()) {
+				String[] argTypes = condition.getArgTypes();
+				for (int i = 0; i < condition.getArguments().length; i++) {
+					RelationalArgument arg = condition.getRelationalArguments()[i];
+					// If the arg is a number
+					if (StateSpec.isNumberType(argTypes[i])) {
+						RangeContext context = new RangeContext(i, condition,
+								baseRule.getAction());
+						// If the arg is a range or represents a range, can
+						// split it
+						if (arg.isRange()) {
+							subranges.addAll(splitExistingRange(baseRule,
+									condition, i, arg, context));
+						} else {
+							double[] range = AgentObservations.getInstance()
+									.getActionRanges(context);
+							if (range != null) {
+								subranges.addAll(createNewSubRanges(baseRule,
+										condition, i, arg.getStringArg(),
+										context, range[0] * range[1] < 0));
+							}
+						}
+					}
 				}
 			}
 		}
@@ -235,7 +291,7 @@ public class RuleCreation implements Serializable {
 		for (String action : validActions.keySet()) {
 			// Gather the action facts for each valid action
 			RelationalPredicate baseAction = StateSpec.getInstance()
-					.getStringFact(action);
+					.getPredicateByName(action);
 			for (String[] actionArgs : validActions.get(action)) {
 				RelationalPredicate actionFact = new RelationalPredicate(
 						baseAction, actionArgs);
