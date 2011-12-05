@@ -21,14 +21,13 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import ch.idsia.tools.EvaluationInfo;
 import ch.idsia.tools.MarioAIOptions;
 
-
 public class RLMarioEnvironment implements EnvironmentInterface {
 	private static final boolean[] NO_ACTION = new boolean[Environment.numberOfKeys];
 	private static final int TIMEOUT_THRESHOLD = 30;
 	private MarioAIOptions cmdLineOptions_;
 	private MarioEnvironment environment_;
 	private boolean experimentMode_ = false;
-	private int levelDifficulty_;
+	private int levelDifficulty_ = 1;
 	private RelationalWrapper wrapper_;
 	private int noActionCount_;
 
@@ -100,13 +99,14 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		} else if (arg0.equals("-e")) {
 			// Run the program in experiment mode (No GUI).
 			experimentMode_ = true;
+		} else if (arg0.startsWith("Diff")) {
+			levelDifficulty_ = Integer.parseInt(arg0.split(" ")[1]);
 		}
 		return null;
 	}
 
 	@Override
 	public Observation env_start() {
-		levelDifficulty_ = 1;
 		resetEnvironment();
 
 		environment_.tick();
@@ -164,7 +164,7 @@ public class RLMarioEnvironment implements EnvironmentInterface {
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();
-		
+
 		noActionCount_ = 0;
 	}
 }

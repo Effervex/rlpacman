@@ -208,7 +208,8 @@ public class RuleCreation implements Serializable {
 		Collection<RelationalRule> subranges = splitIntoThree(baseRule,
 				condition, condArgIndex, rangeVariable, minBound, maxBound, 0,
 				1, context);
-		// TODO Modify this so specialisations aren't constantly being created. They need only be created once, then maybe once more for the 0 range.
+		// TODO Modify this so specialisations aren't constantly being created.
+		// They need only be created once, then maybe once more for the 0 range.
 		if (!baseRule.isMutant() && throughZeroRange) {
 			subranges.add(createRangedSpecialisation(baseRule, condition,
 					condArgIndex, new RelationalArgument(rangeVariable,
@@ -235,12 +236,13 @@ public class RuleCreation implements Serializable {
 
 		// Run through each condition
 		for (RelationalPredicate condition : baseRule.getConditions(false)) {
-			if (condition.isNumerical()) {
+			if (condition.isNumerical() && !condition.isNegated()) {
 				String[] argTypes = condition.getArgTypes();
 				for (int i = 0; i < condition.getArguments().length; i++) {
 					RelationalArgument arg = condition.getRelationalArguments()[i];
 					// If the arg is a number
-					if (StateSpec.isNumberType(argTypes[i])) {
+					if (StateSpec.isNumberType(argTypes[i])
+							&& !arg.equals(RelationalArgument.ANONYMOUS)) {
 						RangeContext context = new RangeContext(i, condition,
 								baseRule.getAction());
 						// If the arg is a range or represents a range, can

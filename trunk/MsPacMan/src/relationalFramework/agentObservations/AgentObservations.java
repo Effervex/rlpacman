@@ -833,13 +833,15 @@ public final class AgentObservations implements Serializable {
 			for (int i = 0; i < factArgs.length; i++) {
 				// Only note ranges
 				if (factArgs[i].isRange()) {
-					RangeContext key = new RangeContext(i, numberFact, action_.getFactName());
+					RangeContext key = new RangeContext(i, numberFact,
+							action_.getFactName());
 					double[] range = actionRanges.get(key);
 					if (range == null) {
 						range = new double[2];
 						actionRanges.put(key, range);
 					}
-					System.arraycopy(factArgs[i].getExplicitRange(), 0, range, 0, 2);
+					System.arraycopy(factArgs[i].getExplicitRange(), 0, range,
+							0, 2);
 				}
 			}
 		}
@@ -942,7 +944,10 @@ public final class AgentObservations implements Serializable {
 		protected void saveActionBasedObservations(BufferedWriter buf)
 				throws Exception {
 			buf.write(action_.getFactName() + "\n");
-			buf.write("RLGG conditions: " + invariantActionConditions_ + "\n");
+			SortedSet<RelationalPredicate> rlggConds = new TreeSet<RelationalPredicate>(
+					ConditionComparator.getInstance());
+			rlggConds.addAll(invariantActionConditions_);
+			buf.write("RLGG conditions: " + rlggConds + "\n");
 			buf.write("Global conditions: "
 					+ recreateSpecialisations(variantActionConditions_, true)
 					+ "\n");
