@@ -66,6 +66,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	public RelationalArgument(String arg) {
 		// Cannot determine range.
+		// TODO Need to be able to divine range for loading modular rules.
 		rangeContext_ = null;
 
 		// Check for a numerical range
@@ -326,8 +327,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return The argument, possibly as a nice range.
 	 */
 	public String toNiceString() {
-		// TODO Modify this to take into account min and max - need information
-		// on argument context to produce explicit numerical range
 		if (isNumber() && (rangeFrac_[0] != rangeFrac_[1])) {
 			if (rangeContext_ != null) {
 				double[] minMax = AgentObservations.getInstance()

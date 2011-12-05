@@ -647,6 +647,79 @@ public final class PolicyGenerator implements Serializable {
 		}
 		return false;
 	}
+	
+	/**
+	 * Determines the population (N) of rules to use for optimisation.
+	 * 
+	 * @param policyGenerator
+	 *            The policy generator to determine the populations from.
+	 * @return A population of rules, large enough to reasonably test most
+	 *         combinations of rules.
+	 */
+	public int determineNumElites() {
+		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
+		double maxWeightedRuleCount = 0;
+		double maxSlotMean = 0;
+		double sumWeightedRuleCount = 0;
+		double sumSlotMean = 0;
+		for (Slot slot : slotGenerator_) {
+			double weight = slot.getSelectionProbability();
+			if (weight > 1)
+				weight = 1;
+			if (weight > maxSlotMean)
+				maxSlotMean = weight;
+			sumSlotMean += weight;
+			// Use klSize to determine the skew of the slot size
+			double klSize = slot.klSize();
+			double weightedRuleCount = klSize * weight;
+			sumWeightedRuleCount += weightedRuleCount;
+			if (weightedRuleCount > maxWeightedRuleCount)
+				maxWeightedRuleCount = weightedRuleCount;
+		}
+
+		double numElites = 1;
+		switch (ProgramArgument.ELITES_SIZE.intValue()) {
+		case ProgramArgument.ELITES_SIZE_SUM_SLOTS:
+			// Elites is equal to the sum of the slot means
+			numElites = sumSlotMean;
+			break;
+		case ProgramArgument.ELITES_SIZE_SUM_RULES:
+			// Elites is equal to the total number of rules (KL sized)
+			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
+			break;
+		case ProgramArgument.ELITES_SIZE_MAX_RULES:
+			// Elites is equal to the maximum slot size
+			numElites = Math.max(maxWeightedRuleCount, sumSlotMean);
+			break;
+		case ProgramArgument.ELITES_SIZE_AV_RULES:
+		default:
+			// Elites is equal to the average number of rules in high mean
+			// slots.
+			numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
+					sumSlotMean);
+		}
+
+		// Check elite bounding
+		return checkEliteBounding((int) Math.ceil(numElites));
+	}
+	
+	/**
+	 * Simple method that just sets the minimum number of elites to the bounded
+	 * value if using bounds.
+	 * 
+	 * @param numElites
+	 *            The current number of elites.
+	 * @return The changed number of elites (if necessary).
+	 */
+	private int checkEliteBounding(int numElites) {
+		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
+			// TODO Update this to reflect fixed slots.
+			int generatorSize = slotGenerator_.size()
+					- getNumConvergedSlots();
+			numElites = Math.max(generatorSize, numElites);
+		}
+		return numElites;
+	}
 
 	/**
 	 * Un/Freezes the state of the policy.
@@ -1010,8 +1083,9 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param buf
 	 *            The stream to save the generators to.
+	 * @param finalWrite If this is the final output for the run.
 	 */
-	public void saveHumanGenerators(BufferedWriter buf) throws IOException {
+	public void saveHumanGenerators(BufferedWriter buf, boolean finalWrite) throws IOException {
 		buf.write("A typical policy:\n");
 
 		// Generate a bunch of policies and display the most frequent one
@@ -1033,6 +1107,9 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		buf.write(bestPolicy.toString());
+		
+		if (finalWrite)
+			System.out.println("Best policy:\n" + bestPolicy);
 	}
 
 	/**
@@ -1231,6 +1308,7 @@ public final class PolicyGenerator implements Serializable {
 			}
 
 			// If not using dynamic slots, split the slots now.
+			// TODO Creating an initial burst may be worth it...
 			if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
 				splitRLGGSlots();
 			}

@@ -127,7 +127,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Checks if this slot can fix its rule in place and checks if the slot is fully converged.
+	 * Checks if this slot can fix its rule in place and checks if the slot is
+	 * fully converged.
 	 * 
 	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
 	 */
@@ -140,7 +141,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 			}
 
 			// If mean is close to 0 or 1, return true
-			if (slotMean_ - EPSILON <= 0 || (slotMean_ + EPSILON >= 1 && fixed_))
+			if (slotMean_ - EPSILON <= 0
+					|| (slotMean_ + EPSILON >= 1 && fixed_))
 				return true;
 		}
 		return false;
@@ -338,8 +340,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 	public double getOrderingSD() {
 		int maxCapacity = getMaximumCapacity();
-		double slotFillLevel = (maxCapacity > 1) ? (1.0 * klSize() - 1)
-				/ (maxCapacity - 1) : 1;
+		double slotFillLevel = (1.0 * klSize()) / maxCapacity;
 		slotFillLevel = Math.max(slotFillLevel, 0);
 		slotFillLevel = Math.min(slotFillLevel, 1);
 		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()

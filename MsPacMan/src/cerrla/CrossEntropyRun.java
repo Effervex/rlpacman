@@ -271,61 +271,6 @@ public class CrossEntropyRun {
 	}
 
 	/**
-	 * Determines the population (N) of rules to use for optimisation.
-	 * 
-	 * @param policyGenerator
-	 *            The policy generator to determine the populations from.
-	 * @return A population of rules, large enough to reasonably test most
-	 *         combinations of rules.
-	 */
-	private int determineNumElites(PolicyGenerator policyGenerator) {
-		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
-		double maxWeightedRuleCount = 0;
-		double maxSlotMean = 0;
-		double sumWeightedRuleCount = 0;
-		double sumSlotMean = 0;
-		for (Slot slot : policyGenerator.getGenerator()) {
-			double weight = slot.getSelectionProbability();
-			if (weight > 1)
-				weight = 1;
-			if (weight > maxSlotMean)
-				maxSlotMean = weight;
-			sumSlotMean += weight;
-			// Use klSize to determine the skew of the slot size
-			double klSize = slot.klSize();
-			double weightedRuleCount = klSize * weight;
-			sumWeightedRuleCount += weightedRuleCount;
-			if (weightedRuleCount > maxWeightedRuleCount)
-				maxWeightedRuleCount = weightedRuleCount;
-		}
-
-		double numElites = 1;
-		switch (ProgramArgument.ELITES_SIZE.intValue()) {
-		case ProgramArgument.ELITES_SIZE_SUM_SLOTS:
-			// Elites is equal to the sum of the slot means
-			numElites = sumSlotMean;
-			break;
-		case ProgramArgument.ELITES_SIZE_SUM_RULES:
-			// Elites is equal to the total number of rules (KL sized)
-			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
-			break;
-		case ProgramArgument.ELITES_SIZE_MAX_RULES:
-			// Elites is equal to the maximum slot size
-			numElites = maxWeightedRuleCount / maxSlotMean;
-			break;
-		case ProgramArgument.ELITES_SIZE_AV_RULES:
-		default:
-			// Elites is equal to the average number of rules in high mean
-			// slots.
-			numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
-					sumSlotMean);
-		}
-
-		// Check elite bounding
-		return checkEliteBounding((int) Math.ceil(numElites));
-	}
-
-	/**
 	 * Prints out the percentage complete, time elapsed and estimated time
 	 * remaining.
 	 * 
@@ -385,7 +330,6 @@ public class CrossEntropyRun {
 		System.out.println(percentStr);
 
 		// Adjust numElites if using bounded elites
-		numElites = checkEliteBounding(numElites);
 		String eliteString = "N_E: " + numElites + ", |E|: " + actualNumElites
 				+ ", E_best: " + formatter.format(bestElite) + ", E_worst: "
 				+ formatter.format(worstElite);
@@ -394,23 +338,6 @@ public class CrossEntropyRun {
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
 		System.out.println(totalPercentStr);
-	}
-
-	/**
-	 * Simple method that just sets the minimum number of elites to the bounded
-	 * value if using bounds.
-	 * 
-	 * @param numElites
-	 *            The current number of elites.
-	 * @return The changed number of elites (if necessary).
-	 */
-	private int checkEliteBounding(int numElites) {
-		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
-			int generatorSize = policyGenerator_.getGenerator().size()
-					- policyGenerator_.getNumConvergedSlots();
-			numElites = Math.max(generatorSize, numElites);
-		}
-		return numElites;
 	}
 
 	/**
@@ -535,8 +462,6 @@ public class CrossEntropyRun {
 	private SortedSet<PolicyValue> preUpdateModification(
 			SortedSet<PolicyValue> elites, int numElite, int staleValue,
 			float minValue) {
-		numElite = checkEliteBounding(numElite);
-
 		// Firstly, remove any policy values that have been around for more
 		// than N steps
 
@@ -629,7 +554,7 @@ public class CrossEntropyRun {
 		if (experimentController_.getComment() != null)
 			buf.write(experimentController_.getComment() + "\n");
 
-		policyGenerator_.saveHumanGenerators(buf);
+		policyGenerator_.saveHumanGenerators(buf, finalWrite);
 		buf.write("\n\n");
 		policyGenerator_.saveGenerators(buf);
 		int lastKey = episodeMeans.lastKey();
@@ -933,8 +858,8 @@ public class CrossEntropyRun {
 			}
 
 			// Determine the dynamic population, based on rule-base size
-			int numElites = determineNumElites(policyGenerator_);
-			int population = (int) Math.round(checkEliteBounding(numElites)
+			int numElites = policyGenerator_.determineNumElites();
+			int population = (int) Math.round(numElites
 					/ ProgramArgument.RHO.doubleValue());
 			finiteNum = maxEpisodes * population;
 			if (maxEpisodes < 0)
@@ -1064,14 +989,20 @@ public class CrossEntropyRun {
 
 						// Basic update of run
 						if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-							if (hasUpdated) {
+							long elapsedTime = System.currentTimeMillis()
+									- experimentController_
+											.getExperimentStart();
+							String elapsed = "Elapsed: "
+									+ LearningController
+											.toTimeFormat(elapsedTime);
+							if (hasUpdated && !episodeMeans.isEmpty()) {
 								System.out.println("Run "
 										+ run
 										+ ", learning: "
 										+ currentEpisode_
 										+ ": "
 										+ episodeMeans.get(episodeMeans
-												.lastKey()));
+												.lastKey()) + ", " + elapsed);
 								System.out.println("Learning...");
 							} else
 								System.out.println("Learning...");
