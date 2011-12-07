@@ -20,9 +20,6 @@ import util.ProbabilityDistribution;
 public class Slot implements Serializable, Comparable<Slot> {
 	private static final long serialVersionUID = -8194795456340834012L;
 
-	/** The convergence point for determining if a slot's mean is converged. */
-	private static final double EPSILON = 0.01;
-
 	/** The action which all rules within lead to. */
 	private String action_;
 
@@ -55,6 +52,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 	/** The slot level (number of splits frm RLGG slot). */
 	private int slotLevel_;
+
+	/** The amount of updating this slot is receiving. */
+	private transient double updateDelta_ = Integer.MAX_VALUE;
 
 	/**
 	 * A constructor for a new slot. The slot may be fixed (only one rule
@@ -132,17 +132,18 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * 
 	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
 	 */
-	public boolean checkSlotFixing() {
+	public boolean isConverged() {
 		// If KL size is 1, then the slot can be fixed.
 		if (ProgramArgument.SLOT_FIXING.booleanValue()) {
-			if (klSize() == 1) {
+			if (!fixed_ && klSize() == 1
+					&& slotMean_ >= 1 - ProgramArgument.BETA.doubleValue()) {
 				fixed_ = true;
 				fixedRule_ = ruleGenerator_.getBestElement();
 			}
 
 			// If mean is close to 0 or 1, return true
-			if (slotMean_ - EPSILON <= 0
-					|| (slotMean_ + EPSILON >= 1 && fixed_))
+			if (fixed_ || slotMean_ <= ProgramArgument.BETA.doubleValue()
+					|| updateDelta_ < ProgramArgument.BETA.doubleValue())
 				return true;
 		}
 		return false;
@@ -517,31 +518,34 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The minimum number of elite samples.
 	 * @param totalPoliciesEvaluated
 	 *            The number of policies evaluated so far.
-	 * @return A normalised (to alpha) KL divergence of the generators.
+	 * @return A normalised KL divergence of the generators.
 	 */
 	public double updateProbabilities(ElitesData ed, double alpha,
 			int population, int numElites, int totalPoliciesEvaluated) {
 		numUpdates_++;
-		if (ed == null || alpha == 0)
-			return alpha;
+		if (ed == null || alpha == 0) {
+			updateDelta_ = Integer.MAX_VALUE;
+			return updateDelta_;
+		}
 
 		double alphaPrime = getLocalAlpha(alpha, population, numElites,
 				totalPoliciesEvaluated);
+		updateDelta_ = Double.NaN;
 		if (alphaPrime > 0) {
 			// Update the slot values
-			updateSlotValues(ed.getSlotPosition(this),
+			updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
 					ed.getSlotNumeracyMean(this), alphaPrime);
 
 			// If not fixed, update the rule values.
 			if (!fixed_) {
-				double updateModifier = alpha / alphaPrime;
-				return updateModifier
-						* ruleGenerator_.updateDistribution(
-								ed.getSlotCount(this), ed.getRuleCounts(),
-								alphaPrime);
+				updateDelta_ = ruleGenerator_.updateDistribution(
+						ed.getSlotCount(this), ed.getRuleCounts(), alphaPrime);
 			}
+			
+			// Normalise to 1
+			updateDelta_ /= alphaPrime;
 		}
-		return alpha;
+		return updateDelta_;
 	}
 
 	/**
@@ -554,11 +558,21 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The mean value to step towards.
 	 * @param alpha
 	 *            The amount the value should update by.
+	 * @return The absolute difference of the update values.
 	 */
-	public void updateSlotValues(Double ordering, double mean, double alpha) {
-		if (ordering != null)
+	public double updateSlotValues(Double ordering, double mean, double alpha) {
+		double absDiff = 0;
+		if (ordering != null) {
+			double diff = ordering_;
 			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
+			diff -= ordering_;
+			absDiff += Math.abs(diff);
+		}
+		double diff = slotMean_;
 		slotMean_ = mean * alpha + (1 - alpha) * slotMean_;
+		diff -= slotMean_;
+		absDiff += Math.abs(diff);
+		return absDiff;
 	}
 
 	/**
@@ -574,5 +588,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 	public void resetPolicyCount() {
 		numUpdates_ = 0;
+	}
+
+	public double getUpdateDelta() {
+		return updateDelta_;
 	}
 }

@@ -377,8 +377,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 				Double itemCount = counts.get(element);
 				if (itemCount == null)
 					itemCount = 0d;
-				absoluteChange += Math.abs(updateElement(element, numSamples,
-						itemCount, stepSize));
+				absoluteChange += updateElement(element, numSamples,
+						itemCount, stepSize);
 			}
 
 			// Normalise the probabilities
@@ -407,8 +407,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			Double ratio = observedDistribution.getProb(element);
 			if (ratio == null)
 				ratio = 0d;
-			absoluteChange += Math.abs(updateElement(element, 1, ratio,
-					stepSizes.get(element)));
+			absoluteChange += updateElement(element, 1, ratio,
+					stepSizes.get(element));
 		}
 
 		// Normalise the probabilities
@@ -435,8 +435,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			Double ratio = observedDistribution.getProb(element);
 			if (ratio == null)
 				ratio = 0d;
-			absoluteChange += Math.abs(updateElement(element, 1, ratio,
-					stepSize));
+			absoluteChange += updateElement(element, 1, ratio,
+					stepSize);
 		}
 
 		// Normalise the probabilities
@@ -456,7 +456,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            The count for this element.
 	 * @param stepSize
 	 *            The step size for the update.
-	 * @return The KL divergence of the update.
+	 * @return The absolute difference of the update.
 	 */
 	public double updateElement(T element, double numSamples, double count,
 			double stepSize) {
@@ -468,7 +468,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		// Set the new value.
 		itemProbs_.put(element, newValue);
 
-		return klDivergence(newValue, oldValue);
+		return Math.abs(newValue - oldValue);
 	}
 
 	/**

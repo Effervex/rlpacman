@@ -142,10 +142,10 @@ public class CrossEntropyRun {
 						+ " " + SD_SYMBOL + " " + meanDeviation);
 			}
 
-			if (convergedCount_ > convergedSteps
-					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
-				return true;
-			}
+//			if (convergedCount_ > convergedSteps
+//					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
+//				return true;
+//			}
 		}
 		return false;
 	}

@@ -79,9 +79,6 @@ public final class PolicyGenerator implements Serializable {
 	/** The number of slots which have both a fixed rule and a converged mean. */
 	private int convergedSlots_;
 
-	/** The number of times in a row the updates have been convergent. */
-	private transient int convergedStrike_ = 0;
-
 	/**
 	 * The maximum amount of change between the slots before it is considered
 	 * converged.
@@ -647,7 +644,7 @@ public final class PolicyGenerator implements Serializable {
 		}
 		return false;
 	}
-	
+
 	/**
 	 * Determines the population (N) of rules to use for optimisation.
 	 * 
@@ -663,18 +660,21 @@ public final class PolicyGenerator implements Serializable {
 		double sumWeightedRuleCount = 0;
 		double sumSlotMean = 0;
 		for (Slot slot : slotGenerator_) {
-			double weight = slot.getSelectionProbability();
-			if (weight > 1)
-				weight = 1;
-			if (weight > maxSlotMean)
-				maxSlotMean = weight;
-			sumSlotMean += weight;
-			// Use klSize to determine the skew of the slot size
-			double klSize = slot.klSize();
-			double weightedRuleCount = klSize * weight;
-			sumWeightedRuleCount += weightedRuleCount;
-			if (weightedRuleCount > maxWeightedRuleCount)
-				maxWeightedRuleCount = weightedRuleCount;
+			// If using slot fixing, don't count fixed slots.
+			if (!ProgramArgument.SLOT_FIXING.booleanValue() || !slot.isFixed()) {
+				double weight = slot.getSelectionProbability();
+				if (weight > 1)
+					weight = 1;
+				if (weight > maxSlotMean)
+					maxSlotMean = weight;
+				sumSlotMean += weight;
+				// Use klSize to determine the skew of the slot size
+				double klSize = slot.klSize();
+				double weightedRuleCount = klSize * weight;
+				sumWeightedRuleCount += weightedRuleCount;
+				if (weightedRuleCount > maxWeightedRuleCount)
+					maxWeightedRuleCount = weightedRuleCount;
+			}
 		}
 
 		double numElites = 1;
@@ -702,7 +702,7 @@ public final class PolicyGenerator implements Serializable {
 		// Check elite bounding
 		return checkEliteBounding((int) Math.ceil(numElites));
 	}
-	
+
 	/**
 	 * Simple method that just sets the minimum number of elites to the bounded
 	 * value if using bounds.
@@ -713,9 +713,7 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private int checkEliteBounding(int numElites) {
 		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
-			// TODO Update this to reflect fixed slots.
-			int generatorSize = slotGenerator_.size()
-					- getNumConvergedSlots();
+			int generatorSize = slotGenerator_.size() - getNumConvergedSlots();
 			numElites = Math.max(generatorSize, numElites);
 		}
 		return numElites;
@@ -888,19 +886,11 @@ public final class PolicyGenerator implements Serializable {
 	 * @return True if the generator is converged, false otherwise.
 	 */
 	public boolean isConverged() {
-		if (klDivergence_ < convergedValue_)
-			convergedStrike_++;
-		else
-			convergedStrike_ = 0;
-
-		if (convergedStrike_ >= ProgramArgument.NUM_UPDATES_CONVERGED
-				.intValue())
-			return true;
-		return false;
-	}
-
-	public boolean isFrozen() {
-		return frozen_;
+		for (Slot slot : slotGenerator_) {
+			if (!slot.isConverged())
+				return false;
+		}
+		return true;
 	}
 
 	public boolean isModuleGenerator() {
@@ -939,10 +929,9 @@ public final class PolicyGenerator implements Serializable {
 
 		// For each slot
 		Collection<Slot> newSlots = new ArrayList<Slot>();
-		convergedSlots_ = 0;
 		for (Object oSlot : slotGenerator_.toArray()) {
 			Slot slot = (Slot) oSlot;
-			if (slot.checkSlotFixing())
+			if (slot.isConverged())
 				convergedSlots_++;
 
 			if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
@@ -1083,9 +1072,11 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param buf
 	 *            The stream to save the generators to.
-	 * @param finalWrite If this is the final output for the run.
+	 * @param finalWrite
+	 *            If this is the final output for the run.
 	 */
-	public void saveHumanGenerators(BufferedWriter buf, boolean finalWrite) throws IOException {
+	public void saveHumanGenerators(BufferedWriter buf, boolean finalWrite)
+			throws IOException {
 		buf.write("A typical policy:\n");
 
 		// Generate a bunch of policies and display the most frequent one
@@ -1107,7 +1098,7 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		buf.write(bestPolicy.toString());
-		
+
 		if (finalWrite)
 			System.out.println("Best policy:\n" + bestPolicy);
 	}
@@ -1357,7 +1348,7 @@ public final class PolicyGenerator implements Serializable {
 			// Update the slot
 			double result = slot.updateProbabilities(ed, alpha, population,
 					numElites, policiesEvaluated_);
-			updated |= (result != alpha);
+			updated |= (result != Double.NaN);
 			klDivergence_ += result;
 		}
 
