@@ -208,8 +208,6 @@ public class RuleCreation implements Serializable {
 		Collection<RelationalRule> subranges = splitIntoThree(baseRule,
 				condition, condArgIndex, rangeVariable, minBound, maxBound, 0,
 				1, context);
-		// TODO Modify this so specialisations aren't constantly being created.
-		// They need only be created once, then maybe once more for the 0 range.
 		if (!baseRule.isMutant() && throughZeroRange) {
 			subranges.add(createRangedSpecialisation(baseRule, condition,
 					condArgIndex, new RelationalArgument(rangeVariable,
