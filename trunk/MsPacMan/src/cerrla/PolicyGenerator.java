@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -97,12 +98,6 @@ public final class PolicyGenerator implements Serializable {
 	/** If the generator is currently frozen. */
 	private boolean frozen_ = false;
 
-	/**
-	 * The last amount of difference in distribution probabilities from the
-	 * update.
-	 */
-	private transient double klDivergence_;
-
 	/** Gets the local goal this policy generator is working towards. */
 	private String localGoal_;
 
@@ -146,7 +141,6 @@ public final class PolicyGenerator implements Serializable {
 		ruleCreation_ = new RuleCreation();
 		currentRules_ = new SelectableSet<RelationalRule>();
 		currentSlots_ = MultiMap.createListMultiMap();
-		klDivergence_ = Double.MAX_VALUE;
 		policiesEvaluated_ = 0;
 		mutationTree_ = new TreeMap<Double, RelationalRule>();
 
@@ -802,6 +796,12 @@ public final class PolicyGenerator implements Serializable {
 		return policy;
 	}
 
+	/**
+	 * Gets the *rough* amount that this generator has converged (between 0 and
+	 * 1).
+	 * 
+	 * @return The *rough* estimate of convergence.
+	 */
 	public double getConvergenceValue() {
 		return convergedValue_;
 	}
@@ -842,10 +842,6 @@ public final class PolicyGenerator implements Serializable {
 
 	public Collection<Slot> getGenerator() {
 		return slotGenerator_;
-	}
-
-	public double getKLDivergence() {
-		return klDivergence_;
 	}
 
 	public String getLocalGoal() {
@@ -1063,8 +1059,9 @@ public final class PolicyGenerator implements Serializable {
 		buf.write(slotBuffer.toString() + "\n");
 		// Write the number of slots
 		buf.write("Num slots: " + slotGenerator_.size() + "\n");
-		buf.write("Total Update Size: " + klDivergence_ + "\n");
-		buf.write("Converged Value: " + convergedValue_);
+		DecimalFormat formatter = new DecimalFormat("#0.0000");
+		buf.write("Estimated Convergence: "
+				+ formatter.format(100 * convergedValue_) + "%");
 	}
 
 	/**
@@ -1330,6 +1327,7 @@ public final class PolicyGenerator implements Serializable {
 	public void updateDistributions(SortedSet<PolicyValue> elites,
 			double alpha, int population, int numElites, float minValue) {
 		// Keep count of the rules seen (and slots used)
+		double maxUpdate = alpha * 3;
 		ElitesData ed = new ElitesData();
 		int numEliteSamples = countRules(elites, ed, minValue);
 		double modAlpha = (1.0 * numEliteSamples) / numElites;
@@ -1340,22 +1338,27 @@ public final class PolicyGenerator implements Serializable {
 				ed = null;
 		}
 
-		klDivergence_ = 0;
-
 		// Update the rule distributions and slot activation probability
 		boolean updated = false;
+		convergedValue_ = 0;
 		for (Slot slot : slotGenerator_) {
 			// Update the slot
-			double result = slot.updateProbabilities(ed, alpha, population,
+			Double result = slot.updateProbabilities(ed, alpha, population,
 					numElites, policiesEvaluated_);
-			updated |= (result != Double.NaN);
-			klDivergence_ += result;
+			if (result != null) {
+				updated = true;
+				convergedValue_ += Math.min(result - ProgramArgument.BETA.doubleValue(), maxUpdate);
+			} else {
+				convergedValue_ += maxUpdate;
+			}
 		}
 
-		if (updated)
-			convergedValue_ = alpha * ProgramArgument.BETA.doubleValue();
-		else
+		if (!updated)
 			convergedValue_ = NO_UPDATES_CONVERGENCE;
+		else {
+			// Normalise converged value between 0 and 1 (1 is fully converged)
+			convergedValue_ = 1 - convergedValue_ / (slotGenerator_.size() * maxUpdate); 
+		}
 	}
 
 	/**
