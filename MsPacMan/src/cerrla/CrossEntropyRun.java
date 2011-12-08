@@ -142,10 +142,10 @@ public class CrossEntropyRun {
 						+ " " + SD_SYMBOL + " " + meanDeviation);
 			}
 
-//			if (convergedCount_ > convergedSteps
-//					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
-//				return true;
-//			}
+			if (convergedCount_ > convergedSteps
+					&& ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue()) {
+				return true;
+			}
 		}
 		return false;
 	}
@@ -274,12 +274,8 @@ public class CrossEntropyRun {
 	 * Prints out the percentage complete, time elapsed and estimated time
 	 * remaining.
 	 * 
-	 * @param klDivergence
-	 *            The amount of divergence the generators are experiencing in
-	 *            updates.
-	 * @param convergenceValue
-	 *            The amount of divergence required for convergence to be
-	 *            called.
+	 * @param convergencePercent
+	 *            The percentage that this is converged.
 	 * @param run
 	 *            The run number.
 	 * @param maxRuns
@@ -296,9 +292,9 @@ public class CrossEntropyRun {
 	 *            the worst value of the elite samples.
 	 * 
 	 */
-	private void estimateETA(double klDivergence, double convergenceValue,
-			int run, int maxRuns, long startTime, int numElites,
-			int actualNumElites, float bestElite, float worstElite) {
+	private void estimateETA(double convergencePercent, int run, int maxRuns,
+			long startTime, int numElites, int actualNumElites,
+			float bestElite, float worstElite) {
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 			return;
 
@@ -309,10 +305,11 @@ public class CrossEntropyRun {
 				+ LearningController.toTimeFormat(elapsedTime);
 		System.out.println(elapsed);
 
-		double convergencePercent = Math
-				.min(convergenceValue / klDivergence, 1);
-		if (convergenceValue == PolicyGenerator.NO_UPDATES_CONVERGENCE)
+		boolean noUpdates = false;
+		if (convergencePercent == PolicyGenerator.NO_UPDATES_CONVERGENCE) {
+			noUpdates = true;
 			convergencePercent = 0;
+		}
 		double totalRunComplete = (1.0 * run + convergencePercent) / maxRuns;
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
@@ -321,11 +318,12 @@ public class CrossEntropyRun {
 			modular = "MODULAR: [" + policyGenerator_.getLocalGoal() + "] ";
 		// No updates yet, convergence unknown
 		String percentStr = null;
-		if (convergenceValue == PolicyGenerator.NO_UPDATES_CONVERGENCE) {
+		if (noUpdates) {
 			percentStr = "Unknown convergence; No updates yet.";
 		} else {
-			percentStr = formatter.format(100 * convergencePercent) + "% "
-					+ modular + "converged.";
+			percentStr = "~" + formatter.format(100 * convergencePercent)
+					+ "% " + modular + "converged ("
+					+ policyGenerator_.getGenerator().size() + " slots).";
 		}
 		System.out.println(percentStr);
 
@@ -964,10 +962,8 @@ public class CrossEntropyRun {
 					bestElite = Float.NaN;
 					worst = Float.NaN;
 				}
-				estimateETA(policyGenerator_.getKLDivergence(),
-						policyGenerator_.getConvergenceValue(), run
-								- repetitionsStart, repetitionsEnd
-								- repetitionsStart,
+				estimateETA(policyGenerator_.getConvergenceValue(), run
+						- repetitionsStart, repetitionsEnd - repetitionsStart,
 						experimentController_.getExperimentStart(), numElites,
 						pvs.size(), bestElite, worst);
 				isConverged |= checkConvergenceValues(episodeMeans, episodeSDs,

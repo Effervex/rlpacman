@@ -127,8 +127,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Checks if this slot can fix its rule in place and checks if the slot is
-	 * fully converged.
+	 * Checks if this slot is converged. Also applies slot fixing if that option
+	 * is enabled.
 	 * 
 	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
 	 */
@@ -140,12 +140,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 				fixed_ = true;
 				fixedRule_ = ruleGenerator_.getBestElement();
 			}
-
-			// If mean is close to 0 or 1, return true
-			if (fixed_ || slotMean_ <= ProgramArgument.BETA.doubleValue()
-					|| updateDelta_ < ProgramArgument.BETA.doubleValue())
-				return true;
 		}
+		// If mean is close to 0 or 1, return true
+		if (fixed_ || slotMean_ <= ProgramArgument.BETA.doubleValue()
+				|| updateDelta_ < ProgramArgument.BETA.doubleValue())
+			return true;
 		return false;
 	}
 
@@ -518,19 +517,18 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The minimum number of elite samples.
 	 * @param totalPoliciesEvaluated
 	 *            The number of policies evaluated so far.
-	 * @return A normalised KL divergence of the generators.
+	 * @return The 'normalised to 1' sum absolute updates, or null if no
+	 *         updates.
 	 */
-	public double updateProbabilities(ElitesData ed, double alpha,
+	public Double updateProbabilities(ElitesData ed, double alpha,
 			int population, int numElites, int totalPoliciesEvaluated) {
 		numUpdates_++;
-		if (ed == null || alpha == 0) {
-			updateDelta_ = Integer.MAX_VALUE;
-			return updateDelta_;
-		}
+		updateDelta_ = Integer.MAX_VALUE;
+		if (ed == null || alpha == 0)
+			return null;
 
 		double alphaPrime = getLocalAlpha(alpha, population, numElites,
 				totalPoliciesEvaluated);
-		updateDelta_ = Double.NaN;
 		if (alphaPrime > 0) {
 			// Update the slot values
 			updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
@@ -541,11 +539,13 @@ public class Slot implements Serializable, Comparable<Slot> {
 				updateDelta_ = ruleGenerator_.updateDistribution(
 						ed.getSlotCount(this), ed.getRuleCounts(), alphaPrime);
 			}
-			
+
 			// Normalise to 1
 			updateDelta_ /= alphaPrime;
+			return updateDelta_;
 		}
-		return updateDelta_;
+
+		return null;
 	}
 
 	/**
@@ -588,9 +588,5 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 	public void resetPolicyCount() {
 		numUpdates_ = 0;
-	}
-
-	public double getUpdateDelta() {
-		return updateDelta_;
 	}
 }
