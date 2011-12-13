@@ -103,6 +103,12 @@ public class PacManStateSpec extends StateSpec {
 			result[1] = "(level 11)";
 			return result;
 		}
+		
+		if (envParameter_.equals("edible")) {
+			result[0] = "edible";
+			result[1] = "(edible ?)";
+			return result;
+		}
 
 		// Score maximisation by default
 		return null;

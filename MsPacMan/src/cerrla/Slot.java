@@ -5,8 +5,9 @@ import relationalFramework.RelationalRule;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Random;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import relationalFramework.agentObservations.AgentObservations;
 import util.ProbabilityDistribution;
@@ -308,13 +309,14 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public double getLocalAlpha(double alpha, int population, int numElites,
 			int totalPoliciesEvaluated) {
-		// If not using a local alpha, or not using dynamic slots, use global
-		// policies evaluated
+		// If using a local alpha and using dynamic slots, use the number of
+		// updates this slot has been present in.
 		if (ProgramArgument.LOCAL_ALPHA.booleanValue()
 				&& ProgramArgument.DYNAMIC_SLOTS.booleanValue())
 			totalPoliciesEvaluated = numUpdates_;
 
 		// If the slot has not seen enough samples to update, return 0.
+		// TODO Maybe should change this to x * |S|.
 		if (totalPoliciesEvaluated < 2 * numElites)
 			return 0;
 
@@ -327,7 +329,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * Gets the slot's maximum capacity, based on the number of possible rule
 	 * specialisations.
 	 * 
-	 * @return The maximum capacity. Note that the size CAN be ovr this, but no
+	 * @return The maximum capacity. Note that the size CAN be over this, but no
 	 *         mutations will be allowed.
 	 */
 	public int getMaximumCapacity() {
@@ -361,7 +363,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * @return A collection of facts that differ (if any).
 	 */
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
-		Collection<RelationalPredicate> splitFacts = new HashSet<RelationalPredicate>(
+		SortedSet<RelationalPredicate> splitFacts = new TreeSet<RelationalPredicate>(
 				seedRule_.getConditions(true));
 		RelationalRule rlggRule = CrossEntropyRun.getPolicyGenerator()
 				.getRLGGRules().get(action_);

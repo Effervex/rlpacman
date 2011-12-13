@@ -4,7 +4,9 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -46,6 +48,57 @@ public class ProbabilityDistributionTest {
 	}
 
 	@Test
+	public void testMinimumBaggingSample() {
+		sut_.clear();
+		// Build a uniform set of samples
+		int size = 25;
+		for (int i = 0; i < size; i++) {
+			char name = (char) ('a' + i);
+			sut_.add(name + "");
+		}
+		sut_.normaliseProbs();
+
+		// Test sampling probability
+		// Only sampling N
+		testRepetitions(1, size);
+		// Sampling N * 2
+		testRepetitions(2, size);
+		// Sampling N * 3
+		testRepetitions(3, size);
+		// Sampling N * 4
+		testRepetitions(4, size);
+		// Sampling N * 5
+		testRepetitions(5, size);
+	}
+
+	/**
+	 * Tests repetitive sampling from the probability distribution with a given
+	 * amount of reps.
+	 * 
+	 * @param numReps
+	 *            The number of repretitions of sampling.
+	 * @param size
+	 *            The size of the set being sampled
+	 */
+	private void testRepetitions(double numReps, int size) {
+		int totalSize = 0;
+		int crossValidation = 20;
+		for (int i = 0; i < crossValidation; i++) {
+			Set<String> sampled = new HashSet<String>();
+			for (int j = 0; j < numReps * size; j++)
+				sampled.add(sut_.sample(false));
+
+			int sampledSize = sampled.size();
+			totalSize += sampledSize;
+		}
+		double totalProb = 1.0 * totalSize / (size * crossValidation);
+		System.out.println(numReps + " samples: " + totalSize + "/" + size
+				* crossValidation);
+		System.out.println("  Total prob: " + totalProb);
+		assertEquals(1 - Math.exp(-1 * numReps), totalProb, 1.0 / size);
+	}
+
+	@Test
 	public void testSampleWithRemoval() {
 		assertEquals(sut_.size(), 5);
 		assertEquals(sut_.sampleWithRemoval(true), "d");
@@ -81,7 +134,7 @@ public class ProbabilityDistributionTest {
 		assertEquals(0.33, sut_.getProb("c"), 0.0001);
 		assertEquals(0.35, sut_.getProb("d"), 0.0001);
 		assertEquals(0.02, sut_.getProb("e"), 0.0001);
-		
+
 		// Normalisation
 		resetSUT();
 		counts.put("c", 7d);
@@ -96,7 +149,7 @@ public class ProbabilityDistributionTest {
 	@Test
 	public void testKlSize() {
 		assertEquals(sut_.klSize(), 4.44429164, 0.001);
-		
+
 		sut_.set("d", 0.7);
 		sut_.normaliseProbs();
 		assertEquals(sut_.klSize(), 3.95338898, 0.001);

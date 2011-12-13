@@ -74,6 +74,12 @@ public final class PolicyGenerator implements Serializable {
 	/** The name of a module-saved policy generator serialised file. */
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
+	/**
+	 * The multiplier to test 95% of the rules at least once in the largest
+	 * slot.
+	 */
+	public static final double CONFIDENCE_INTERVAL = 3.0;
+
 	/** Policies awaiting testing. */
 	private Stack<CoveringRelationalPolicy> awaitingTest_;
 
@@ -133,6 +139,17 @@ public final class PolicyGenerator implements Serializable {
 	/** The rule creation object. */
 	protected RuleCreation ruleCreation_;
 
+	// /** Test array of noting KL and other slot values. */
+	// public double[][] values_;
+	//
+	// public int iter_ = 0;
+	//
+	// public static final int MAX_KL = 0;
+	// public static final int SUM_KL = 1;
+	// public static final int SUM_MU = 2;
+	// public static final int SIZE_D_S = 3;
+	// public static final int REPS = 1000;
+
 	/**
 	 * The constructor for creating a new Policy Generator.
 	 */
@@ -143,6 +160,7 @@ public final class PolicyGenerator implements Serializable {
 		currentSlots_ = MultiMap.createListMultiMap();
 		policiesEvaluated_ = 0;
 		mutationTree_ = new TreeMap<Double, RelationalRule>();
+		// values_ = new double[SIZE_D_S + 1][REPS];
 
 		resetGenerator();
 	}
@@ -180,6 +198,24 @@ public final class PolicyGenerator implements Serializable {
 		moduleGenerator_ = true;
 		goalCondition.normaliseArgs();
 		moduleGoal_ = goalCondition;
+	}
+
+	/**
+	 * Simple method that just sets the minimum number of elites to the bounded
+	 * value if using bounds.
+	 * 
+	 * @param numElites
+	 *            The current number of elites.
+	 * @return The changed number of elites (if necessary).
+	 */
+	private int checkPopulationBounding(int population) {
+		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
+			int generatorSize = slotGenerator_.size() - getNumConvergedSlots();
+			population = Math.max(
+					(int) (generatorSize / ProgramArgument.RHO.doubleValue()),
+					population);
+		}
+		return population;
 	}
 
 	/**
@@ -647,7 +683,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @return A population of rules, large enough to reasonably test most
 	 *         combinations of rules.
 	 */
-	public int determineNumElites() {
+	public int determinePopulation() {
 		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
 		double maxWeightedRuleCount = 0;
 		double maxSlotMean = 0;
@@ -671,46 +707,64 @@ public final class PolicyGenerator implements Serializable {
 			}
 		}
 
-		double numElites = 1;
-		switch (ProgramArgument.ELITES_SIZE.intValue()) {
+		double population = 1;
+		double rho = ProgramArgument.RHO.doubleValue();
+		switch (ProgramArgument.ELITES_FUNCTION.intValue()) {
 		case ProgramArgument.ELITES_SIZE_SUM_SLOTS:
 			// Elites is equal to the sum of the slot means
-			numElites = sumSlotMean;
+			population = sumSlotMean / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_SUM_RULES:
 			// Elites is equal to the total number of rules (KL sized)
-			numElites = Math.max(sumWeightedRuleCount, sumSlotMean);
+			population = Math.max(sumWeightedRuleCount, sumSlotMean) / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULES:
-			// Elites is equal to the maximum slot size
-			numElites = Math.max(maxWeightedRuleCount, sumSlotMean);
+			// Elites is equal to the (weighted) maximum slot size
+			population = Math.max(maxWeightedRuleCount, sumSlotMean) / rho;
+			break;
+		case ProgramArgument.ELITES_SIZE_MAX_RULE_NUM_SLOTS:
+			// Population is equal to the maximum (weighted) slot size * the
+			// number of slots * 3
+			population = CONFIDENCE_INTERVAL * maxWeightedRuleCount
+					* sumSlotMean;
 			break;
 		case ProgramArgument.ELITES_SIZE_AV_RULES:
 		default:
 			// Elites is equal to the average number of rules in high mean
 			// slots.
-			numElites = Math.max(sumWeightedRuleCount / sumSlotMean,
-					sumSlotMean);
+			population = Math.max(sumWeightedRuleCount / sumSlotMean,
+					sumSlotMean) / rho;
 		}
+
+		population *= ProgramArgument.ELITES_MULTIPLE.doubleValue();
+
+		// values_[MAX_KL][iter_] = maxWeightedRuleCount;
+		// values_[SUM_KL][iter_] = sumWeightedRuleCount;
+		// values_[SUM_MU][iter_] = sumSlotMean;
+		// values_[SIZE_D_S][iter_] = slotGenerator_.size();
+		// iter_++;
+		// if (iter_ >= REPS) {
+		// try {
+		// File file = new File("distributionDebug.csv");
+		// FileWriter fw = new FileWriter(file);
+		// BufferedWriter bw = new BufferedWriter(fw);
+		// bw.write("MaxKL,SumKL,SumMu,SizeDS,\n");
+		// for (int i = 0; i < REPS; i++) {
+		// for (int j = 0; j <= SIZE_D_S; j++)
+		// bw.write(values_[j][i] + ",");
+		// bw.write("\n");
+		// }
+		//
+		// bw.close();
+		// fw.close();
+		// } catch (Exception e) {
+		// e.printStackTrace();
+		// }
+		// System.exit(1);
+		// }
 
 		// Check elite bounding
-		return checkEliteBounding((int) Math.ceil(numElites));
-	}
-
-	/**
-	 * Simple method that just sets the minimum number of elites to the bounded
-	 * value if using bounds.
-	 * 
-	 * @param numElites
-	 *            The current number of elites.
-	 * @return The changed number of elites (if necessary).
-	 */
-	private int checkEliteBounding(int numElites) {
-		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
-			int generatorSize = slotGenerator_.size() - getNumConvergedSlots();
-			numElites = Math.max(generatorSize, numElites);
-		}
-		return numElites;
+		return checkPopulationBounding((int) Math.ceil(population));
 	}
 
 	/**
@@ -817,7 +871,6 @@ public final class PolicyGenerator implements Serializable {
 	 *         the rule.
 	 */
 	public RelationalRule getCreateCorrespondingRule(RelationalRule rule) {
-		// TODO Trial immediate slot creation
 		rule = rule.groundModular();
 		RelationalRule match = currentRules_.findMatch(rule);
 		// If there is no match, or the matched rule isn't a seed rule, create a
@@ -1347,7 +1400,8 @@ public final class PolicyGenerator implements Serializable {
 					numElites, policiesEvaluated_);
 			if (result != null) {
 				updated = true;
-				convergedValue_ += Math.min(result - ProgramArgument.BETA.doubleValue(), maxUpdate);
+				convergedValue_ += Math.min(
+						result - ProgramArgument.BETA.doubleValue(), maxUpdate);
 			} else {
 				convergedValue_ += maxUpdate;
 			}
@@ -1357,7 +1411,8 @@ public final class PolicyGenerator implements Serializable {
 			convergedValue_ = NO_UPDATES_CONVERGENCE;
 		else {
 			// Normalise converged value between 0 and 1 (1 is fully converged)
-			convergedValue_ = 1 - convergedValue_ / (slotGenerator_.size() * maxUpdate); 
+			convergedValue_ = 1 - convergedValue_
+					/ (slotGenerator_.size() * maxUpdate);
 		}
 	}
 
