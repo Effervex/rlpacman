@@ -18,7 +18,7 @@ import util.Pair;
 
 public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, ParameterType.UPDATING, "Step size update"),
-	BETA(0.001, "beta", null, ParameterType.CONVERGENCE,
+	BETA(0.0001, "beta", null, ParameterType.CONVERGENCE,
 			"If KL sum updates are less than Beta * Alpha"),
 	BOUNDED_ELITES(false, "boundedElites", null, ParameterType.UPDATING,
 			"If the minimum number of elites = |S|."),
@@ -28,8 +28,12 @@ public enum ProgramArgument implements Serializable {
 			"If the slots grow dynamically"),
 	EARLY_UPDATING(true, "earlyUpdating", null, ParameterType.UPDATING,
 			"If the algorithm should perform updates using incomplete, but viable, elites."),
-	ELITES_SIZE(3, "elitesSize", null, ParameterType.SAMPLING,
-			"The size of the elites: 0=Av # rules, 1=Sum slot means, 2=Sum # KL rules, 3=Max KL weighted rules"),
+	ELITES_FUNCTION(3, "elitesFunction", null, ParameterType.SAMPLING,
+			"The size of the elites: 0=Av # rules, 1=Sum slot means, "
+					+ "2=Sum # KL rules, 3=Max KL weighted rules, "
+					+ "4=Confidence * Max KL weighted rules * num slots * rho"),
+	ELITES_MULTIPLE(1, "elitesMultiple", null, ParameterType.SAMPLING,
+			"The multiplier of the elites size."),
 	ENSEMBLE_EVALUATION(false, "ensembleEvaluation", null,
 			ParameterType.EVALUATION, "If using ensemble evaluation"),
 	ENSEMBLE_SIZE(100, "ensembleSize", null, ParameterType.EVALUATION,
@@ -97,6 +101,7 @@ public enum ProgramArgument implements Serializable {
 	public static final int ELITES_SIZE_SUM_SLOTS = 1;
 	public static final int ELITES_SIZE_SUM_RULES = 2;
 	public static final int ELITES_SIZE_MAX_RULES = 3;
+	public static final int ELITES_SIZE_MAX_RULE_NUM_SLOTS = 4;
 	private Boolean booleanValue_;
 	private String comment_;
 	private Object defaultValue_;

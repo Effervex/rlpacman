@@ -311,6 +311,27 @@ public class RuleCreationTest {
 
 		assertFalse(results.toString().contains("(on ?G_0 ?G_1)"));
 	}
+	
+	@Test
+	public void testSpecialiseRuleMinorBWMove() {
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
+		sut_ = new RuleCreation();
+		new PolicyGenerator(0);
+		assertTrue("No loaded onAB agent observations. Cannot run test.",
+				AgentObservations.loadAgentObservations("onab"));
+		
+		RelationalRule rule = new RelationalRule(
+				"(clear ?X) (floor ?Y) => (move ?X ?Y)");
+		Collection<RelationalRule> results = sut_.specialiseRuleMinor(rule);
+
+		RelationalRule mutant = new RelationalRule(
+				"(clear ?G_0) (floor ?Y) => (move ?G_0 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?G_1) (floor ?Y) => (move ?G_1 ?Y)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 2);
+	}
 
 	@Test
 	public void testSimplifyRule() {

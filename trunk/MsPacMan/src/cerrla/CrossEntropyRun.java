@@ -856,9 +856,9 @@ public class CrossEntropyRun {
 			}
 
 			// Determine the dynamic population, based on rule-base size
-			int numElites = policyGenerator_.determineNumElites();
-			int population = (int) Math.round(numElites
-					/ ProgramArgument.RHO.doubleValue());
+			int population = policyGenerator_.determinePopulation();
+			int numElites = (int) Math.ceil(population
+					* ProgramArgument.RHO.doubleValue());
 			finiteNum = maxEpisodes * population;
 			if (maxEpisodes < 0)
 				finiteNum = Integer.MAX_VALUE;
