@@ -10,11 +10,11 @@ import java.util.TreeSet;
 
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.RangeContext;
+import rrlFramework.RRLObservations;
 
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
-import util.MultiMap;
 
 /**
  * A skeletal implementation of a relational policy.
@@ -145,19 +145,12 @@ public abstract class RelationalPolicy implements Serializable {
 	 * Evaluates a policy for a number of firing rules, and switches on the
 	 * necessary rules.
 	 * 
-	 * @param state
-	 *            The current state in predicates.
-	 * @param validActions
-	 *            The set of valid actions to choose from in the state.
-	 * @param goalReplacements
-	 *            The goal term replacements.
+	 * @param observations The observations of the state.
 	 * @param actionsReturned
 	 *            The number of actions to be returned, or if -1, all actions.
 	 * @return The actions being returned by the policy.
 	 */
-	public abstract PolicyActions evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements, int actionsReturned);
+	public abstract PolicyActions evaluatePolicy(RRLObservations observations, int actionsReturned);
 
 	/**
 	 * Apply arguments to any parameterised rules contained within this policy.

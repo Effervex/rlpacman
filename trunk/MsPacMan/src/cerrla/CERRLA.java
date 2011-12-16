@@ -65,16 +65,16 @@ public class CERRLA implements RRLAgent {
 			totalPolicyReward_ = 0;
 		}
 		// TODO Policy restarts...
-		return currentPolicy_.evaluatePolicy(observations, StateSpec
-				.getInstance().getNumReturnedActions());
+		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
+				StateSpec.getInstance().getNumReturnedActions()));
 	}
 
 	@Override
 	public RRLActions stepEpisode(RRLObservations observations) {
 		episodeReward_ += currentCECortex_.determineReward(observations
 				.getReward());
-		return currentPolicy_.evaluatePolicy(observations, StateSpec
-				.getInstance().getNumReturnedActions());
+		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
+				StateSpec.getInstance().getNumReturnedActions()));
 	}
 
 	@Override

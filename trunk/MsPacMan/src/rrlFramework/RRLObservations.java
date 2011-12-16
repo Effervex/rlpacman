@@ -1,5 +1,7 @@
 package rrlFramework;
 
+import java.util.SortedSet;
+
 import org.apache.commons.collections.BidiMap;
 
 import jess.Rete;
@@ -62,8 +64,20 @@ public class RRLObservations {
 		return state_;
 	}
 
-	public MultiMap<String, String[]> getValidActions() {
-		return validActions_;
+	/**
+	 * Gets the actions for a given action predicate.
+	 * 
+	 * @param actionPred
+	 *            The action to get the args for.
+	 * @return The arguments for a given action predicate.
+	 */
+	public SortedSet<String[]> getValidActions(String actionPred) {
+		try {
+			return validActions_.getSortedSet(actionPred);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	public boolean isTerminal() {

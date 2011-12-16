@@ -8,6 +8,7 @@ import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.AgentObservations;
+import rrlFramework.RRLObservations;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -192,29 +193,20 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * Evaluates a policy for a number of firing rules, and switches on the
 	 * necessary rules.
 	 * 
-	 * @param state
-	 *            The current state in predicates.
-	 * @param validActions
-	 *            The set of valid actions to choose from in the state.
-	 * @param goalReplacements
-	 *            The goal term replacements.
+	 * @param observations
+	 *            The observations of the state.
 	 * @param actionsReturned
 	 *            The number of actions to be returned, or if -1, all actions.
-	 * @param handCoded
-	 *            If the policy is a hand-coded test one.
-	 * @param noteTriggered
-	 *            If this policy is noting the rules fired as triggered. Usually
-	 *            deactivated after agent has found internal goal.
 	 */
-	public PolicyActions evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements, int actionsReturned) {
+	public PolicyActions evaluatePolicy(RRLObservations observations,
+			int actionsReturned) {
 		PolicyActions actionSwitch = new PolicyActions();
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 		int actionsFound = 0;
 		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
 				: actionsReturned;
+		Rete state = observations.getState();
 
 		try {
 			// First evaluate the RLGG rules (if any). If the actions there
@@ -224,8 +216,10 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 					.getRLGGRules().values()) {
 				SortedSet<String[]> rlggActions = new TreeSet<String[]>(
 						ArgumentComparator.getInstance());
-				evaluateRule(rlgg, state,
-						validActions.getSortedSet(rlgg.getActionPredicate()),
+				evaluateRule(
+						rlgg,
+						state,
+						observations.getValidActions(rlgg.getActionPredicate()),
 						rlggActions);
 				activatedActions.putCollection(rlgg.getActionPredicate(),
 						rlggActions);
@@ -234,8 +228,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			// Next trigger covering, storing the rules in the policy if
 			// required
 			List<RelationalRule> coveredRules = CrossEntropyRun
-					.getPolicyGenerator().triggerRLGGCovering(state,
-							validActions, goalReplacements, activatedActions);
+					.getPolicyGenerator().triggerRLGGCovering(observations,
+							activatedActions);
 			// If the policy is empty, store the rules in it.
 			if (activatedActions.isKeysEmpty() && coveredRules != null) {
 				Collections.shuffle(coveredRules, PolicyGenerator.random_);
@@ -251,11 +245,9 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			Iterator<RelationalRule> iter = policyRules_.iterator();
 			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
 				RelationalRule polRule = iter.next();
-				Collection<FiredAction> firedActions = evaluateRule(
-						polRule,
-						state,
-						validActions.getSortedSet(polRule.getActionPredicate()),
-						null);
+				Collection<FiredAction> firedActions = evaluateRule(polRule,
+						state, observations.getValidActions(polRule
+								.getActionPredicate()), null);
 				actionSwitch.addFiredRule(firedActions);
 				actionsFound += firedActions.size();
 			}
@@ -266,7 +258,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 		// This allows action covering to catch variant action conditions.
 		// This problem is caused by hierarchical RLGG rules, which cover
 		// actions regarding new object type already
-		checkForUnseenPreds(state, validActions, goalReplacements);
+		checkForUnseenPreds(observations);
 
 		return actionSwitch;
 	}
@@ -275,16 +267,10 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * Runs through the set of unseen predicates to check if the state contains
 	 * them. This method is used to capture variant action conditions.
 	 * 
-	 * @param state
-	 *            The state to scan.
-	 * @param validActions
-	 *            The state valid actions.
-	 * @param goalReplacements
-	 *            The goal argument replacements.
+	 * @param observations
+	 *            The observations of the state.
 	 */
-	private void checkForUnseenPreds(Rete state,
-			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements) {
+	private void checkForUnseenPreds(RRLObservations observations) {
 		try {
 			// Run through the unseen preds, triggering covering if necessary.
 			boolean triggerCovering = false;
@@ -306,8 +292,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 				MultiMap<String, String[]> emptyActions = MultiMap
 						.createSortedSetMultiMap(ArgumentComparator
 								.getInstance());
-				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(state,
-						validActions, goalReplacements, emptyActions);
+				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(
+						observations, emptyActions);
 				AgentObservations.getInstance().removeUnseenPredicates(
 						removables);
 			}
