@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 
+import rrlFramework.RRLObservations;
+
 import jess.Rete;
 import util.MultiMap;
 
@@ -19,9 +21,7 @@ public class BasicRelationalPolicy extends RelationalPolicy {
 	private static final long serialVersionUID = 3758878250620187453L;
 
 	@Override
-	public PolicyActions evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements, int actionsReturned) {
+	public PolicyActions evaluatePolicy(RRLObservations observations, int actionsReturned) {
 		PolicyActions actionSwitch = new PolicyActions();
 		int actionsFound = 0;
 		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
