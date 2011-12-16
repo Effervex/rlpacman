@@ -852,7 +852,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	 * @param value
 	 *            The value the rule attained as part of a policy.
 	 */
-	public void updateInternalValue(float value) {
+	public void updateInternalValue(double value) {
 		internalCount_++;
 
 		if (internalCount_ == 1) {

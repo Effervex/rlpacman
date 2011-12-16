@@ -231,7 +231,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @return The number of elites samples used for the count (max |elites|).
 	 */
 	private int countRules(SortedSet<PolicyValue> elites, ElitesData ed,
-			float minValue) {
+			double minValue) {
 		// If no samples better than others, return null
 		if (elites == null || elites.isEmpty()
 				|| elites.first().getValue() == minValue)
@@ -1217,7 +1217,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @param serFile
 	 *            The file to serialize to.
 	 */
-	public void savePolicyGenerator(File serFile) throws Exception {
+	public void serialisePolicyGenerator(File serFile) throws Exception {
 		if (moduleGenerator_ && Module.saveAtEnd_)
 			return;
 
@@ -1378,7 +1378,7 @@ public final class PolicyGenerator implements Serializable {
 	 *            The minimum value the agent has seen.
 	 */
 	public void updateDistributions(SortedSet<PolicyValue> elites,
-			double alpha, int population, int numElites, float minValue) {
+			double alpha, int population, int numElites, double minValue) {
 		// Keep count of the rules seen (and slots used)
 		double maxUpdate = alpha * 3;
 		ElitesData ed = new ElitesData();
@@ -1441,8 +1441,8 @@ public final class PolicyGenerator implements Serializable {
 			return;
 
 		// 'Negative' updates
-		float bestVal = elites.first().getValue();
-		float gamma = elites.last().getValue();
+		double bestVal = elites.first().getValue();
+		double gamma = elites.last().getValue();
 		double denominator = bestVal - gamma;
 		for (PolicyValue negVal : removed) {
 			// Calculate the dynamic alpha value based on how bad a sample this
@@ -1514,5 +1514,14 @@ public final class PolicyGenerator implements Serializable {
 		PolicyGenerator loaded = modPG;
 		StateSpec.reinitInstance();
 		return loaded;
+	}
+
+	/**
+	 * If the distribution has been updated at all.
+	 * 
+	 * @return True if the distribution has updated (isn't uniform anymore).
+	 */
+	public boolean hasUpdated() {
+		return convergedValue_ != NO_UPDATES_CONVERGENCE;
 	}
 }

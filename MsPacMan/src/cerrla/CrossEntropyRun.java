@@ -294,7 +294,7 @@ public class CrossEntropyRun {
 	 */
 	private void estimateETA(double convergencePercent, int run, int maxRuns,
 			long startTime, int numElites, int actualNumElites,
-			float bestElite, float worstElite) {
+			double bestElite, double worstElite) {
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 			return;
 
@@ -459,12 +459,11 @@ public class CrossEntropyRun {
 	 */
 	private SortedSet<PolicyValue> preUpdateModification(
 			SortedSet<PolicyValue> elites, int numElite, int staleValue,
-			float minValue) {
+			double minValue) {
 		// Firstly, remove any policy values that have been around for more
 		// than N steps
 
 		// Only remove stuff if the elites are a representative solution
-		// if (neValue.getValue() > minValue) {
 		int iteration = policyGenerator_.getPoliciesEvaluated();
 		for (Iterator<PolicyValue> iter = elites.iterator(); iter.hasNext();) {
 			PolicyValue pv = iter.next();
@@ -474,7 +473,6 @@ public class CrossEntropyRun {
 				iter.remove();
 			}
 		}
-		// }
 
 		SortedSet<PolicyValue> tailSet = null;
 		if (elites.size() > numElite) {
@@ -749,7 +747,7 @@ public class CrossEntropyRun {
 			// Output the episode averages
 			savePerformance(episodeMeans, episodeSDs, tempPerf, finalWrite);
 		}
-		policyGenerator_.savePolicyGenerator(new File(tempPerf + ".ser"));
+		policyGenerator_.serialisePolicyGenerator(new File(tempPerf + ".ser"));
 		AgentObservations.getInstance().saveAgentObservations(policyGenerator_);
 	}
 
@@ -771,7 +769,7 @@ public class CrossEntropyRun {
 	 */
 	protected boolean updateDistributions(PolicyGenerator localPolicy,
 			SortedSet<PolicyValue> elites, int population, int numElites,
-			float minReward) {
+			double minReward) {
 		// Clean up the policy values
 		SortedSet<PolicyValue> removed = preUpdateModification(elites,
 				numElites, population, minReward);
@@ -833,8 +831,8 @@ public class CrossEntropyRun {
 		int finiteNum = Integer.MAX_VALUE;
 
 		// Noting min/max rewards
-		float maxReward = -(Float.MAX_VALUE - 1);
-		float minReward = Float.MAX_VALUE;
+		double maxReward = -(Float.MAX_VALUE - 1);
+		double minReward = Float.MAX_VALUE;
 
 		currentEpisode_ = 0;
 		boolean isConverged = false;
@@ -911,14 +909,14 @@ public class CrossEntropyRun {
 					System.out.println(currentEpisode_ + ": " + score);
 				}
 
-				float worst = (!pvs.isEmpty()) ? pvs.last().getValue()
+				double worst = (!pvs.isEmpty()) ? pvs.last().getValue()
 						: Float.NaN;
 				PolicyValue thisPolicy = new PolicyValue(policy.objA_, score,
 						policyGenerator_.getPoliciesEvaluated());
 				pvs.add(thisPolicy);
 				policyGenerator_.incrementPoliciesEvaluated();
 
-				if (Float.isNaN(worst))
+				if (Double.isNaN(worst))
 					worst = pvs.first().getValue();
 
 				// Give an ETA
@@ -956,7 +954,7 @@ public class CrossEntropyRun {
 				// Update the distributions
 				boolean resetElites = updateDistributions(policyGenerator_,
 						pvs, population, numElites, minReward);
-				float bestElite = pvs.first().getValue();
+				double bestElite = pvs.first().getValue();
 				if (resetElites && ProgramArgument.RESET_ELITES.booleanValue()) {
 					pvs.clear();
 					bestElite = Float.NaN;
@@ -1032,13 +1030,13 @@ public class CrossEntropyRun {
 
 		// Return the best policy. if multiple policies have the same value,
 		// return the most common one.
-		float threshold = pvs.first().getValue();
+		double threshold = pvs.first().getValue();
 		Map<CoveringRelationalPolicy, Integer> bestPolicyMap = new HashMap<CoveringRelationalPolicy, Integer>();
 		PolicyValue bestPolicy = null;
 		int mostCounts = 0;
 		for (PolicyValue pv : pvs) {
 			CoveringRelationalPolicy thisPolicy = pv.getPolicy();
-			float thisValue = pv.getValue();
+			double thisValue = pv.getValue();
 			if (thisValue < threshold)
 				break;
 
