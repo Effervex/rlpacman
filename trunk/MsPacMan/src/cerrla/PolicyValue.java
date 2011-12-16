@@ -13,7 +13,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	/** The policy. */
 	private CoveringRelationalPolicy policy_;
 	/** The estimated value of the policy. */
-	private float value_;
+	private double value_;
 	/** The iteration this policy value was created at. */
 	private int iteration_;
 
@@ -25,7 +25,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * @param value
 	 *            The (estimated) value
 	 */
-	public PolicyValue(CoveringRelationalPolicy pol, float value, int iteration) {
+	public PolicyValue(CoveringRelationalPolicy pol, double value, int iteration) {
 		policy_ = pol;
 		value_ = value;
 		iteration_ = iteration;
@@ -42,7 +42,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 *            The value the policy achieved
 	 */
 	private void updateInternalRuleValues(CoveringRelationalPolicy pol,
-			float value) {
+			double value) {
 		if (pol != null)
 			for (RelationalRule rule : pol.getFiringRules()) {
 				rule.updateInternalValue(value);
@@ -63,7 +63,7 @@ public class PolicyValue implements Comparable<PolicyValue> {
 	 * 
 	 * @return The value.
 	 */
-	public float getValue() {
+	public double getValue() {
 		return value_;
 	}
 
@@ -105,7 +105,9 @@ public class PolicyValue implements Comparable<PolicyValue> {
 		int result = 1;
 		result = prime * result + iteration_;
 		result = prime * result + ((policy_ == null) ? 0 : policy_.hashCode());
-		result = prime * result + Float.floatToIntBits(value_);
+		long temp;
+		temp = Double.doubleToLongBits(value_);
+		result = prime * result + (int) (temp ^ (temp >>> 32));
 		return result;
 	}
 
@@ -125,7 +127,8 @@ public class PolicyValue implements Comparable<PolicyValue> {
 				return false;
 		} else if (!policy_.equals(other.policy_))
 			return false;
-		if (Float.floatToIntBits(value_) != Float.floatToIntBits(other.value_))
+		if (Double.doubleToLongBits(value_) != Double
+				.doubleToLongBits(other.value_))
 			return false;
 		return true;
 	}

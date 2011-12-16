@@ -301,13 +301,11 @@ public class PolicyActor implements AgentInterface {
 	 * @return A relational action.
 	 */
 	private PolicyActions chooseAction(Rete state, Double reward) {
-		PolicyActions actions = new PolicyActions();
-
 		// Evaluate the policy for true rules and activates
 		MultiMap<String, String[]> validActions = ObjectObservations
 				.getInstance().validActions;
 
-		actions = policy_.evaluatePolicy(state, validActions, goalArgs_,
+		PolicyActions actions = policy_.evaluatePolicy(state, validActions, goalArgs_,
 				StateSpec.getInstance().getNumReturnedActions());
 
 		// Resampling code

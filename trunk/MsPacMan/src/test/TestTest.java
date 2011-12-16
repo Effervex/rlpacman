@@ -21,6 +21,8 @@ import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
 
+import blocksWorldMove.BlocksWorldEnvironment;
+
 import util.ArgumentComparator;
 
 public class TestTest {
@@ -265,5 +267,11 @@ public class TestTest {
 		end = System.currentTimeMillis();
 		System.out.println(end - start);
 		start = end;
+	}
+	
+	@Test
+	public void testClass() {
+		BlocksWorldEnvironment bwe = new BlocksWorldEnvironment();
+		assertEquals("blocksWorldMove.BlocksWorldEnvironment", bwe.getClass().getName());
 	}
 }

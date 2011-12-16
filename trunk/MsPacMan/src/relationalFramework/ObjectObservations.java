@@ -23,7 +23,7 @@ public final class ObjectObservations {
 	/** The private singleton instance. */
 	private static ObjectObservations instance_;
 
-	/** The array of objects begin used as observations. */
+	/** The array of objects being used as observations. */
 	public Object[] objectArray;
 
 	/** The knowledge base of current state predicate and background knowledge. */
