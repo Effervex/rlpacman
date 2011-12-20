@@ -21,7 +21,8 @@ public class BasicRelationalPolicy extends RelationalPolicy {
 	private static final long serialVersionUID = 3758878250620187453L;
 
 	@Override
-	public PolicyActions evaluatePolicy(RRLObservations observations, int actionsReturned) {
+	public PolicyActions evaluatePolicy(RRLObservations observations,
+			int actionsReturned) {
 		PolicyActions actionSwitch = new PolicyActions();
 		int actionsFound = 0;
 		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
@@ -32,11 +33,10 @@ public class BasicRelationalPolicy extends RelationalPolicy {
 			Iterator<RelationalRule> iter = policyRules_.iterator();
 			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
 				RelationalRule polRule = iter.next();
-				Collection<FiredAction> firedActions = evaluateRule(
-						polRule,
-						state,
-						validActions.getSortedSet(polRule.getActionPredicate()),
-						null);
+				Collection<FiredAction> firedActions = evaluateRule(polRule,
+						observations.getState(),
+						observations.getValidActions(polRule
+								.getActionPredicate()), null);
 				actionSwitch.addFiredRule(firedActions);
 				actionsFound += firedActions.size();
 			}

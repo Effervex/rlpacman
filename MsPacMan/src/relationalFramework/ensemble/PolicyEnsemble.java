@@ -2,6 +2,7 @@ package relationalFramework.ensemble;
 
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPolicy;
+import rrlFramework.RRLObservations;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -99,13 +100,12 @@ public class PolicyEnsemble {
 	 * @return The selected action choice (decided by ensemble vote).
 	 */
 	@SuppressWarnings("unchecked")
-	public PolicyActions evaluatePolicy(Rete state,
-			MultiMap<String, String[]> validActions, BidiMap goalArgs,
+	public PolicyActions evaluatePolicy(RRLObservations observations,
 			int numReturnedActions) {
 		ActionChoiceEnsemble ace = new ActionChoiceEnsemble();
 		for (RelationalPolicy pol : policies_) {
-			PolicyActions actions = pol.evaluatePolicy(state, validActions,
-					goalArgs, numReturnedActions);
+			PolicyActions actions = pol.evaluatePolicy(observations,
+					numReturnedActions);
 			// If we only have one policy, just use that.
 			if (policies_.size() == 1)
 				return actions;
@@ -113,8 +113,7 @@ public class PolicyEnsemble {
 		}
 
 		PolicyActions result = ace.getVotedActionChoice();
-		Set<RelationalPolicy> votedPolicies = ace
-				.getPolicyConsistency();
+		Set<RelationalPolicy> votedPolicies = ace.getPolicyConsistency();
 		for (RelationalPolicy rp : votedPolicies) {
 			Double count = policyConsistency_.get(rp);
 			if (count == null)
@@ -145,8 +144,8 @@ public class PolicyEnsemble {
 	 */
 	public Pair<RelationalPolicy, Double> getMajorPolicy() {
 		if (policies_.size() == 1)
-			return new Pair<RelationalPolicy, Double>(policies_
-					.iterator().next(), 1d);
+			return new Pair<RelationalPolicy, Double>(policies_.iterator()
+					.next(), 1d);
 
 		// Use the policy with the greatest consistency
 		double bestWeight = 0;
@@ -158,8 +157,7 @@ public class PolicyEnsemble {
 				bestPolicy = rp;
 			}
 		}
-		return new Pair<RelationalPolicy, Double>(bestPolicy,
-				bestWeight);
+		return new Pair<RelationalPolicy, Double>(bestPolicy, bestWeight);
 	}
 
 	@Override

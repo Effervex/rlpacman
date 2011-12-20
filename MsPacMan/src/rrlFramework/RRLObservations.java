@@ -79,6 +79,10 @@ public class RRLObservations {
 		}
 		return null;
 	}
+	
+	public MultiMap<String, String[]> getValidActions() {
+		return validActions_;
+	}
 
 	public boolean isTerminal() {
 		return terminal_;

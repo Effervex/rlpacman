@@ -1,5 +1,7 @@
 package cerrla;
 
+import java.io.Serializable;
+
 import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalRule;
 
@@ -9,7 +11,8 @@ import relationalFramework.RelationalRule;
  * 
  * @author Samuel J. Sarjant
  */
-public class PolicyValue implements Comparable<PolicyValue> {
+public class PolicyValue implements Comparable<PolicyValue>, Serializable {
+	private static final long serialVersionUID = 6807660104018734424L;
 	/** The policy. */
 	private CoveringRelationalPolicy policy_;
 	/** The estimated value of the policy. */

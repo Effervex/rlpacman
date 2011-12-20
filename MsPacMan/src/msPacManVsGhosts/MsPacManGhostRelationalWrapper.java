@@ -314,10 +314,10 @@ public class MsPacManGhostRelationalWrapper extends RelationalWrapper {
 	}
 
 	@Override
-	public int isTerminal(Object... args) {
-		if (((Game) args[0]).gameOver() || super.isTerminal(args) == 1)
-			return 1;
-		return 0;
+	public boolean isTerminal(Object... args) {
+		if (((Game) args[0]).gameOver() || super.isTerminal(args))
+			return true;
+		return false;
 	}
 
 	@Override

@@ -17,17 +17,19 @@ import cerrla.PolicyGenerator;
 
 
 public class RelationalPolicyTest {
+	private PolicyGenerator policyGenerator_;
 
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		new PolicyGenerator(0);
+		policyGenerator_ = new PolicyGenerator(0);
 	}
 
 	@Test
 	public void testAddRule() {
 		// Basic rule adding
-		CoveringRelationalPolicy pol = new CoveringRelationalPolicy();
+		
+		CoveringRelationalPolicy pol = new CoveringRelationalPolicy(policyGenerator_);
 		RelationalRule rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 1);
@@ -35,7 +37,7 @@ public class RelationalPolicyTest {
 		assertTrue(pol.getFiringRules().isEmpty());
 
 		// Rule adding with modular check (but no module defined)
-		pol = new CoveringRelationalPolicy();
+		pol = new CoveringRelationalPolicy(policyGenerator_);
 		rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 1);
@@ -48,7 +50,7 @@ public class RelationalPolicyTest {
 				.getModuleRules().size();
 
 		// Rule adding with modular check (module fires)
-		pol = new CoveringRelationalPolicy();
+		pol = new CoveringRelationalPolicy(policyGenerator_);
 		rule = new RelationalRule("(clear a) => (moveFloor a)");
 		pol.addRule(rule);
 
@@ -67,7 +69,7 @@ public class RelationalPolicyTest {
 			fail("'clear&clear' module doesn't exist!");
 
 		// Rule adding with multiple modular check
-		pol = new CoveringRelationalPolicy();
+		pol = new CoveringRelationalPolicy(policyGenerator_);
 		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
 		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), clearRulesNum * 2 + 1);
@@ -93,7 +95,7 @@ public class RelationalPolicyTest {
 
 		// Rule adding with modular check (recursive modular firing where on
 		// module calls clear module)
-		pol = new CoveringRelationalPolicy();
+		pol = new CoveringRelationalPolicy(policyGenerator_);
 		rule = new RelationalRule("(on a b) => (moveFloor a)");
 		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 6);

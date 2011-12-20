@@ -64,7 +64,6 @@ public class CERRLA implements RRLAgent {
 			policyEpisodes_ = 0;
 			totalPolicyReward_ = 0;
 		}
-		// TODO Policy restarts...
 		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
 				StateSpec.getInstance().getNumReturnedActions()));
 	}
@@ -84,13 +83,19 @@ public class CERRLA implements RRLAgent {
 				.getReward());
 		totalPolicyReward_ += episodeReward_;
 
+		// Check for restart flag
+		if (currentPolicy_ instanceof CoveringRelationalPolicy
+				&& ((CoveringRelationalPolicy) currentPolicy_).shouldRestart()) {
+			currentPolicy_ = null;
+			return;
+		}
+
 		// Note the rewards.
 		currentCECortex_.noteEpisodeReward(episodeReward_, policyEpisodes_);
 		policyEpisodes_++;
 		if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()) {
-			currentCECortex_.recordSample(
-					(CoveringRelationalPolicy) currentPolicy_,
-					totalPolicyReward_ / policyEpisodes_);
+			currentCECortex_.recordSample(currentPolicy_, totalPolicyReward_
+					/ policyEpisodes_);
 			currentPolicy_ = null;
 		}
 	}

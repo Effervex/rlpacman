@@ -39,17 +39,14 @@ public class Config {
 	 * files.
 	 */
 	private String comment_;
-
+	/** The class prefix for the environment. */
+	private String environmentClass_;
 	/** The time that the experiment started. */
 	private long experimentStart_;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
-	/** The maximum number of steps the agent can take. */
-	private int maxSteps_;
-	/** If the performance is saved by episode or by CE iteration. */
-	private boolean performanceByEpisode_ = true;
 	/** The performance output file. */
 	private File performanceFile_;
 	/** The best policy found output file. */
@@ -66,9 +63,6 @@ public class Config {
 	/** The loaded serializable file. */
 	private File serializedFile_;
 
-	/** The main goal of the experiment. */
-	private String goalArg_;
-
 	/** The singleton instance. */
 	private static Config instance_;
 
@@ -76,6 +70,12 @@ public class Config {
 	 * Initialising the configuration details.
 	 */
 	private Config(String[] args) {
+		try {
+			if (args.length == 0)
+				throw new Exception("No environment config file provided!");
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
 		File argumentFile = new File(args[0]);
 		ProgramArgument.loadArgs();
 		ProgramArgument.saveArgsFile();
@@ -85,7 +85,7 @@ public class Config {
 			FileReader reader = new FileReader(argumentFile);
 			BufferedReader bf = new BufferedReader(reader);
 
-			String environmentClass = bf.readLine();
+			environmentClass_ = bf.readLine();
 			String[] repetitionsStr = bf.readLine().split("-");
 			// Num repetitions specified by a range for seeding random number.
 			Integer repetitionsStart = 0;
@@ -152,7 +152,7 @@ public class Config {
 				}
 			}
 
-			initialise(environmentClass, repetitionsStart, repetitionsEnd,
+			initialise(environmentClass_, repetitionsStart, repetitionsEnd,
 					episodes, elitesFile, performanceFile, handledArgs,
 					extraArgsList.toArray(new String[extraArgsList.size()]));
 		} catch (Exception e) {
@@ -196,13 +196,9 @@ public class Config {
 			e.printStackTrace();
 		}
 		extraArgs_ = extraArgs;
-		goalArg_ = null;
 		for (String extraArg : extraArgs)
 			if (extraArg.startsWith("goal"))
-				goalArg_ = extraArg.substring(5);
-
-		// Initialise the state spec.
-		StateSpec.initInstance(environmentClass, goalArg_);
+				mainGoal_ = extraArg.substring(5);
 
 		// If the elites and performance file are null, generate filenames
 		if (elitesFile == null || performanceFile == null) {
@@ -214,7 +210,7 @@ public class Config {
 		elitesFile_ = new File(elitesFile);
 		performanceFile_ = new File(performanceFile);
 	}
-	
+
 	/**
 	 * Generates the filenames for the elites and performance files.
 	 * 
@@ -282,8 +278,7 @@ public class Config {
 	}
 
 	public String getGoal() {
-		// TODO Auto-generated method stub
-		return null;
+		return mainGoal_;
 	}
 
 	public File getPerformanceFile() {
@@ -313,7 +308,7 @@ public class Config {
 	public int getRepetitionsEnd() {
 		return repetitionsEnd_;
 	}
-	
+
 	public int getNumRepetitions() {
 		return repetitionsEnd_ - repetitionsStart_;
 	}
@@ -337,5 +332,13 @@ public class Config {
 		// Comments
 		if (Config.getInstance().getComment() != null)
 			buf.write(Config.getInstance().getComment() + "\n");
+	}
+
+	public String[] getExtraArgs() {
+		return extraArgs_;
+	}
+
+	public String getEnvironmentClass() {
+		return environmentClass_;
 	}
 }

@@ -1,5 +1,6 @@
 package cerrla;
 
+import java.io.Serializable;
 import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -14,7 +15,8 @@ import relationalFramework.agentObservations.AgentObservations;
  * 
  * @author Sam Sarjant
  */
-public class LocalCrossEntropyDistribution {
+public class LocalCrossEntropyDistribution implements Serializable {
+	private static final long serialVersionUID = 300896343523518290L;
 	/** The current episode as evidenced by this generator. */
 	private int currentEpisode_;
 	/** The elites set. */
@@ -44,9 +46,11 @@ public class LocalCrossEntropyDistribution {
 	 */
 	public LocalCrossEntropyDistribution(String goal, int run) {
 		goalCondition_ = goal;
-		policyGenerator_ = new PolicyGenerator(run);
+		policyGenerator_ = new PolicyGenerator(run, this);
 		performance_ = new Performance(run);
 		elites_ = new TreeSet<PolicyValue>();
+		population_ = Integer.MAX_VALUE;
+		numElites_ = Integer.MAX_VALUE;
 	}
 
 	/**
@@ -203,11 +207,11 @@ public class LocalCrossEntropyDistribution {
 	 * @param value
 	 *            The value of the sample.
 	 */
-	public void recordSample(CoveringRelationalPolicy sample, double value) {
+	public void recordSample(RelationalPolicy sample, double value) {
 		if (!frozen_) {
 			// Add sample to elites
-			PolicyValue pv = new PolicyValue(sample, value,
-					policyGenerator_.getPoliciesEvaluated());
+			PolicyValue pv = new PolicyValue((CoveringRelationalPolicy) sample,
+					value, policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
 			policyGenerator_.incrementPoliciesEvaluated();
 
@@ -270,5 +274,9 @@ public class LocalCrossEntropyDistribution {
 		frozen_ = b;
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
+	}
+
+	public String getGoalCondition() {
+		return goalCondition_;
 	}
 }

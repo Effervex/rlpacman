@@ -57,6 +57,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 	/** The amount of updating this slot is receiving. */
 	private transient double updateDelta_ = Integer.MAX_VALUE;
 
+	/** The distribution containing this slot. */
+	private PolicyGenerator parentDistribution_;
+
 	/**
 	 * A constructor for a new slot. The slot may be fixed (only one rule
 	 * allowed) and is initialised with a level (distance of splits from RLGG
@@ -69,7 +72,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * @param level
 	 *            The number of splits this slot is from RLGG slot.
 	 */
-	public Slot(RelationalRule seedRule, boolean fixed, int level) {
+	public Slot(RelationalRule seedRule, boolean fixed, int level,
+			PolicyGenerator parentDistribution) {
 		action_ = seedRule.getActionPredicate();
 		fixed_ = fixed;
 		seedRule.setSlot(this);
@@ -85,6 +89,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 			slotLevel_ = level;
 		}
 		ordering_ = 0.5;
+		parentDistribution_ = parentDistribution;
 		calculateHash();
 	}
 
@@ -365,8 +370,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
 		SortedSet<RelationalPredicate> splitFacts = new TreeSet<RelationalPredicate>(
 				seedRule_.getConditions(true));
-		RelationalRule rlggRule = CrossEntropyRun.getPolicyGenerator()
-				.getRLGGRules().get(action_);
+		RelationalRule rlggRule = parentDistribution_.getRLGGRules().get(
+				action_);
 		if (rlggRule != null)
 			splitFacts.removeAll(rlggRule.getConditions(true));
 		return splitFacts;

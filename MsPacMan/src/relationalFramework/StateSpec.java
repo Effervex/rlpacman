@@ -1,6 +1,5 @@
 package relationalFramework;
 
-import relationalFramework.ObjectObservations;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -508,8 +507,9 @@ public abstract class StateSpec {
 	 *            The goal args to add, or if null, generate new ones.
 	 * @param state
 	 *            The state to add to.
+	 * @return The goal replacements map created from the goal args.
 	 */
-	public void assertGoalPred(List<String> goalArgs, Rete state)
+	public BidiMap assertGoalPred(List<String> goalArgs, Rete state)
 			throws Exception {
 		StringBuffer goalString = new StringBuffer();
 		for (String arg : goalArgs)
@@ -527,7 +527,8 @@ public abstract class StateSpec {
 						RelationalArgument.createGoalTerm(i));
 			i++;
 		}
-		ObjectObservations.getInstance().goalReplacements = goalReplacements;
+
+		return goalReplacements;
 	}
 
 	/**

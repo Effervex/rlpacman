@@ -23,15 +23,12 @@ import cerrla.ProgramArgument;
  * 
  * @author Sam Sarjant
  */
-public abstract class RRLExperiment {
+public class RRLExperiment {
 	/** The agent to use for experiments. */
 	private RRLAgent agent_;
 
 	/** The environment to use for experiments. */
 	private RRLEnvironment environment_;
-
-	/** The package prefix to the environment. */
-	private String environmentPrefix_;
 
 	/**
 	 * Start a new experiment with the given args.
@@ -40,21 +37,18 @@ public abstract class RRLExperiment {
 	 *            The provided arguments (filename, etc).
 	 */
 	public RRLExperiment(String[] args) {
-		agent_ = setAgent();
-		environment_ = setEnvironment();
-		environmentPrefix_ = environment_.getClass().getName();
-		int envSuffixIndex = environmentPrefix_.lastIndexOf("Environment");
-		environmentPrefix_ = environmentPrefix_.substring(0, envSuffixIndex);
-
 		Config.newInstance(args);
-	}
 
-	/**
-	 * Initialise the environment to be used in this experiment.
-	 * 
-	 * @return The environment to be used in this experiment.
-	 */
-	protected abstract RRLEnvironment setEnvironment();
+		try {
+			agent_ = setAgent();
+			environment_ = (RRLEnvironment) Class.forName(
+					Config.getInstance().getEnvironmentClass()
+							+ RRLEnvironment.ENVIRONMENT_CLASS_SUFFIX)
+					.newInstance();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
 	/**
 	 * Initialise the agent to be used in this experiment.
@@ -72,10 +66,12 @@ public abstract class RRLExperiment {
 	 */
 	public void run(int runIndex, int finiteEpisodes) {
 		// Initialise the agent and environment
-		StateSpec.initInstance(environmentPrefix_, Config.getInstance()
-				.getGoal());
+		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
+				Config.getInstance().getGoal());
+		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
+
 		agent_.initialise(runIndex);
-		environment_.initialise(runIndex);
+		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
 
 		// Continue to run episodes until either the agent states it is
 		// converged, or a finite pre-specified number of episodes have passed.
@@ -88,19 +84,20 @@ public abstract class RRLExperiment {
 			episodeCount++;
 		}
 
-		
-		
+
+
 		// Test the learned behaviour
 		System.out.println();
 		if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-			System.out.println("Beginning testing for episode " + episodeCount + ".");
-		else
-			System.out.println("Beginning ensemble testing for episode " + episodeCount
+			System.out.println("Beginning testing for episode " + episodeCount
 					+ ".");
+		else
+			System.out.println("Beginning ensemble testing for episode "
+					+ episodeCount + ".");
 		System.out.println();
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 			System.out.println("Testing...");
-		
+
 		agent_.freeze(true);
 		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue(); i++) {
 			episode();
@@ -115,22 +112,27 @@ public abstract class RRLExperiment {
 	 */
 	protected void episode() {
 		// Form the initial observations and feed them to the agent.
+		// Ensure that the goal isn't met immediately
 		RRLObservations observations = environment_.startEpisode();
+		while (observations.isTerminal())
+			observations = environment_.startEpisode();
 		RRLActions actions = agent_.startEpisode(observations);
 
 		// Continue through the episode until it's over, or the agent calls it
 		// over.
 		while (true) {
 			// Compile observations
-			observations = environment_.step(actions);
+			observations = environment_.step(actions.getActions());
 			if (observations.isTerminal())
-				return;
+				break;
 
 			// Determine actions
 			actions = agent_.stepEpisode(observations);
 			if (actions.isEarlyExit())
-				return;
+				break;
 		}
+
+		agent_.endEpisode(observations);
 	}
 
 	/**
@@ -142,15 +144,21 @@ public abstract class RRLExperiment {
 	 *            A finite number of episodes for each run to go through (or -1
 	 *            if infinite).
 	 */
-	public void runMultiple(int numRuns, int finiteEpisodes) {
+	public void runExperiment() {
 		long experimentStart = System.currentTimeMillis();
 
-		// TODO Load existing runs and start from there.
-		for (int i = 0; i < numRuns; i++) {
+		// Determine the initial run (as previous runs may have already been
+		// done in a previous experiment)
+		int[] startPoint = checkFiles(Config.getInstance()
+				.getRepetitionsStart());
+		int run = startPoint[0];
+
+		// Load existing runs and start from there.
+		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
 			run(i, Config.getInstance().getMaxEpisodes());
 		}
 
-		// TODO Compile the files
+		// Compile the files
 		if (Config.getInstance().getRepetitionsStart() == 0
 				&& !ProgramArgument.TESTING.booleanValue()) {
 			try {
@@ -392,5 +400,16 @@ public abstract class RRLExperiment {
 		String timeString = time / (1000 * 60 * 60) + ":"
 				+ (time / (1000 * 60)) % 60 + ":" + (time / 1000) % 60;
 		return timeString;
+	}
+
+	/**
+	 * The main method to get the experiment running.
+	 * 
+	 * @param args
+	 *            The config filename defining environment + any other args.
+	 */
+	public static void main(String[] args) {
+		RRLExperiment experiment = new RRLExperiment(args);
+		experiment.runExperiment();
 	}
 }
