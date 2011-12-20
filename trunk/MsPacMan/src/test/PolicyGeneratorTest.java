@@ -13,6 +13,8 @@ import java.util.Map;
 
 import jess.Rete;
 
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -22,6 +24,7 @@ import cerrla.ProgramArgument;
 import cerrla.Slot;
 
 import relationalFramework.agentObservations.AgentObservations;
+import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
 import util.MultiMap;
 
@@ -70,11 +73,11 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		Map<String, String> goalReplacements = new HashMap<String, String>();
+		BidiMap goalReplacements = new DualHashBidiMap();
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
-		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, goalReplacements, activatedActions);
+		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions);
 
 		// [e]
 		// [b][d]
@@ -102,8 +105,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				goalReplacements, activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions);
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -128,8 +131,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				goalReplacements, activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
 		List<String> queryParameters = new ArrayList<String>();
@@ -168,8 +171,9 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(state,
-				validActions, new HashMap<String, String>(), activatedActions);
+		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(
+				new RRLObservations(state, validActions, 0d,
+						new DualHashBidiMap(), false), activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -184,8 +188,9 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				new HashMap<String, String>(), activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+				validActions, 0d, new DualHashBidiMap(), false),
+				activatedActions);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -199,8 +204,9 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(state, validActions,
-				new HashMap<String, String>(), activatedActions);
+		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+				validActions, 0d, new DualHashBidiMap(), false),
+				activatedActions);
 		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");

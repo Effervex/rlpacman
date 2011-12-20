@@ -1,7 +1,12 @@
 package relationalFramework;
 
+import java.util.List;
+
+import org.apache.commons.collections.BidiMap;
+
 import relationalFramework.PolicyActions;
 import relationalFramework.StateSpec;
+import rrlFramework.RRLObservations;
 import jess.Rete;
 
 /**
@@ -41,13 +46,14 @@ public abstract class RelationalWrapper {
 	 * 
 	 * @param rete
 	 *            The rete object to assert/retract the facts.
+	 * @param goalArgs
+	 *            The goal arguments (if any).
 	 * @param args
 	 *            The args given to form a state.
-	 * @return The rete object with all non-background knowledge current
-	 *         observations asserted.
+	 * @return The goal replacement map.
 	 */
-	protected abstract Rete assertStateFacts(Rete rete, Object... args)
-			throws Exception;
+	protected abstract BidiMap assertStateFacts(Rete rete,
+			List<String> goalArgs, Object... args) throws Exception;
 
 	/**
 	 * Checks if the current state is the first state in the episode.
@@ -62,30 +68,48 @@ public abstract class RelationalWrapper {
 	 * Forms the relational observations using the args as the input for
 	 * relationalising.
 	 * 
+	 * @param goalArgs
+	 *            The goal arguments given for the episode.
 	 * @param args
 	 *            The necessary state information.
 	 * @return The Rete object of observations or null if the state is invalid.
 	 */
-	public final Rete formObservations(Object... args) {
+	public final RRLObservations formObservations(List<String> goalArgs,
+			Object... args) {
 		Rete rete = StateSpec.getInstance().getRete();
+		BidiMap goalReplacementMap = null;
 		try {
 			if (!reteDriven_ || firstState_)
 				rete.reset();
 
-			rete = assertStateFacts(rete, args);
+			goalReplacementMap = assertStateFacts(rete, goalArgs, args);
 			if (rete == null)
 				return null;
 			rete.run();
 
-			ObjectObservations.getInstance().validActions = StateSpec
-					.getInstance().generateValidActions(rete);
 			firstState_ = false;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		prevState_ = args;
-		return rete;
+
+		boolean isTerminal = isTerminal(args);
+		return new RRLObservations(rete, StateSpec.getInstance()
+				.generateValidActions(rete), calculateReward(isTerminal, args),
+				goalReplacementMap, isTerminal);
 	}
+
+	/**
+	 * Calculates the reward.
+	 * 
+	 * @param isTerminal
+	 *            If at the terminal state.
+	 * @param args
+	 *            Args required to calculate the reward.
+	 * @return The reward received at this given interval.
+	 */
+	protected abstract double calculateReward(boolean isTerminal,
+			Object... args);
 
 	/**
 	 * Grounds a collection of relational actions into a single low-level object
@@ -104,12 +128,12 @@ public abstract class RelationalWrapper {
 	 * 
 	 * @param args
 	 *            The state parameters.
-	 * @return 1 if terminal, 0 otherwise.
+	 * @return True if terminal, false otherwise.
 	 */
-	public int isTerminal(Object... args) {
+	protected boolean isTerminal(Object... args) {
 		if (StateSpec.getInstance().isGoal(StateSpec.getInstance().getRete()))
-			return 1;
-		return 0;
+			return true;
+		return false;
 	}
 
 	/**

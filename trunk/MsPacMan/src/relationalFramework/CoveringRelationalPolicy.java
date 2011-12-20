@@ -16,12 +16,10 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import cerrla.CrossEntropyRun;
 import cerrla.Module;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
@@ -44,6 +42,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	private Collection<RelationalRule> modularRules_;
 	/** The triggered rules in the policy */
 	private Set<RelationalRule> triggeredRules_;
+	/** The policy generator that created this policy. */
+	private PolicyGenerator policyGenerator_;
 
 	/**
 	 * A constructor for creating a new policy.
@@ -51,10 +51,11 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * @param policySize
 	 *            The maximum size of the policy.
 	 */
-	public CoveringRelationalPolicy() {
+	public CoveringRelationalPolicy(PolicyGenerator policyGenerator) {
 		super();
 		triggeredRules_ = new HashSet<RelationalRule>();
 		modularRules_ = new HashSet<RelationalRule>();
+		policyGenerator_ = policyGenerator;
 	}
 
 	/**
@@ -63,8 +64,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * @param policy
 	 *            The old policy.
 	 */
-	public CoveringRelationalPolicy(RelationalPolicy policy) {
-		this();
+	public CoveringRelationalPolicy(CoveringRelationalPolicy policy) {
+		this(policy.policyGenerator_);
 		policyRules_.addAll(policy.policyRules_);
 		policySize_ = policy.policySize_;
 	}
@@ -98,8 +99,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 *            The goal condition to load.
 	 */
 	private void insertModuleRules(GoalCondition gc) {
-		if (!CrossEntropyRun.getPolicyGenerator().getLocalGoal()
-				.equals(gc.toString())) {
+		if (!policyGenerator_.getLocalGoal().equals(gc.toString())) {
 			Module module = Module.loadModule(StateSpec.getInstance()
 					.getEnvironmentName(), gc.toString());
 			// If the module exists
@@ -113,8 +113,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 					gr.setModularParameters(parameters);
 					checkModular(gr);
 					// Get/create the corresponding rule in the generator
-					gr = CrossEntropyRun.getPolicyGenerator()
-							.getCreateCorrespondingRule(gr);
+					gr = policyGenerator_.getCreateCorrespondingRule(gr);
 					if (!policyRules_.contains(gr)) {
 						gr.setQueryParams(null);
 						modularRules_.add(gr);
@@ -212,8 +211,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			// First evaluate the RLGG rules (if any). If the actions there
 			// don't match up to the activated actions, covering will be
 			// required.
-			for (RelationalRule rlgg : CrossEntropyRun.getPolicyGenerator()
-					.getRLGGRules().values()) {
+			for (RelationalRule rlgg : policyGenerator_.getRLGGRules().values()) {
 				SortedSet<String[]> rlggActions = new TreeSet<String[]>(
 						ArgumentComparator.getInstance());
 				evaluateRule(
@@ -227,9 +225,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 
 			// Next trigger covering, storing the rules in the policy if
 			// required
-			List<RelationalRule> coveredRules = CrossEntropyRun
-					.getPolicyGenerator().triggerRLGGCovering(observations,
-							activatedActions);
+			List<RelationalRule> coveredRules = policyGenerator_
+					.triggerRLGGCovering(observations, activatedActions);
 			// If the policy is empty, store the rules in it.
 			if (activatedActions.isKeysEmpty() && coveredRules != null) {
 				Collections.shuffle(coveredRules, PolicyGenerator.random_);
@@ -278,8 +275,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			for (RelationalPredicate unseenPred : AgentObservations
 					.getInstance().getUnseenPredicates()) {
 				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
-				QueryResult results = state.runQueryStar(query,
-						new ValueVector());
+				QueryResult results = observations.getState().runQueryStar(
+						query, new ValueVector());
 				if (results.next()) {
 					// The unseen pred exists - trigger covering
 					triggerCovering = true;
@@ -292,8 +289,8 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 				MultiMap<String, String[]> emptyActions = MultiMap
 						.createSortedSetMultiMap(ArgumentComparator
 								.getInstance());
-				CrossEntropyRun.getPolicyGenerator().triggerRLGGCovering(
-						observations, emptyActions);
+				policyGenerator_
+						.triggerRLGGCovering(observations, emptyActions);
 				AgentObservations.getInstance().removeUnseenPredicates(
 						removables);
 			}
@@ -378,5 +375,9 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			first = false;
 		}
 		return buffer.toString();
+	}
+
+	public boolean shouldRestart() {
+		return policyGenerator_.shouldRestart();
 	}
 }

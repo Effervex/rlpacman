@@ -8,6 +8,8 @@ import java.io.FileWriter;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import rrlFramework.Config;
+
 /**
  * Reads a performance file in and notes down the performance array, the last
  * readable generator and the last generator.
@@ -48,7 +50,7 @@ public class PerformanceReader {
 		while (input != null) {
 			// Check for end of file
 			if ((input == null)
-					|| (input.equals(LearningController.END_PERFORMANCE)))
+					|| (input.equals(Config.END_PERFORMANCE)))
 				break;
 			// First read in the readableGenerator
 			readableGenerator_ = input;

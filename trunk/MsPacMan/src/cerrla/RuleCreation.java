@@ -21,6 +21,7 @@ import java.util.TreeSet;
 
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.RangeContext;
+import rrlFramework.RRLObservations;
 import util.MultiMap;
 
 import jess.Rete;
@@ -269,21 +270,20 @@ public class RuleCreation implements Serializable {
 	 * Covers a state using RLGG by creating a rule for every action type
 	 * present in the valid actions for the state.
 	 * 
-	 * @param state
-	 *            The state of the environment, containing the valid actions.
-	 * @param validActions
-	 *            The set of valid actions to choose from.
-	 * @param goalReplacements
-	 *            The goal replacements.
+	 * @param observations
+	 *            The observations for the state.
 	 * @param moduleGoal
 	 *            The modular goal (if any).
 	 * @return A list of guided rules, one for each action type.
 	 */
-	public List<RelationalRule> rlggState(Rete state,
-			MultiMap<String, String[]> validActions,
-			Map<String, String> goalReplacements, GoalCondition moduleGoal)
-			throws Exception {
+	public List<RelationalRule> rlggState(RRLObservations observations,
+			GoalCondition moduleGoal) throws Exception {
 		// The relevant facts which contain the key term
+		Rete state = observations.getState();
+		MultiMap<String, String[]> validActions = observations
+				.getValidActions();
+		@SuppressWarnings("unchecked")
+		Map<String, String> goalReplacements = observations.getGoalReplacements();
 		AgentObservations.getInstance().scanState(
 				StateSpec.extractFacts(state), goalReplacements);
 
