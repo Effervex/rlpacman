@@ -6,6 +6,8 @@ import jess.Rete;
 
 import org.apache.commons.collections.BidiMap;
 
+import cerrla.PolicyGenerator;
+
 import relationalFramework.PolicyActions;
 import relationalFramework.StateSpec;
 
@@ -48,9 +50,14 @@ public abstract class RRLEnvironment {
 
 			// Assert the state facts and goal replacements.
 			assertStateFacts(rete, goalArgs);
-			if (goalReplacementMap_ == null)
+			if (goalReplacementMap_ == null) {
 				goalReplacementMap_ = StateSpec.getInstance().assertGoalPred(
 						goalArgs, rete);
+
+				if (PolicyGenerator.debugMode_) {
+					System.out.println(goalReplacementMap_.inverseBidiMap());
+				}
+			}
 			if (rete == null)
 				return null;
 			rete.run();
@@ -72,7 +79,26 @@ public abstract class RRLEnvironment {
 	 *            The action to apply on the environment (if first state, action
 	 *            is null).
 	 */
-	protected abstract void applyActionToState(Object action);
+	private void applyActionToState(Object action) {
+		if (action == null) {
+			startState();
+		} else {
+			stepState(action);
+		}
+	}
+
+	/**
+	 * Starts the episode by initialising the environment state.
+	 */
+	protected abstract void startState();
+
+	/**
+	 * Moves the state forward by applying the action to the environment.
+	 * 
+	 * @param action
+	 *            The action to apply.
+	 */
+	protected abstract void stepState(Object action);
 
 	/**
 	 * Performs the actual asserting/retracting of facts based on the args

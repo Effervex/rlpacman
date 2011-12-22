@@ -19,61 +19,28 @@ import rrlFramework.RRLObservations;
  * @author Sam Sarjant
  */
 public class CERRLA implements RRLAgent {
-	/** The set of learned behaviours the agent is maintaining concurrently. */
-	private Map<String, LocalCrossEntropyDistribution> goalMappedGenerators_;
-
 	/** The current behaviour for the goal at hand. Convenience member. */
 	private LocalCrossEntropyDistribution currentCECortex_;
 
 	/** The current policy being tested. */
 	private RelationalPolicy currentPolicy_;
 
-	/** The number of episodes the policy has been involved in. */
-	private int policyEpisodes_;
-
 	/** The reward received this episode. */
 	private double episodeReward_;
+
+	/** The set of learned behaviours the agent is maintaining concurrently. */
+	private Map<String, LocalCrossEntropyDistribution> goalMappedGenerators_;
+
+	/** The number of episodes the policy has been involved in. */
+	private int policyEpisodes_;
 
 	/** The total reward received by this policy. */
 	private double totalPolicyReward_;
 
 	@Override
-	public void initialise(int run) {
-		goalMappedGenerators_ = new HashMap<String, LocalCrossEntropyDistribution>();
-		currentCECortex_ = new LocalCrossEntropyDistribution(Config
-				.getInstance().getGoal(), run);
-	}
-
-	@Override
-	public boolean isConverged() {
-		return currentCECortex_.isConverged();
-	}
-
-	@Override
 	public void cleanup() {
 		// Save the final output
 		currentCECortex_.finalWrite();
-	}
-
-	@Override
-	public RRLActions startEpisode(RRLObservations observations) {
-		episodeReward_ = 0;
-		if (currentPolicy_ == null) {
-			// Generate a new policy
-			currentPolicy_ = currentCECortex_.generatePolicy();
-			policyEpisodes_ = 0;
-			totalPolicyReward_ = 0;
-		}
-		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
-				StateSpec.getInstance().getNumReturnedActions()));
-	}
-
-	@Override
-	public RRLActions stepEpisode(RRLObservations observations) {
-		episodeReward_ += currentCECortex_.determineReward(observations
-				.getReward());
-		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
-				StateSpec.getInstance().getNumReturnedActions()));
 	}
 
 	@Override
@@ -103,6 +70,45 @@ public class CERRLA implements RRLAgent {
 	@Override
 	public void freeze(boolean b) {
 		currentCECortex_.freeze(b);
+	}
+
+	@Override
+	public void initialise(int run) {
+		goalMappedGenerators_ = new HashMap<String, LocalCrossEntropyDistribution>();
+		currentCECortex_ = new LocalCrossEntropyDistribution(Config
+				.getInstance().getGoal(), run);
+		currentPolicy_ = null;
+		policyEpisodes_ = 0;
+	}
+
+	@Override
+	public boolean isConverged() {
+		return currentCECortex_.isConverged();
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public RRLActions startEpisode(RRLObservations observations) {
+		episodeReward_ = 0;
+		if (currentPolicy_ == null) {
+			// Generate a new policy
+			currentPolicy_ = currentCECortex_.generatePolicy();
+			policyEpisodes_ = 0;
+			totalPolicyReward_ = 0;
+		}
+		
+		currentPolicy_.parameterArgs(observations.getGoalReplacements().inverseBidiMap());
+		
+		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
+				StateSpec.getInstance().getNumReturnedActions()));
+	}
+
+	@Override
+	public RRLActions stepEpisode(RRLObservations observations) {
+		episodeReward_ += currentCECortex_.determineReward(observations
+				.getReward());
+		return new RRLActions(currentPolicy_.evaluatePolicy(observations,
+				StateSpec.getInstance().getNumReturnedActions()));
 	}
 
 }

@@ -21,7 +21,14 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 import jess.JessException;
 import jess.Rete;
 
-public class RLMarioRelationalWrapper extends RelationalWrapper {
+/**
+ * A class to deal with the large amount of processing required to move Mario
+ * and assert the facts seen in the environment.
+ * 
+ * @author Sam Sarjant
+ * 
+ */
+public class RLMarioMovement {
 	public static final int CELL_SIZE = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
 	public static final float MAX_JUMP_DIST = 79;
 	public static final float MAX_JUMP_DIST_RUNNING = 130;
@@ -996,6 +1003,81 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 	}
 
 	/**
+	 * Asserts the Mario objects to the rete object.
+	 * 
+	 * @param rete
+	 *            The rete object to assert to.
+	 * @param environment
+	 *            The current Mario environment.
+	 * @throws Exception
+	 *             Should something go awry...
+	 */
+	public void assertStateFacts(Rete rete, MarioEnvironment environment)
+			throws Exception {
+		initialiseExtraEnvironmentObservations(environment);
+
+		// Player
+		rete.assertString("(mario player))");
+		// Mario state
+		switch (environment.getMarioMode()) {
+		case 2:
+			rete.assertString("(marioPower fire))");
+			break;
+		case 1:
+			rete.assertString("(marioPower large))");
+			break;
+		case 0:
+			rete.assertString("(marioPower small))");
+			break;
+		}
+
+		// Run through the level observations
+		byte[][] levelObs = environment.getLevelSceneObservationZ(1);
+		byte[][] enemyObs = environment.getEnemiesObservationZ(0);
+		float[] enemyPos = environment.getEnemiesFloatPos();
+
+		// Assert the level objects
+		for (byte y = 0; y < levelObs.length; y++) {
+			for (byte x = 0; x < levelObs[y].length; x++) {
+				// Level objects, like coins and solid objects
+				assertLevelObjects(rete, environment, levelObs, enemyObs, x, y);
+			}
+			if (PolicyGenerator.debugMode_)
+				System.out.println();
+		}
+
+		// Reassert static objects
+		if (isMarioInAir_)
+			for (String fact : staticObjectFacts_)
+				rete.assertString(fact);
+
+		// Assert the enemies
+		Collection<String> currentShells = new HashSet<String>();
+		for (int e = 0; e < enemyPos.length; e++) {
+			float enemyType = enemyPos[e++];
+			float x = enemyPos[e++];
+			float y = enemyPos[e];
+			// Check it's not stuck in geometry
+			if (!stuckInGeometry(x, y, levelObs, enemyType)) {
+				// Enemy objects, like fireFlower, mushroom, all enemies and
+				// projectiles
+				String isShell = assertEnemyObjects(rete, environment,
+						enemyType, x, y, levelObs);
+				if (isShell != null)
+					currentShells.add(isShell);
+			}
+		}
+		shellPositions_ = currentShells;
+
+		// Ever present goal
+		rete.assertString("(flag goal))");
+		rete.assertString("(distance goal " + marioCentreX_
+				* LevelScene.cellSize + ")");
+		rete.assertString("(canJumpOn goal)");
+		rete.assertString("(heightDiff goal 0)");
+	}
+
+	/**
 	 * Applies the action chosen by the agent to the environment - returning a
 	 * boolean array of keystroke actions to take.
 	 * 
@@ -1127,81 +1209,18 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 		return canJumpOnOver;
 	}
 
-	@Override
-	protected Rete assertStateFacts(Rete rete, Object... args) throws Exception {
-		MarioEnvironment environment = (MarioEnvironment) args[0];
-
-		initialiseExtraEnvironmentObservations(environment);
-
-		// Player
-		rete.assertString("(mario player))");
-		// Mario state
-		switch (environment.getMarioMode()) {
-		case 2:
-			rete.assertString("(marioPower fire))");
-			break;
-		case 1:
-			rete.assertString("(marioPower large))");
-			break;
-		case 0:
-			rete.assertString("(marioPower small))");
-			break;
-		}
-
-		// Run through the level observations
-		byte[][] levelObs = environment.getLevelSceneObservationZ(1);
-		byte[][] enemyObs = environment.getEnemiesObservationZ(0);
-		float[] enemyPos = environment.getEnemiesFloatPos();
-
-		// Assert the level objects
-		for (byte y = 0; y < levelObs.length; y++) {
-			for (byte x = 0; x < levelObs[y].length; x++) {
-				// Level objects, like coins and solid objects
-				assertLevelObjects(rete, environment, levelObs, enemyObs, x, y);
-			}
-			if (PolicyGenerator.debugMode_)
-				System.out.println();
-		}
-
-		// Reassert static objects
-		if (isMarioInAir_)
-			for (String fact : staticObjectFacts_)
-				rete.assertString(fact);
-
-		// Assert the enemies
-		Collection<String> currentShells = new HashSet<String>();
-		for (int e = 0; e < enemyPos.length; e++) {
-			float enemyType = enemyPos[e++];
-			float x = enemyPos[e++];
-			float y = enemyPos[e];
-			// Check it's not stuck in geometry
-			if (!stuckInGeometry(x, y, levelObs, enemyType)) {
-				// Enemy objects, like fireFlower, mushroom, all enemies and
-				// projectiles
-				String isShell = assertEnemyObjects(rete, environment,
-						enemyType, x, y, levelObs);
-				if (isShell != null)
-					currentShells.add(isShell);
-			}
-		}
-		shellPositions_ = currentShells;
-
-		// Ever present goal
-		rete.assertString("(flag goal))");
-		rete.assertString("(distance goal " + marioCentreX_
-				* LevelScene.cellSize + ")");
-		rete.assertString("(canJumpOn goal)");
-		rete.assertString("(heightDiff goal 0)");
-
-		StateSpec.getInstance().assertGoalPred(new ArrayList<String>(), rete);
-
-		// Send the state of the system
-		return rete;
-	}
-
-	@Override
-	public Object groundActions(PolicyActions actions, Object... args) {
-		MarioEnvironment environment = (MarioEnvironment) args[0];
+	/**
+	 * Grounds the relational actions given by an RRL Mario policy into a
+	 * boolean array of keys pressed.
+	 * 
+	 * @param actions
+	 *            The actions
+	 * @param environment
+	 *            The current mario environment state.
+	 * @return A boolean array of keys to press to achieve the action.
+	 */
+	public boolean[] groundActions(PolicyActions actions,
+			MarioEnvironment environment) {
 		byte[][] basicLevelObservation = environment
 				.getLevelSceneObservationZ(2);
 		float[] marioFloatPos = environment.getMarioFloatPos();
@@ -1289,10 +1308,5 @@ public class RLMarioRelationalWrapper extends RelationalWrapper {
 			return 2;
 		}
 		return 0;
-	}
-
-	@Override
-	protected boolean isReteDriven() {
-		return false;
 	}
 }

@@ -1,77 +1,61 @@
 package jCloisterZone;
 
-import relationalFramework.ObjectObservations;
-import relationalFramework.PolicyActions;
-import relationalFramework.RelationalWrapper;
+import java.util.List;
 
-import org.rlcommunity.rlglue.codec.EnvironmentInterface;
-import org.rlcommunity.rlglue.codec.types.Action;
-import org.rlcommunity.rlglue.codec.types.Observation;
-import org.rlcommunity.rlglue.codec.types.Reward_observation_terminal;
+import jess.Rete;
+import relationalFramework.PolicyActions;
+import rrlFramework.RRLEnvironment;
 
 import com.jcloisterzone.game.Game;
 
-public class CarcassonneEnvironment implements EnvironmentInterface {
+public class CarcassonneEnvironment extends RRLEnvironment {
 	private Game environment_;
 	private boolean guiMode_ = false;
-	private RelationalWrapper wrapper_;
-
+	
 	@Override
-	public void env_cleanup() {
-		environment_ = null;
+	protected void assertStateFacts(Rete rete, List<String> goalArgs)
+			throws Exception {
+		// TODO Auto-generated method stub
+		
 	}
-
 	@Override
-	public String env_init() {
-		wrapper_ = new CarcassonneRelationalWrapper();
-
+	protected double calculateReward(boolean isTerminal) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	@Override
+	protected List<String> getGoalArgs() {
+		// TODO Auto-generated method stub
 		return null;
 	}
-
 	@Override
-	public String env_message(String arg0) {
-		if (arg0.equals("-e")) {
-			// Run the program in experiment mode (No GUI).
-			guiMode_ = true;
-		} else {
-			try {
-				int numPlayers = Integer.parseInt(arg0);
-				// TODO Set the players.
-				// TODO If using multiple policies, may need to redesign RLGlue
-				// structure
-
-			} catch (Exception e) {
-			}
-		}
+	protected Object groundActions(PolicyActions actions) {
+		// TODO Auto-generated method stub
 		return null;
 	}
-
 	@Override
-	public Observation env_start() {
-		resetEnvironment();
-
-		environment_.start();
-
-		ObjectObservations.getInstance().predicateKB = wrapper_
-				.formObservations(environment_);
-		return new Observation();
+	protected boolean isReteDriven() {
+		// TODO Auto-generated method stub
+		return false;
 	}
-
 	@Override
-	public Reward_observation_terminal env_step(Action arg0) {
-		// Applying the action (up down left right or nothing)
-		PolicyActions actions = (PolicyActions) ObjectObservations
-				.getInstance().objectArray[0];
-
-		Reward_observation_terminal rot = new Reward_observation_terminal(0,
-				new Observation(), 0);
-		return rot;
+	public void cleanup() {
+		// TODO Auto-generated method stub
+		
 	}
-
-	/**
-	 * Resets the environment back to normal.
-	 */
-	public void resetEnvironment() {
-		// TODO Reset (start new game)
+	@Override
+	public void initialise(int runIndex, String[] extraArg) {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	protected void startState() {
+		// TODO Auto-generated method stub
+		
+	}
+	@Override
+	protected void stepState(Object action) {
+		// TODO Auto-generated method stub
+		
 	}
 }

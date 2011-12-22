@@ -35,6 +35,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private boolean oldAOSettled_;
 	/** If this generator is currently frozen (not learning). */
 	private boolean frozen_;
+	/** The current testing episode. */
+	private int testEpisode_;
 
 	/**
 	 * Initialise new learned behaviour with the given goal.
@@ -155,6 +157,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		RelationalPolicy policy = policyGenerator_.generatePolicy(false);
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
 			System.out.println(policy);
+			System.out.println();
 		}
 
 		return policy;
@@ -225,20 +228,32 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 
 
-		// Note performance values
+		// Output system output
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			System.out.println();
 			System.out.println(currentEpisode_ + ": " + value);
+
+			// Estimate experiment convergence
+			double convergence = policyGenerator_.getConvergenceValue();
+			if (frozen_) {
+				testEpisode_++;
+				convergence = testEpisode_
+						/ ProgramArgument.TEST_ITERATIONS.doubleValue();
+			}
+			int numSlots = policyGenerator_.size();
+			String moduleGoal = (policyGenerator_.isModuleGenerator()) ? policyGenerator_
+					.getLocalGoal() : null;
+			performance_.estimateETA(convergence, numElites_, elites_,
+					numSlots, moduleGoal);
 		}
+
+		// Note performance values
 		performance_.noteSampleReward(value, currentEpisode_);
 
-		// Estimate experiment convergence
-		double convergence = policyGenerator_.getConvergenceValue();
-		int numSlots = policyGenerator_.size();
-		String moduleGoal = (policyGenerator_.isModuleGenerator()) ? policyGenerator_
-				.getLocalGoal() : null;
-		performance_.estimateETA(convergence, numElites_, elites_, numSlots,
-				moduleGoal);
+		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+			// New lines.
+			System.out.println();
+			System.out.println();
+		}
 
 
 
@@ -274,9 +289,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		frozen_ = b;
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
+		testEpisode_ = 0;
 	}
 
 	public String getGoalCondition() {
 		return goalCondition_;
+	}
+
+	public int getCurrentEpisode() {
+		return currentEpisode_;
 	}
 }

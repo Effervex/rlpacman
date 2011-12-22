@@ -1,6 +1,5 @@
 package cerrla;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.GoalCondition;
 import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPolicy;
@@ -60,6 +59,12 @@ public final class PolicyGenerator implements Serializable {
 
 	private static final long serialVersionUID = 3157117448981353095L;
 
+	/**
+	 * The multiplier to test 95% of the rules at least once in the largest
+	 * slot.
+	 */
+	public static final double CONFIDENCE_INTERVAL = 6.0;
+
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
 
@@ -74,12 +79,6 @@ public final class PolicyGenerator implements Serializable {
 
 	/** The name of a module-saved policy generator serialised file. */
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
-
-	/**
-	 * The multiplier to test 95% of the rules at least once in the largest
-	 * slot.
-	 */
-	public static final double CONFIDENCE_INTERVAL = 3.0;
 
 	/** Policies awaiting testing. */
 	private Stack<CoveringRelationalPolicy> awaitingTest_;
@@ -122,6 +121,9 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private SortedMap<Double, RelationalRule> mutationTree_;
 
+	/** The learning distribution this is contained by. */
+	private LocalCrossEntropyDistribution parentLearner_;
+
 	/** Total policies evaluated. */
 	private int policiesEvaluated_;
 
@@ -140,8 +142,20 @@ public final class PolicyGenerator implements Serializable {
 	/** The rule creation object. */
 	protected RuleCreation ruleCreation_;
 
-	/** The learning distribution this is contained by. */
-	private LocalCrossEntropyDistribution parentLearner_;
+	/**
+	 * Initialises the instance as a new policy generator.
+	 * 
+	 * @return The new PolicyGenerator.
+	 */
+	public PolicyGenerator(int randSeed,
+			LocalCrossEntropyDistribution parentLearner) {
+		this(parentLearner);
+		random_ = new Random(randSeed);
+		localGoal_ = StateSpec.getInstance().getGoalName();
+		moduleGenerator_ = false;
+
+		loadAgentData();
+	}
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -156,21 +170,6 @@ public final class PolicyGenerator implements Serializable {
 		parentLearner_ = parentLearner;
 
 		resetGenerator();
-	}
-
-	/**
-	 * Initialises the instance as a new policy generator.
-	 * 
-	 * @return The new PolicyGenerator.
-	 */
-	public PolicyGenerator(int randSeed,
-			LocalCrossEntropyDistribution parentLearner) {
-		this(parentLearner);
-		random_ = new Random(randSeed);
-		localGoal_ = StateSpec.getInstance().getGoalName();
-		moduleGenerator_ = false;
-
-		loadAgentData();
 	}
 
 	/**
@@ -439,7 +438,7 @@ public final class PolicyGenerator implements Serializable {
 				}
 			}
 			baseRule.setChildren(mutants);
-			noteMutationTree(baseRule, 0);
+			noteMutationTree(baseRule, parentLearner_.getCurrentEpisode());
 
 			if (debugMode_ && needToPause) {
 				try {
@@ -792,8 +791,7 @@ public final class PolicyGenerator implements Serializable {
 		if (!frozen_ && !awaitingTest_.isEmpty())
 			return awaitingTest_.pop();
 
-		RelationalPolicy policy = (frozen_) ? new BasicRelationalPolicy()
-				: new CoveringRelationalPolicy(this);
+		RelationalPolicy policy = new CoveringRelationalPolicy(this);
 
 		SortedMap<Double, RelationalRule> policyOrdering = new TreeMap<Double, RelationalRule>();
 
@@ -918,6 +916,15 @@ public final class PolicyGenerator implements Serializable {
 		return rlggRules_;
 	}
 
+	/**
+	 * If the distribution has been updated at all.
+	 * 
+	 * @return True if the distribution has updated (isn't uniform anymore).
+	 */
+	public boolean hasUpdated() {
+		return convergedValue_ != NO_UPDATES_CONVERGENCE;
+	}
+
 	public void incrementPoliciesEvaluated() {
 		policiesEvaluated_++;
 	}
@@ -1003,7 +1010,8 @@ public final class PolicyGenerator implements Serializable {
 					RelationalRule bestRule = ruleGenerator.getBestElement();
 					// If the best rule isn't the seed, create a new slot
 					if (!bestRule.equals(slot.getSeedRule())) {
-						Slot newSlot = new Slot(bestRule, false, newSlotLevel, this);
+						Slot newSlot = new Slot(bestRule, false, newSlotLevel,
+								this);
 						if (slotGenerator_.contains(newSlot)) {
 							// If the slot already exists, update the level if
 							// lower
@@ -1208,25 +1216,6 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Saves the policy generator in a serializable format.
-	 * 
-	 * @param serFile
-	 *            The file to serialize to.
-	 */
-	public void serialisePolicyGenerator(File serFile) throws Exception {
-		if (moduleGenerator_ && Module.saveAtEnd_)
-			return;
-
-		FileOutputStream fos = new FileOutputStream(serFile);
-		ObjectOutputStream oos = new ObjectOutputStream(fos);
-
-		Module.saveGenerator(this);
-
-		oos.writeObject(this);
-		oos.close();
-	}
-
-	/**
 	 * Seed rules from a file as new slots.
 	 * 
 	 * @param ruleFile
@@ -1253,6 +1242,25 @@ public final class PolicyGenerator implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * Saves the policy generator in a serializable format.
+	 * 
+	 * @param serFile
+	 *            The file to serialize to.
+	 */
+	public void serialisePolicyGenerator(File serFile) throws Exception {
+		if (moduleGenerator_ && Module.saveAtEnd_)
+			return;
+
+		FileOutputStream fos = new FileOutputStream(serFile);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+
+		Module.saveGenerator(this);
+
+		oos.writeObject(this);
+		oos.close();
 	}
 
 	public void setPoliciesEvaluated(int pe) {
@@ -1508,14 +1516,5 @@ public final class PolicyGenerator implements Serializable {
 		PolicyGenerator loaded = modPG;
 		StateSpec.reinitInstance();
 		return loaded;
-	}
-
-	/**
-	 * If the distribution has been updated at all.
-	 * 
-	 * @return True if the distribution has updated (isn't uniform anymore).
-	 */
-	public boolean hasUpdated() {
-		return convergedValue_ != NO_UPDATES_CONVERGENCE;
 	}
 }

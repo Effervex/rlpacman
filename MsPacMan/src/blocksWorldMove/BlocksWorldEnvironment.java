@@ -18,8 +18,6 @@ import java.util.Random;
 
 import jess.Rete;
 
-import blocksWorld.BlocksState;
-
 import cerrla.PolicyGenerator;
 
 /**
@@ -84,107 +82,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
 	}
 
-	// // @Override
-	// public String env_message(String arg0) {
-	// if (arg0.equals("maxSteps")) {
-	// maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
-	// return (maxSteps_ + 1) + "";
-	// }
-	// if ((arg0.startsWith("goal"))) {
-	// StateSpec.reinitInstance(arg0.substring(5));
-	// } else if (arg0.startsWith("nonDet")) {
-	// actionSuccess_ = Double.parseDouble(arg0.substring(6));
-	// } else if (arg0.equals("-e"))
-	// viewingMode_ = true;
-	// else {
-	// try {
-	// numBlocks_ = Integer.parseInt(arg0);
-	// optimalMap_ = new HashMap<BlocksState, Integer>();
-	// return null;
-	// } catch (Exception e) {
-	//
-	// }
-	// }
-	// return null;
-	// }
-	//
-	// /**
-	// * Forms the observation for the first step of the experiment.
-	// *
-	// * @return The (useless) observation. The real return is the singleton
-	// * ObjectObservation.
-	// */
-	// private Observation formObs_Start() {
-	// Observation obs = new Observation();
-	// obs.charArray = ObjectObservations.OBSERVATION_ID.toCharArray();
-	// wrapper_.newEpisode();
-	// ObjectObservations.getInstance().predicateKB = wrapper_
-	// .formObservations(state_, goalArgs_);
-	// ObjectObservations.getInstance().earlyExit = false;
-	// return obs;
-	// }
-	//
-	// @Override
-	// public RRLObservations step(RRLActions actions) {
-	// // Check for an early exit
-	// if (actions.isEarlyExit())
-	// return new Reward_observation_terminal(0, obs, true);
-	//
-	// // Action can fail
-	// BlocksState newState = state_;
-	// boolean actionFailed = false;
-	// RelationalPredicate action = null;
-	// if (PolicyGenerator.random_.nextDouble() < actionSuccess_) {
-	// Object result = wrapper_
-	// .groundActions(actions.getActions(), state_);
-	// if (result instanceof Pair) {
-	// action = (RelationalPredicate) ((Pair<BlocksState, RelationalPredicate>)
-	// result).objB_;
-	// newState = ((Pair<BlocksState, RelationalPredicate>) result).objA_;
-	// } else
-	// newState = (BlocksState) result;
-	// } else
-	// actionFailed = true;
-	//
-	// if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
-	// if (action != null)
-	// System.out.println("\t" + action + " ->\n" + newState);
-	// else
-	// System.out.println("\t\t\tNo action chosen.");
-	// }
-	//
-	// // If our new state is different, update observations
-	// if (!state_.equals(newState)) {
-	// state_ = newState;
-	// ObjectObservations.getInstance().predicateKB = wrapper_
-	// .formObservations(state_, goalArgs_);
-	// } else if (!actionFailed) {
-	// // If the agent caused the state to remain the same, exit the
-	// // episode with max negative reward.
-	// return new Reward_observation_terminal(MINIMAL_REWARD,
-	// new Observation(), true);
-	// }
-	//
-	// steps_++;
-	//
-	// double reward = 0;
-	// int isGoal = wrapper_.isTerminal();
-	// if (isGoal == 1 || steps_ == maxSteps_) {
-	// if (optimalSteps_ >= maxSteps_)
-	// reward = 0;
-	// else
-	// reward = MINIMAL_REWARD * (steps_ - optimalSteps_)
-	// / (maxSteps_ - optimalSteps_);
-	// if (reward > 0)
-	// reward = 0;
-	// }
-	// // reward = -1;
-	// Reward_observation_terminal rot = new Reward_observation_terminal(
-	// reward, obs, isGoal);
-	//
-	// return rot;
-	// }
-
 	/**
 	 * Initialises the blocks world to a random, non-goal state.
 	 * 
@@ -192,9 +89,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	 *            The number of blocks in the world.
 	 * @param goalName
 	 *            The goal name.
-	 * @return The newly initialised blocks world state.
 	 */
-	protected void initialiseWorld(int numBlocks) {
+	protected void initialiseBlocksState(int numBlocks) {
 		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
@@ -241,7 +137,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				if (block != 0)
 					unclears.add(block);
 			if (unclears.isEmpty()) {
-				initialiseWorld(numBlocks);
+				initialiseBlocksState(numBlocks);
 				return;
 			}
 
@@ -308,56 +204,56 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		return steps_;
 	}
 
+	@Override
+	protected void startState() {
+		if (!optimal_) {
+			// If action is null, thn this is the first episode.
+			initialiseBlocksState(numBlocks_);
+			optimalSteps_ = optimalSteps();
+			if (PolicyGenerator.debugMode_ || viewingMode_) {
+				System.out.println("\tAgent:\n" + state_);
+			}
+			steps_ = 0;
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
-	protected void applyActionToState(Object action) {
-		if (action == null) {
-			if (!optimal_) {
-				// If action is null, thn this is the first episode.
-				initialiseWorld(numBlocks_);
-				optimalSteps_ = optimalSteps();
-				if (PolicyGenerator.debugMode_ || viewingMode_) {
-					System.out.println("\tAgent:\n" + state_);
-				}
-				steps_ = 0;
-			}
-		} else {
-
-			// We have an action, apply it
-			BlocksState newState = state_;
-			boolean actionFailed = false;
-			RelationalPredicate actionFact = null;
-			if (PolicyGenerator.random_.nextDouble() < actionSuccess_) {
-				if (action instanceof Pair) {
-					actionFact = ((Pair<BlocksState, RelationalPredicate>) action).objB_;
-					newState = ((Pair<BlocksState, RelationalPredicate>) action).objA_;
-				} else
-					newState = (BlocksState) action;
+	protected void stepState(Object action) {
+		// We have an action, apply it
+		BlocksState newState = state_;
+		boolean actionFailed = false;
+		RelationalPredicate actionFact = null;
+		if (PolicyGenerator.random_.nextDouble() < actionSuccess_) {
+			if (action instanceof Pair) {
+				actionFact = ((Pair<BlocksState, RelationalPredicate>) action).objB_;
+				newState = ((Pair<BlocksState, RelationalPredicate>) action).objA_;
 			} else
-				actionFailed = true;
+				newState = (BlocksState) action;
+		} else
+			actionFailed = true;
 
 
-			// Notify the user what the action is if outputting.
-			if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
-				if (actionFact != null)
-					System.out.println("\t" + actionFact + " ->\n" + newState);
-				else
-					System.out.println("\t\t\tNo action chosen.");
-			}
-
-
-			// If our new state is different, update observations
-			if (!state_.equals(newState)) {
-				state_ = newState;
-			} else if (!actionFailed) {
-				// If the agent caused the state to remain the same, exit the
-				// episode with max negative reward.
-				steps_ = maxSteps_;
-				return;
-			}
-
-			steps_++;
+		// Notify the user what the action is if outputting.
+		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
+			if (actionFact != null)
+				System.out.println("\t" + actionFact + " ->\n" + newState);
+			else
+				System.out.println("\t\t\tNo action chosen.");
 		}
+
+
+		// If our new state is different, update observations
+		if (!state_.equals(newState)) {
+			state_ = newState;
+		} else if (!actionFailed) {
+			// If the agent caused the state to remain the same, exit the
+			// episode with max negative reward.
+			steps_ = maxSteps_;
+			return;
+		}
+
+		steps_++;
 	}
 
 	@Override
