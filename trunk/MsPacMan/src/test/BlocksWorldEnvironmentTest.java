@@ -6,7 +6,7 @@ import java.util.*;
 
 import org.junit.*;
 
-import blocksWorld.BlocksState;
+import blocksWorldMove.BlocksState;
 
 public class BlocksWorldEnvironmentTest {
 

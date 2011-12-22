@@ -68,7 +68,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bckKnow = super.initialiseBackgroundKnowledge();
 		bckKnow.put("bindRule", new BackgroundKnowledge(
-				"(bound ?X ?Y) (bound ?Y ?Z)) => (assert (bound ?X ?Z))",
+				"(bound ?X ?Y) (bound ?Y ?Z) => (assert (bound ?X ?Z))",
 				true));
 		
 		return bckKnow;

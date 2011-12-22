@@ -1,4 +1,4 @@
-package blocksWorld;
+package blocksWorldMove;
 
 import java.awt.Point;
 import java.util.Arrays;

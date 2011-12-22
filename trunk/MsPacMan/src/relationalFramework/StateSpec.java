@@ -511,6 +511,9 @@ public abstract class StateSpec {
 	 */
 	public BidiMap assertGoalPred(List<String> goalArgs, Rete state)
 			throws Exception {
+		if (goalArgs == null)
+			return new DualHashBidiMap();
+
 		StringBuffer goalString = new StringBuffer();
 		for (String arg : goalArgs)
 			goalString.append(" " + arg);

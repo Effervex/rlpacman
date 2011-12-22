@@ -124,7 +124,7 @@ public class PacManStateSpec extends StateSpec {
 		if (envParameter_ != null && envParameter_.equals("noDots")) {
 			// Good policy for no dots play
 			rules
-					.add("(distanceGhost ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
+					.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
 							+ "(not (edible ?Ghost)) (ghost ?Ghost) "
 							+ "=> (moveFrom ?Ghost ?Dist0)");
 			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
@@ -150,7 +150,7 @@ public class PacManStateSpec extends StateSpec {
 					+ "(ghost ?Ghost) => (moveFrom ?Ghost ?Dist0)");
 			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
 					+ "(fruit ?Fruit) => (moveTo ?Fruit ?Dist0)");
-			rules.add("(distanceDot ?Player ?Dot ?Dist0) "
+			rules.add("(distance ?Dot ?Dist0) "
 					+ "(dot ?Dot) => (moveTo ?Dot ?Dist0)");
 		} else {
 			// Good policy for regular play
@@ -219,7 +219,7 @@ public class PacManStateSpec extends StateSpec {
 		structure[0] = "ghost";
 		predicates.add(new RelationalPredicate("blinking", structure));
 
-		// Distance Metrics
+		// Distance Metric
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Double.toString();

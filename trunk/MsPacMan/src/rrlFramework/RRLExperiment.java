@@ -51,127 +51,64 @@ public class RRLExperiment {
 	}
 
 	/**
-	 * Initialise the agent to be used in this experiment.
+	 * Checks the files for pre-existing versions so runs do not have to be
+	 * re-run.
 	 * 
-	 * @return The environment to be used in this experiment.
+	 * @return The run number that the files stopped at and the point at which
+	 *         the experiment stopped.
 	 */
-	protected RRLAgent setAgent() {
-		return new CERRLA();
-	}
-
-	/**
-	 * Perform one run, recording statistics as it goes.
-	 * 
-	 * @param finiteEpisodes
-	 */
-	public void run(int runIndex, int finiteEpisodes) {
-		// Initialise the agent and environment
-		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
-				Config.getInstance().getGoal());
-		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
-
-		agent_.initialise(runIndex);
-		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
-
-		// Continue to run episodes until either the agent states it is
-		// converged, or a finite pre-specified number of episodes have passed.
-		if (finiteEpisodes == -1)
-			finiteEpisodes = Integer.MAX_VALUE;
-		int episodeCount = 0;
-		while (!agent_.isConverged() && episodeCount < finiteEpisodes) {
-			episode();
-
-			episodeCount++;
+	private int[] checkFiles(int startPoint) {
+		// Check the performance files
+		int[] result = new int[2];
+		// Find the last file created
+		int run = startPoint;
+		result[0] = run;
+		File lastPerf = null;
+		File tempPerf = new File(Config.TEMP_FOLDER + "/"
+				+ Config.getInstance().getPerformanceFile().getName() + run);
+		while (tempPerf.exists()) {
+			run++;
+			lastPerf = tempPerf;
+			tempPerf = new File(Config.TEMP_FOLDER + "/"
+					+ Config.getInstance().getPerformanceFile().getName() + run);
 		}
 
+		// If there aren't any performance files, return 0,0
+		if (lastPerf == null)
+			return result;
 
+		// Otherwise, scan the last file for how far in it got through
+		try {
+			FileReader reader = new FileReader(lastPerf);
+			BufferedReader br = new BufferedReader(reader);
+			int iteration = -1;
+			String input = null;
+			// Read lines until end performance marker, or null lines.
+			while ((input = br.readLine()) != null) {
+				if (input.equals(Config.END_PERFORMANCE)) {
+					result[0] = run;
+					result[1] = -1;
+					return result;
+				}
 
-		// Test the learned behaviour
-		System.out.println();
-		if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-			System.out.println("Beginning testing for episode " + episodeCount
-					+ ".");
-		else
-			System.out.println("Beginning ensemble testing for episode "
-					+ episodeCount + ".");
-		System.out.println();
-		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-			System.out.println("Testing...");
-
-		agent_.freeze(true);
-		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue(); i++) {
-			episode();
-		}
-
-		agent_.cleanup();
-		environment_.cleanup();
-	}
-
-	/**
-	 * Run a single episode in the given environment.
-	 */
-	protected void episode() {
-		// Form the initial observations and feed them to the agent.
-		// Ensure that the goal isn't met immediately
-		RRLObservations observations = environment_.startEpisode();
-		while (observations.isTerminal())
-			observations = environment_.startEpisode();
-		RRLActions actions = agent_.startEpisode(observations);
-
-		// Continue through the episode until it's over, or the agent calls it
-		// over.
-		while (true) {
-			// Compile observations
-			observations = environment_.step(actions.getActions());
-			if (observations.isTerminal())
-				break;
-
-			// Determine actions
-			actions = agent_.stepEpisode(observations);
-			if (actions.isEarlyExit())
-				break;
-		}
-
-		agent_.endEpisode(observations);
-	}
-
-	/**
-	 * Run multiple runs, each with an optional finite number of episodes.
-	 * 
-	 * @param numRuns
-	 *            The number of runs to run.
-	 * @param finiteEpisodes
-	 *            A finite number of episodes for each run to go through (or -1
-	 *            if infinite).
-	 */
-	public void runExperiment() {
-		long experimentStart = System.currentTimeMillis();
-
-		// Determine the initial run (as previous runs may have already been
-		// done in a previous experiment)
-		int[] startPoint = checkFiles(Config.getInstance()
-				.getRepetitionsStart());
-		int run = startPoint[0];
-
-		// Load existing runs and start from there.
-		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
-			run(i, Config.getInstance().getMaxEpisodes());
-		}
-
-		// Compile the files
-		if (Config.getInstance().getRepetitionsStart() == 0
-				&& !ProgramArgument.TESTING.booleanValue()) {
-			try {
-				combineTempFiles(Config.getInstance().getPerformanceFile(),
-						Config.getInstance().getRepetitionsEnd(),
-						experimentStart);
-			} catch (Exception e) {
-				e.printStackTrace();
+				// If the value is a number, increment iteration
+				try {
+					String[] split = input.split("\t");
+					if (split.length == 2) {
+						Integer.parseInt(split[0]);
+						Double.parseDouble(split[1]);
+						iteration++;
+					}
+				} catch (Exception e) {
+				}
 			}
-		}
 
-		System.out.println("Total learning time: "
-				+ toTimeFormat(System.currentTimeMillis() - experimentStart));
+			result[0] = run - 1;
+			result[1] = iteration;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return result;
 	}
 
 	/**
@@ -329,64 +266,140 @@ public class RRLExperiment {
 	}
 
 	/**
-	 * Checks the files for pre-existing versions so runs do not have to be
-	 * re-run.
-	 * 
-	 * @return The run number that the files stopped at and the point at which
-	 *         the experiment stopped.
+	 * Run a single episode in the given environment.
 	 */
-	private int[] checkFiles(int startPoint) {
-		// Check the performance files
-		int[] result = new int[2];
-		// Find the last file created
-		int run = startPoint;
-		result[0] = run;
-		File lastPerf = null;
-		File tempPerf = new File(Config.TEMP_FOLDER + "/"
-				+ Config.getInstance().getPerformanceFile().getName() + run);
-		while (tempPerf.exists()) {
-			run++;
-			lastPerf = tempPerf;
-			tempPerf = new File(Config.TEMP_FOLDER + "/"
-					+ Config.getInstance().getPerformanceFile().getName() + run);
+	protected void episode() {
+		// Form the initial observations and feed them to the agent.
+		// Ensure that the goal isn't met immediately
+		RRLObservations observations = environment_.startEpisode();
+		while (observations.isTerminal())
+			observations = environment_.startEpisode();
+		RRLActions actions = agent_.startEpisode(observations);
+
+		// Continue through the episode until it's over, or the agent calls it
+		// over.
+		while (true) {
+			// Compile observations
+			observations = environment_.step(actions.getActions());
+			if (observations.isTerminal())
+				break;
+
+			// Determine actions
+			actions = agent_.stepEpisode(observations);
+			if (actions.isEarlyExit())
+				break;
 		}
 
-		// If there aren't any performance files, return 0,0
-		if (lastPerf == null)
-			return result;
+		agent_.endEpisode(observations);
+	}
 
-		// Otherwise, scan the last file for how far in it got through
-		try {
-			FileReader reader = new FileReader(lastPerf);
-			BufferedReader br = new BufferedReader(reader);
-			int iteration = -1;
-			String input = null;
-			// Read lines until end performance marker, or null lines.
-			while ((input = br.readLine()) != null) {
-				if (input.equals(Config.END_PERFORMANCE)) {
-					result[0] = run;
-					result[1] = -1;
-					return result;
-				}
+	/**
+	 * Initialise the agent to be used in this experiment.
+	 * 
+	 * @return The environment to be used in this experiment.
+	 */
+	protected RRLAgent setAgent() {
+		return new CERRLA();
+	}
 
-				// If the value is a number, increment iteration
-				try {
-					String[] split = input.split("\t");
-					if (split.length == 2) {
-						Integer.parseInt(split[0]);
-						Double.parseDouble(split[1]);
-						iteration++;
-					}
-				} catch (Exception e) {
-				}
+	/**
+	 * Perform one run, recording statistics as it goes.
+	 * 
+	 * @param finiteEpisodes
+	 */
+	public void run(int runIndex, int finiteEpisodes) {
+		// Initialise the agent and environment
+		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
+				Config.getInstance().getGoal());
+		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
+
+		agent_.initialise(runIndex);
+		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
+
+		// Continue to run episodes until either the agent states it is
+		// converged, or a finite pre-specified number of episodes have passed.
+		if (finiteEpisodes == -1)
+			finiteEpisodes = Integer.MAX_VALUE;
+		int episodeCount = 0;
+		while (!agent_.isConverged() && episodeCount < finiteEpisodes) {
+			episode();
+
+			episodeCount++;
+		}
+
+
+
+		// Test the learned behaviour
+		System.out.println();
+		if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+			System.out.println("Beginning testing for episode " + episodeCount
+					+ ".");
+		else
+			System.out.println("Beginning ensemble testing for episode "
+					+ episodeCount + ".");
+		System.out.println();
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+			System.out.println("Testing...");
+
+		agent_.freeze(true);
+		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue()
+				* ProgramArgument.POLICY_REPEATS.intValue(); i++) {
+			episode();
+		}
+		agent_.freeze(false);
+
+		agent_.cleanup();
+		environment_.cleanup();
+	}
+
+	/**
+	 * Run multiple runs, each with an optional finite number of episodes.
+	 * 
+	 * @param numRuns
+	 *            The number of runs to run.
+	 * @param finiteEpisodes
+	 *            A finite number of episodes for each run to go through (or -1
+	 *            if infinite).
+	 */
+	public void runExperiment() {
+		long experimentStart = System.currentTimeMillis();
+
+		// Determine the initial run (as previous runs may have already been
+		// done in a previous experiment)
+		int[] startPoint = checkFiles(Config.getInstance()
+				.getRepetitionsStart());
+		int run = startPoint[0];
+
+		// Load existing runs and start from there.
+		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
+			run(i, Config.getInstance().getMaxEpisodes());
+		}
+
+		// Compile the files
+		if (Config.getInstance().getRepetitionsStart() == 0
+				&& !ProgramArgument.TESTING.booleanValue()) {
+			try {
+				combineTempFiles(Config.getInstance().getPerformanceFile(),
+						Config.getInstance().getRepetitionsEnd(),
+						experimentStart);
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-
-			result[0] = run - 1;
-			result[1] = iteration;
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
-		return result;
+
+		System.out.println("Total learning time: "
+				+ toTimeFormat(System.currentTimeMillis() - experimentStart));
+	}
+
+	/**
+	 * The main method to get the experiment running.
+	 * 
+	 * @param args
+	 *            The config filename defining environment + any other args.
+	 */
+	public static void main(String[] args) {
+		RRLExperiment experiment = new RRLExperiment(args);
+		experiment.runExperiment();
 	}
 
 	/**
@@ -400,16 +413,5 @@ public class RRLExperiment {
 		String timeString = time / (1000 * 60 * 60) + ":"
 				+ (time / (1000 * 60)) % 60 + ":" + (time / 1000) % 60;
 		return timeString;
-	}
-
-	/**
-	 * The main method to get the experiment running.
-	 * 
-	 * @param args
-	 *            The config filename defining environment + any other args.
-	 */
-	public static void main(String[] args) {
-		RRLExperiment experiment = new RRLExperiment(args);
-		experiment.runExperiment();
 	}
 }

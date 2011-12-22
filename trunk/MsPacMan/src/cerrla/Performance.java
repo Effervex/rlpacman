@@ -110,6 +110,18 @@ public class Performance implements Serializable {
 			convergedCount_ = -1;
 		}
 		convergedCount_++;
+
+		// Output current means
+		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue() && !frozen_) {
+			DecimalFormat formatter = new DecimalFormat("#0.00");
+			String converged = formatter.format(100 * convergedCount_
+					/ ProgramArgument.PERFORMANCE_TESTING_SIZE.doubleValue())
+					+ "%";
+			String meanString = formatter.format(mean);
+			String sdString = formatter.format(meanDeviation);
+			System.out.println(converged + " performance converged at value: "
+					+ meanString + " " + SD_SYMBOL + " " + sdString);
+		}
 	}
 
 	/**
@@ -245,6 +257,9 @@ public class Performance implements Serializable {
 		}
 		double totalRunComplete = (1.0 * runIndex_ + convergence)
 				/ Config.getInstance().getNumRepetitions();
+		if (frozen_)
+			totalRunComplete = (runIndex_ + 1)
+					/ Config.getInstance().getNumRepetitions();
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
 		String modular = "";
@@ -254,25 +269,28 @@ public class Performance implements Serializable {
 		String percentStr = null;
 		if (noUpdates) {
 			percentStr = "Unknown convergence; No updates yet.";
-		} else {
+		} else if (!frozen_) {
 			percentStr = "~" + formatter.format(100 * convergence) + "% "
 					+ modular + "converged (" + numSlots + " slots).";
+		} else {
+			percentStr = formatter.format(100 * convergence) + "% " + modular
+					+ "test complete.";
 		}
 		System.out.println(percentStr);
 
-		// Adjust numElites if using bounded elites
-		String eliteString = "N_E: " + numElites + ", |E|: " + elites.size()
-				+ ", E_best: " + formatter.format(elites.first().getValue())
-				+ ", E_worst: " + formatter.format(elites.last().getValue());
-		System.out.println(eliteString);
+		if (!frozen_) {
+			// Adjust numElites if using bounded elites
+			String eliteString = "N_E: " + numElites + ", |E|: "
+					+ elites.size() + ", E_best: "
+					+ formatter.format(elites.first().getValue())
+					+ ", E_worst: "
+					+ formatter.format(elites.last().getValue());
+			System.out.println(eliteString);
+		}
 
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
 		System.out.println(totalPercentStr);
-
-		// New lines.
-		System.out.println();
-		System.out.println();
 	}
 
 	/**

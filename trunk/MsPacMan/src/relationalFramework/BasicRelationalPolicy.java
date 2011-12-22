@@ -5,12 +5,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 
 import rrlFramework.RRLObservations;
-
-import jess.Rete;
-import util.MultiMap;
 
 /**
  * A basic policy that just evaluates its rules against the state and returns.

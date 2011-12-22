@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import blocksWorld.BlocksState;
+import blocksWorldMove.BlocksState;
 
 /**
  * The blocks state containing active and non-active blocks.
