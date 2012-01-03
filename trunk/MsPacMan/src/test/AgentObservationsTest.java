@@ -18,8 +18,6 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.PolicyGenerator;
-
 import relationalFramework.agentObservations.AgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
@@ -32,7 +30,6 @@ public class AgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		new PolicyGenerator(0);
 		sut_ = AgentObservations.getInstance();
 	}
 

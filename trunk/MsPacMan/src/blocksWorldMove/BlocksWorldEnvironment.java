@@ -14,7 +14,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import jess.Rete;
 
@@ -42,7 +41,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	protected BlocksState state_;
 
 	/** The number of steps taken. */
-	private int steps_;
+	protected int steps_;
 
 	/** The optimal number of steps for a state to be solved. */
 	private Map<BlocksState, Integer> optimalMap_ = new HashMap<BlocksState, Integer>();
@@ -91,7 +90,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	 *            The goal name.
 	 */
 	protected void initialiseBlocksState(int numBlocks) {
-		Random random = PolicyGenerator.random_;
 		Integer[] worldState = new Integer[numBlocks];
 		List<Double> contourState = new ArrayList<Double>();
 		contourState.add(0d);
@@ -104,11 +102,11 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		while (!blocksLeft.isEmpty()) {
 			// Get a random block
 			Integer block = blocksLeft
-					.remove(random.nextInt(blocksLeft.size()));
+					.remove(PolicyGenerator.random_.nextInt(blocksLeft.size()));
 
 			// Put the block in a random position, influenced by the number of
 			// free blocks.
-			int index = random.nextInt(contourState.size());
+			int index = PolicyGenerator.random_.nextInt(contourState.size());
 			worldState[block - 1] = contourState.get(index).intValue();
 			if (worldState[block - 1] == 0) {
 				contourState.add(new Double(block));
@@ -179,7 +177,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		actionSuccess_ = 1.0;
 
 		// Loop until the task is complete
-		int numActions = BlocksWorldStateSpec.getInstance()
+		int numActions = StateSpec.getInstance()
 				.getNumReturnedActions();
 		RRLObservations obs = startEpisode();
 		while (!obs.isTerminal()) {
@@ -233,7 +231,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		} else
 			actionFailed = true;
 
-
 		// Notify the user what the action is if outputting.
 		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
 			if (actionFact != null)
@@ -270,11 +267,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 		Integer[] intState = state_.getState();
 
-		// Scanning through, making predicates (On, Highest)
-		int[] heightMap = new int[state_.length];
-		int maxHeight = 0;
-		List<Integer> highestBlocks = new ArrayList<Integer>();
-		List<Integer> allBlocks = new ArrayList<Integer>();
+		// Scanning through, making predicates (On)
 		for (int i = 0; i < state_.length; i++) {
 			// On the floor
 			if (intState[i] == 0) {
@@ -284,48 +277,10 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				rete.assertString("(on " + (char) ('a' + i) + " "
 						+ (char) ('a' + intState[i] - 1) + ")");
 			}
-			allBlocks.add(i);
-
-			// Finding the heights
-			int blockHeight = heightMap[i];
-			if (blockHeight == 0) {
-				blockHeight = recurseHeight(i, heightMap, intState);
-			}
-			if (blockHeight > maxHeight) {
-				maxHeight = blockHeight;
-				highestBlocks.clear();
-			}
-			if (blockHeight == maxHeight) {
-				highestBlocks.add(i);
-			}
 
 			// Assert the blocks
 			rete.assertString("(block " + (char) ('a' + i) + ")");
 		}
-	}
-
-	/**
-	 * Finds the height of a block recursively by following a path. Stores the
-	 * values.
-	 * 
-	 * @param start
-	 *            The starting index to check.
-	 * @param heightMap
-	 *            The stored heightMap.
-	 * @param worldState
-	 *            The state of the world in block links.
-	 * @return The maximum height of the block stack.
-	 */
-	private int recurseHeight(int start, int[] heightMap, Integer[] worldState) {
-		if (worldState[start] == 0) {
-			heightMap[start] = 1;
-			return 1;
-		}
-
-		int below = worldState[start] - 1;
-		recurseHeight(below, heightMap, worldState);
-		heightMap[start] = heightMap[below] + 1;
-		return heightMap[start];
 	}
 
 	@Override

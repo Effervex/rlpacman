@@ -9,7 +9,6 @@ import org.junit.Test;
 
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
 
 public class MarioRuleCreationTest {
@@ -19,7 +18,6 @@ public class MarioRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("mario.RLMario");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 	}
 
 	@Test

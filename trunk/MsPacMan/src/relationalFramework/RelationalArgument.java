@@ -183,6 +183,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * 
 	 * @return The clone of this arg.
 	 */
+	@Override
 	public RelationalArgument clone() {
 		RelationalArgument relArg = new RelationalArgument(stringArg_,
 				rangeBounds_[0], rangeFrac_[0], rangeBounds_[1], rangeFrac_[1],
@@ -288,7 +289,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		final int prime = 31;
 		int result = 1;
 		result = prime * result
-				+ ((argType_ == null) ? 0 : argType_.hashCode());
+				+ ((argType_ == null) ? 0 : argType_.ordinal());
 		result = prime * result + Arrays.hashCode(rangeBounds_);
 		result = prime * result + Arrays.hashCode(rangeFrac_);
 		result = prime * result

@@ -11,7 +11,6 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
 
 public class PacManRuleCreationTest {
@@ -21,7 +20,6 @@ public class PacManRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacMan.PacMan");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 	}
 
 	@Test
@@ -96,7 +94,6 @@ public class PacManRuleCreationTest {
 	public void testGeneralRangedConditions() {
 		StateSpec.initInstance("rlPacManGeneral.PacMan");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 
 		// A split containing multiple ranges
 		RelationalRule rule = new RelationalRule(

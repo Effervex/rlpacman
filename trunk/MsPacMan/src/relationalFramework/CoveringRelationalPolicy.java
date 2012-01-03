@@ -146,6 +146,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * @param rule
 	 *            The rule to be added.
 	 */
+	@Override
 	public void addRule(RelationalRule rule) {
 		if (!policyRules_.contains(rule)) {
 			// Check if the rule contains constant facts that could invoke
@@ -197,6 +198,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 	 * @param actionsReturned
 	 *            The number of actions to be returned, or if -1, all actions.
 	 */
+	@Override
 	public PolicyActions evaluatePolicy(RRLObservations observations,
 			int actionsReturned) {
 		PolicyActions actionSwitch = new PolicyActions();

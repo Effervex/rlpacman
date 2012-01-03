@@ -328,7 +328,7 @@ public class Module {
 	public ArrayList<RelationalRule> getModuleRules() {
 		ArrayList<RelationalRule> clonedRules = new ArrayList<RelationalRule>();
 		for (RelationalRule gr : moduleRules_) {
-			clonedRules.add((RelationalRule) gr.clone(true));
+			clonedRules.add(gr.clone(true));
 		}
 		return clonedRules;
 	}

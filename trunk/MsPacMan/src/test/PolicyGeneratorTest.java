@@ -7,9 +7,7 @@ import relationalFramework.StateSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import jess.Rete;
 
@@ -18,7 +16,6 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.CrossEntropyRun;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
@@ -34,8 +31,6 @@ public class PolicyGeneratorTest {
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = new PolicyGenerator(0);
-		CrossEntropyRun.newInstance(sut_, null);
 	}
 
 	@Test
@@ -154,7 +149,6 @@ public class PolicyGeneratorTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new PolicyGenerator(0);
 		AgentObservations.loadAgentObservations("levelmax");
 
 		Rete state = StateSpec.getInstance().getRete();

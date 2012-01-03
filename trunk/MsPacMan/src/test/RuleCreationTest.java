@@ -15,7 +15,6 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.PolicyGenerator;
 import cerrla.RuleCreation;
 
 import relationalFramework.agentObservations.AgentObservations;
@@ -29,7 +28,6 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 		assertTrue("No onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations("onab"));
 	}
@@ -220,7 +218,6 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations("onab"));
 
@@ -316,7 +313,6 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinorBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations("onab"));
 		
@@ -569,7 +565,6 @@ public class RuleCreationTest {
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
-		new PolicyGenerator(0);
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
 				AgentObservations.loadAgentObservations("onab"));
 

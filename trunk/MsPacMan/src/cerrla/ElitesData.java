@@ -5,8 +5,6 @@ import relationalFramework.RelationalRule;
 import java.util.HashMap;
 import java.util.Map;
 
-import util.ProbabilityDistribution;
-
 /**
  * A class for containing all of the data gathered about the elite solutions,
  * such as counts, positions, etc.
@@ -80,21 +78,6 @@ public class ElitesData {
 	public void setUsageStats(Slot slot, double mean) {
 		SlotData slotData = getSlotData(slot);
 		slotData.setMean(mean);
-	}
-
-	/**
-	 * Gets the slot positions.
-	 * 
-	 * @return A mapping of slots and their average relative positions.
-	 */
-	public ProbabilityDistribution<Slot> getObservedSlotDistribution() {
-		ProbabilityDistribution<Slot> observedDistribution = new ProbabilityDistribution<Slot>();
-		for (Slot slot : slotData_.keySet()) {
-			observedDistribution.add(slot,
-					Math.pow(1 - slotData_.get(slot).getAverageOrdering(), 2));
-		}
-		observedDistribution.normaliseProbs();
-		return observedDistribution;
 	}
 
 	public Double getSlotPosition(Slot slot) {
