@@ -10,11 +10,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import jess.Rete;
-
 import org.apache.commons.collections.BidiMap;
 
-import util.MultiMap;
 import util.Pair;
 
 /**

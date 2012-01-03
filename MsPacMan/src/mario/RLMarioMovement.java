@@ -3,8 +3,6 @@ package mario;
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalWrapper;
-import relationalFramework.StateSpec;
 
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -193,7 +191,7 @@ public class RLMarioMovement {
 			staticObjectFacts_.add(fact);
 
 		// Height diff
-		int heightDiff = (int) Math.round(marioPos[1] - y);
+		int heightDiff = Math.round(marioPos[1] - y);
 		fact = "(heightDiff " + thing + " " + heightDiff + ")";
 		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
@@ -762,7 +760,7 @@ public class RLMarioMovement {
 		int midX = basicLevelObs_[midY].length / 2;
 		int jumpPoint = (int) Math.ceil(Math.min(currentEndDiffs_[0]
 				/ CELL_SIZE, MAX_JUMP_DIST / CELL_SIZE));
-		for (int x = (int) jumpPoint; x >= 1; x--) {
+		for (int x = jumpPoint; x >= 1; x--) {
 			// If there is an obstacle
 			// Big Mario check.
 			boolean obstacle = !ObservationConstants

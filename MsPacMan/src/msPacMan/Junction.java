@@ -18,6 +18,7 @@ public class Junction extends PacPoint implements Comparable<Junction> {
 	}
 
 	// @Override
+	@Override
 	public int compareTo(Junction otherPoint) {
 		// Mainly comparable by distance
 		if (otherPoint.distance_ < distance_)

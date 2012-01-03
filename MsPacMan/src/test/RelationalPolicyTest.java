@@ -22,7 +22,7 @@ public class RelationalPolicyTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		policyGenerator_ = new PolicyGenerator(0);
+		policyGenerator_ = new PolicyGenerator(0, null);
 	}
 
 	@Test

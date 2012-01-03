@@ -348,6 +348,7 @@ public final class PolicyGenerator implements Serializable {
 			int mutationUses) {
 		int observationHash = AgentObservations.getInstance()
 				.getObservationHash();
+		boolean printSlot = false;
 		if (ruleCanMutate(baseRule, mutationUses, observationHash)) {
 			// If the rule can mutate.
 			boolean needToPause = false;
@@ -379,6 +380,9 @@ public final class PolicyGenerator implements Serializable {
 				Collection<RelationalRule> removables = new ArrayList<RelationalRule>(
 						previousChildren);
 				removables.removeAll(mutants);
+				
+				if (!removables.isEmpty())
+					System.out.println(ruleSlot);
 
 				// Remove any parent-child links from the rule first
 				for (Iterator<RelationalRule> iter = removables.iterator(); iter
@@ -389,9 +393,10 @@ public final class PolicyGenerator implements Serializable {
 					if (!rr.isWithoutParents())
 						iter.remove();
 
-					if (debugMode_) {
+					printSlot = true;
+					//if (debugMode_) {
 						System.out.println("\tREMOVING MUTANT: " + rr);
-					}
+					//}
 				}
 
 				// Setting the restart value.
@@ -407,10 +412,14 @@ public final class PolicyGenerator implements Serializable {
 			} else {
 				restart_ = false;
 			}
+			
+			if (printSlot)
+				System.out.println(ruleSlot);
 
 			// Add all mutants to the ruleSlot
 			for (RelationalRule rr : mutants) {
 				// Only add if not already in there
+				// TODO The problem with non-determinism seems to be somewhere around here.
 				ruleSlot.addNewRule(rr);
 				currentRules_.add(rr);
 
@@ -439,6 +448,9 @@ public final class PolicyGenerator implements Serializable {
 			}
 			baseRule.setChildren(mutants);
 			noteMutationTree(baseRule, parentLearner_.getCurrentEpisode());
+			
+			if (printSlot)
+				System.out.println(ruleSlot);
 
 			if (debugMode_ && needToPause) {
 				try {

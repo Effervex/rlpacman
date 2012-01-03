@@ -98,6 +98,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            The element being added.
 	 * @return True if the element was added.
 	 */
+	@Override
 	public boolean add(T element) {
 		itemProbs_.put(element, 1d);
 		return true;
@@ -171,6 +172,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            The collection being added.
 	 * @return True if the collection was modified.
 	 */
+	@Override
 	public boolean addAll(Collection<? extends T> elements) {
 		if ((elements == null) || (elements.size() == 0))
 			return false;

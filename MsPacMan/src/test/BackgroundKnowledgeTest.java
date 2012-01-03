@@ -12,13 +12,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
-import cerrla.PolicyGenerator;
 
 public class BackgroundKnowledgeTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		new PolicyGenerator(0);
 	}
 
 	@Test

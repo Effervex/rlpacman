@@ -252,6 +252,7 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 	 * 
 	 * @return The difference in score.
 	 */
+	@Override
 	protected double calculateReward(boolean isTerminal) {
 		double scoreDiff = game_.getScore() - prevScore_;
 		prevScore_ = game_.getScore();
@@ -352,7 +353,7 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 
 	@Override
 	protected void stepState(Object action) {
-		game_.advanceGame((Integer) action, ghosts_.getActions(game_, G.DELAY));
+		game_.advanceGame((Integer) action, ghosts_.getActions(game_, Game.DELAY));
 		if (!experimentMode_) {
 			gv_.repaint();
 		}

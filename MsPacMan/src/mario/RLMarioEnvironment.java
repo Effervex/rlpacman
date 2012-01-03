@@ -6,9 +6,6 @@ import java.util.List;
 import jess.Rete;
 
 import relationalFramework.PolicyActions;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalWrapper;
-import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
 
 import cerrla.PolicyGenerator;
@@ -20,11 +17,13 @@ import ch.idsia.tools.MarioAIOptions;
 
 public class RLMarioEnvironment extends RRLEnvironment {
 	private static final boolean[] NO_ACTION = new boolean[Environment.numberOfKeys];
+	private static final int TIMEOUT_THRESHOLD = 30;
 	private MarioAIOptions cmdLineOptions_;
 	private MarioEnvironment environment_;
 	private boolean experimentMode_ = false;
 	private int levelDifficulty_ = 1;
 	private RLMarioMovement marioMovement_;
+	private int noActionCount_;
 
 	@Override
 	protected void assertStateFacts(Rete rete, List<String> goalArgs)
@@ -68,13 +67,13 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	 */
 	@Override
 	protected double calculateReward(boolean isTerminal) {
-		if (terminal == 2) {
-			EvaluationInfo ei = environment_.getEvaluationInfo();
-			ei.timeSpent += ei.timeLeft;
-			ei.timeLeft = 0;
-			return ei.computeWeightedFitness();
-		}
-		if (terminal == 1) {
+		if (isTerminal) {
+			if (noActionCount_ >= TIMEOUT_THRESHOLD) {
+				EvaluationInfo ei = environment_.getEvaluationInfo();
+				ei.timeSpent += ei.timeLeft;
+				ei.timeLeft = 0;
+				return ei.computeWeightedFitness();
+			}
 			return environment_.getEvaluationInfo().computeWeightedFitness();
 		}
 		return 0;
@@ -87,8 +86,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 
 	@Override
 	protected Object groundActions(PolicyActions actions) {
-		// TODO Auto-generated method stub
-		return null;
+		return marioMovement_.groundActions(actions, environment_);
 	}
 
 	@Override
@@ -113,11 +111,17 @@ public class RLMarioEnvironment extends RRLEnvironment {
 			// Idle...
 			environment_.tick();
 		}
+		
+		noActionCount_ = 0;
 	}
 
 	@Override
 	protected void stepState(Object action) {
 		boolean[] groundAction = (boolean[]) action;
+		if (Arrays.equals(groundAction, NO_ACTION))
+			noActionCount_++;
+		else
+			noActionCount_ = 0;
 
 		environment_.performAction(groundAction);
 
@@ -127,6 +131,16 @@ public class RLMarioEnvironment extends RRLEnvironment {
 			// Idle...
 			environment_.tick();
 		}
+	}
+	
+	@Override
+	protected boolean isTerminal() {
+		boolean result = super.isTerminal();
+		if (noActionCount_ >= TIMEOUT_THRESHOLD)
+			return true;
+		if (environment_.isLevelFinished())
+			return true;
+		return result;
 	}
 
 	@Override

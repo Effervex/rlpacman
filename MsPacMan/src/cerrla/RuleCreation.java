@@ -430,12 +430,15 @@ public class RuleCreation implements Serializable {
 					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
 							|| AgentObservations.getInstance().getNumGoalArgs() == 0
 							|| specConditions.toString().contains(
-									RelationalArgument.GOAL_VARIABLE_PREFIX))
+									RelationalArgument.GOAL_VARIABLE_PREFIX)) {
 						specialisations.add(specialisation);
+						System.out.println(specialisation + ", " + specialisation.hashCode());
+					}
 				}
 			}
 		}
 
+		System.out.println(specialisations);
 		return specialisations;
 	}
 
