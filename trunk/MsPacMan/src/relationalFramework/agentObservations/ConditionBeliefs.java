@@ -365,7 +365,7 @@ public class ConditionBeliefs implements Serializable {
 			boolean isAlwaysTrue, TypedBeliefs typeBeliefs,
 			Map<String, String> typeVarReplacements) {
 		// If the predicate is a never-seen invariant, return false
-		if (AgentObservations.getInstance().getNeverSeenInvariants()
+		if (EnvironmentAgentObservations.getInstance().getNeverSeenInvariants()
 				.contains(relativeFact.getFactName()))
 			return false;
 
@@ -673,7 +673,7 @@ public class ConditionBeliefs implements Serializable {
 			if (negatedConditionBeliefs.containsKey(factName)) {
 				Map<IntegerArray, ConditionBeliefs> negatedCBs = negatedConditionBeliefs
 						.get(factName);
-				IntegerArray argState = AgentObservations
+				IntegerArray argState = EnvironmentAgentObservations
 						.determineArgState(otherCond);
 				if (negatedCBs.containsKey(argState))
 					return negatedCBs.get(argState);

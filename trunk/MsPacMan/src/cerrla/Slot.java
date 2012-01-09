@@ -9,7 +9,6 @@ import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import relationalFramework.agentObservations.AgentObservations;
 import util.ProbabilityDistribution;
 
 /**
@@ -330,24 +329,12 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return alpha / Math.max(population - policiesEvaluated, numElites);
 	}
 
-	/**
-	 * Gets the slot's maximum capacity, based on the number of possible rule
-	 * specialisations.
-	 * 
-	 * @return The maximum capacity. Note that the size CAN be over this, but no
-	 *         mutations will be allowed.
-	 */
-	public int getMaximumCapacity() {
-		return AgentObservations.getInstance().getNumSpecialisations(action_) + 1;
-	}
-
 	public double getOrdering() {
 		return ordering_;
 	}
 
 	public double getOrderingSD() {
-		int maxCapacity = getMaximumCapacity();
-		double slotFillLevel = (1.0 * klSize()) / maxCapacity;
+		double slotFillLevel = (1.0 * klSize()) / size();
 		slotFillLevel = Math.max(slotFillLevel, 0);
 		slotFillLevel = Math.min(slotFillLevel, 1);
 		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()

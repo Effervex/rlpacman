@@ -395,7 +395,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	public RelationalArgument[] getRelationalArguments() {
 		return cloneArgs(arguments_);
 	}
-	
+
 	public SortedSet<RangeContext> getRangeContexts() {
 		return rangeContexts_;
 	}
@@ -559,5 +559,15 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 				arguments_[i] = new RelationalArgument(
 						arguments_[i].getStringArg());
 		}
+	}
+
+	/**
+	 * Sets the arguments of this predicate. This method should be used
+	 * carefully, as the hashcode may change.
+	 * 
+	 * @param arguments The new arguments for the 
+	 */
+	public void setArguments(RelationalArgument[] actionArgs) {
+		arguments_ = cloneArgs(actionArgs);
 	}
 }

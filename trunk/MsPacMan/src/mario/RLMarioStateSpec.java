@@ -12,6 +12,7 @@ import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.RelationalPredicate;
@@ -143,7 +144,7 @@ public class RLMarioStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+	protected RelationalPolicy initialiseHandCodedPolicy() {
 		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
 
 		// Defining a good policy (basic at the moment)

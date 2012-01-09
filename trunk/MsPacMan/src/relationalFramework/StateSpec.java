@@ -481,7 +481,7 @@ public abstract class StateSpec {
 	 * 
 	 * @return The policy that solves the goal in optimal time.
 	 */
-	protected abstract BasicRelationalPolicy initialiseHandCodedPolicy();
+	protected abstract RelationalPolicy initialiseHandCodedPolicy();
 
 	/**
 	 * Initialises the state predicates.
@@ -507,7 +507,8 @@ public abstract class StateSpec {
 	 *            The goal args to add, or if null, generate new ones.
 	 * @param state
 	 *            The state to add to.
-	 * @return The goal replacements map created from the goal args.
+	 * @return The goal replacements map created from the goal args (a/?G_0,
+	 *         b/?G_1, etc.).
 	 */
 	public BidiMap assertGoalPred(List<String> goalArgs, Rete state)
 			throws Exception {

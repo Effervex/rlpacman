@@ -1,7 +1,7 @@
 package blocksWorld;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -110,7 +110,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 	}
 
 	@Override
-	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+	protected RelationalPolicy initialiseHandCodedPolicy() {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
 		if (envParameter_.equals("onab")) {
@@ -139,7 +139,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
 		}
 
-		BasicRelationalPolicy optimal = new BasicRelationalPolicy();
+		RelationalPolicy optimal = new RelationalPolicy();
 		for (int i = 0; i < rules.length; i++)
 			optimal.addRule(new RelationalRule(rules[i]));
 

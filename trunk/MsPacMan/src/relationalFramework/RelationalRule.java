@@ -20,6 +20,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.collections.BidiMap;
+
 import cerrla.Slot;
 
 import util.ConditionComparator;
@@ -30,7 +32,8 @@ import util.ConditionComparator;
  * 
  * @author Sam Sarjant
  */
-public class RelationalRule implements Serializable, Comparable<RelationalRule> {
+public class RelationalRule implements Serializable,
+		Comparable<RelationalRule>, RelationallyEvaluatableObject {
 	private static final long serialVersionUID = -7517726681678896438L;
 
 	/**
@@ -212,7 +215,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				if (isConstant) {
 					constants.add(cond);
 				}
-				
+
 				// Checking for RangeContexts
 				rangeContexts_.addAll(cond.getRangeContexts());
 			}
@@ -385,10 +388,10 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 				constantTerms));
 
 		Integer oldHash = ruleHash_;
+		ruleHash_ = null;
 		Integer newHash = hashCode();
 		if (!newHash.equals(oldHash))
 			statesSeen_ = 0;
-		ruleHash_ = newHash;
 	}
 
 	public RelationalPredicate getAction() {
@@ -537,16 +540,20 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 
 	@Override
 	public int hashCode() {
+		if (ruleHash_ != null)
+			return ruleHash_;
+
+		// Calculate the rule hash.
 		final int prime = 31;
-		int result = 1;
-		result = prime * result
+		ruleHash_ = 1;
+		ruleHash_ = prime * ruleHash_
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		int conditionResult = 0;
 		if (ruleConditions_ != null)
 			for (RelationalPredicate condition : ruleConditions_)
 				conditionResult += condition.hashCode();
-		result = prime * result + conditionResult;
-		return result;
+		ruleHash_ = prime * ruleHash_ + conditionResult;
+		return ruleHash_;
 	}
 
 	/**
@@ -709,48 +716,18 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 	}
 
 	/**
-	 * Sets temporary parameter replacements for any parameterisable terms
-	 * within. The temp parameters don't affect the rule itself, just the
-	 * evaluation, so rule updating will not be affected.
-	 * 
-	 * @param parameters
-	 *            The parameters being set.
-	 */
-	public void setParameters(List<String> parameters) {
-		if (parameters == null) {
-			parameters_ = null;
-			return;
-		}
-
-		try {
-			// Inits/Clears the parameters
-			if (parameters_ == null)
-				parameters_ = new ArrayList<String>();
-			else
-				parameters_.clear();
-
-			// Sets the parameters
-			parameters_.addAll(parameters);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		if (queryParams_ == null) {
-			queryParams_ = new ArrayList<String>();
-			for (int i = 0; i < parameters_.size(); i++)
-				queryParams_.add(RelationalArgument.createGoalTerm(i));
-			findConstantsAndRanges();
-		}
-	}
-
-	/**
-	 * Sets the parameters of the the query parameters (given by the key) to the
-	 * values.
+	 * Sets the parameters of the the query parameters (given by the value) to
+	 * the values.
 	 * 
 	 * @param parameterMap
 	 *            The map of parameters.
 	 */
-	public void setParameters(Map<String, String> parameterMap) {
+	public void setParameters(BidiMap parameterMap) {
+		if (parameterMap == null) {
+			parameters_ = null;
+			return;
+		}
+
 		boolean hasQueryParams = queryParams_ != null;
 		if (!hasQueryParams)
 			queryParams_ = new ArrayList<String>(parameterMap.size());
@@ -759,7 +736,7 @@ public class RelationalRule implements Serializable, Comparable<RelationalRule> 
 			String goalTerm = RelationalArgument.createGoalTerm(i);
 			if (!hasQueryParams)
 				queryParams_.add(goalTerm);
-			parameters_.add(parameterMap.get(goalTerm));
+			parameters_.add((String) parameterMap.getKey(goalTerm));
 		}
 		if (!hasQueryParams)
 			findConstantsAndRanges();

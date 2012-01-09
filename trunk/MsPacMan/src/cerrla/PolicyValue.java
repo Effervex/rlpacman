@@ -2,7 +2,7 @@ package cerrla;
 
 import java.io.Serializable;
 
-import relationalFramework.CoveringRelationalPolicy;
+import relationalFramework.ModularPolicy;
 import relationalFramework.RelationalRule;
 
 /**
@@ -14,7 +14,7 @@ import relationalFramework.RelationalRule;
 public class PolicyValue implements Comparable<PolicyValue>, Serializable {
 	private static final long serialVersionUID = 6807660104018734424L;
 	/** The policy. */
-	private CoveringRelationalPolicy policy_;
+	private ModularPolicy policy_;
 	/** The estimated value of the policy. */
 	private double value_;
 	/** The iteration this policy value was created at. */
@@ -23,17 +23,17 @@ public class PolicyValue implements Comparable<PolicyValue>, Serializable {
 	/**
 	 * A constructor for storing the members.
 	 * 
-	 * @param pol
+	 * @param currentPolicy_
 	 *            The policy.
 	 * @param value
 	 *            The (estimated) value
 	 */
-	public PolicyValue(CoveringRelationalPolicy pol, double value, int iteration) {
-		policy_ = pol;
+	public PolicyValue(ModularPolicy currentPolicy_, double value, int iteration) {
+		policy_ = currentPolicy_;
 		value_ = value;
 		iteration_ = iteration;
 
-		updateInternalRuleValues(pol, value);
+		updateInternalRuleValues(currentPolicy_, value);
 	}
 
 	/**
@@ -44,11 +44,11 @@ public class PolicyValue implements Comparable<PolicyValue>, Serializable {
 	 * @param value
 	 *            The value the policy achieved
 	 */
-	private void updateInternalRuleValues(CoveringRelationalPolicy pol,
+	private void updateInternalRuleValues(ModularPolicy pol,
 			double value) {
 		if (pol != null)
-			for (RelationalRule rule : pol.getFiringRules()) {
-				rule.updateInternalValue(value);
+			for (RelationalRule reo : pol.getFiringRules()) {
+				reo.updateInternalValue(value);
 			}
 	}
 
@@ -57,7 +57,7 @@ public class PolicyValue implements Comparable<PolicyValue>, Serializable {
 	 * 
 	 * @return The policy.
 	 */
-	public CoveringRelationalPolicy getPolicy() {
+	public ModularPolicy getPolicy() {
 		return policy_;
 	}
 

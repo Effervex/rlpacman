@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 
 import org.rlcommunity.rlglue.codec.RLGlue;
 
+import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 
 import util.Pair;
@@ -52,7 +53,7 @@ public class Config {
 	/** The best policy found output file. */
 	private File elitesFile_;
 	/** The primary goal of the experiment. */
-	private String mainGoal_;
+	private GoalCondition mainGoal_;
 	/** The last run number. */
 	private int repetitionsEnd_ = 1;
 	/** The first run number. */
@@ -198,7 +199,7 @@ public class Config {
 		extraArgs_ = extraArgs;
 		for (String extraArg : extraArgs)
 			if (extraArg.startsWith("goal"))
-				mainGoal_ = extraArg.substring(5);
+				mainGoal_ = new GoalCondition(extraArg.substring(5));
 
 		// If the elites and performance file are null, generate filenames
 		if (elitesFile == null || performanceFile == null) {
@@ -277,7 +278,7 @@ public class Config {
 		return instance_;
 	}
 
-	public String getGoal() {
+	public GoalCondition getGoal() {
 		return mainGoal_;
 	}
 

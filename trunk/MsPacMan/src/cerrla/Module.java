@@ -26,6 +26,8 @@ import java.util.regex.Pattern;
  * arguments and return a rule(s) which solve the module. Note that if modules
  * call modules, the rules returned will be gathered recursively.
  * 
+ * TODO This has become deprecated.
+ * 
  * @author Samuel J. Sarjant
  */
 public class Module {

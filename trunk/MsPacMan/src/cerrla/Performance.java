@@ -15,7 +15,7 @@ import java.util.TreeMap;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.GoalCondition;
 import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
 
@@ -57,6 +57,8 @@ public class Performance implements Serializable {
 	private double minEpisodeReward_;
 	/** Notes the minimum and maximum reward recieved. */
 	private double[] minMaxReward_;
+	/** if this performance is for a modular generator. */
+	private boolean modularPerformance_;
 	/** A queue of the most recent episodic rewards. */
 	private Queue<Double> recentScores_;
 	/** The current run for this performance object. */
@@ -66,6 +68,9 @@ public class Performance implements Serializable {
 
 	/**
 	 * A constructor for a fresh performance object.
+	 * 
+	 * @param runIndex
+	 *            The run index to append to saved files.
 	 */
 	public Performance(int runIndex) {
 		episodeMeans_ = new TreeMap<Integer, Double>();
@@ -78,6 +83,18 @@ public class Performance implements Serializable {
 		startTime_ = System.currentTimeMillis();
 		runIndex_ = runIndex;
 		resetPolicyValues();
+	}
+
+	/**
+	 * A new performance object for a module learner, so files are saved in the
+	 * module directory.
+	 * 
+	 * @param modulePerformance
+	 *            A throwaway boolean to denote modular performance.
+	 */
+	public Performance(boolean modulePerformance) {
+		this(0);
+		modularPerformance_ = true;
 	}
 
 	/**
@@ -236,11 +253,12 @@ public class Performance implements Serializable {
 	 *            The current elites.
 	 * @param numSlots
 	 *            The number of slots in the distribution.
-	 * @param moduleGoal
-	 *            If the learner is learning a module, null otherwise.
+	 * @param goalCondition
+	 *            The goal condition this performance is concerned with.
 	 */
 	public void estimateETA(double convergence, int numElites,
-			SortedSet<PolicyValue> elites, int numSlots, String moduleGoal) {
+			SortedSet<PolicyValue> elites, int numSlots,
+			GoalCondition goalCondition) {
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 			return;
 
@@ -263,8 +281,8 @@ public class Performance implements Serializable {
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
 		String modular = "";
-		if (moduleGoal != null)
-			modular = "MODULAR: [" + moduleGoal + "] ";
+		if (!goalCondition.isMainGoal())
+			modular = "MODULAR: [" + goalCondition + "] ";
 		// No updates yet, convergence unknown
 		String percentStr = null;
 		if (noUpdates) {
@@ -379,19 +397,19 @@ public class Performance implements Serializable {
 	/**
 	 * Saves performance and distributions to file.
 	 * 
-	 * @param policyGenerator
-	 *            The current policy generator.
+	 * @param distribution
+	 *            The current CEDistribution.
 	 * @param elites
 	 *            The current elites.
 	 * @param currentEpisode
 	 *            The current episode.
 	 */
-	public void saveFiles(PolicyGenerator policyGenerator,
-			SortedSet<PolicyValue> elites, int currentEpisode) {
-		boolean hasUpdated = policyGenerator.hasUpdated();
-
+	public void saveFiles(LocalCrossEntropyDistribution distribution,
+			SortedSet<PolicyValue> elites, int currentEpisode,
+			boolean hasUpdated) {
 		// Basic update of run
-		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()
+				&& !modularPerformance_) {
 			long elapsedTime = System.currentTimeMillis() - startTime_;
 			String elapsed = "Elapsed: "
 					+ RRLExperiment.toTimeFormat(elapsedTime);
@@ -407,11 +425,12 @@ public class Performance implements Serializable {
 
 		// Determine the temp filenames
 		File tempPerf = null;
-		if (policyGenerator.isModuleGenerator()) {
-			File modTemps = new File(Module.MODULE_DIR + File.separatorChar
-					+ Config.TEMP_FOLDER + File.separatorChar);
+		if (modularPerformance_) {
+			File modTemps = new File(LocalCrossEntropyDistribution.MODULE_DIR
+					+ File.separatorChar + Config.TEMP_FOLDER
+					+ File.separatorChar);
 			modTemps.mkdirs();
-			tempPerf = new File(modTemps, policyGenerator.getLocalGoal()
+			tempPerf = new File(modTemps, distribution.getGoalCondition()
 					+ Config.getInstance().getPerformanceFile().getName());
 		} else {
 			Config.TEMP_FOLDER.mkdir();
@@ -431,14 +450,22 @@ public class Performance implements Serializable {
 			if (hasUpdated) {
 				saveElitePolicies(elites);
 				// Output the episode averages
-				savePerformance(policyGenerator, tempPerf, frozen_);
+				savePerformance(distribution.getPolicyGenerator(), tempPerf,
+						frozen_);
 			}
-			policyGenerator
-					.serialisePolicyGenerator(new File(tempPerf + ".ser"));
-			AgentObservations.getInstance().saveAgentObservations(
-					policyGenerator);
+			// TODO Also save LocalAgentObservations
+			distribution.saveCEDistribution(new File(tempPerf.getAbsolutePath()
+					+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX),
+					!modularPerformance_);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public double getAverageEpisodeReward() {
+		double reward = 0;
+		for (double r : episodeRewards_)
+			reward += r;
+		return reward / episodeRewards_.length;
 	}
 }

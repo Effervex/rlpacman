@@ -1,6 +1,7 @@
 package hanoi;
 
 import relationalFramework.BasicRelationalPolicy;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -80,7 +81,7 @@ public class HanoiStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+	protected RelationalPolicy initialiseHandCodedPolicy() {
 		// Defining the optimal policy (has to be split for even/odd)
 		String[] rules = new String[3];
 		rules[0] = "(numTiles even) (tile ?X) (not (lastMoved ?X)) "

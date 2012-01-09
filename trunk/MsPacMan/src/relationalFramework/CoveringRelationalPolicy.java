@@ -7,7 +7,7 @@ import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import rrlFramework.RRLObservations;
 
 import java.util.ArrayList;
@@ -33,6 +33,8 @@ import jess.ValueVector;
 
 /**
  * This class represents a policy that the agent can use.
+ * 
+ * TODO Made redundant by the ModularPolicy.
  * 
  * @author Samuel J. Sarjant
  */
@@ -247,7 +249,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 				Collection<FiredAction> firedActions = evaluateRule(polRule,
 						state, observations.getValidActions(polRule
 								.getActionPredicate()), null);
-				actionSwitch.addFiredRule(firedActions);
+				actionSwitch.addFiredRule(firedActions, polRule);
 				actionsFound += firedActions.size();
 			}
 		} catch (Exception e) {
@@ -274,7 +276,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 			// Run through the unseen preds, triggering covering if necessary.
 			boolean triggerCovering = false;
 			Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
-			for (RelationalPredicate unseenPred : AgentObservations
+			for (RelationalPredicate unseenPred : EnvironmentAgentObservations
 					.getInstance().getUnseenPredicates()) {
 				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
 				QueryResult results = observations.getState().runQueryStar(
@@ -293,7 +295,7 @@ public class CoveringRelationalPolicy extends RelationalPolicy {
 								.getInstance());
 				policyGenerator_
 						.triggerRLGGCovering(observations, emptyActions);
-				AgentObservations.getInstance().removeUnseenPredicates(
+				EnvironmentAgentObservations.getInstance().removeUnseenPredicates(
 						removables);
 			}
 		} catch (Exception e) {
