@@ -12,7 +12,7 @@ import org.junit.Test;
 
 import cerrla.RuleCreation;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 
 public class PacManGeneralRuleCreationTest {
 	private RuleCreation sut_;
@@ -23,7 +23,7 @@ public class PacManGeneralRuleCreationTest {
 		sut_ = new RuleCreation();
 
 		// Set up the allowable conditions
-		AgentObservations.loadAgentObservations("blah");
+		EnvironmentAgentObservations.loadAgentObservations("blah");
 	}
 
 	@Test

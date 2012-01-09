@@ -8,6 +8,7 @@ import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 import java.util.SortedMap;
 
 import org.apache.commons.math.stat.descriptive.moment.Mean;
@@ -24,6 +25,8 @@ import cerrla.ProgramArgument;
  * @author Sam Sarjant
  */
 public class RRLExperiment {
+	public static Random random_ = new Random();
+	
 	/** The agent to use for experiments. */
 	private RRLAgent agent_;
 
@@ -310,8 +313,9 @@ public class RRLExperiment {
 	public void run(int runIndex, int finiteEpisodes) {
 		// Initialise the agent and environment
 		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
-				Config.getInstance().getGoal());
+				Config.getInstance().getGoal().toString());
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
+		random_ = new Random(runIndex);
 
 		agent_.initialise(runIndex);
 		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());

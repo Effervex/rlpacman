@@ -7,6 +7,7 @@ import java.util.Map;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -94,7 +95,7 @@ public class CarcassonneStateSpec extends StateSpec {
 	}
 
 	@Override
-	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+	protected RelationalPolicy initialiseHandCodedPolicy() {
 		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
 
 		return goodPolicy;

@@ -17,7 +17,7 @@ import org.junit.Test;
 
 import cerrla.RuleCreation;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import util.ConditionComparator;
 
@@ -29,7 +29,7 @@ public class RuleCreationTest {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue("No onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations("onab"));
+				EnvironmentAgentObservations.loadAgentObservations("onab"));
 	}
 
 	@Test
@@ -219,7 +219,7 @@ public class RuleCreationTest {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations("onab"));
+				EnvironmentAgentObservations.loadAgentObservations("onab"));
 
 		// Interesting case of losing (clear/highest ?Y)
 		RelationalRule rule = new RelationalRule(
@@ -314,7 +314,7 @@ public class RuleCreationTest {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations("onab"));
+				EnvironmentAgentObservations.loadAgentObservations("onab"));
 		
 		RelationalRule rule = new RelationalRule(
 				"(clear ?X) (floor ?Y) => (move ?X ?Y)");
@@ -566,7 +566,7 @@ public class RuleCreationTest {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = new RuleCreation();
 		assertTrue("No loaded onAB agent observations. Cannot run test.",
-				AgentObservations.loadAgentObservations("onab"));
+				EnvironmentAgentObservations.loadAgentObservations("onab"));
 
 		// Strange issue:
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
@@ -692,7 +692,7 @@ public class RuleCreationTest {
 		conditions.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		conditions.add(StateSpec.toRelationalPredicate("(highest ?X)"));
 		conditions.add(StateSpec.toRelationalPredicate("(clear ?X)"));
-		AgentObservations.getInstance().setActionConditions("moveFloor",
+		EnvironmentAgentObservations.getInstance().setActionConditions("moveFloor",
 				conditions);
 		conditions = new HashSet<RelationalPredicate>();
 		conditions.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
@@ -705,7 +705,7 @@ public class RuleCreationTest {
 		conditions.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
 		conditions.add(StateSpec.toRelationalPredicate("(onFloor ?X)"));
 		conditions.add(StateSpec.toRelationalPredicate("(onFloor ?Y)"));
-		AgentObservations.getInstance().setActionConditions("move", conditions);
+		EnvironmentAgentObservations.getInstance().setActionConditions("move", conditions);
 
 		// Set up the equivalence and other rules
 		SortedSet<BackgroundKnowledge> backKnow = new TreeSet<BackgroundKnowledge>();
@@ -737,7 +737,7 @@ public class RuleCreationTest {
 		backKnow.add(new BackgroundKnowledge("(on ?X ?) => (above ?X ?)"));
 		backKnow.add(new BackgroundKnowledge(
 				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))"));
-		AgentObservations.getInstance().setBackgroundKnowledge(backKnow);
+		EnvironmentAgentObservations.getInstance().setBackgroundKnowledge(backKnow);
 
 		// Basic implication test
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(

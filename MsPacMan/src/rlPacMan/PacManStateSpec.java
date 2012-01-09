@@ -2,6 +2,7 @@ package rlPacMan;
 
 import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
+import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import rlPacManGeneral.DistanceDir;
@@ -98,7 +99,7 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 	}
 
 	@Override
-	protected BasicRelationalPolicy initialiseHandCodedPolicy() {
+	protected RelationalPolicy initialiseHandCodedPolicy() {
 		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
 
 		// Defining a good policy

@@ -1,12 +1,19 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
+
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
+
+import cerrla.Unification;
+import cerrla.UnifiedFact;
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -53,21 +60,20 @@ public class InvariantObservations implements Serializable {
 	 *            The facts of the state.
 	 * @return True if the invariants collections changed at all.
 	 */
-	public boolean noteInvariants(Collection<RelationalPredicate> stateFacts,
+	public boolean noteAllInvariants(
+			Collection<RelationalPredicate> stateFacts,
 			Collection<String> generalStateFacts) {
+		// Note specific invariants
+		boolean result = noteSpecificInvariants(stateFacts);
+
 		// If the first pass, invariants are just the state.
-		counter_++;
-		if (specificInvariants_ == null) {
-			specificInvariants_ = new TreeSet<RelationalPredicate>(stateFacts);
+		if (generalInvariants_ == null) {
 			generalInvariants_ = new TreeSet<String>(generalStateFacts);
 			neverPresent_.removeAll(generalStateFacts);
 			return true;
 		}
 
 		// Otherwise, perform a basic retainAll operation
-		boolean result = specificInvariants_.retainAll(stateFacts);
-		if (result)
-			expandedSpecificInvariants_ = null;
 		result |= generalInvariants_.retainAll(generalStateFacts);
 		result |= neverPresent_.removeAll(generalStateFacts);
 		return result;
@@ -83,34 +89,42 @@ public class InvariantObservations implements Serializable {
 	 *            The goal replacement terms.
 	 * @return True if the invariants collection changed at all.
 	 */
-	public boolean noteInvariants(Collection<RelationalPredicate> stateFacts,
-			Map<String, String> goalReplacements) {
+	public boolean noteSpecificInvariants(
+			Collection<RelationalPredicate> stateFacts) {
 		counter_++;
 		if (specificInvariants_ == null) {
-			specificInvariants_ = new TreeSet<RelationalPredicate>();
-		}
-
-		// Run through each fact, only noting it down if the replacement applies
-		// to it.
-		Collection<RelationalPredicate> goalFacts = new TreeSet<RelationalPredicate>();
-		for (RelationalPredicate stateFact : stateFacts) {
-			RelationalPredicate checkFact = new RelationalPredicate(stateFact);
-			if (checkFact.replaceArguments(goalReplacements, false, false)) {
-				RelationalPredicate replFact = new RelationalPredicate(
-						stateFact);
-				replFact.replaceArguments(goalReplacements, true, false);
-				if (counter_ == 1)
-					specificInvariants_.add(replFact);
-				goalFacts.add(replFact);
-			}
-		}
-
-		if (counter_ == 1)
+			specificInvariants_ = new TreeSet<RelationalPredicate>(stateFacts);
 			return true;
-		boolean result = specificInvariants_.retainAll(goalFacts);
+		}
+
+		boolean result = specificInvariants_.retainAll(stateFacts);
 		if (result)
 			expandedSpecificInvariants_ = null;
 		return result;
+
+		// // Run through each fact, only noting it down if the replacement
+		// applies
+		// // to it.
+		// Collection<RelationalPredicate> goalFacts = new
+		// TreeSet<RelationalPredicate>();
+		// for (RelationalPredicate stateFact : stateFacts) {
+		// RelationalPredicate checkFact = new RelationalPredicate(stateFact);
+		// if (checkFact.replaceArguments(goalReplacements, false, false)) {
+		// RelationalPredicate replFact = new RelationalPredicate(
+		// stateFact);
+		// replFact.replaceArguments(goalReplacements, true, false);
+		// if (counter_ == 1)
+		// specificInvariants_.add(replFact);
+		// goalFacts.add(replFact);
+		// }
+		// }
+		//
+		// if (counter_ == 1)
+		// return true;
+		// boolean result = specificInvariants_.retainAll(goalFacts);
+		// if (result)
+		// expandedSpecificInvariants_ = null;
+		// return result;
 	}
 
 	@Override
@@ -195,5 +209,136 @@ public class InvariantObservations implements Serializable {
 
 	public Collection<String> getGeneralInvariants() {
 		return generalInvariants_;
+	}
+
+	/**
+	 * Intersects the action conditions sets, handling numerical values as a
+	 * special case.
+	 * 
+	 * @param newAction
+	 *            The action currently being used for intersection. Possibly
+	 *            null (doesn't matter).
+	 * @param oldAction
+	 *            The old unified action to be modified. Possibly null (doesn't
+	 *            matter).
+	 * @param actionConds
+	 *            The action conditions being added.
+	 * @param invariants
+	 *            Invariant action conditions. Can only get smaller.
+	 * @param variants
+	 *            Variant action conditions. Can only get bigger.
+	 * @param actionRanges
+	 *            The observed ranges for various conditions.
+	 * @return True if the action conditions changed, false otherwise.
+	 */
+	public static boolean intersectActionConditions(
+			RelationalPredicate newAction, RelationalPredicate oldAction,
+			Collection<RelationalPredicate> actionConds,
+			Collection<RelationalPredicate> invariants,
+			Collection<RelationalPredicate> variants,
+			Map<RangeContext, double[]> actionRanges) {
+		boolean changed = false;
+
+		// Generalise the action if necessary
+		RelationalArgument[] actionArgs = (oldAction != null) ? oldAction
+				.getRelationalArguments() : new RelationalArgument[0];
+		for (int i = 0; i < actionArgs.length; i++) {
+			RelationalArgument argument = actionArgs[i];
+
+			// If the action isn't variable, but doesn't match with the
+			// current action, generalise it.
+			if (!argument.isVariable()
+					&& !argument.isNumber()
+					&& (!argument.equals(newAction.getRelationalArguments()[i]))) {
+				actionArgs[i] = RelationalArgument.getVariableTermArg(i);
+				changed = true;
+			}
+		}
+
+		Collection<RelationalPredicate> newInvariantConditions = new HashSet<RelationalPredicate>();
+
+		// Run through each invariant fact
+		for (RelationalPredicate invFact : invariants) {
+			// Merge any numerical ranges
+			Collection<UnifiedFact> mergedFacts = Unification.getInstance()
+					.unifyFact(invFact, actionConds, null, actionArgs, false,
+							true);
+			if (mergedFacts != null && !mergedFacts.isEmpty()) {
+				for (UnifiedFact uf : mergedFacts) {
+					RelationalPredicate unifiedFact = uf.getResultFact();
+					changed |= !invFact.equals(unifiedFact);
+					newInvariantConditions.add(unifiedFact);
+					actionConds.remove(uf.getUnityFact());
+					System.arraycopy(uf.getFactTerms(), 0, actionArgs, 0,
+							actionArgs.length);
+
+					if (oldAction != null)
+						noteRange(oldAction.getFactName(), unifiedFact,
+								actionRanges);
+				}
+			} else {
+				variants.add(invFact);
+				changed = true;
+			}
+		}
+		invariants.clear();
+		invariants.addAll(newInvariantConditions);
+
+		// Add any remaining action conds to the variants, merging any
+		// numerical ranges together
+		Collection<RelationalPredicate> newVariantConditions = new HashSet<RelationalPredicate>();
+		for (RelationalPredicate variant : variants) {
+			Collection<UnifiedFact> mergedFacts = Unification.getInstance()
+					.unifyFact(variant, actionConds, new DualHashBidiMap(),
+							actionArgs, false, true);
+			if (mergedFacts != null && !mergedFacts.isEmpty()) {
+				for (UnifiedFact uf : mergedFacts) {
+					RelationalPredicate unifiedFact = uf.getResultFact();
+					changed |= !variant.equals(unifiedFact);
+					newVariantConditions.add(unifiedFact);
+					actionConds.remove(uf.getUnityFact());
+
+					if (oldAction != null)
+						noteRange(oldAction.getFactName(), unifiedFact,
+								actionRanges);
+				}
+			} else
+				newVariantConditions.add(variant);
+		}
+		variants.clear();
+		variants.addAll(newVariantConditions);
+		changed |= variants.addAll(actionConds);
+
+		if (changed && oldAction != null)
+			oldAction.setArguments(actionArgs);
+		return changed;
+	}
+
+	/**
+	 * Notes the range from a given fact.
+	 * 
+	 * @param numberFact
+	 *            The range fact.
+	 * @param actionRanges
+	 *            The map of facts, mapped by factName-range variable.
+	 */
+	private static void noteRange(String actionName,
+			RelationalPredicate numberFact,
+			Map<RangeContext, double[]> actionRanges) {
+		if (actionRanges == null || !numberFact.isNumerical())
+			return;
+		RelationalArgument[] factArgs = numberFact.getRelationalArguments();
+		for (int i = 0; i < factArgs.length; i++) {
+			// Only note ranges
+			if (factArgs[i].isRange()) {
+				RangeContext key = new RangeContext(i, numberFact, actionName);
+				double[] range = actionRanges.get(key);
+				if (range == null) {
+					range = new double[2];
+					actionRanges.put(key, range);
+				}
+				System.arraycopy(factArgs[i].getExplicitRange(), 0, range, 0, 2);
+			}
+		}
 	}
 }

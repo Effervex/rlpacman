@@ -1,14 +1,19 @@
 package relationalFramework;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import relationalFramework.agentObservations.AgentObservations;
+import org.apache.commons.collections.BidiMap;
+
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 import rrlFramework.RRLObservations;
 
@@ -21,10 +26,10 @@ import jess.ValueVector;
  * 
  * @author Sam Sarjant
  */
-public abstract class RelationalPolicy implements Serializable {
+public class RelationalPolicy implements Serializable {
 	private static final long serialVersionUID = -5575181715619476335L;
 	/** The rules of this policy, organised in a deterministic list format. */
-	protected List<RelationalRule> policyRules_;
+	protected List<RelationallyEvaluatableObject> policyRules_;
 	/** The number of rules added to this policy (excluding modular) */
 	protected int policySize_;
 
@@ -32,19 +37,28 @@ public abstract class RelationalPolicy implements Serializable {
 	 * Basic constructor.
 	 */
 	public RelationalPolicy() {
-		policyRules_ = new ArrayList<RelationalRule>();
+		policyRules_ = new ArrayList<RelationallyEvaluatableObject>();
 		policySize_ = 0;
 	}
 
 	/**
-	 * Adds a rule to the policy.
+	 * Checks if this action is in the valid actions.
 	 * 
-	 * @param rule
-	 *            The rule to be added.
+	 * @param actionArgs
+	 *            The action args being checked.
+	 * @param validArgs
+	 *            The set of valid action args.
+	 * @return True if the action is valid, false otherwise.
 	 */
-	public void addRule(RelationalRule rule) {
-		policyRules_.add(rule);
-		policySize_++;
+	private boolean isValidAction(String[] actionArgs,
+			SortedSet<String[]> validArgs) {
+		// If there are no chances for this action at all, return false.
+		if (validArgs == null)
+			return false;
+
+		if (validArgs.contains(actionArgs))
+			return true;
+		return false;
 	}
 
 	/**
@@ -70,7 +84,8 @@ public abstract class RelationalPolicy implements Serializable {
 		// If there are parameters, temp or concrete, insert them here
 		ValueVector vv = new ValueVector();
 		for (RangeContext rangeContext : rule.getRangeContexts()) {
-			double[] minMax = AgentObservations.getInstance().getActionRanges(rangeContext);
+			double[] minMax = EnvironmentAgentObservations
+					.getActionRanges(rangeContext);
 			if (minMax != null) {
 				vv.add(minMax[0]);
 				vv.add(minMax[1]);
@@ -122,35 +137,90 @@ public abstract class RelationalPolicy implements Serializable {
 	}
 
 	/**
-	 * Checks if this action is in the valid actions.
+	 * Adds a rule to the policy.
 	 * 
-	 * @param actionArgs
-	 *            The action args being checked.
-	 * @param validArgs
-	 *            The set of valid action args.
-	 * @return True if the action is valid, false otherwise.
+	 * @param rule
+	 *            The rule to be added.
 	 */
-	private boolean isValidAction(String[] actionArgs,
-			SortedSet<String[]> validArgs) {
-		// If there are no chances for this action at all, return false.
-		if (validArgs == null)
-			return false;
+	public void addRule(RelationalRule rule) {
+		policyRules_.add(rule);
+		policySize_++;
+	}
 
-		if (validArgs.contains(actionArgs))
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
 			return true;
-		return false;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		RelationalPolicy other = (RelationalPolicy) obj;
+		if (policySize_ != other.policySize_)
+			return false;
+		if (policyRules_ == null) {
+			if (other.policyRules_ != null)
+				return false;
+		} else if (!policyRules_.equals(other.policyRules_))
+			return false;
+		return true;
 	}
 
 	/**
 	 * Evaluates a policy for a number of firing rules, and switches on the
 	 * necessary rules.
 	 * 
-	 * @param observations The observations of the state.
+	 * @param observations
+	 *            The observations of the state.
 	 * @param actionsReturned
 	 *            The number of actions to be returned, or if -1, all actions.
 	 * @return The actions being returned by the policy.
 	 */
-	public abstract PolicyActions evaluatePolicy(RRLObservations observations, int actionsReturned);
+	public PolicyActions evaluatePolicy(RRLObservations observations,
+			int actionsReturned) {
+		PolicyActions actionSwitch = new PolicyActions();
+		int actionsFound = 0;
+		int actionsReturnedModified = (actionsReturned <= -1) ? Integer.MAX_VALUE
+				: actionsReturned;
+
+		try {
+			// Evaluate the policy rules.
+			Iterator<RelationallyEvaluatableObject> iter = policyRules_
+					.iterator();
+			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
+				RelationalRule polRule = (RelationalRule) iter.next();
+				Collection<FiredAction> firedActions = evaluateRule(polRule,
+						observations.getState(),
+						observations.getValidActions(polRule
+								.getActionPredicate()), null);
+				actionSwitch.addFiredRule(firedActions, polRule);
+				actionsFound += firedActions.size();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return actionSwitch;
+	}
+
+	/**
+	 * Gets the rules of this object.
+	 * 
+	 * @return The rules/relationally evaluable objects of the policy.
+	 */
+	public List<RelationallyEvaluatableObject> getRules() {
+		return policyRules_;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + policySize_;
+		result = prime * result
+				+ ((policyRules_ == null) ? 0 : policyRules_.hashCode());
+		return result;
+	}
 
 	/**
 	 * Apply arguments to any parameterised rules contained within this policy.
@@ -158,17 +228,10 @@ public abstract class RelationalPolicy implements Serializable {
 	 * @param goalState
 	 *            The arguments to apply to the parameters.
 	 */
-	public void parameterArgs(Map<String, String> goalArgs) {
-		List<String> params = null;
-		if (goalArgs != null) {
-			params = new ArrayList<String>();
-			for (int i = 0; i < goalArgs.size(); i++)
-				params.add(goalArgs.get(RelationalArgument.createGoalTerm(i)));
-		}
-
+	public void parameterArgs(BidiMap goalArgs) {
 		// Set the parameters for the policy rules.
-		for (RelationalRule gr : policyRules_) {
-			gr.setParameters(params);
+		for (RelationallyEvaluatableObject reo : policyRules_) {
+			reo.setParameters(goalArgs);
 		}
 	}
 
@@ -181,12 +244,34 @@ public abstract class RelationalPolicy implements Serializable {
 		buffer.append(":\n");
 
 		boolean first = true;
-		for (RelationalRule rule : policyRules_) {
+		for (RelationallyEvaluatableObject reo : policyRules_) {
 			if (!first)
 				buffer.append("\n");
-			buffer.append(rule.toNiceString());
+			buffer.append(reo.toNiceString());
 			first = false;
 		}
 		return buffer.toString();
+	}
+
+	/**
+	 * Loads a policy from file.
+	 * 
+	 * @param polFile
+	 *            The policy file.
+	 * @return The loaded policy.
+	 */
+	public static RelationalPolicy loadPolicyFile(File polFile)
+			throws Exception {
+		RelationalPolicy policy = new RelationalPolicy();
+		FileReader fr = new FileReader(polFile);
+		BufferedReader br = new BufferedReader(fr);
+
+		String input = null;
+		while ((input = br.readLine()) != null)
+			policy.addRule(new RelationalRule(input));
+
+		br.close();
+		fr.close();
+		return policy;
 	}
 }

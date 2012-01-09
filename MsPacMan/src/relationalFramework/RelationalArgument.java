@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 
 /**
@@ -133,8 +133,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @param context
 	 *            The given context of this range.
 	 */
-	public RelationalArgument(String variable, double minBound,
-			double maxBound) {
+	public RelationalArgument(String variable, double minBound, double maxBound) {
 		rangeContext_ = null;
 		stringArg_ = variable;
 		rangeBounds_[0] = new RangeBound(minBound);
@@ -288,8 +287,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result
-				+ ((argType_ == null) ? 0 : argType_.ordinal());
+		result = prime * result + ((argType_ == null) ? 0 : argType_.ordinal());
 		result = prime * result + Arrays.hashCode(rangeBounds_);
 		result = prime * result + Arrays.hashCode(rangeFrac_);
 		result = prime * result
@@ -330,7 +328,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public String toNiceString() {
 		if (isNumber() && (rangeFrac_[0] != rangeFrac_[1])) {
 			if (rangeContext_ != null) {
-				double[] minMax = AgentObservations.getInstance()
+				double[] minMax = EnvironmentAgentObservations
 						.getActionRanges(rangeContext_);
 				double minBound = (rangeBounds_[0].getValue(minMax));
 				double maxBound = (rangeBounds_[1].getValue(minMax));
@@ -394,5 +392,9 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	private enum ArgType {
 		CONST, NUMBER_CONST, NUMBER_RANGE, VAR, ANON;
+	}
+
+	public boolean isAnonymous() {
+		return this == ANONYMOUS || this.equals(ANONYMOUS);
 	}
 }

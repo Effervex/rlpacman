@@ -18,19 +18,19 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
 import relationalFramework.agentObservations.IntegerArray;
 import util.MultiMap;
 
 public class AgentObservationsTest {
-	private AgentObservations sut_;
+	private EnvironmentAgentObservations sut_;
 
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = AgentObservations.getInstance();
+		sut_ = EnvironmentAgentObservations.getInstance();
 	}
 
 	private void assertBeliefs(ConditionBeliefs cb,
@@ -82,7 +82,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance("blah");
+		sut_ = EnvironmentAgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -449,7 +449,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance("blah");
+		sut_ = EnvironmentAgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -575,7 +575,7 @@ public class AgentObservationsTest {
 	@Test
 	public void testMoveBWScanState() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		sut_ = AgentObservations.newInstance("blah");
+		sut_ = EnvironmentAgentObservations.newInstance("blah");
 
 		// [e]
 		// [b][d]
@@ -986,7 +986,7 @@ public class AgentObservationsTest {
 		// [e]
 		// [b][d]
 		// [f][a][c]
-		sut_ = AgentObservations.newInstance("blah");
+		sut_ = EnvironmentAgentObservations.newInstance("blah");
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear d))");
 		state.eval("(assert (clear e))");
@@ -1203,8 +1203,8 @@ public class AgentObservationsTest {
 	@Test
 	public void testLoadedBackgroundRules() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
-		assertTrue(AgentObservations.loadAgentObservations("onab"));
-		sut_ = AgentObservations.getInstance();
+		assertTrue(EnvironmentAgentObservations.loadAgentObservations("onab"));
+		sut_ = EnvironmentAgentObservations.getInstance();
 
 		// Basic test
 		Collection<BackgroundKnowledge> backgroundKnowledge = sut_

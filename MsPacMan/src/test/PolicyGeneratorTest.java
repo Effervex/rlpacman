@@ -20,7 +20,7 @@ import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
 
-import relationalFramework.agentObservations.AgentObservations;
+import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
 import util.MultiMap;
@@ -36,7 +36,7 @@ public class PolicyGeneratorTest {
 	@Test
 	public void testTriggerRLGGCovering() throws Exception {
 		ProgramArgument.DYNAMIC_SLOTS.setBooleanValue(false);
-		AgentObservations.loadAgentObservations("blah");
+		EnvironmentAgentObservations.loadAgentObservations("blah");
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
@@ -149,7 +149,7 @@ public class PolicyGeneratorTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		AgentObservations.loadAgentObservations("levelmax");
+		EnvironmentAgentObservations.loadAgentObservations("levelmax");
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");

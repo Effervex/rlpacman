@@ -1,21 +1,18 @@
 package cerrla;
 
 import relationalFramework.GoalCondition;
-import relationalFramework.CoveringRelationalPolicy;
+import relationalFramework.ModularPolicy;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
+import relationalFramework.RelationallyEvaluatableObject;
 import relationalFramework.StateSpec;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -33,11 +30,11 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import relationalFramework.agentObservations.AgentObservations;
-import rrlFramework.RRLObservations;
+import relationalFramework.agentObservations.LocalAgentObservations.RuleMutation;
 import util.MultiMap;
 import util.Pair;
 import util.ProbabilityDistribution;
+import util.Recursive;
 import util.SelectableSet;
 import util.SlotOrderComparator;
 
@@ -74,6 +71,7 @@ public final class PolicyGenerator implements Serializable {
 	/** The value of convergence if the algorithm hasn't updated yet. */
 	public static final double NO_UPDATES_CONVERGENCE = -1;
 
+	// TODO Move to RRL Experiment
 	/** The random number generator. */
 	public static Random random_ = new Random(0);
 
@@ -81,7 +79,7 @@ public final class PolicyGenerator implements Serializable {
 	public static final String SERIALISED_FILENAME = "policyGenerator.ser";
 
 	/** Policies awaiting testing. */
-	private Stack<CoveringRelationalPolicy> awaitingTest_;
+	private Stack<ModularPolicy> awaitingTest_;
 
 	/** The number of slots which have both a fixed rule and a converged mean. */
 	private int convergedSlots_;
@@ -103,15 +101,6 @@ public final class PolicyGenerator implements Serializable {
 
 	/** If the generator is currently frozen. */
 	private boolean frozen_ = false;
-
-	/** Gets the local goal this policy generator is working towards. */
-	private String localGoal_;
-
-	/** If this policy generator is being used for learning a module. */
-	private boolean moduleGenerator_;
-
-	/** The goal this generator is working towards if modular. */
-	private GoalCondition moduleGoal_;
 
 	/**
 	 * The number of slot means that have converged to either 0 or 1 (+-
@@ -139,59 +128,25 @@ public final class PolicyGenerator implements Serializable {
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
 
-	/** The rule creation object. */
-	protected RuleCreation ruleCreation_;
-
-	/**
-	 * Initialises the instance as a new policy generator.
-	 * 
-	 * @return The new PolicyGenerator.
-	 */
-	public PolicyGenerator(int randSeed,
-			LocalCrossEntropyDistribution parentLearner) {
-		this(parentLearner);
-		random_ = new Random(randSeed);
-		localGoal_ = StateSpec.getInstance().getGoalName();
-		moduleGenerator_ = false;
-
-		loadAgentData();
-	}
+	/** The modular learning candidate goal conditions. */
+	private Map<RelationalRule, GoalCondition> modularGoalConditions_;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
+	 * 
+	 * @param parentLearner
+	 *            The parent learner controlling how this is used.
 	 */
 	public PolicyGenerator(LocalCrossEntropyDistribution parentLearner) {
 		rlggRules_ = new HashMap<String, RelationalRule>();
-		ruleCreation_ = new RuleCreation();
 		currentRules_ = new SelectableSet<RelationalRule>();
 		currentSlots_ = MultiMap.createListMultiMap();
 		policiesEvaluated_ = 0;
 		mutationTree_ = new TreeMap<Double, RelationalRule>();
 		parentLearner_ = parentLearner;
+		modularGoalConditions_ = new HashMap<RelationalRule, GoalCondition>();
 
 		resetGenerator();
-	}
-
-	/**
-	 * Initialises the instance as a new policy generator which uses information
-	 * from the old generator.
-	 * 
-	 * @param policyGenerator
-	 *            The policy generator containing the old LGG rules.
-	 * @param goalCondition
-	 *            The modular goal being worked towards.
-	 * @return The new PolicyGenerator.
-	 */
-	public PolicyGenerator(PolicyGenerator policyGenerator,
-			GoalCondition goalCondition) {
-		// TODO This probably isn't the right thing to initialise
-		this(policyGenerator.parentLearner_);
-		// Set up the new local goal.
-		localGoal_ = goalCondition.toString();
-		loadAgentData();
-		moduleGenerator_ = true;
-		goalCondition.normaliseArgs();
-		moduleGoal_ = goalCondition;
 	}
 
 	/**
@@ -249,43 +204,20 @@ public final class PolicyGenerator implements Serializable {
 		}
 		// /////////////////////
 
+		
 		// Only selecting the top elite samples
 		Map<Slot, Double> slotMean = new HashMap<Slot, Double>();
 		for (PolicyValue pv : subElites) {
 			double weight = pv.getValue() * gradient + offset;
-			CoveringRelationalPolicy eliteSolution = pv.getPolicy();
+			ModularPolicy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
-			Set<RelationalRule> firingRules = eliteSolution.getFiringRules();
-			Set<Slot> meanNotedSlots = new HashSet<Slot>();
-			int firedRuleIndex = 0;
-			for (RelationalRule rule : eliteSolution.getPolicyRules()) {
-				if (firingRules.contains(rule)) {
-					Slot ruleSlot = rule.getSlot();
-					// Slot counts
-					ed.addSlotCount(ruleSlot, weight);
-
-					// Slot ordering
-					double order = (firingRules.size() == 1) ? 0.5 : 1.0
-							* firedRuleIndex / (firingRules.size() - 1);
-					ed.addSlotOrdering(ruleSlot, order);
-					firedRuleIndex++;
-
-					// Rule counts
-					ed.addRuleCount(rule, weight);
-
-					// Note which slots were active in this policy
-					if (!meanNotedSlots.contains(ruleSlot)) {
-						Double val = slotMean.get(ruleSlot);
-						if (val == null)
-							val = 0.0;
-						slotMean.put(ruleSlot, val + 1);
-						meanNotedSlots.add(ruleSlot);
-					}
-				}
-			}
+			Collection<Slot> meanNotedSlots = new HashSet<Slot>();
+			recurseCountPolicyRules(eliteSolution, weight, meanNotedSlots, ed,
+					slotMean, null);
 		}
 
+		
 		// Calculate the Bernoulli probabilities of each slot
 		for (Slot slot : slotMean.keySet()) {
 			// Each slot should have elites number of counts
@@ -294,6 +226,82 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		return subElites.size();
+	}
+
+	/**
+	 * Recursively counts the firing rules in the Modular Policy.
+	 * 
+	 * @param policy
+	 *            The current modular policy being looked at.
+	 * @param weight
+	 *            The weighted count (or 1, if not weighting).
+	 * @param meanNotedSlots
+	 *            The slots that have already been noted in this policy so far.
+	 * @param ed
+	 *            The ElitesData to add to.
+	 * @param slotMean
+	 *            The slot mean to add to.
+	 * @param orderedFiredSlots
+	 *            An ordered list of slots that fired.
+	 */
+	@Recursive
+	private void recurseCountPolicyRules(ModularPolicy policy, double weight,
+			Collection<Slot> meanNotedSlots, ElitesData ed,
+			Map<Slot, Double> slotMean, List<Slot> orderedFiredSlots) {
+		Set<RelationalRule> firingRules = policy.getFiringRules();
+		boolean mainPolicy = false;
+		if (orderedFiredSlots == null) {
+			mainPolicy = true;
+			orderedFiredSlots = new ArrayList<Slot>();
+		}
+
+		// Recurse through the rule/policies, noting fired rules/policies.
+		for (RelationallyEvaluatableObject reo : policy.getRules()) {
+			// If reo is another policy, get/create the corresponding rule
+			// in this generator.
+			if (reo instanceof ModularPolicy) {
+
+				recurseCountPolicyRules((ModularPolicy) reo, weight,
+						meanNotedSlots, ed, slotMean, orderedFiredSlots);
+
+			} else if (firingRules.contains(reo)) {
+				RelationalRule rule = ((RelationalRule) reo);
+				// May haev to get/create new rule
+				if (!mainPolicy)
+					rule = getCreateCorrespondingRule(rule);
+
+				Slot ruleSlot = rule.getSlot();
+				// Slot counts
+				ed.addSlotCount(ruleSlot, weight);
+
+				// Noting slot order
+				orderedFiredSlots.add(ruleSlot);
+
+				// Rule counts
+				ed.addRuleCount(rule, weight);
+
+				// Note which slots were active in this policy
+				if (!meanNotedSlots.contains(ruleSlot)) {
+					Double val = slotMean.get(ruleSlot);
+					if (val == null)
+						val = 0.0;
+					slotMean.put(ruleSlot, val + 1);
+					meanNotedSlots.add(ruleSlot);
+				}
+			}
+		}
+
+		// Note the order of the policies.
+		if (mainPolicy) {
+			int index = 0;
+			for (Slot orderedSlot : orderedFiredSlots) {
+				// Slot ordering
+				double order = (orderedFiredSlots.size() == 1) ? 0.5 : 1.0
+						* index / (orderedFiredSlots.size() - 1);
+				ed.addSlotOrdering(orderedSlot, order);
+				index++;
+			}
+		}
 	}
 
 	/**
@@ -346,9 +354,8 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	private void mutateRule(RelationalRule baseRule, Slot ruleSlot,
 			int mutationUses) {
-		int observationHash = AgentObservations.getInstance()
+		int observationHash = parentLearner_.getLocalAgentObservations()
 				.getObservationHash();
-		boolean printSlot = false;
 		if (ruleCanMutate(baseRule, mutationUses, observationHash)) {
 			// If the rule can mutate.
 			boolean needToPause = false;
@@ -362,11 +369,14 @@ public final class PolicyGenerator implements Serializable {
 				}
 			}
 
-			Set<RelationalRule> mutants = ruleCreation_
+			// Create the mutants.
+			RuleMutation ruleMutation = parentLearner_
+					.getLocalAgentObservations().getRuleMutation();
+			Set<RelationalRule> mutants = ruleMutation
 					.specialiseRuleMinor(baseRule);
 			if (ProgramArgument.DYNAMIC_SLOTS.booleanValue()
 					|| !rlggRules_.containsValue(ruleSlot.getSeedRule()))
-				mutants.addAll(ruleCreation_.specialiseRule(baseRule));
+				mutants.addAll(ruleMutation.specialiseRule(baseRule));
 			baseRule.setSpawned(observationHash);
 
 			// Ensure no duplicate rules.
@@ -380,9 +390,6 @@ public final class PolicyGenerator implements Serializable {
 				Collection<RelationalRule> removables = new ArrayList<RelationalRule>(
 						previousChildren);
 				removables.removeAll(mutants);
-				
-				if (!removables.isEmpty())
-					System.out.println(ruleSlot);
 
 				// Remove any parent-child links from the rule first
 				for (Iterator<RelationalRule> iter = removables.iterator(); iter
@@ -393,10 +400,10 @@ public final class PolicyGenerator implements Serializable {
 					if (!rr.isWithoutParents())
 						iter.remove();
 
-					printSlot = true;
-					//if (debugMode_) {
+					modularGoalConditions_.remove(rr);
+					if (debugMode_) {
 						System.out.println("\tREMOVING MUTANT: " + rr);
-					//}
+					}
 				}
 
 				// Setting the restart value.
@@ -412,19 +419,19 @@ public final class PolicyGenerator implements Serializable {
 			} else {
 				restart_ = false;
 			}
-			
-			if (printSlot)
-				System.out.println(ruleSlot);
 
 			// Add all mutants to the ruleSlot
 			for (RelationalRule rr : mutants) {
 				// Only add if not already in there
-				// TODO The problem with non-determinism seems to be somewhere around here.
 				ruleSlot.addNewRule(rr);
 				currentRules_.add(rr);
 
+				// Note the goal constants
+				GoalCondition ruleConstants = rr.getConstantCondition();
+				if (ruleConstants != null)
+					modularGoalConditions_.put(rr, ruleConstants);
+
 				if (ProgramArgument.SEED_MODULE_RULES.booleanValue()) {
-					GoalCondition ruleConstants = rr.getConstantCondition();
 					if (ruleConstants != null) {
 						if (ProgramArgument.MULTI_MODULES.booleanValue())
 							insertModuleRules(ruleConstants);
@@ -448,10 +455,8 @@ public final class PolicyGenerator implements Serializable {
 			}
 			baseRule.setChildren(mutants);
 			noteMutationTree(baseRule, parentLearner_.getCurrentEpisode());
-			
-			if (printSlot)
-				System.out.println(ruleSlot);
 
+			// Debug text input
 			if (debugMode_ && needToPause) {
 				try {
 					System.out.println("Press Enter to continue.");
@@ -536,7 +541,8 @@ public final class PolicyGenerator implements Serializable {
 		// (Only check for postUpdate mutations - not split slot mutations)
 		// If the rule's slot isn't already full (using klSize() to simulate
 		// pruning)
-		int maximumSlotCapacity = rule.getSlot().getMaximumCapacity();
+		int maximumSlotCapacity = parentLearner_.getLocalAgentObservations()
+				.getNumSpecialisations(rule.getActionPredicate());
 		if ((mutationUses > -1)
 				&& rule.getSlot().klSize() > maximumSlotCapacity)
 			return false;
@@ -586,8 +592,8 @@ public final class PolicyGenerator implements Serializable {
 		boolean changed = false;
 		for (RelationalRule rlgg : rlggRules_.values()) {
 			// Only re-split the slots if the observation hash has changed.
-			if (ruleCanMutate(rlgg, -1, AgentObservations.getInstance()
-					.getObservationHash())) {
+			if (ruleCanMutate(rlgg, -1, parentLearner_
+					.getLocalAgentObservations().getObservationHash())) {
 				if (debugMode_) {
 					try {
 						System.out.println("\tSPLITTING SLOT "
@@ -602,7 +608,8 @@ public final class PolicyGenerator implements Serializable {
 
 				Slot rlggSlot = rlgg.getSlot();
 				// Split the slots and add them.
-				Set<RelationalRule> splitSeeds = ruleCreation_
+				Set<RelationalRule> splitSeeds = parentLearner_
+						.getLocalAgentObservations().getRuleMutation()
 						.specialiseRule(rlgg);
 				currentRules_.addAll(splitSeeds);
 				for (RelationalRule seedRule : splitSeeds) {
@@ -803,7 +810,7 @@ public final class PolicyGenerator implements Serializable {
 		if (!frozen_ && !awaitingTest_.isEmpty())
 			return awaitingTest_.pop();
 
-		RelationalPolicy policy = new CoveringRelationalPolicy(this);
+		RelationalPolicy policy = new RelationalPolicy();
 
 		SortedMap<Double, RelationalRule> policyOrdering = new TreeMap<Double, RelationalRule>();
 
@@ -900,14 +907,6 @@ public final class PolicyGenerator implements Serializable {
 		return slotGenerator_;
 	}
 
-	public String getLocalGoal() {
-		return localGoal_;
-	}
-
-	public GoalCondition getModuleGoal() {
-		return moduleGoal_;
-	}
-
 	public Collection<RelationalRule> getMutatedRules() {
 		return mutationTree_.values();
 	}
@@ -926,6 +925,10 @@ public final class PolicyGenerator implements Serializable {
 
 	public Map<String, RelationalRule> getRLGGRules() {
 		return rlggRules_;
+	}
+
+	public Collection<GoalCondition> getPotentialModuleGoals() {
+		return modularGoalConditions_.values();
 	}
 
 	/**
@@ -955,18 +958,6 @@ public final class PolicyGenerator implements Serializable {
 				return false;
 		}
 		return true;
-	}
-
-	public boolean isModuleGenerator() {
-		return moduleGenerator_;
-	}
-
-	/**
-	 * Loads external agent data (AgentObservations and StateSpec).
-	 */
-	public void loadAgentData() {
-		AgentObservations.loadAgentObservations(localGoal_);
-		StateSpec.reinitInstance();
 	}
 
 	/**
@@ -1077,7 +1068,7 @@ public final class PolicyGenerator implements Serializable {
 		currentRules_.clear();
 		currentSlots_.clear();
 
-		awaitingTest_ = new Stack<CoveringRelationalPolicy>();
+		awaitingTest_ = new Stack<ModularPolicy>();
 	}
 
 	/**
@@ -1087,8 +1078,8 @@ public final class PolicyGenerator implements Serializable {
 	 * @param policy
 	 *            The policy to retest.
 	 */
-	public void retestPolicy(CoveringRelationalPolicy policy) {
-		awaitingTest_.push(new CoveringRelationalPolicy(policy));
+	public void retestPolicy(ModularPolicy policy) {
+		awaitingTest_.push(new ModularPolicy(policy));
 	}
 
 	/**
@@ -1242,8 +1233,9 @@ public final class PolicyGenerator implements Serializable {
 				RelationalRule seedRule = new RelationalRule(input);
 				SortedSet<RelationalPredicate> ruleConds = seedRule
 						.getConditions(false);
-				ruleConds = ruleCreation_.simplifyRule(ruleConds, null,
-						seedRule.getAction(), false);
+				ruleConds = parentLearner_.getLocalAgentObservations()
+						.simplifyRule(ruleConds, null, seedRule.getAction(),
+								false);
 				seedRule = new RelationalRule(ruleConds, seedRule.getAction(),
 						null);
 				createSeededSlot(seedRule);
@@ -1254,25 +1246,6 @@ public final class PolicyGenerator implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
-
-	/**
-	 * Saves the policy generator in a serializable format.
-	 * 
-	 * @param serFile
-	 *            The file to serialize to.
-	 */
-	public void serialisePolicyGenerator(File serFile) throws Exception {
-		if (moduleGenerator_ && Module.saveAtEnd_)
-			return;
-
-		FileOutputStream fos = new FileOutputStream(serFile);
-		ObjectOutputStream oos = new ObjectOutputStream(fos);
-
-		Module.saveGenerator(this);
-
-		oos.writeObject(this);
-		oos.close();
 	}
 
 	public void setPoliciesEvaluated(int pe) {
@@ -1301,80 +1274,6 @@ public final class PolicyGenerator implements Serializable {
 	@Override
 	public String toString() {
 		return slotGenerator_.toString();
-	}
-
-	/**
-	 * Triggers covering of a state. This works by finding the maximally general
-	 * (valid) set of conditions for each valid action type in the state (not
-	 * individual actions).
-	 * 
-	 * @param state
-	 *            The observations of the current state, including the valid
-	 *            actions to take.
-	 * @param validActions
-	 *            The set of valid actions to choose from.
-	 * @param activatedActions
-	 *            The set of actions that have already been activated by
-	 *            existing rules in the policy. By the way policies are set up,
-	 *            LGG rules will always be in them.
-	 * @param goalTerms
-	 *            The replacement terms for the goal.
-	 * @return The list of covered rules, one for each action type.
-	 */
-	public List<RelationalRule> triggerRLGGCovering(
-			RRLObservations observations,
-			MultiMap<String, String[]> activatedActions) {
-		// If there are actions to cover, cover them.
-		if (!frozen_
-				&& AgentObservations.getInstance().isCoveringNeeded(
-						observations.getValidActions(), activatedActions)) {
-			List<RelationalRule> covered = null;
-			try {
-				currentRules_.removeAll(rlggRules_.values());
-				covered = ruleCreation_.rlggState(observations, moduleGoal_);
-				currentRules_.addAll(covered);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-
-			// Add remaining information to rules.
-			for (RelationalRule coveredRule : covered) {
-				Slot rlggSlot = coveredRule.getSlot();
-				if (coveredRule.isRecentlyModified()) {
-					System.out.println("\tCOVERED RULE: " + coveredRule);
-					if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
-						restart_ = true;
-						if (rlggSlot != null)
-							rlggSlot.resetPolicyCount();
-					}
-				}
-
-				RelationalPredicate action = coveredRule.getAction();
-				if (rlggSlot == null) {
-					rlggSlot = new Slot(coveredRule, false, 0, this);
-					slotGenerator_.add(rlggSlot);
-					currentSlots_.clearValues(coveredRule.getActionPredicate());
-					currentSlots_.put(coveredRule.getActionPredicate(),
-							rlggSlot);
-				}
-
-				// Add to the covered rules
-				rlggRules_.put(action.getFactName(), coveredRule);
-			}
-
-			// If not using dynamic slots, split the slots now.
-			// TODO Creating an initial burst may be worth it...
-			if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
-				splitRLGGSlots();
-			}
-
-			// Re-mutate all slot seed rules (if observations have changed)
-			for (Slot slot : slotGenerator_)
-				mutateRule(slot.getSeedRule(), slot, -1);
-
-			return covered;
-		}
-		return null;
 	}
 
 	/**
@@ -1483,50 +1382,53 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Loads a serialised policy generator.
-	 * 
-	 * @param serializedFile
-	 *            The serialised generator file to load.
-	 * @param run
-	 *            The run value.
-	 * @return The instantiated Policy Generator of the file.
+	 * Simply removes the RLGG rules from the current rules collection.
 	 */
-	public static PolicyGenerator loadPolicyGenerator(File serializedFile) {
-		ObjectInputStream ois = null;
-		try {
-			FileInputStream fis = new FileInputStream(serializedFile);
-			ois = new ObjectInputStream(fis);
-			PolicyGenerator loaded = (PolicyGenerator) ois.readObject();
-			AgentObservations.loadAgentObservations(loaded.localGoal_);
-			ois.close();
-
-			StateSpec.reinitInstance();
-			return loaded;
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
+	protected void removeRLGGRules() {
+		currentRules_.removeAll(rlggRules_.values());
 	}
 
 	/**
-	 * Loads a serialised policy generator and sets it as a module generator.
+	 * Adds a collection of RLGG rules to this generator.
 	 * 
-	 * @param modFile
-	 *            The serialised policy generator module file.
-	 * @param goalCondition
-	 *            The goal condition to set, if necessary.
-	 * @return The loaded policy generator, or null if it doesn't exist.
+	 * @param rlggRules
+	 *            The rlgg rules to add.
 	 */
-	public static PolicyGenerator loadPolicyGenerator(File modFile,
-			GoalCondition goalCondition) {
-		PolicyGenerator modPG = loadPolicyGenerator(modFile);
-		if (modPG != null) {
-			modPG.moduleGenerator_ = true;
-			goalCondition.normaliseArgs();
-			modPG.moduleGoal_ = goalCondition;
+	protected void addRLGGRules(List<RelationalRule> rlggRules) {
+		currentRules_.addAll(rlggRules);
+
+		// Add remaining information to rules.
+		for (RelationalRule coveredRule : rlggRules) {
+			Slot rlggSlot = coveredRule.getSlot();
+			if (coveredRule.isRecentlyModified()) {
+				System.out.println("\tCOVERED RULE: " + coveredRule);
+				if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
+					restart_ = true;
+					if (rlggSlot != null)
+						rlggSlot.resetPolicyCount();
+				}
+			}
+
+			RelationalPredicate action = coveredRule.getAction();
+			if (rlggSlot == null) {
+				rlggSlot = new Slot(coveredRule, false, 0, this);
+				slotGenerator_.add(rlggSlot);
+				currentSlots_.clearValues(coveredRule.getActionPredicate());
+				currentSlots_.put(coveredRule.getActionPredicate(), rlggSlot);
+			}
+
+			// Add to the covered rules
+			rlggRules_.put(action.getFactName(), coveredRule);
 		}
-		PolicyGenerator loaded = modPG;
-		StateSpec.reinitInstance();
-		return loaded;
+
+		// If not using dynamic slots, split the slots now.
+		// TODO Creating an initial burst may be worth it...
+		if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
+			splitRLGGSlots();
+		}
+
+		// Re-mutate all slot seed rules (if observations have changed)
+		for (Slot slot : slotGenerator_)
+			mutateRule(slot.getSeedRule(), slot, -1);
 	}
 }

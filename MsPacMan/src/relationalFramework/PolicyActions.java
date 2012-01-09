@@ -5,6 +5,7 @@ import relationalFramework.PolicyActions;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 /**
  * This class represents the chosen actions the agent returns when making a
@@ -20,11 +21,15 @@ public class PolicyActions {
 	 */
 	private ArrayList<Collection<FiredAction>> activeActions_;
 
+	/** The rules that fired actions. */
+	private List<RelationalRule> firedRules_;
+
 	/**
 	 * A constructor for a new ActionChoice, which initialises the action array.
 	 */
 	public PolicyActions() {
 		activeActions_ = new ArrayList<Collection<FiredAction>>();
+		firedRules_ = new ArrayList<RelationalRule>();
 	}
 
 	/**
@@ -32,10 +37,14 @@ public class PolicyActions {
 	 * 
 	 * @param firedActions
 	 *            The actions being switched on.
+	 * @param firedRule
+	 *            The rule that produced these actions.
 	 */
-	public void addFiredRule(Collection<FiredAction> firedActions) {
+	public void addFiredRule(Collection<FiredAction> firedActions,
+			RelationalRule firedRule) {
 		if ((firedActions != null) && (!firedActions.isEmpty())) {
 			activeActions_.add(firedActions);
+			firedRules_.add(firedRule);
 		}
 	}
 
@@ -95,5 +104,16 @@ public class PolicyActions {
 		} else if (!activeActions_.equals(other.activeActions_))
 			return false;
 		return true;
+	}
+
+	/**
+	 * Gets an ordered list of all the rules that fired (produced an action) in
+	 * this {@link PolicyActions}.
+	 * 
+	 * @return The list of firing rules.
+	 */
+	public List<RelationalRule> getFiredRules() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

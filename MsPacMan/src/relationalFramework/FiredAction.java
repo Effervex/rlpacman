@@ -1,7 +1,6 @@
 package relationalFramework;
 
 import relationalFramework.FiredAction;
-import relationalFramework.CoveringRelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import cerrla.Slot;
@@ -61,8 +60,8 @@ public class FiredAction implements Comparable<FiredAction> {
 	 */
 	public void triggerRule() {
 		utilised_ = true;
-		if (firingPolicy_ instanceof CoveringRelationalPolicy)
-			((CoveringRelationalPolicy) firingPolicy_).addTriggeredRule(firingRule_);
+		if (firingPolicy_ instanceof ModularPolicy)
+			((ModularPolicy) firingPolicy_).addTriggeredRule(firingRule_);
 	}
 
 	/**
