@@ -720,7 +720,7 @@ public class RelationalRule implements Serializable,
 	 * the values.
 	 * 
 	 * @param parameterMap
-	 *            The map of parameters.
+	 *            The map of parameters (a -> ?G_0).
 	 */
 	public void setParameters(BidiMap parameterMap) {
 		if (parameterMap == null) {
@@ -728,16 +728,19 @@ public class RelationalRule implements Serializable,
 			return;
 		}
 
+		// Creating new query params if necessary (shouldn't be)
 		boolean hasQueryParams = queryParams_ != null;
-		if (!hasQueryParams)
+		if (!hasQueryParams) {
 			queryParams_ = new ArrayList<String>(parameterMap.size());
-		parameters_ = new ArrayList<String>(parameterMap.size());
-		for (int i = 0; i < parameterMap.size(); i++) {
-			String goalTerm = RelationalArgument.createGoalTerm(i);
-			if (!hasQueryParams)
-				queryParams_.add(goalTerm);
-			parameters_.add((String) parameterMap.getKey(goalTerm));
+			for (int i = 0; i < parameterMap.size(); i++)
+				queryParams_.add(RelationalArgument.createGoalTerm(i));
 		}
+		
+		// Setting the parameters
+		parameters_ = new ArrayList<String>(parameterMap.size());
+		for (String queryParam : queryParams_)
+			parameters_.add((String) parameterMap.getKey(queryParam));
+		
 		if (!hasQueryParams)
 			findConstantsAndRanges();
 	}

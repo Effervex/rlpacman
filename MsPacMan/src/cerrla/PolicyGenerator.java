@@ -128,9 +128,6 @@ public final class PolicyGenerator implements Serializable {
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
 
-	/** The modular learning candidate goal conditions. */
-	private Map<RelationalRule, GoalCondition> modularGoalConditions_;
-
 	/**
 	 * The constructor for creating a new Policy Generator.
 	 * 
@@ -144,7 +141,6 @@ public final class PolicyGenerator implements Serializable {
 		policiesEvaluated_ = 0;
 		mutationTree_ = new TreeMap<Double, RelationalRule>();
 		parentLearner_ = parentLearner;
-		modularGoalConditions_ = new HashMap<RelationalRule, GoalCondition>();
 
 		resetGenerator();
 	}
@@ -400,7 +396,6 @@ public final class PolicyGenerator implements Serializable {
 					if (!rr.isWithoutParents())
 						iter.remove();
 
-					modularGoalConditions_.remove(rr);
 					if (debugMode_) {
 						System.out.println("\tREMOVING MUTANT: " + rr);
 					}
@@ -428,8 +423,6 @@ public final class PolicyGenerator implements Serializable {
 
 				// Note the goal constants
 				GoalCondition ruleConstants = rr.getConstantCondition();
-				if (ruleConstants != null)
-					modularGoalConditions_.put(rr, ruleConstants);
 
 				if (ProgramArgument.SEED_MODULE_RULES.booleanValue()) {
 					if (ruleConstants != null) {
@@ -925,10 +918,6 @@ public final class PolicyGenerator implements Serializable {
 
 	public Map<String, RelationalRule> getRLGGRules() {
 		return rlggRules_;
-	}
-
-	public Collection<GoalCondition> getPotentialModuleGoals() {
-		return modularGoalConditions_.values();
 	}
 
 	/**

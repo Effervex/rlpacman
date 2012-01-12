@@ -342,4 +342,15 @@ public class Config {
 	public String getEnvironmentClass() {
 		return environmentClass_;
 	}
+
+	public void setGoal(String goalName) {
+		if (mainGoal_ == null || !mainGoal_.toString().equals(goalName))
+			mainGoal_ = new GoalCondition(goalName);
+	}
+
+	public String getGoalString() {
+		if (mainGoal_ == null)
+			return null;
+		return mainGoal_.toString();
+	}
 }

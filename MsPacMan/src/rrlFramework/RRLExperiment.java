@@ -313,7 +313,8 @@ public class RRLExperiment {
 	public void run(int runIndex, int finiteEpisodes) {
 		// Initialise the agent and environment
 		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
-				Config.getInstance().getGoal().toString());
+				Config.getInstance().getGoalString());
+		Config.getInstance().setGoal(StateSpec.getInstance().getGoalName());
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 		random_ = new Random(runIndex);
 

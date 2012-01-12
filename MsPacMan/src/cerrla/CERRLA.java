@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 
 import relationalFramework.GoalCondition;
@@ -35,6 +34,9 @@ public class CERRLA implements RRLAgent {
 	/** The modular policy being tested. */
 	private ModularPolicy currentPolicy_;
 
+	/** Notes the generators that will be involved in the update process. */
+	private Collection<LocalCrossEntropyDistribution> relevantDistributions_;
+
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
 
@@ -59,17 +61,26 @@ public class CERRLA implements RRLAgent {
 		}
 
 		// Note figures
+		policyEpisodes_++;
 		for (LocalCrossEntropyDistribution distribution : currentPolicy_
 				.getRelevantCEDistributions()) {
 			distribution.noteStepReward(observations.getReward());
 
 			// Note the rewards.
-			distribution.noteEpisodeReward(policyEpisodes_);
-			policyEpisodes_++;
+			distribution.noteEpisodeReward();
 			if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()) {
 				distribution.recordSample();
 				currentPolicy_ = null;
+
+				if (ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+					System.out.println();
 			}
+		}
+
+		// Extra lines
+		if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()
+				&& ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+			System.out.println();
 		}
 	}
 
@@ -89,6 +100,7 @@ public class CERRLA implements RRLAgent {
 		currentPolicy_ = null;
 		policyEpisodes_ = 0;
 		currentRun_ = run;
+		relevantDistributions_ = new HashSet<LocalCrossEntropyDistribution>();
 	}
 
 	@Override
@@ -96,7 +108,6 @@ public class CERRLA implements RRLAgent {
 		return mainGoalCECortex_.isConverged();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public RRLActions startEpisode(RRLObservations observations) {
 		// Check for module stuff
@@ -111,8 +122,11 @@ public class CERRLA implements RRLAgent {
 				System.out.println();
 			}
 			policyEpisodes_ = 0;
+			relevantDistributions_.clear();
+			relevantDistributions_.add(mainGoalCECortex_);
 		}
 
+		// Start the episode for each contained behaviour.
 		for (LocalCrossEntropyDistribution dist : currentPolicy_
 				.getRelevantCEDistributions())
 			dist.startEpisode();
@@ -154,11 +168,22 @@ public class CERRLA implements RRLAgent {
 		ModularPolicy modularPolicy = new ModularPolicy(policyGenerator,
 				paramReplacementMap);
 
-		RelationalPolicy mainPolicy = policyGenerator.generatePolicy(modularPolicy);
+		RelationalPolicy mainPolicy = policyGenerator
+				.generatePolicy(modularPolicy);
+		// Dealing with re-tested policies.
+		if (mainPolicy instanceof ModularPolicy)
+			return (ModularPolicy) mainPolicy;
+
+		// TODO Disallow duplicate rules from policies - they have no use.
 		// Add all rules in the basic policy
 		for (RelationallyEvaluatableObject reo : mainPolicy.getRules()) {
 			RelationalRule rule = (RelationalRule) reo;
-			
+
+			// Add the rule first
+			if (moduleParams != null)
+				rule.setModularParameters(moduleParams);
+			modularPolicy.addRule(rule);
+
 			GoalCondition ruleGCs = rule.getConstantCondition();
 			LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
 					.get(ruleGCs);
@@ -173,17 +198,20 @@ public class CERRLA implements RRLAgent {
 
 				// Apply the replacement map
 				ArrayList<String> newModuleParams = new ArrayList<String>();
-				for (String constantArg : ruleGCs.getConstantArgs())
-					newModuleParams.add(paramReplacementMap.get(constantArg));
+				for (String constantArg : ruleGCs.getConstantArgs()) {
+					if (paramReplacementMap.isEmpty())
+						newModuleParams.add(constantArg);
+					else
+						newModuleParams.add(paramReplacementMap
+								.get(constantArg));
+				}
 
 				// Add the policy
-				modularPolicy.addPolicy(generatePolicy(moduleDistribution,
-						modulePrior, newModuleParams));
+				modularPolicy.addPolicy(
+						ruleGCs.getFacts(),
+						generatePolicy(moduleDistribution, modulePrior,
+								newModuleParams));
 			}
-
-			if (moduleParams != null)
-				rule.setModularParameters(moduleParams);
-			modularPolicy.addRule(rule);
 		}
 
 		return modularPolicy;
@@ -203,8 +231,19 @@ public class CERRLA implements RRLAgent {
 
 		// Scan which rules are firing if using modules
 		if (ProgramArgument.USE_MODULES.booleanValue()) {
-			List<RelationalRule> firedRules = policyActions.getFiredRules();
-			// TODO Unimplemented
+			Collection<RelationalPolicy> firedPolicies = policyActions
+					.getFiredPolicies();
+			// For every rule that fired, add the relevant behaviours to the
+			// relevant collection.
+			for (RelationalPolicy firedPolicy : firedPolicies) {
+				ModularPolicy modPolicy = (ModularPolicy) firedPolicy;
+				// Run through the policy hierarchy
+				do {
+					relevantDistributions_.add(modPolicy
+							.getLocalCEDistribution());
+					modPolicy = modPolicy.getParentPolicy();
+				} while (modPolicy != null);
+			}
 		}
 		return new RRLActions(policyActions);
 	}
@@ -241,9 +280,8 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public RRLActions stepEpisode(RRLObservations observations) {
-		// Note the reward for each distribution
-		for (LocalCrossEntropyDistribution distribution : currentPolicy_
-				.getRelevantCEDistributions())
+		// Note the reward for the relevant distributions
+		for (LocalCrossEntropyDistribution distribution : relevantDistributions_)
 			distribution.noteStepReward(observations.getReward());
 		return evaluatePolicy(observations);
 	}

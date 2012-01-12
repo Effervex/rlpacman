@@ -6,17 +6,24 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+
+import org.apache.commons.collections.BidiMap;
+
+import jess.QueryResult;
+import jess.Rete;
+import jess.ValueVector;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.ModularPolicy;
 import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.LocalAgentObservations;
@@ -30,10 +37,16 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public class LocalCrossEntropyDistribution implements Serializable {
+	/** The minimum 'goal-not-achieved' value. */
+	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
+
 	/** The collection of non existant modules. */
 	private static final Collection<String> nonExistantModule_ = new HashSet<String>();
 
-	private static final long serialVersionUID = 300896343523518290L;
+	private static final long serialVersionUID = 6883881456264179505L;
+
+	/** The reward received at every step by the sub-goal. */
+	private static final double SUB_GOAL_REWARD = -1;
 
 	/** The relative directory in which modules are stored. */
 	public static final String MODULE_DIR = "modules";
@@ -59,8 +72,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** If this generator is currently frozen (not learning). */
 	private boolean frozen_;
 
+	/** An internal flag to check if the sub-goal has been achieved. */
+	private boolean goalAchieved_;
+
 	/** The goal condition for this cross-entropy behaviour. */
-	private GoalCondition goalCondition_;
+	private final GoalCondition goalCondition_;
+
+	/** The created goal rule for checking if the internal goal is achieved. */
+	private final RelationalRule goalRule_;
 
 	/** The localised agent observations for this goal. */
 	private transient LocalAgentObservations localAgentObservations_;
@@ -72,10 +91,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private boolean oldAOSettled_;
 
 	/** The performance object, noting figures. */
-	private Performance performance_;
+	private final Performance performance_;
 
 	/** The distributions of rules. */
-	private PolicyGenerator policyGenerator_;
+	private final PolicyGenerator policyGenerator_;
 
 	/** The population value. */
 	private int population_;
@@ -91,8 +110,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            The goal of this behaviour.
 	 */
 	public LocalCrossEntropyDistribution(GoalCondition goal) {
-		this(goal, 0);
-		performance_ = new Performance(true);
+		this(goal, -1);
 	}
 
 	/**
@@ -104,13 +122,34 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            The run this generator is for.
 	 */
 	public LocalCrossEntropyDistribution(GoalCondition goal, int run) {
-		goalCondition_ = goal;
+		if (goal.isMainGoal())
+			goalCondition_ = goal;
+		else {
+			goalCondition_ = new GoalCondition(goal);
+			goalCondition_.normaliseArgs();
+		}
+
 		policyGenerator_ = new PolicyGenerator(this);
-		performance_ = new Performance(run);
-		localAgentObservations_ = new LocalAgentObservations(goalCondition_);
+		if (run == -1)
+			performance_ = new Performance(true);
+		else
+			performance_ = new Performance(run);
 		elites_ = new TreeSet<PolicyValue>();
 		population_ = Integer.MAX_VALUE;
 		numElites_ = Integer.MAX_VALUE;
+
+		// Form the goal rule
+		if (!goalCondition_.isMainGoal()) {
+			SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>(
+					goalCondition_.getFacts());
+			goalRule_ = new RelationalRule(conditions, null, null);
+			goalRule_.expandConditions();
+		} else
+			goalRule_ = null;
+
+		// Load the local agent observations
+		localAgentObservations_ = LocalAgentObservations
+				.loadAgentObservations(goal);
 	}
 
 	/**
@@ -162,6 +201,44 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
+	 * Processes the internal goal (checks if it is achieved).
+	 * 
+	 * @param observations
+	 *            The current state observations.
+	 * @param goalReplacements
+	 *            The current goal replacement variable(s) (a -> ?G_0).
+	 * @return True if the internal goal is/has been achieved.
+	 */
+	private boolean processInternalGoal(RRLObservations observations,
+			BidiMap goalReplacements) {
+		if (goalAchieved_)
+			return true;
+
+		try {
+			// Assign the parameters
+			Rete state = observations.getState();
+//			System.out.println(StateSpec.extractFacts(state));
+			ValueVector vv = new ValueVector();
+			goalRule_.setParameters(goalReplacements);
+			for (String param : goalRule_.getParameters())
+				vv.add(param);
+
+			// Run the query
+			String query = StateSpec.getInstance().getRuleQuery(goalRule_);
+			QueryResult results = state.runQueryStar(query, vv);
+
+			// If results, then the goal has been met!
+			if (results.next()) {
+				goalAchieved_ = true;
+			}
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return goalAchieved_;
+	}
+
+	/**
 	 * Updates the distributions based on the current state of the elites.
 	 * 
 	 * @param elites
@@ -171,6 +248,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	private boolean updateDistributions(SortedSet<PolicyValue> elites,
 			int population, int numElites) {
+		if (population == 0)
+			return false;
+
 		double minReward = performance_.getMinimumReward();
 
 		// Clean up the policy values
@@ -192,6 +272,48 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// Clear the restart
 		policyGenerator_.shouldRestart();
 		return resetElites;
+	}
+
+	/**
+	 * (Potentially) covers the current state depending on whether the agent
+	 * believes covering the state will get it more information.
+	 * 
+	 * @param observations
+	 *            The current state observations.
+	 * @param activatedActions
+	 *            The actions found by the current RLGG rules.
+	 * @param moduleParamReplacements
+	 *            Optional module parameter replacements to apply to the current
+	 *            goal replacements.
+	 * @return Any newly created RLGG rules, or null if no change/no new rules.
+	 */
+	@SuppressWarnings("unchecked")
+	public List<RelationalRule> coverState(RRLObservations observations,
+			MultiMap<String, String[]> activatedActions,
+			BidiMap goalReplacements) {
+		// Process internal goals and return if goal is already achieved.
+		if (!goalCondition_.isMainGoal()) {
+			if (processInternalGoal(observations, goalReplacements))
+				return null;
+		}
+
+		// Only trigger RLGG covering if it is needed.
+		if (!frozen_
+				&& localAgentObservations_.observeState(observations,
+						activatedActions, goalReplacements)) {
+			// Old RLGGs
+			Collection<RelationalRule> oldRLGGs = new ArrayList<RelationalRule>(
+					policyGenerator_.getRLGGRules().values());
+			policyGenerator_.removeRLGGRules();
+			List<RelationalRule> covered = localAgentObservations_
+					.getRLGGRules();
+
+			policyGenerator_.addRLGGRules(covered);
+			covered.removeAll(oldRLGGs);
+			return covered;
+		}
+
+		return null;
 	}
 
 	/**
@@ -251,7 +373,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return All potential module conditions.
 	 */
 	public Collection<GoalCondition> getPotentialModuleGoals() {
-		return policyGenerator_.getPotentialModuleGoals();
+		return localAgentObservations_.getSpecificGoalConditions();
 	}
 
 	/**
@@ -280,30 +402,48 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
+	 * If the internal goal has been achieved in this episode yet.
+	 * 
+	 * @return True if the goal has been achieved this episode.
+	 */
+	public boolean isGoalAchieved() {
+		return goalAchieved_;
+	}
+
+	/**
 	 * Notes the reward for a _single_ episode.
 	 * 
 	 * @param episodeReward
 	 *            The total reward received this episode.
-	 * @param policyEpisode
-	 *            The policy relative episode index.
 	 */
-	public void noteEpisodeReward(int policyEpisode) {
-		performance_.noteEpisodeReward(episodeReward_, policyEpisode);
-		if (!frozen_)
-			currentEpisode_++;
+	public void noteEpisodeReward() {
+		// Modify the reward if the goal hasn't been achieved if a sub-goal
+		// generator
+		if (!goalCondition_.isMainGoal() && !goalAchieved_)
+			episodeReward_ = MINIMUM_REWARD;
+
+		// Only note the sample if it was actually used
+		if (goalCondition_.isMainGoal() || episodeReward_ != 0) {
+			performance_.noteEpisodeReward(episodeReward_);
+			if (!frozen_)
+				currentEpisode_++;
+		}
 	}
 
 	/**
-	 * Determines the reward received, given the environment's reward.
+	 * Notes reward received, given the environment's reward OR an internal
+	 * reward.
 	 * 
 	 * @param environmentReward
 	 *            The reward provided by the environment.
-	 * @return The reward to be recorded.
 	 */
-	public double noteStepReward(double environmentReward) {
-		// TODO Modify if internal reward.
-		episodeReward_ += environmentReward;
-		return environmentReward;
+	public void noteStepReward(double environmentReward) {
+		// If this is an unachieved sub-goal, note reward.
+		if (!goalCondition_.isMainGoal()) {
+			if (!goalAchieved_)
+				episodeReward_ += SUB_GOAL_REWARD;
+		} else
+			episodeReward_ += environmentReward;
 	}
 
 	/**
@@ -313,12 +453,19 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            The value of the sample.
 	 */
 	public void recordSample() {
+		// If no samples were gathered (due to sub-goal definition), exit
+		if (!performance_.hasSampleValue()) {
+			// TODO Enforce 3 repetitions per policy?
+			performance_.resetPolicyValues();
+			return;
+		}
+
 		double value = performance_.getAverageEpisodeReward();
 
 		if (!frozen_) {
 			// Add sample to elites
-			PolicyValue pv = new PolicyValue((ModularPolicy) currentPolicy_,
-					value, policyGenerator_.getPoliciesEvaluated());
+			PolicyValue pv = new PolicyValue(currentPolicy_, value,
+					policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
 			policyGenerator_.incrementPoliciesEvaluated();
 
@@ -334,7 +481,11 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Output system output
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			System.out.println(currentEpisode_ + ": " + value);
+			if (goalCondition_.isMainGoal())
+				System.out.println(currentEpisode_ + ": " + value);
+			else
+				System.out.println("[" + goalCondition_ + "] "
+						+ currentEpisode_ + ": " + value);
 
 			// Estimate experiment convergence
 			double convergence = policyGenerator_.getConvergenceValue();
@@ -350,12 +501,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Note performance values
 		performance_.noteSampleReward(value, currentEpisode_);
-
-		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			// New lines.
-			System.out.println();
-			System.out.println();
-		}
 
 
 
@@ -384,10 +529,26 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	public void saveCEDistribution(File serFile,
 			boolean saveEnvAgentObservations) {
 		try {
+			// Write the main behaviour to temp and module
+			if (goalCondition_.isMainGoal()) {
+				FileOutputStream fos = new FileOutputStream(serFile);
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(this);
+				oos.close();
+			}
+
+			// Write serialised to module
+			File moduleFolder = getModFolder(StateSpec.getInstance()
+					.getEnvironmentName(), goalCondition_.toString());
+			serFile = new File(moduleFolder, goalCondition_.toString()
+					+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX);
+			serFile.createNewFile();
+
 			FileOutputStream fos = new FileOutputStream(serFile);
 			ObjectOutputStream oos = new ObjectOutputStream(fos);
 			oos.writeObject(this);
 			oos.close();
+
 
 			// Also note Local Agent Observations (as they are transient)
 			localAgentObservations_
@@ -410,7 +571,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		try {
 			File modFolder = getModFolder(StateSpec.getInstance()
 					.getEnvironmentName(), goalCondition_.toString());
-			modFolder.mkdirs();
 			File genFile = new File(modFolder,
 					PolicyGenerator.SERIALISED_FILENAME);
 			genFile.createNewFile();
@@ -427,37 +587,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	public void startEpisode() {
 		// Reset the reward.
 		episodeReward_ = 0;
+		goalAchieved_ = false;
 	}
 
-	/**
-	 * (Potentially) covers the current state depending on whether the agent
-	 * believes covering the state will get it more information.
-	 * 
-	 * @param observations
-	 *            The current state observations.
-	 * @param activatedActions
-	 *            The actions found by the current RLGG rules.
-	 * @param moduleParamReplacements
-	 *            Optional module parameter replacements to apply to the current
-	 *            goal replacements.
-	 * @return The RLGG rules if new ones are found, or null if no change.
-	 */
-	public List<RelationalRule> coverState(RRLObservations observations,
-			MultiMap<String, String[]> activatedActions,
-			Map<String, String> goalReplacements) {
-		// Only trigger RLGG covering if it is needed.
-		if (!frozen_
-				&& localAgentObservations_.observeState(observations,
-						activatedActions, goalReplacements)) {
-			policyGenerator_.removeRLGGRules();
-			List<RelationalRule> covered = localAgentObservations_
-					.getRLGGRules();
-
-			policyGenerator_.addRLGGRules(covered);
-			return covered;
-		}
-
-		return null;
+	@Override
+	public String toString() {
+		return goalCondition_.toString() + " Behaviour";
 	}
 
 	/**
@@ -471,8 +606,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return The File path to the module.
 	 */
 	private static File getModFolder(String environmentName, String modName) {
-		return new File(MODULE_DIR + File.separatorChar + environmentName
-				+ File.separatorChar + modName + File.separatorChar);
+		File modFolder = new File(MODULE_DIR + File.separatorChar
+				+ environmentName);
+		modFolder.mkdir();
+		File goalModFolder = new File(modFolder, modName);
+		goalModFolder.mkdir();
+		return goalModFolder;
 	}
 
 	/**
@@ -514,5 +653,15 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	/**
+	 * Sets if the goal is achieved or not.
+	 * 
+	 * @param b
+	 *            The state of goal achievement (usually true).
+	 */
+	public void setGoalAchieved(boolean b) {
+		goalAchieved_ = b;
 	}
 }

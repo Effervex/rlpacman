@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.Serializable;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -46,7 +47,7 @@ public class Performance implements Serializable {
 	/** The episodic reward (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeMeans_;
 	/** The rewards received from each episode. */
-	private double[] episodeRewards_;
+	private ArrayList<Double> episodeRewards_;
 	/** The episodic SD (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeSDs_;
 	/** If the performance is frozen. */
@@ -75,6 +76,8 @@ public class Performance implements Serializable {
 	public Performance(int runIndex) {
 		episodeMeans_ = new TreeMap<Integer, Double>();
 		episodeSDs_ = new TreeMap<Integer, Double>();
+		episodeRewards_ = new ArrayList<Double>(
+				ProgramArgument.POLICY_REPEATS.intValue());
 		recentScores_ = new LinkedList<Double>();
 		internalSDs_ = new LinkedList<Double>();
 		minMaxReward_ = new double[2];
@@ -344,13 +347,11 @@ public class Performance implements Serializable {
 	 * 
 	 * @param episodeReward
 	 *            The total reward received during the episode.
-	 * @param policyEpisode
-	 *            The policy relative episode index.
 	 */
-	public void noteEpisodeReward(double episodeReward, int policyEpisode) {
+	public void noteEpisodeReward(double episodeReward) {
 		minMaxReward_[0] = Math.min(episodeReward, minMaxReward_[0]);
 		minMaxReward_[1] = Math.max(episodeReward, minMaxReward_[1]);
-		episodeRewards_[policyEpisode] = episodeReward;
+		episodeRewards_.add(episodeReward);
 		minEpisodeReward_ = Math.min(episodeReward, minEpisodeReward_);
 	}
 
@@ -390,7 +391,7 @@ public class Performance implements Serializable {
 	 * Resets performance measures that are local to a policy.
 	 */
 	public void resetPolicyValues() {
-		episodeRewards_ = new double[ProgramArgument.POLICY_REPEATS.intValue()];
+		episodeRewards_.clear();
 		minEpisodeReward_ = Float.MAX_VALUE;
 	}
 
@@ -453,7 +454,7 @@ public class Performance implements Serializable {
 				savePerformance(distribution.getPolicyGenerator(), tempPerf,
 						frozen_);
 			}
-			// TODO Also save LocalAgentObservations
+			// Serialise the generator
 			distribution.saveCEDistribution(new File(tempPerf.getAbsolutePath()
 					+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX),
 					!modularPerformance_);
@@ -466,6 +467,15 @@ public class Performance implements Serializable {
 		double reward = 0;
 		for (double r : episodeRewards_)
 			reward += r;
-		return reward / episodeRewards_.length;
+		return reward / episodeRewards_.size();
+	}
+
+	/**
+	 * If this sample has accumulated any sample values at all.
+	 * 
+	 * @return True if this sample has at least one value.
+	 */
+	public boolean hasSampleValue() {
+		return !episodeRewards_.isEmpty();
 	}
 }
