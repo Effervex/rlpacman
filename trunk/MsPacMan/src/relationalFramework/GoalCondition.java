@@ -83,9 +83,38 @@ public class GoalCondition implements Serializable {
 	 *            The goal String.
 	 */
 	public GoalCondition(String goalString) {
-		// TODO May be able to extract goalConds.
-		goalName_ = goalString;
+		extractGoal(goalString);
 		isMainGoal_ = true;
+	}
+
+	/**
+	 * Attempts to extract a goal from a String representation, using the way
+	 * the String is formatted.
+	 * 
+	 * @param goalString
+	 */
+	private void extractGoal(String goalString) {
+		goalName_ = goalString;
+		// Parse for a specific goal
+		int specIndex = goalString.lastIndexOf('A');
+		String predName = goalString.substring(0, specIndex);
+	}
+
+	/**
+	 * Creates a duplicate goal condition.
+	 * 
+	 * @param goalCondition
+	 *            The goal condition to duplicate.
+	 */
+	public GoalCondition(GoalCondition goalCondition) {
+		facts_ = new TreeSet<RelationalPredicate>(
+				ConditionComparator.getInstance());
+		for (RelationalPredicate fact : goalCondition.facts_)
+			facts_.add(new RelationalPredicate(fact));
+
+		goalArgs_ = new ArrayList<String>(goalCondition.goalArgs_);
+		goalName_ = goalCondition.goalName_;
+		isMainGoal_ = goalCondition.isMainGoal_;
 	}
 
 	@Override
@@ -146,13 +175,17 @@ public class GoalCondition implements Serializable {
 	public void normaliseArgs() {
 		if (facts_ == null)
 			return;
+
+		goalArgs_.clear();
 		Map<String, String> replacements = new HashMap<String, String>();
 		int i = 0;
 		for (RelationalPredicate fact : facts_) {
 			for (String arg : fact.getArguments()) {
-				if (!replacements.containsKey(arg))
-					replacements.put(arg,
-							RelationalArgument.createGoalTerm(i++));
+				if (!replacements.containsKey(arg)) {
+					String goalTerm = RelationalArgument.createGoalTerm(i++);
+					goalArgs_.add(goalTerm);
+					replacements.put(arg, goalTerm);
+				}
 			}
 			fact.replaceArguments(replacements, false, false);
 		}

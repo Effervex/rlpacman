@@ -155,7 +155,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Recreates the set of specialisation conditions, which are basically the
+	 * Creates the set of specialisation conditions, which are basically the
 	 * variant conditions, both negated and normal, and simplified to exclude
 	 * the invariant and illegal conditions.
 	 * 
@@ -173,7 +173,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 *         conditions in the invariants, and not containing any conditions
 	 *         not in either invariants or variants.
 	 */
-	protected Collection<RelationalPredicate> recreateSpecialisations(
+	protected Collection<RelationalPredicate> createSpecialisations(
 			Collection<RelationalPredicate> variants, boolean checkNegated,
 			String action, Collection<RelationalPredicate> localInvariants,
 			Collection<RelationalPredicate> localVariants) {
@@ -442,8 +442,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		boolean changed = isScanNeeded();
-		if (changed)
-			System.out.println("Environmental Scan");
 		return changed;
 	}
 
@@ -791,8 +789,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					ConditionComparator.getInstance());
 			rlggConds.addAll(invariantActionConditions_);
 			buf.write("RLGG conditions: " + rlggConds + "\n");
-			buf.write("Global conditions: "
-					+ recreateSpecialisations(variantActionConditions_, true,
+			buf.write("Specialisation conditions: "
+					+ createSpecialisations(variantActionConditions_, true,
 							action_.getFactName(), null, null) + "\n");
 			buf.write("Observed ranges: [");
 			boolean first = true;
@@ -843,7 +841,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					variantActionConditions_, actionRanges_);
 
 			if (changed) {
-				specialisationConditions_ = recreateSpecialisations(
+				specialisationConditions_ = createSpecialisations(
 						variantActionConditions_, true, action_.getFactName(),
 						null, null);
 				recreateRLGG_ = true;
@@ -930,8 +928,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 		public Collection<RelationalPredicate> getSpecialisationConditions() {
 			if (specialisationConditions_ == null)
-				recreateSpecialisations(variantActionConditions_, true,
-						action_.getFactName(), null, null);
+				specialisationConditions_ = createSpecialisations(
+						variantActionConditions_, true, action_.getFactName(),
+						null, null);
 			return specialisationConditions_;
 		}
 
@@ -1050,6 +1049,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		/**
 		 * Records all conditions associations from the current state using the
 		 * term mapped facts to form the relations.
+		 * 
+		 * TODO This is a slow method. Find ways to speed it up.
 		 * 
 		 * @param stateFacts
 		 *            The facts of the state in StringFact form.

@@ -6,14 +6,15 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import rrlFramework.Config;
 import rrlFramework.RRLObservations;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -184,8 +185,6 @@ public class LocalAgentObservations extends SettlingScan implements
 			MultiMap<String, String[]> validActions,
 			MultiMap<String, String[]> activatedActions) {
 		boolean changed = isScanNeeded();
-		if (changed)
-			System.out.println("Local Scan");
 		changed |= EnvironmentAgentObservations.getInstance().isCoveringNeeded(
 				state, validActions, activatedActions);
 		return changed;
@@ -295,10 +294,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				variantGoalActionConditions_.get(action.getFactName()), null);
 
 		// If it changed, recreate the specialisations
-		if (changed) {
-			ruleMutation_.recreateAllSpecialisations(action.getFactName());
+		if (changed)
 			resetInactivity();
-		}
 
 		return changed;
 	}
@@ -480,17 +477,26 @@ public class LocalAgentObservations extends SettlingScan implements
 			}
 		}
 
+		boolean observeState = isChanged()
+				|| EnvironmentAgentObservations.getInstance().isChanged();
+
 		// If this didn't change, increment inactivity
-		if (changed)
+		if (changed) {
+			for (String action : StateSpec.getInstance().getActions().keySet())
+				ruleMutation_.recreateAllSpecialisations(action);
 			resetInactivity();
-		else
+		} else
 			incrementInactivity();
 
 		// Environmental changes
-		changed |= EnvironmentAgentObservations.getInstance().isChanged();
 		EnvironmentAgentObservations.getInstance().noteScannedState(stateFacts);
 
-		return changed;
+		return observeState;
+	}
+
+	@Override
+	public String toString() {
+		return "'" + localGoal_.toString() + "' local agent observations.";
 	}
 
 	/**
@@ -505,13 +511,29 @@ public class LocalAgentObservations extends SettlingScan implements
 			EnvironmentAgentObservations.getInstance().saveAgentObservations();
 
 		File environmentDir = new File(
-				EnvironmentAgentObservations.AGENT_OBSERVATIONS_DIR, Config
-						.getInstance().getEnvironmentClass()
+				EnvironmentAgentObservations.AGENT_OBSERVATIONS_DIR, StateSpec
+						.getInstance().getEnvironmentName()
 						+ File.separatorChar);
 		environmentDir.mkdir();
 		File localEnvironmentDir = new File(environmentDir,
 				localGoal_.toString() + File.separatorChar);
 		localEnvironmentDir.mkdir();
+
+		// Save the observed goal predicates and invariants (condition beliefs)
+		File localGoalConds = new File(localEnvironmentDir,
+				LocalAgentObservations.LOCAL_GOAL_COND_FILE);
+		FileWriter wr = new FileWriter(localGoalConds);
+		BufferedWriter buf = new BufferedWriter(wr);
+		for (String term : observedGoalPredicates_.keySet()) {
+			buf.write(term + ":\n  " + observedGoalPredicates_.get(term) + "\n");
+		}
+
+		buf.write("\n");
+		buf.write("Local Invariants\n");
+		buf.write(localInvariants_.toString());
+
+		buf.close();
+		wr.close();
 
 		// Save the action based observations.
 		File localActionCondsFile = new File(localEnvironmentDir,
@@ -525,7 +547,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			localBuf.write(action + "\n");
 			localBuf.write("Local conditions: "
 					+ EnvironmentAgentObservations.getInstance()
-							.recreateSpecialisations(
+							.createSpecialisations(
 									variantGoalActionConditions_.get(action),
 									false, action,
 									invariantGoalActionConditions_.get(action),
@@ -533,9 +555,19 @@ public class LocalAgentObservations extends SettlingScan implements
 					+ "\n");
 			localBuf.write("\n");
 		}
-		
+
 		localBuf.close();
 		localWR.close();
+
+		// Serialise the observations
+		File serialisedFile = new File(localEnvironmentDir, SERIALISATION_FILE);
+		serialisedFile.createNewFile();
+		FileOutputStream fos = new FileOutputStream(serialisedFile);
+		ObjectOutputStream oos = new ObjectOutputStream(fos);
+		oos.writeObject(this);
+
+		oos.close();
+		fos.close();
 	}
 
 	/**
@@ -545,7 +577,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @param stateFacts
 	 *            The facts of the state.
 	 * @param goalReplacements
-	 *            The current goal replacements.
+	 *            The current goal replacements (a -> ?G_0).
 	 * @return True if the scan modified the agent observations at all.
 	 */
 	public boolean scanState(Collection<Fact> stateFacts,
@@ -692,6 +724,9 @@ public class LocalAgentObservations extends SettlingScan implements
 				ObjectInputStream ois = new ObjectInputStream(fis);
 				LocalAgentObservations lao = (LocalAgentObservations) ois
 						.readObject();
+				// Reset the rlgg rules so they can be recalculated for this
+				// generator.
+				lao.rlggRules_ = null;
 				if (lao != null) {
 					return lao;
 				}
@@ -1012,10 +1047,11 @@ public class LocalAgentObservations extends SettlingScan implements
 		 */
 		public void recreateAllSpecialisations(String actionPred) {
 			specialisationConditions_ = new HashSet<RelationalPredicate>();
+			// Add the environment specialisation conditions
 			specialisationConditions_.addAll(EnvironmentAgentObservations
 					.getInstance().getSpecialisationConditions(actionPred));
 			specialisationConditions_.addAll(EnvironmentAgentObservations
-					.getInstance().recreateSpecialisations(
+					.getInstance().createSpecialisations(
 							variantGoalActionConditions_.get(actionPred),
 							false, actionPred,
 							invariantGoalActionConditions_.get(actionPred),

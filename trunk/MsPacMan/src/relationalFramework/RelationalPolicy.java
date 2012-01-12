@@ -156,8 +156,6 @@ public class RelationalPolicy implements Serializable {
 		if (getClass() != obj.getClass())
 			return false;
 		RelationalPolicy other = (RelationalPolicy) obj;
-		if (policySize_ != other.policySize_)
-			return false;
 		if (policyRules_ == null) {
 			if (other.policyRules_ != null)
 				return false;
@@ -193,7 +191,7 @@ public class RelationalPolicy implements Serializable {
 						observations.getState(),
 						observations.getValidActions(polRule
 								.getActionPredicate()), null);
-				actionSwitch.addFiredRule(firedActions, polRule);
+				actionSwitch.addFiredRule(firedActions, this);
 				actionsFound += firedActions.size();
 			}
 		} catch (Exception e) {
@@ -216,7 +214,6 @@ public class RelationalPolicy implements Serializable {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + policySize_;
 		result = prime * result
 				+ ((policyRules_ == null) ? 0 : policyRules_.hashCode());
 		return result;
