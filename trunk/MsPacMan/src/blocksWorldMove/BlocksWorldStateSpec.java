@@ -100,7 +100,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		String[] result = new String[2];
 		// On(a,b) goal
 		if (envParameter_.equals("onab")) {
-			result[0] = "onAB";
+			result[0] = "on$A$B";
 			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
 					+ RelationalArgument.createGoalTerm(1) + ") (block "
 					+ RelationalArgument.createGoalTerm(0) + ") (block "
@@ -124,14 +124,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Clear goal
 		if (envParameter_.equals("clearA")) {
-			result[0] = "clearA";
+			result[0] = "clear$A";
 			result[1] = "(clear " + RelationalArgument.createGoalTerm(0)
 					+ ") (block " + RelationalArgument.createGoalTerm(0) + ")";
 			return result;
 		}
 
 		if (envParameter_.equals("highestA")) {
-			result[0] = "highestA";
+			result[0] = "highest$A";
 			result[1] = "(highest " + RelationalArgument.createGoalTerm(0)
 					+ ")";
 			return result;

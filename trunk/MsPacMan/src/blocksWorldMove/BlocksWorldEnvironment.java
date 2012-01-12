@@ -118,7 +118,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		// Set the goal
 		int[] params = null;
 		String goalName = StateSpec.getInstance().getGoalName();
-		if (goalName.equals("onAB")) {
+		if (goalName.equals("on$A$B")) {
 			boolean valid = false;
 			while (!valid) {
 				params = new int[2];
@@ -128,7 +128,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				valid = (params[0] != params[1])
 						&& (worldState[params[0] - 1] != params[1]);
 			}
-		} else if (goalName.equals("clearA")) {
+		} else if (goalName.equals("clear$A") || goalName.equals("highest$A")) {
 			params = new int[1];
 			List<Integer> unclears = new ArrayList<Integer>();
 			for (int block : worldState)
