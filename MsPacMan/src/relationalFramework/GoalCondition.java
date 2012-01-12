@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * A small class representing a possible goal condition for the agent to pursue.
@@ -20,6 +22,9 @@ import java.util.TreeSet;
 public class GoalCondition implements Serializable {
 	/** The string for joining predicates. */
 	private static final String MODULE_JOIN = "";
+
+	/** The format individual goals take. */
+	private static final Pattern GOAL_FORM = Pattern.compile("\\w+(\\$[A-Z])+");
 
 	private static final long serialVersionUID = 578463340574407596L;
 
@@ -95,9 +100,32 @@ public class GoalCondition implements Serializable {
 	 */
 	private void extractGoal(String goalString) {
 		goalName_ = goalString;
+		goalArgs_ = new ArrayList<String>();
+		facts_ = new TreeSet<RelationalPredicate>(
+				ConditionComparator.getInstance());
+		
 		// Parse for a specific goal
-		int specIndex = goalString.lastIndexOf('A');
-		String predName = goalString.substring(0, specIndex);
+		Matcher m = GOAL_FORM.matcher(goalString);
+		while (m.find()) {
+			String goal = m.group();
+			int specIndex = goal.indexOf('$');
+			
+			// Determine the arguments
+			String args = goalString.substring(specIndex);
+			String[] arguments = new String[args.length() / 2];
+			for (int a = 0; a < arguments.length; a++) {
+				int argIndex = goalString.charAt(specIndex + a * 2 + 1) - 'A';
+				arguments[a] = RelationalArgument.createGoalTerm(argIndex);
+				if (!goalArgs_.contains(arguments[a]))
+					goalArgs_.add(arguments[a]);
+			}
+			
+			// Finding the predicate
+			String predName = goalString.substring(0, specIndex);
+			RelationalPredicate pred = StateSpec.getInstance().getPredicateByName(predName);
+			pred = new RelationalPredicate(pred, arguments);
+			facts_.add(pred);
+		}
 	}
 
 	/**
@@ -237,7 +265,7 @@ public class GoalCondition implements Serializable {
 		for (String arg : fact.getArguments()) {
 			if (!argMapping.containsKey(arg))
 				argMapping.put(arg, (char) ('A' + i++));
-			buffer.append(argMapping.get(arg));
+			buffer.append("$" + argMapping.get(arg));
 		}
 
 		return buffer.toString();
@@ -262,7 +290,7 @@ public class GoalCondition implements Serializable {
 			for (String arg : fact.getArguments()) {
 				if (!argMapping.containsKey(arg))
 					argMapping.put(arg, (char) ('A' + i++));
-				buffer.append(argMapping.get(arg));
+				buffer.append("$" + argMapping.get(arg));
 			}
 
 			first = false;
