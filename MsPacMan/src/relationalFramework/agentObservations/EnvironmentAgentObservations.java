@@ -179,6 +179,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> localVariants) {
 		SortedSet<RelationalPredicate> specialisations = new TreeSet<RelationalPredicate>(
 				ConditionComparator.getInstance());
+		if (variants == null)
+			return specialisations;
+		
 		for (RelationalPredicate condition : variants) {
 			// Check the non-negated version
 			condition = simplifyCondition(condition, action, localInvariants,
@@ -622,12 +625,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		return goalFacts;
 	}
 
-	public void setActionConditions(String action,
-			Collection<RelationalPredicate> conditions) {
-		getActionBasedObservation(action).setActionConditions(conditions);
-		resetInactivity();
-	}
-
 	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
 		conditionObservations_.learnedEnvironmentRules_ = backKnow;
 	}
@@ -944,12 +941,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					+ ((variantActionConditions_ == null) ? 0
 							: variantActionConditions_.hashCode());
 			return result;
-		}
-
-		public void setActionConditions(
-				Collection<RelationalPredicate> conditions) {
-			specialisationConditions_ = new HashSet<RelationalPredicate>(
-					conditions);
 		}
 
 		@Override

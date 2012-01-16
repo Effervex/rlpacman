@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.GoalCondition;
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
@@ -22,15 +23,16 @@ import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.ConditionBeliefs;
 import relationalFramework.agentObservations.IntegerArray;
+import relationalFramework.agentObservations.LocalAgentObservations;
 import util.MultiMap;
 
 public class AgentObservationsTest {
-	private EnvironmentAgentObservations sut_;
+	private LocalAgentObservations sut_;
 
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = EnvironmentAgentObservations.getInstance();
+		sut_ = new LocalAgentObservations(new GoalCondition("on$A$B"));
 	}
 
 	private void assertBeliefs(ConditionBeliefs cb,
@@ -57,7 +59,7 @@ public class AgentObservationsTest {
 		for (String[] pair : equivalencePairs) {
 			BackgroundKnowledge bk = new BackgroundKnowledge(pair[0] + relation
 					+ pair[1]);
-			assertTrue(bk.toString() + " not found.", sut_
+			assertTrue(bk.toString() + " not found.", sut_.
 					.getLearnedBackgroundKnowledge().contains(bk));
 			sut_.getLearnedBackgroundKnowledge().remove(bk);
 		}

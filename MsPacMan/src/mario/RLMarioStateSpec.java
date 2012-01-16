@@ -10,7 +10,6 @@ import java.util.Map;
 import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalRule;
@@ -145,7 +144,7 @@ public class RLMarioStateSpec extends StateSpec {
 
 	@Override
 	protected RelationalPolicy initialiseHandCodedPolicy() {
-		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
+		RelationalPolicy goodPolicy = new RelationalPolicy();
 
 		// Defining a good policy (basic at the moment)
 		ArrayList<String> rules = new ArrayList<String>();

@@ -751,7 +751,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * Essentially the variant action conditions both negated and normal,
 		 * then simplified.
 		 */
-		private transient Collection<RelationalPredicate> specialisationConditions_;
+		private transient MultiMap<String, RelationalPredicate> specialisationConditions_;
 
 		/**
 		 * Creates a range using the minimum and maximum observed ranges.
@@ -840,9 +840,10 @@ public class LocalAgentObservations extends SettlingScan implements
 		 */
 		public Collection<RelationalPredicate> getSpecialisationConditions(
 				String actionPred) {
-			if (specialisationConditions_ == null)
+			if (specialisationConditions_ == null
+					|| specialisationConditions_.get(actionPred) == null)
 				recreateAllSpecialisations(actionPred);
-			return specialisationConditions_;
+			return specialisationConditions_.get(actionPred);
 		}
 
 		/**
@@ -1046,16 +1047,27 @@ public class LocalAgentObservations extends SettlingScan implements
 		 *            The action to create the conditions for.
 		 */
 		public void recreateAllSpecialisations(String actionPred) {
-			specialisationConditions_ = new HashSet<RelationalPredicate>();
+			if (specialisationConditions_ == null)
+				specialisationConditions_ = MultiMap.createSortedSetMultiMap();
+			else
+				specialisationConditions_.clear();
+
 			// Add the environment specialisation conditions
-			specialisationConditions_.addAll(EnvironmentAgentObservations
-					.getInstance().getSpecialisationConditions(actionPred));
-			specialisationConditions_.addAll(EnvironmentAgentObservations
-					.getInstance().createSpecialisations(
-							variantGoalActionConditions_.get(actionPred),
-							false, actionPred,
-							invariantGoalActionConditions_.get(actionPred),
-							variantGoalActionConditions_.get(actionPred)));
+			specialisationConditions_.putCollection(actionPred,
+					EnvironmentAgentObservations.getInstance()
+							.getSpecialisationConditions(actionPred));
+			specialisationConditions_.putCollection(
+					actionPred,
+					EnvironmentAgentObservations.getInstance()
+							.createSpecialisations(
+									variantGoalActionConditions_
+											.get(actionPred),
+									false,
+									actionPred,
+									invariantGoalActionConditions_
+											.get(actionPred),
+									variantGoalActionConditions_
+											.get(actionPred)));
 		}
 
 		/**

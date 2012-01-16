@@ -1,6 +1,5 @@
 package rlPacManGeneral;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
@@ -117,7 +116,7 @@ public class PacManStateSpec extends StateSpec {
 
 	@Override
 	protected RelationalPolicy initialiseHandCodedPolicy() {
-		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
+		RelationalPolicy goodPolicy = new RelationalPolicy();
 
 		// Defining a good policy
 		ArrayList<String> rules = new ArrayList<String>();

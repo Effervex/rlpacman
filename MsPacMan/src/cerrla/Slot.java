@@ -2,6 +2,7 @@ package cerrla;
 
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
+import rrlFramework.RRLExperiment;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -54,7 +55,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	private int slotLevel_;
 
 	/** The amount of updating this slot is receiving. */
-	private transient double updateDelta_ = Integer.MAX_VALUE;
+	private double updateDelta_ = Integer.MAX_VALUE;
 
 	/** The distribution containing this slot. */
 	private PolicyGenerator parentDistribution_;
@@ -83,7 +84,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		} else {
 			slotMean_ = ProgramArgument.INITIAL_SLOT_MEAN.doubleValue();
 			ruleGenerator_ = new ProbabilityDistribution<RelationalRule>(
-					PolicyGenerator.random_);
+					RRLExperiment.random_);
 			ruleGenerator_.add(seedRule);
 			slotLevel_ = level;
 		}

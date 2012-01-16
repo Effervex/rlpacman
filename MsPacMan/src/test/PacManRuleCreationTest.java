@@ -3,23 +3,25 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import relationalFramework.GoalCondition;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.LocalAgentObservations;
 
 import java.util.Set;
 
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.RuleCreation;
-
 public class PacManRuleCreationTest {
-	private RuleCreation sut_;
+	private LocalAgentObservations.RuleMutation sut_;
 
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new RuleCreation();
+		LocalAgentObservations lao = LocalAgentObservations
+				.loadAgentObservations(new GoalCondition("blah"));
+		sut_ = lao.getRuleMutation();
 	}
 
 	@Test
@@ -88,48 +90,5 @@ public class PacManRuleCreationTest {
 						+ " => (toGhost ?X ?__Num0)");
 		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
 		assertEquals(specialisedRules.size(), 3);
-	}
-
-	@Test
-	public void testGeneralRangedConditions() {
-		StateSpec.initInstance("rlPacManGeneral.PacMan");
-		sut_ = new RuleCreation();
-
-		// A split containing multiple ranges
-		RelationalRule rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		Set<RelationalRule> specialisedRules = sut_.specialiseRuleMinor(rule);
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 26.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 26.0 52.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 13.0 39.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 10.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 0.0 5.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 5.0 10.0)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertTrue(specialisedRules.toString(), specialisedRules.contains(rule));
-		rule = new RelationalRule(
-				"(distance ?X ?__Num0&:(betweenRange ?__Num0 0.0 52.0)) (powerDot ?X) "
-						+ "(distance ?Y ?__Num1&:(betweenRange ?__Num1 2.5 7.5)) (ghost ?Y)"
-						+ " => (moveTo ?X ?__Num0)");
-		assertEquals(specialisedRules.size(), 6);
 	}
 }

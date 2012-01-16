@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.GoalCondition;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -16,27 +17,26 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.PolicyGenerator;
+import cerrla.LocalCrossEntropyDistribution;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
 
-import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
 import util.MultiMap;
 
-public class PolicyGeneratorTest {
-	private PolicyGenerator sut_;
+public class LocalCrossEntropyDistributionTest {
+	private LocalCrossEntropyDistribution sut_;
 
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
+		sut_ = new LocalCrossEntropyDistribution(new GoalCondition("on$A$B"), 0);
 	}
 
 	@Test
-	public void testTriggerRLGGCovering() throws Exception {
+	public void testCoverState() throws Exception {
 		ProgramArgument.DYNAMIC_SLOTS.setBooleanValue(false);
-		EnvironmentAgentObservations.loadAgentObservations("blah");
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
@@ -71,8 +71,8 @@ public class PolicyGeneratorTest {
 		BidiMap goalReplacements = new DualHashBidiMap();
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
-		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions);
+		List<RelationalRule> rlggRules = sut_.coverState(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions, null);
 
 		// [e]
 		// [b][d]
@@ -100,8 +100,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions);
+		rlggRules = sut_.coverState(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (clear d))");
@@ -126,8 +126,8 @@ public class PolicyGeneratorTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions);
+		rlggRules = sut_.coverState(new RRLObservations(state,
+				validActions, 0d, goalReplacements, false), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
 		List<String> queryParameters = new ArrayList<String>();
@@ -141,7 +141,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		Collection<Slot> slotGenerator = sut_.getGenerator();
+		Collection<Slot> slotGenerator = sut_.getPolicyGenerator().getGenerator();
 		assertEquals(slotGenerator.size(), 12);
 	}
 
@@ -149,7 +149,7 @@ public class PolicyGeneratorTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		EnvironmentAgentObservations.loadAgentObservations("levelmax");
+		sut_ = new LocalCrossEntropyDistribution(new GoalCondition("levelmax"), 0);
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -165,9 +165,9 @@ public class PolicyGeneratorTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<RelationalRule> rlggRules = sut_.triggerRLGGCovering(
+		List<RelationalRule> rlggRules = sut_.coverState(
 				new RRLObservations(state, validActions, 0d,
-						new DualHashBidiMap(), false), activatedActions);
+						new DualHashBidiMap(), false), activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -182,9 +182,9 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+		rlggRules = sut_.coverState(new RRLObservations(state,
 				validActions, 0d, new DualHashBidiMap(), false),
-				activatedActions);
+				activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -198,9 +198,9 @@ public class PolicyGeneratorTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.triggerRLGGCovering(new RRLObservations(state,
+		rlggRules = sut_.coverState(new RRLObservations(state,
 				validActions, 0d, new DualHashBidiMap(), false),
-				activatedActions);
+				activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
@@ -212,7 +212,7 @@ public class PolicyGeneratorTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		Collection<Slot> slotGenerator = sut_.getGenerator();
+		Collection<Slot> slotGenerator = sut_.getPolicyGenerator().getGenerator();
 		assertEquals(slotGenerator.size(), 10);
 	}
 }

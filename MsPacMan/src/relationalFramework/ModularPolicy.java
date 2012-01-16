@@ -1,5 +1,6 @@
 package relationalFramework;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -16,9 +17,9 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Rete;
 import cerrla.LocalCrossEntropyDistribution;
-import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 
+import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
 import util.MultiMap;
@@ -27,6 +28,12 @@ import util.Recursive;
 public class ModularPolicy extends RelationalPolicy implements
 		RelationallyEvaluatableObject {
 	private static final long serialVersionUID = 7855536761222318011L;
+
+	/** The reward received at every step by the sub-goal. */
+	private static final double SUB_GOAL_REWARD = -1;
+
+	/** The minimum 'goal-not-achieved' value. */
+	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
 
 	/** The distribution that created this modular policy. */
 	private LocalCrossEntropyDistribution ceDistribution_;
@@ -49,6 +56,18 @@ public class ModularPolicy extends RelationalPolicy implements
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
 
+	/** Gets the rules that fired last step. */
+	private Set<RelationalRule> firedLastStep_;
+
+	/** If the internal goal of this policy was achieved this episode. */
+	private boolean goalAchieved_;
+
+	/** The rewards this policy achieved for each episode. */
+	private final ArrayList<Double> policyRewards_;
+
+	/** The reward received this episode. */
+	private double episodeReward_;
+
 	public ModularPolicy(LocalCrossEntropyDistribution policyGenerator,
 			Map<String, String> paramReplacementMap) {
 		super();
@@ -58,7 +77,9 @@ public class ModularPolicy extends RelationalPolicy implements
 		relevantCEDistributions_.add(ceDistribution_);
 		moduleParamReplacements_ = paramReplacementMap;
 		triggeredRules_ = new HashSet<RelationalRule>();
+		firedLastStep_ = new HashSet<RelationalRule>();
 		childrenPolicies_ = new HashMap<SortedSet<RelationalPredicate>, ModularPolicy>();
+		policyRewards_ = new ArrayList<Double>();
 	}
 
 	/**
@@ -101,19 +122,15 @@ public class ModularPolicy extends RelationalPolicy implements
 			PolicyActions policyActions,
 			MultiMap<String, String[]> activatedActions, int actionsFound,
 			int actionsRequired) throws Exception {
-		// If the goal has already been achieved, don't evaluate this policy.
-		// if (ceDistribution_.isGoalAchieved())
-		// return;
-
-
+		firedLastStep_.clear();
 
 		// Run the cover state method to possibly scan this state (depending on
 		// current RLGG rules and scan intervals).
-		List<RelationalRule> coveredRules = ceDistribution_.coverState(
+		List<RelationalRule> coveredRules = ceDistribution_.coverState(this,
 				observations, activatedActions, episodeGoalReplacements_);
 		// If the policy is empty, store the rules in it.
 		if (coveredRules != null && !coveredRules.isEmpty()) {
-			Collections.shuffle(coveredRules, PolicyGenerator.random_);
+			Collections.shuffle(coveredRules, RRLExperiment.random_);
 			// Add any new rules to the policy
 			for (RelationalRule gr : coveredRules) {
 				policyRules_.add(gr);
@@ -147,15 +164,13 @@ public class ModularPolicy extends RelationalPolicy implements
 						SortedSet<RelationalPredicate> goalFacts = gc
 								.getFacts();
 						if (childrenPolicies_.containsKey(goalFacts))
-							childrenPolicies_.get(goalFacts).ceDistribution_
-									.setGoalAchieved(true);
+							childrenPolicies_.get(goalFacts).goalAchieved_ = true;
 					} else {
 						for (GoalCondition splitGC : gc.splitCondition()) {
 							SortedSet<RelationalPredicate> goalFacts = splitGC
 									.getFacts();
 							if (childrenPolicies_.containsKey(goalFacts))
-								childrenPolicies_.get(goalFacts).ceDistribution_
-										.setGoalAchieved(true);
+								childrenPolicies_.get(goalFacts).goalAchieved_ = true;
 						}
 					}
 				}
@@ -238,6 +253,7 @@ public class ModularPolicy extends RelationalPolicy implements
 	 */
 	protected boolean addTriggeredRule(RelationalRule rule) {
 		triggeredRules_.add(rule);
+		firedLastStep_.add(rule);
 		return true;
 	}
 
@@ -368,5 +384,106 @@ public class ModularPolicy extends RelationalPolicy implements
 	@Override
 	public String toString() {
 		return toNiceString();
+	}
+
+	/**
+	 * Notes the environment reward if main modular policy, otherwise it uses an
+	 * internal reward.
+	 */
+	@Recursive
+	public boolean noteStepReward(double reward) {
+		// Note reward if a rule in this policy fired (or it's the main policy).
+		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
+				|| !firedLastStep_.isEmpty();
+		
+		// Drop down and reward from the bottom up.
+		for (ModularPolicy child : childrenPolicies_.values())
+			noteReward |= child.noteStepReward(reward);
+
+		// Only note the reward if a rule within this policy fired.
+		if (noteReward) {
+			// If this is an unachieved sub-goal, note reward.
+			if (!ceDistribution_.getGoalCondition().isMainGoal()) {
+				if (!goalAchieved_)
+					episodeReward_ += SUB_GOAL_REWARD;
+			} else
+				episodeReward_ += reward;
+		}
+
+		return noteReward;
+	}
+
+	/**
+	 * Starts a new episode, so reward observation begins on a new episode.
+	 */
+	@Recursive
+	public void startEpisode() {
+		episodeReward_ = 0;
+		goalAchieved_ = false;
+		
+		// Start episode for all children
+		for (ModularPolicy child : childrenPolicies_.values())
+			child.startEpisode();
+	}
+
+	/**
+	 * Notes the final reward received for this episode.
+	 * 
+	 * @param reward
+	 *            The reward received for the episode.
+	 * @return True if this policy contains a rule that fired.
+	 */
+	@Recursive
+	public void endEpisode() {
+		// Modify the reward if the goal hasn't been achieved if a sub-goal
+		// generator
+		if (!ceDistribution_.getGoalCondition().isMainGoal() && !goalAchieved_)
+			episodeReward_ = MINIMUM_REWARD;
+
+		// Note the episode reward in the generator.
+		if (ceDistribution_.getGoalCondition().isMainGoal()
+				|| episodeReward_ != 0) {
+			policyRewards_.add(episodeReward_);
+		}
+		
+		// End episode for all children.
+		for (ModularPolicy child : childrenPolicies_.values())
+			child.endEpisode();
+	}
+
+	/**
+	 * Records this sample in its behaviour generator.
+	 */
+	@Recursive
+	public void recordSample() {
+		// If this policy was never used (sub-goal only), don't record it.
+		if (policyRewards_.isEmpty())
+			return;
+
+		// Record the sample.
+		ceDistribution_.recordSample(this,
+				policyRewards_.toArray(new Double[policyRewards_.size()]));
+
+		for (ModularPolicy child : childrenPolicies_.values())
+			child.recordSample();
+	}
+
+	/**
+	 * If the goal has been achieved.
+	 * 
+	 * @return True if the goal has been achieved.
+	 */
+	public boolean isGoalAchieved() {
+		return goalAchieved_;
+	}
+
+	/**
+	 * Sets if the goal has been achieved.
+	 * 
+	 * @param b
+	 *            The state of goal achievement.
+	 */
+	public void setGoalAchieved(boolean b) {
+		goalAchieved_ = b;
 	}
 }

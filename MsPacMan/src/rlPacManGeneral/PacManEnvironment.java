@@ -4,6 +4,7 @@ import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
+import rrlFramework.RRLExperiment;
 
 import java.awt.Point;
 import java.awt.geom.Point2D;
@@ -25,8 +26,6 @@ import msPacMan.PacPoint;
 import msPacMan.Player;
 import msPacMan.PowerDot;
 import msPacMan.Thing;
-
-import cerrla.PolicyGenerator;
 
 public class PacManEnvironment extends RRLEnvironment {
 	public static int playerDelay_ = 0;
@@ -475,7 +474,7 @@ public class PacManEnvironment extends RRLEnvironment {
 		model_.noPowerDots_ = noPowerDots;
 		model_.oneLife_ = oneLife;
 		model_.m_highScore = highScore;
-		model_.setRandom(PolicyGenerator.random_);
+		model_.setRandom(RRLExperiment.random_);
 
 		prevScore_ = 0;
 		prevLives_ = model_.m_nLives;
