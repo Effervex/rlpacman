@@ -1,6 +1,5 @@
 package hanoi;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -94,7 +93,7 @@ public class HanoiStateSpec extends StateSpec {
 				+ "(clear ?X ?Ta) (clear ?Y ?Tb) (smaller ?X ?Y) "
 				+ "=> (move ?X ?Ta ?Y ?Tb)";
 
-		BasicRelationalPolicy optimal = new BasicRelationalPolicy();
+		RelationalPolicy optimal = new RelationalPolicy();
 		for (int i = 0; i < rules.length; i++)
 			optimal.addRule(new RelationalRule(rules[i]));
 

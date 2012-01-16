@@ -19,7 +19,7 @@ public interface RRLAgent {
 	 * 
 	 * @return True if the agent is done learning.
 	 */
-	public boolean isConverged();
+	public boolean isLearningComplete();
 
 	/**
 	 * Cleans up any fields.

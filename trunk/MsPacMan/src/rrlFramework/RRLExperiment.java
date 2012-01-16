@@ -25,8 +25,9 @@ import cerrla.ProgramArgument;
  * @author Sam Sarjant
  */
 public class RRLExperiment {
-	public static Random random_ = new Random();
-	
+	/** The random number generator. */
+	public static Random random_ = new Random(0);
+
 	/** The agent to use for experiments. */
 	private RRLAgent agent_;
 
@@ -218,7 +219,7 @@ public class RRLExperiment {
 		// Calculate the average and print out the stats
 		FileWriter writer = new FileWriter(performanceFile);
 		BufferedWriter buf = new BufferedWriter(writer);
-		Config.writeFileHeader(buf);
+		Config.writeFileHeader(buf, Config.getInstance().getGoal());
 
 		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
 		boolean moreEpisodes = true;
@@ -312,11 +313,11 @@ public class RRLExperiment {
 	 */
 	public void run(int runIndex, int finiteEpisodes) {
 		// Initialise the agent and environment
+		random_ = new Random(runIndex);
 		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
 				Config.getInstance().getGoalString());
 		Config.getInstance().setGoal(StateSpec.getInstance().getGoalName());
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
-		random_ = new Random(runIndex);
 
 		agent_.initialise(runIndex);
 		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
@@ -326,32 +327,11 @@ public class RRLExperiment {
 		if (finiteEpisodes == -1)
 			finiteEpisodes = Integer.MAX_VALUE;
 		int episodeCount = 0;
-		while (!agent_.isConverged() && episodeCount < finiteEpisodes) {
+		while (!agent_.isLearningComplete() && episodeCount < finiteEpisodes) {
 			episode();
 
 			episodeCount++;
 		}
-
-
-
-		// Test the learned behaviour
-		System.out.println();
-		if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-			System.out.println("Beginning testing for episode " + episodeCount
-					+ ".");
-		else
-			System.out.println("Beginning ensemble testing for episode "
-					+ episodeCount + ".");
-		System.out.println();
-		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-			System.out.println("Testing...");
-
-		agent_.freeze(true);
-		for (int i = 0; i < ProgramArgument.TEST_ITERATIONS.intValue()
-				* ProgramArgument.POLICY_REPEATS.intValue(); i++) {
-			episode();
-		}
-		agent_.freeze(false);
 
 		agent_.cleanup();
 		environment_.cleanup();

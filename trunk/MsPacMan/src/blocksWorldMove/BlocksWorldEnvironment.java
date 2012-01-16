@@ -6,6 +6,7 @@ import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
+import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 import util.Pair;
 
@@ -102,11 +103,11 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		while (!blocksLeft.isEmpty()) {
 			// Get a random block
 			Integer block = blocksLeft
-					.remove(PolicyGenerator.random_.nextInt(blocksLeft.size()));
+					.remove(RRLExperiment.random_.nextInt(blocksLeft.size()));
 
 			// Put the block in a random position, influenced by the number of
 			// free blocks.
-			int index = PolicyGenerator.random_.nextInt(contourState.size());
+			int index = RRLExperiment.random_.nextInt(contourState.size());
 			worldState[block - 1] = contourState.get(index).intValue();
 			if (worldState[block - 1] == 0) {
 				contourState.add(new Double(block));
@@ -122,8 +123,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			boolean valid = false;
 			while (!valid) {
 				params = new int[2];
-				params[0] = PolicyGenerator.random_.nextInt(numBlocks) + 1;
-				params[1] = PolicyGenerator.random_.nextInt(numBlocks) + 1;
+				params[0] = RRLExperiment.random_.nextInt(numBlocks) + 1;
+				params[1] = RRLExperiment.random_.nextInt(numBlocks) + 1;
 				// Cannot be the same block, and cannot already be achieved.
 				valid = (params[0] != params[1])
 						&& (worldState[params[0] - 1] != params[1]);
@@ -139,7 +140,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				return;
 			}
 
-			params[0] = unclears.get(PolicyGenerator.random_.nextInt(unclears
+			params[0] = unclears.get(RRLExperiment.random_.nextInt(unclears
 					.size()));
 		}
 
@@ -222,7 +223,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		BlocksState newState = state_;
 		boolean actionFailed = false;
 		RelationalPredicate actionFact = null;
-		if (PolicyGenerator.random_.nextDouble() < actionSuccess_) {
+		if (RRLExperiment.random_.nextDouble() < actionSuccess_) {
 			if (action instanceof Pair) {
 				actionFact = ((Pair<BlocksState, RelationalPredicate>) action).objB_;
 				newState = ((Pair<BlocksState, RelationalPredicate>) action).objA_;
@@ -308,7 +309,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			List<FiredAction> actionsList = new ArrayList<FiredAction>(
 					firedActions);
 			FiredAction selectedAction = actionsList
-					.get(PolicyGenerator.random_.nextInt(actionsList.size()));
+					.get(RRLExperiment.random_.nextInt(actionsList.size()));
 			selectedAction.triggerRule();
 			action = selectedAction.getAction();
 

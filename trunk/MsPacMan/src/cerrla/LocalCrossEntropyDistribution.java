@@ -37,16 +37,11 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public class LocalCrossEntropyDistribution implements Serializable {
-	/** The minimum 'goal-not-achieved' value. */
-	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
 
 	/** The collection of non existant modules. */
 	private static final Collection<String> nonExistantModule_ = new HashSet<String>();
 
 	private static final long serialVersionUID = 6883881456264179505L;
-
-	/** The reward received at every step by the sub-goal. */
-	private static final double SUB_GOAL_REWARD = -1;
 
 	/** The relative directory in which modules are stored. */
 	public static final String MODULE_DIR = "modules";
@@ -61,19 +56,19 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private int currentEpisode_;
 
 	/** The current policy being used for these (3) episodes. */
-	private transient ModularPolicy currentPolicy_;
+	// private transient ModularPolicy currentPolicy_;
 
 	/** The elites set. */
 	private SortedSet<PolicyValue> elites_;
 
 	/** The reward received this episode. */
-	private transient double episodeReward_;
+	// private transient double episodeReward_;
 
 	/** If this generator is currently frozen (not learning). */
-	private boolean frozen_;
+	private transient boolean frozen_;
 
 	/** An internal flag to check if the sub-goal has been achieved. */
-	private boolean goalAchieved_;
+	// private boolean goalAchieved_;
 
 	/** The goal condition for this cross-entropy behaviour. */
 	private final GoalCondition goalCondition_;
@@ -203,21 +198,23 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/**
 	 * Processes the internal goal (checks if it is achieved).
 	 * 
+	 * @param modularPolicy
+	 *            The policy that called this operation.
 	 * @param observations
 	 *            The current state observations.
 	 * @param goalReplacements
 	 *            The current goal replacement variable(s) (a -> ?G_0).
 	 * @return True if the internal goal is/has been achieved.
 	 */
-	private boolean processInternalGoal(RRLObservations observations,
-			BidiMap goalReplacements) {
-		if (goalAchieved_)
+	private boolean processInternalGoal(ModularPolicy modularPolicy,
+			RRLObservations observations, BidiMap goalReplacements) {
+		if (modularPolicy.isGoalAchieved())
 			return true;
 
 		try {
 			// Assign the parameters
 			Rete state = observations.getState();
-//			System.out.println(StateSpec.extractFacts(state));
+			// System.out.println(StateSpec.extractFacts(state));
 			ValueVector vv = new ValueVector();
 			goalRule_.setParameters(goalReplacements);
 			for (String param : goalRule_.getParameters())
@@ -229,13 +226,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 			// If results, then the goal has been met!
 			if (results.next()) {
-				goalAchieved_ = true;
+				modularPolicy.setGoalAchieved(true);
 			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return goalAchieved_;
+		return modularPolicy.isGoalAchieved();
 	}
 
 	/**
@@ -278,6 +275,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * (Potentially) covers the current state depending on whether the agent
 	 * believes covering the state will get it more information.
 	 * 
+	 * @param modularPolicy
+	 *            The policy that called this covering operation.
 	 * @param observations
 	 *            The current state observations.
 	 * @param activatedActions
@@ -288,12 +287,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return Any newly created RLGG rules, or null if no change/no new rules.
 	 */
 	@SuppressWarnings("unchecked")
-	public List<RelationalRule> coverState(RRLObservations observations,
+	public List<RelationalRule> coverState(ModularPolicy modularPolicy,
+			RRLObservations observations,
 			MultiMap<String, String[]> activatedActions,
 			BidiMap goalReplacements) {
 		// Process internal goals and return if goal is already achieved.
 		if (!goalCondition_.isMainGoal()) {
-			if (processInternalGoal(observations, goalReplacements))
+			if (processInternalGoal(modularPolicy, observations,
+					goalReplacements))
 				return null;
 		}
 
@@ -335,6 +336,20 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
 		testEpisode_ = 0;
+
+		if (b) {
+			// Test the learned behaviour
+			System.out.println();
+			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+				System.out.println("Beginning [" + goalCondition_
+						+ "] testing for episode " + currentEpisode_ + ".");
+			else
+				System.out.println("Beginning ensemble testing for episode "
+						+ currentEpisode_ + ".");
+			System.out.println();
+			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+				System.out.println("Testing...");
+		}
 	}
 
 	/**
@@ -346,7 +361,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return A newly generated policy from the current distribution.
 	 */
 	public RelationalPolicy generatePolicy(ModularPolicy modularPolicy) {
-		currentPolicy_ = modularPolicy;
 		return policyGenerator_.generatePolicy(false);
 	}
 
@@ -402,48 +416,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
-	 * If the internal goal has been achieved in this episode yet.
-	 * 
-	 * @return True if the goal has been achieved this episode.
-	 */
-	public boolean isGoalAchieved() {
-		return goalAchieved_;
-	}
-
-	/**
 	 * Notes the reward for a _single_ episode.
 	 * 
 	 * @param episodeReward
 	 *            The total reward received this episode.
 	 */
-	public void noteEpisodeReward() {
-		// Modify the reward if the goal hasn't been achieved if a sub-goal
-		// generator
-		if (!goalCondition_.isMainGoal() && !goalAchieved_)
-			episodeReward_ = MINIMUM_REWARD;
-
+	public void noteEpisodeReward(double episodeReward) {
 		// Only note the sample if it was actually used
-		if (goalCondition_.isMainGoal() || episodeReward_ != 0) {
-			performance_.noteEpisodeReward(episodeReward_);
+		if (goalCondition_.isMainGoal() || episodeReward != 0) {
 			if (!frozen_)
 				currentEpisode_++;
 		}
-	}
-
-	/**
-	 * Notes reward received, given the environment's reward OR an internal
-	 * reward.
-	 * 
-	 * @param environmentReward
-	 *            The reward provided by the environment.
-	 */
-	public void noteStepReward(double environmentReward) {
-		// If this is an unachieved sub-goal, note reward.
-		if (!goalCondition_.isMainGoal()) {
-			if (!goalAchieved_)
-				episodeReward_ += SUB_GOAL_REWARD;
-		} else
-			episodeReward_ += environmentReward;
 	}
 
 	/**
@@ -452,19 +435,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @param value
 	 *            The value of the sample.
 	 */
-	public void recordSample() {
-		// If no samples were gathered (due to sub-goal definition), exit
-		if (!performance_.hasSampleValue()) {
-			// TODO Enforce 3 repetitions per policy?
-			performance_.resetPolicyValues();
-			return;
-		}
-
-		double value = performance_.getAverageEpisodeReward();
+	public void recordSample(ModularPolicy sample, Double[] values) {
+		currentEpisode_ += values.length;
+		double average = performance_
+				.noteSampleRewards(values, currentEpisode_);
 
 		if (!frozen_) {
 			// Add sample to elites
-			PolicyValue pv = new PolicyValue(currentPolicy_, value,
+			PolicyValue pv = new PolicyValue(sample, average,
 					policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
 			policyGenerator_.incrementPoliciesEvaluated();
@@ -481,11 +459,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Output system output
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			if (goalCondition_.isMainGoal())
-				System.out.println(currentEpisode_ + ": " + value);
-			else
-				System.out.println("[" + goalCondition_ + "] "
-						+ currentEpisode_ + ": " + value);
+			System.out.println("[" + goalCondition_ + "] " + currentEpisode_
+					+ ": " + average);
 
 			// Estimate experiment convergence
 			double convergence = policyGenerator_.getConvergenceValue();
@@ -498,9 +473,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			performance_.estimateETA(convergence, numElites_, elites_,
 					numSlots, goalCondition_);
 		}
-
-		// Note performance values
-		performance_.noteSampleReward(value, currentEpisode_);
 
 
 
@@ -560,8 +532,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 	/**
 	 * Saves the best behaviour to a text file as a static module.
-	 * 
-	 * TODO Not being used yet.
 	 */
 	public void saveModule() {
 		// Don't save the main goal as a module.
@@ -585,9 +555,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * Simply resets episode reward.
 	 */
 	public void startEpisode() {
-		// Reset the reward.
-		episodeReward_ = 0;
-		goalAchieved_ = false;
+		// Check for convergence
+		if (isConverged() && !frozen_) {
+			freeze(true);
+		}
 	}
 
 	@Override
@@ -656,12 +627,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
-	 * Sets if the goal is achieved or not.
+	 * If this behaviour has finished learning and final testing.
 	 * 
-	 * @param b
-	 *            The state of goal achievement (usually true).
+	 * @return True if the behaviour has finished learning and testing.
 	 */
-	public void setGoalAchieved(boolean b) {
-		goalAchieved_ = b;
+	public boolean isLearningComplete() {
+		return frozen_
+				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue()
+						* ProgramArgument.POLICY_REPEATS.intValue();
+	}
+
+	public boolean isFrozen() {
+		return frozen_;
 	}
 }

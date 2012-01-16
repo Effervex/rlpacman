@@ -3,12 +3,16 @@ package test;
 import static org.junit.Assert.*;
 
 import relationalFramework.CoveringRelationalPolicy;
+import relationalFramework.GoalCondition;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.LocalAgentObservations;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -22,14 +26,16 @@ public class RelationalPolicyTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		policyGenerator_ = new PolicyGenerator(0, null);
+		LocalAgentObservations
+				.loadAgentObservations(new GoalCondition("on$A$B"));
 	}
 
 	@Test
 	public void testAddRule() {
 		// Basic rule adding
-		
-		CoveringRelationalPolicy pol = new CoveringRelationalPolicy(policyGenerator_);
+
+		CoveringRelationalPolicy pol = new CoveringRelationalPolicy(
+				policyGenerator_);
 		RelationalRule rule = new RelationalRule("(clear ?X) => (moveFloor ?X)");
 		pol.addRule(rule);
 		assertEquals(pol.getPolicyRules().size(), 1);
@@ -57,14 +63,14 @@ public class RelationalPolicyTest {
 		assertEquals(pol.getPolicyRules().size(), clearRulesNum + 1);
 		assertTrue(pol.getPolicyRules().contains(rule));
 		List<String> queryParams = new ArrayList<String>();
-		queryParams.add("?_MOD_a");
+		queryParams.add("?G_0");
 		RelationalRule modRule = new RelationalRule(
-				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
-		List<String> params = new ArrayList<String>();
-		params.add("a");
+				"(above ?X ?G_0) (clear ?X) => (moveFloor ?X)", queryParams);
+		BidiMap params = new DualHashBidiMap();
+		params.put("a", "?G_0");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
-		
+
 		if (Module.loadModule("blocksWorld", "clear&clear") == null)
 			fail("'clear&clear' module doesn't exist!");
 
@@ -79,8 +85,7 @@ public class RelationalPolicyTest {
 			if (i < clearRulesNum) {
 				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("a"));
-			}
-			else if (i < (clearRulesNum * 2)) {
+			} else if (i < (clearRulesNum * 2)) {
 				assertTrue(gr.getParameters().size() == 2);
 				assertTrue(gr.getParameters().contains("b"));
 			} else {
@@ -102,29 +107,29 @@ public class RelationalPolicyTest {
 		assertTrue(pol.getPolicyRules().contains(rule));
 		// Clear rules
 		queryParams = new ArrayList<String>();
-		queryParams.add("?_MOD_a");
-		queryParams.add("?_MOD_b");
+		queryParams.add("?G_0");
+		queryParams.add("?G_1");
 		modRule = new RelationalRule(
-				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)", queryParams);
-		params = new ArrayList<String>();
-		params.add("a");
-		params.add("b");
+				"(above ?X ?G_0) (clear ?X) => (moveFloor ?X)", queryParams);
+		params.clear();
+		params.put("a", "?G_0");
+		params.put("b", "?G_1");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
 		modRule = new RelationalRule(
-				"(above ?X ?_MOD_b) (clear ?X) => (moveFloor ?X)", queryParams);
+				"(above ?X ?G_1) (clear ?X) => (moveFloor ?X)", queryParams);
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
 		// On rule
 		queryParams = new ArrayList<String>();
-		queryParams.add("?_MOD_a");
-		queryParams.add("?_MOD_b");
+		queryParams.add("?G_0");
+		queryParams.add("?G_1");
 		modRule = new RelationalRule(
-				"(clear ?_MOD_a) (clear ?_MOD_b) => (move ?_MOD_a ?_MOD_b)",
+				"(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)",
 				queryParams);
-		params = new ArrayList<String>();
-		params.add("a");
-		params.add("b");
+		params.clear();
+		params.put("a", "?G_0");
+		params.put("b", "?G_1");
 		modRule.setParameters(params);
 		assertTrue(pol.getPolicyRules().contains(modRule));
 	}

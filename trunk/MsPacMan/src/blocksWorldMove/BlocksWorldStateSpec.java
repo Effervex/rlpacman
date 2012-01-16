@@ -99,7 +99,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		String[] result = new String[2];
 		// On(a,b) goal
-		if (envParameter_.equals("onab")) {
+		if (envParameter_.equals("onab") || envParameter_.equals("on$A$B")) {
 			result[0] = "on$A$B";
 			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
 					+ RelationalArgument.createGoalTerm(1) + ") (block "
@@ -123,14 +123,15 @@ public class BlocksWorldStateSpec extends StateSpec {
 		}
 
 		// Clear goal
-		if (envParameter_.equals("clearA")) {
+		if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
 			result[0] = "clear$A";
 			result[1] = "(clear " + RelationalArgument.createGoalTerm(0)
 					+ ") (block " + RelationalArgument.createGoalTerm(0) + ")";
 			return result;
 		}
 
-		if (envParameter_.equals("highestA")) {
+		if (envParameter_.equals("highestA")
+				|| envParameter_.equals("highest$A")) {
 			result[0] = "highest$A";
 			result[1] = "(highest " + RelationalArgument.createGoalTerm(0)
 					+ ")";
@@ -143,7 +144,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected RelationalPolicy initialiseHandCodedPolicy() {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
-		if (envParameter_.equals("onab")) {
+		if (envParameter_.equals("onab") || envParameter_.equals("on$A$B")) {
 			rules = new String[3];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
@@ -157,11 +158,11 @@ public class BlocksWorldStateSpec extends StateSpec {
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
 			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
-		} else if (envParameter_.equals("clearA")) {
+		} else if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
-		} else if (envParameter_.equals("highestA")) {
+		} else if (envParameter_.equals("highestA") || envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";

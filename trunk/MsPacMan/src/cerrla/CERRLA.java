@@ -35,7 +35,7 @@ public class CERRLA implements RRLAgent {
 	private ModularPolicy currentPolicy_;
 
 	/** Notes the generators that will be involved in the update process. */
-	private Collection<LocalCrossEntropyDistribution> relevantDistributions_;
+	// private Collection<LocalCrossEntropyDistribution> relevantDistributions_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
@@ -49,7 +49,13 @@ public class CERRLA implements RRLAgent {
 	@Override
 	public void cleanup() {
 		// Save the final output
-		mainGoalCECortex_.finalWrite();
+		for (LocalCrossEntropyDistribution lced : goalMappedGenerators_
+				.values()) {
+			if (lced == mainGoalCECortex_)
+				lced.finalWrite();
+			else
+				lced.saveModule();
+		}
 	}
 
 	@Override
@@ -62,19 +68,15 @@ public class CERRLA implements RRLAgent {
 
 		// Note figures
 		policyEpisodes_++;
-		for (LocalCrossEntropyDistribution distribution : currentPolicy_
-				.getRelevantCEDistributions()) {
-			distribution.noteStepReward(observations.getReward());
+		currentPolicy_.noteStepReward(observations.getReward());
+		currentPolicy_.endEpisode();
 
-			// Note the rewards.
-			distribution.noteEpisodeReward();
-			if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()) {
-				distribution.recordSample();
-				currentPolicy_ = null;
+		if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()) {
+			currentPolicy_.recordSample();
+			currentPolicy_ = null;
 
-				if (ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-					System.out.println();
-			}
+			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+				System.out.println();
 		}
 
 		// Extra lines
@@ -100,12 +102,11 @@ public class CERRLA implements RRLAgent {
 		currentPolicy_ = null;
 		policyEpisodes_ = 0;
 		currentRun_ = run;
-		relevantDistributions_ = new HashSet<LocalCrossEntropyDistribution>();
 	}
 
 	@Override
-	public boolean isConverged() {
-		return mainGoalCECortex_.isConverged();
+	public boolean isLearningComplete() {
+		return mainGoalCECortex_.isLearningComplete();
 	}
 
 	@Override
@@ -122,14 +123,22 @@ public class CERRLA implements RRLAgent {
 				System.out.println();
 			}
 			policyEpisodes_ = 0;
-			relevantDistributions_.clear();
-			relevantDistributions_.add(mainGoalCECortex_);
 		}
 
+		currentPolicy_.startEpisode();
+
 		// Start the episode for each contained behaviour.
+		// TODO Deal with frozen distribution, etc.
+		mainGoalCECortex_.startEpisode();
 		for (LocalCrossEntropyDistribution dist : currentPolicy_
-				.getRelevantCEDistributions())
-			dist.startEpisode();
+				.getRelevantCEDistributions()) {
+			if (dist != mainGoalCECortex_) {
+				dist.startEpisode();
+				// If the main goal is frozen, freeze the others too.
+				if (mainGoalCECortex_.isFrozen() && !dist.isFrozen())
+					dist.freeze(true);
+			}
+		}
 
 		currentPolicy_.parameterArgs(observations.getGoalReplacements());
 
@@ -229,22 +238,6 @@ public class CERRLA implements RRLAgent {
 		PolicyActions policyActions = currentPolicy_.evaluatePolicy(
 				observations, StateSpec.getInstance().getNumReturnedActions());
 
-		// Scan which rules are firing if using modules
-		if (ProgramArgument.USE_MODULES.booleanValue()) {
-			Collection<RelationalPolicy> firedPolicies = policyActions
-					.getFiredPolicies();
-			// For every rule that fired, add the relevant behaviours to the
-			// relevant collection.
-			for (RelationalPolicy firedPolicy : firedPolicies) {
-				ModularPolicy modPolicy = (ModularPolicy) firedPolicy;
-				// Run through the policy hierarchy
-				do {
-					relevantDistributions_.add(modPolicy
-							.getLocalCEDistribution());
-					modPolicy = modPolicy.getParentPolicy();
-				} while (modPolicy != null);
-			}
-		}
 		return new RRLActions(policyActions);
 	}
 
@@ -281,8 +274,9 @@ public class CERRLA implements RRLAgent {
 	@Override
 	public RRLActions stepEpisode(RRLObservations observations) {
 		// Note the reward for the relevant distributions
-		for (LocalCrossEntropyDistribution distribution : relevantDistributions_)
-			distribution.noteStepReward(observations.getReward());
+		currentPolicy_.noteStepReward(observations.getReward());
+
+		// Evaluate the policy.
 		return evaluatePolicy(observations);
 	}
 

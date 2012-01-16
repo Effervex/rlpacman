@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.Serializable;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -46,8 +45,6 @@ public class Performance implements Serializable {
 	private double convergedMean_;
 	/** The episodic reward (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeMeans_;
-	/** The rewards received from each episode. */
-	private ArrayList<Double> episodeRewards_;
 	/** The episodic SD (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeSDs_;
 	/** If the performance is frozen. */
@@ -76,8 +73,6 @@ public class Performance implements Serializable {
 	public Performance(int runIndex) {
 		episodeMeans_ = new TreeMap<Integer, Double>();
 		episodeSDs_ = new TreeMap<Integer, Double>();
-		episodeRewards_ = new ArrayList<Double>(
-				ProgramArgument.POLICY_REPEATS.intValue());
 		recentScores_ = new LinkedList<Double>();
 		internalSDs_ = new LinkedList<Double>();
 		minMaxReward_ = new double[2];
@@ -85,7 +80,6 @@ public class Performance implements Serializable {
 		minMaxReward_[1] = -Float.MAX_VALUE;
 		startTime_ = System.currentTimeMillis();
 		runIndex_ = runIndex;
-		resetPolicyValues();
 	}
 
 	/**
@@ -149,16 +143,18 @@ public class Performance implements Serializable {
 	 * 
 	 * @param elites
 	 *            The best policy, in string format.
+	 * @param goal
+	 *            The goal of the behaviour.
 	 */
-	private void saveElitePolicies(Collection<PolicyValue> elites)
-			throws Exception {
+	private void saveElitePolicies(Collection<PolicyValue> elites,
+			GoalCondition goal) throws Exception {
 		File outputFile = new File(Config.TEMP_FOLDER, Config.getInstance()
 				.getElitesFile().getName());
 		outputFile.createNewFile();
 		FileWriter wr = new FileWriter(outputFile);
 		BufferedWriter buf = new BufferedWriter(wr);
 
-		Config.writeFileHeader(buf);
+		Config.writeFileHeader(buf, goal);
 
 		for (PolicyValue pv : elites) {
 			buf.write(pv.getPolicy().toOnlyUsedString() + "\n");
@@ -195,7 +191,7 @@ public class Performance implements Serializable {
 
 		// If the file is fresh, add the program args to the top
 		if (newFile)
-			Config.writeFileHeader(buf);
+			Config.writeFileHeader(buf, policyGenerator.getGoalCondition());
 
 		policyGenerator.saveHumanGenerators(buf, finalWrite);
 		buf.write("\n\n");
@@ -343,29 +339,28 @@ public class Performance implements Serializable {
 	}
 
 	/**
-	 * Notes the episode reward.
+	 * Notes the rewards the sample received.
 	 * 
-	 * @param episodeReward
-	 *            The total reward received during the episode.
-	 */
-	public void noteEpisodeReward(double episodeReward) {
-		minMaxReward_[0] = Math.min(episodeReward, minMaxReward_[0]);
-		minMaxReward_[1] = Math.max(episodeReward, minMaxReward_[1]);
-		episodeRewards_.add(episodeReward);
-		minEpisodeReward_ = Math.min(episodeReward, minEpisodeReward_);
-	}
-
-	/**
-	 * Notes the averaged reward received for a sample.
-	 * 
-	 * @param value
-	 *            The averaged reward.
+	 * @param sampleRewards
+	 *            The rewards the sample received.
 	 * @param currentEpisode
 	 *            The current episode.
+	 * @return The computed average of the three values.
 	 */
-	public void noteSampleReward(double value, int currentEpisode) {
-		// Note the internal policy SDs
-		for (double reward : episodeRewards_) {
+	public double noteSampleRewards(Double[] sampleRewards, int currentEpisode) {
+		// First pass through the rewards to determine min reward.
+		double average = 0;
+		minEpisodeReward_ = Float.MAX_VALUE;
+		for (double reward : sampleRewards) {
+			minEpisodeReward_ = Math.min(reward, minEpisodeReward_);
+			minMaxReward_[0] = Math.min(reward, minMaxReward_[0]);
+			minMaxReward_[1] = Math.max(reward, minMaxReward_[1]);
+			average += reward;
+		}
+		average /= sampleRewards.length;
+
+		// Second pass through to note the internal policy SDs
+		for (double reward : sampleRewards) {
 			if (internalSDs_.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
 					.intValue() * ProgramArgument.POLICY_REPEATS.intValue())
 				internalSDs_.poll();
@@ -380,19 +375,11 @@ public class Performance implements Serializable {
 			recentScores_.poll();
 			noteScores = true;
 		}
-		recentScores_.add(value);
+		recentScores_.add(average);
 		if (noteScores)
 			recordPerformanceScore(currentEpisode);
-
-		resetPolicyValues();
-	}
-
-	/**
-	 * Resets performance measures that are local to a policy.
-	 */
-	public void resetPolicyValues() {
-		episodeRewards_.clear();
-		minEpisodeReward_ = Float.MAX_VALUE;
+		
+		return average;
 	}
 
 	/**
@@ -449,7 +436,7 @@ public class Performance implements Serializable {
 		// Write the files
 		try {
 			if (hasUpdated) {
-				saveElitePolicies(elites);
+				saveElitePolicies(elites, distribution.getGoalCondition());
 				// Output the episode averages
 				savePerformance(distribution.getPolicyGenerator(), tempPerf,
 						frozen_);
@@ -461,21 +448,5 @@ public class Performance implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}
-
-	public double getAverageEpisodeReward() {
-		double reward = 0;
-		for (double r : episodeRewards_)
-			reward += r;
-		return reward / episodeRewards_.size();
-	}
-
-	/**
-	 * If this sample has accumulated any sample values at all.
-	 * 
-	 * @return True if this sample has at least one value.
-	 */
-	public boolean hasSampleValue() {
-		return !episodeRewards_.isEmpty();
 	}
 }

@@ -7,8 +7,8 @@ import jess.Rete;
 
 import relationalFramework.PolicyActions;
 import rrlFramework.RRLEnvironment;
+import rrlFramework.RRLExperiment;
 
-import cerrla.PolicyGenerator;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
@@ -99,7 +99,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	 */
 	@Override
 	protected void startState() {
-		cmdLineOptions_.setLevelRandSeed(PolicyGenerator.random_.nextInt());
+		cmdLineOptions_.setLevelRandSeed(RRLExperiment.random_.nextInt());
 		cmdLineOptions_.setLevelDifficulty(levelDifficulty_);
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)

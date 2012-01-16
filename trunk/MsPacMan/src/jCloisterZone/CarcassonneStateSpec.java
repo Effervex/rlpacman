@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.BasicRelationalPolicy;
 import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
@@ -96,7 +95,7 @@ public class CarcassonneStateSpec extends StateSpec {
 
 	@Override
 	protected RelationalPolicy initialiseHandCodedPolicy() {
-		BasicRelationalPolicy goodPolicy = new BasicRelationalPolicy();
+		RelationalPolicy goodPolicy = new RelationalPolicy();
 
 		return goodPolicy;
 	}

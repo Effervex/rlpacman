@@ -319,15 +319,18 @@ public class Config {
 	 * 
 	 * @param buf
 	 *            The buffered writer.
+	 * @param goal
+	 *            The goal of the behaviour.
 	 * @throws IOException
 	 *             The exception.
 	 */
-	public static void writeFileHeader(BufferedWriter buf) throws IOException {
+	public static void writeFileHeader(BufferedWriter buf, GoalCondition goal)
+			throws IOException {
 		// Program Arguments
 		buf.write("---PROGRAM ARGUMENTS---\n");
 		ProgramArgument.saveArgs(buf, true);
 		buf.write("-----------------------\n");
-		buf.write("GOAL (" + StateSpec.getInstance().getGoalName() + "): "
+		buf.write("GOAL (" + goal + "): "
 				+ StateSpec.getInstance().getGoalState() + "\n\n");
 
 		// Comments

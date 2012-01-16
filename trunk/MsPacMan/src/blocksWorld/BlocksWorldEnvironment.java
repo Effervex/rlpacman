@@ -4,6 +4,7 @@ import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
+import rrlFramework.RRLExperiment;
 import util.Pair;
 
 import java.util.ArrayList;
@@ -13,8 +14,6 @@ import java.util.List;
 import jess.Rete;
 
 import blocksWorldMove.BlocksState;
-
-import cerrla.PolicyGenerator;
 
 /**
  * The environment for the blocks world interface.
@@ -58,7 +57,7 @@ public class BlocksWorldEnvironment extends
 			List<FiredAction> actionsList = new ArrayList<FiredAction>(
 					firedActions);
 			FiredAction selectedAction = actionsList
-					.get(PolicyGenerator.random_.nextInt(actionsList.size()));
+					.get(RRLExperiment.random_.nextInt(actionsList.size()));
 			selectedAction.triggerRule();
 			action = selectedAction.getAction();
 

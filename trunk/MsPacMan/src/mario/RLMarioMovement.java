@@ -3,6 +3,7 @@ package mario;
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
+import rrlFramework.RRLExperiment;
 
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -1268,7 +1269,7 @@ public class RLMarioMovement {
 
 		// If the selected action isn't null, reset the previous bool action.
 		if (!selectedActions.isEmpty())
-			prevBoolAction_ = selectedActions.get(PolicyGenerator.random_
+			prevBoolAction_ = selectedActions.get(RRLExperiment.random_
 					.nextInt(selectedActions.size()));
 
 		// If Mario is on the ground and cannot jump, allow him time to breathe
