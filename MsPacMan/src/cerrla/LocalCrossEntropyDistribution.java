@@ -10,7 +10,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -55,32 +57,23 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** The current episode as evidenced by this generator. */
 	private int currentEpisode_;
 
-	/** The current policy being used for these (3) episodes. */
-	// private transient ModularPolicy currentPolicy_;
-
 	/** The elites set. */
 	private SortedSet<PolicyValue> elites_;
 
-	/** The reward received this episode. */
-	// private transient double episodeReward_;
-
 	/** If this generator is currently frozen (not learning). */
 	private transient boolean frozen_;
-
-	/** An internal flag to check if the sub-goal has been achieved. */
-	// private boolean goalAchieved_;
 
 	/** The goal condition for this cross-entropy behaviour. */
 	private final GoalCondition goalCondition_;
 
 	/** The created goal rule for checking if the internal goal is achieved. */
-	private final RelationalRule goalRule_;
+	private transient RelationalRule goalRule_;
 
 	/** The localised agent observations for this goal. */
 	private transient LocalAgentObservations localAgentObservations_;
 
 	/** The minimum number of elites value. */
-	private int numElites_;
+	private transient int numElites_;
 
 	/** If the AgentObsrvations were settled last episode. */
 	private boolean oldAOSettled_;
@@ -92,10 +85,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private final PolicyGenerator policyGenerator_;
 
 	/** The population value. */
-	private int population_;
+	private transient int population_;
 
 	/** The current testing episode. */
 	private transient int testEpisode_;
+
+	/** A stack of policies that have not been tested fully. */
+	private transient Queue<ModularPolicy> undertestedPolicies_;
 
 	/**
 	 * Create new sub-goal behaviour using information from another
@@ -133,14 +129,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		population_ = Integer.MAX_VALUE;
 		numElites_ = Integer.MAX_VALUE;
 
-		// Form the goal rule
-		if (!goalCondition_.isMainGoal()) {
-			SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>(
-					goalCondition_.getFacts());
-			goalRule_ = new RelationalRule(conditions, null, null);
-			goalRule_.expandConditions();
-		} else
-			goalRule_ = null;
+		undertestedPolicies_ = new LinkedList<ModularPolicy>();
 
 		// Load the local agent observations
 		localAgentObservations_ = LocalAgentObservations
@@ -210,6 +199,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			RRLObservations observations, BidiMap goalReplacements) {
 		if (modularPolicy.isGoalAchieved())
 			return true;
+
+		// Form the goal rule
+		if (!goalCondition_.isMainGoal()) {
+			if (goalRule_ == null) {
+				SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>(
+						goalCondition_.getFacts());
+				goalRule_ = new RelationalRule(conditions, null, null);
+				goalRule_.expandConditions();
+			}
+		} else
+			goalRule_ = null;
 
 		try {
 			// Assign the parameters
@@ -355,13 +355,40 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/**
 	 * Generates a policy from the current distribution.
 	 * 
-	 * @param modularPolicy
-	 *            The modular policy that is to be crafted using the rules
-	 *            generated.
+	 * @param existingSubGoal
+	 *            A collection of all existing sub-goals in the parent policy
+	 *            this policy is to be put into.
 	 * @return A newly generated policy from the current distribution.
 	 */
-	public RelationalPolicy generatePolicy(ModularPolicy modularPolicy) {
-		return policyGenerator_.generatePolicy(false);
+	public ModularPolicy generatePolicy(
+			Collection<ModularPolicy> existingSubGoals) {
+		// Initialise undertested
+		if (undertestedPolicies_ == null)
+			undertestedPolicies_ = new LinkedList<ModularPolicy>();
+
+		// If there remains an undertested policy not already in the parent
+		// policy, use that
+		for (Iterator<ModularPolicy> iter = undertestedPolicies_.iterator(); iter
+				.hasNext();) {
+			ModularPolicy undertested = iter.next();
+			if (undertested.shouldRegenerate())
+				// If the element is fully tested, remove it.
+				iter.remove();
+			else if (!existingSubGoals.contains(undertested))
+				// If the parent policy doesn't already contain the undertested
+				// policy, return it.
+				return undertested;
+		}
+
+		// Otherwise generate a new policy
+		RelationalPolicy newPol = policyGenerator_.generatePolicy(false);
+		ModularPolicy newModPol = null;
+		if (newPol instanceof ModularPolicy)
+			newModPol = new ModularPolicy((ModularPolicy) newPol);
+		else
+			newModPol = new ModularPolicy(newPol, this);
+		undertestedPolicies_.add(newModPol);
+		return newModPol;
 	}
 
 	public int getCurrentEpisode() {
@@ -415,6 +442,20 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		return false;
 	}
 
+	public boolean isFrozen() {
+		return frozen_;
+	}
+
+	/**
+	 * If this behaviour has finished learning and final testing.
+	 * 
+	 * @return True if the behaviour has finished learning and testing.
+	 */
+	public boolean isLearningComplete() {
+		return frozen_
+				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue();
+	}
+
 	/**
 	 * Notes the reward for a _single_ episode.
 	 * 
@@ -442,6 +483,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		if (!frozen_) {
 			// Add sample to elites
+			// sample.setModularParameters(null);
 			PolicyValue pv = new PolicyValue(sample, average,
 					policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
@@ -624,20 +666,5 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			e.printStackTrace();
 		}
 		return null;
-	}
-
-	/**
-	 * If this behaviour has finished learning and final testing.
-	 * 
-	 * @return True if the behaviour has finished learning and testing.
-	 */
-	public boolean isLearningComplete() {
-		return frozen_
-				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue()
-						* ProgramArgument.POLICY_REPEATS.intValue();
-	}
-
-	public boolean isFrozen() {
-		return frozen_;
 	}
 }

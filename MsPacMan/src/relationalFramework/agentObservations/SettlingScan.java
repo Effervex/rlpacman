@@ -8,6 +8,9 @@ package relationalFramework.agentObservations;
  * @author Sam Sarjant
  */
 public abstract class SettlingScan {
+	/** 2^SETTLED inactive iterations before considered settled. */
+	private static final int SETTLED_THRESHOLD = 7;
+
 	/** The amount of (2^) inactivity the observations has accrued. */
 	private transient int inactivity_ = 0;
 
@@ -17,24 +20,17 @@ public abstract class SettlingScan {
 	/** A hash code to track when observations change. */
 	private transient Integer observationHash_ = null;
 
-	/** 2^SETTLED inactive iterations before considered settled. */
-	private static final int SETTLED_THRESHOLD = 7;
-
-	/**
-	 * If the scan has reset due to a change.
-	 * 
-	 * @return True if the {@link SettlingScan} recently reset/was initialised.
-	 */
-	public boolean isChanged() {
-		return inactivity_ == 0;
+	protected int getInactivity() {
+		return inactivity_;
 	}
 
 	/**
-	 * Resets inactivity to 0.
+	 * Increments the inactivity counter (that is, this many scans have not
+	 * changed the state).
 	 */
-	public void resetInactivity() {
-		inactivity_ = 0;
-		observationHash_ = null;
+	protected void incrementInactivity() {
+		inactivity_++;
+		lastCover_ = 0;
 	}
 
 	/**
@@ -56,25 +52,6 @@ public abstract class SettlingScan {
 	}
 
 	/**
-	 * Increments the inactivity counter (that is, this many scans have not
-	 * changed the state).
-	 */
-	protected void incrementInactivity() {
-		inactivity_++;
-		lastCover_ = 0;
-	}
-
-	/**
-	 * If the agent observations are basically settled (have not changed in X
-	 * iterations).
-	 * 
-	 * @return If the inactivity has exceeded a particular threshold.
-	 */
-	public boolean isSettled() {
-		return inactivity_ >= SETTLED_THRESHOLD;
-	}
-
-	/**
 	 * Updates the observation hash
 	 */
 	protected abstract int updateHash();
@@ -87,5 +64,32 @@ public abstract class SettlingScan {
 		if (observationHash_ == null)
 			observationHash_ = updateHash();
 		return observationHash_;
+	}
+
+	/**
+	 * If the scan has reset due to a change.
+	 * 
+	 * @return True if the {@link SettlingScan} recently reset/was initialised.
+	 */
+	public boolean isChanged() {
+		return inactivity_ == 0;
+	}
+
+	/**
+	 * If the agent observations are basically settled (have not changed in X
+	 * iterations).
+	 * 
+	 * @return If the inactivity has exceeded a particular threshold.
+	 */
+	public boolean isSettled() {
+		return inactivity_ >= SETTLED_THRESHOLD;
+	}
+	
+	/**
+	 * Resets inactivity to 0.
+	 */
+	public void resetInactivity() {
+		inactivity_ = 0;
+		observationHash_ = null;
 	}
 }
