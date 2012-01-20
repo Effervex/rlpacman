@@ -454,6 +454,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			return false;
 		}
 
+		System.err.println(localGoal_ + " Covering " + getInactivity());
 		// The relevant facts which contain the key term
 		Rete state = observations.getState();
 		if (goalReplacements == null)

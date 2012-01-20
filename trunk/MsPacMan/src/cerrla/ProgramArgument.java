@@ -93,6 +93,8 @@ public enum ProgramArgument implements Serializable {
 			"If just running tests"),
 	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
+	USE_GENERAL_MODULES(true, "useGeneralModules", null, ParameterType.SAMPLING,
+			"If using/learning general modules"),
 	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
 			"If using weighted updates");
 

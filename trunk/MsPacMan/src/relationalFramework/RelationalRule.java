@@ -9,7 +9,6 @@ import relationalFramework.agentObservations.RangeContext;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -60,9 +59,6 @@ public class RelationalRule implements Serializable,
 	/** The rule's internal value for calculating standard deviation. */
 	private double internalS_ = 0;
 
-	/** The modular parameters for loaded module rules. */
-	private List<String> moduleParams_;
-
 	/** If this slot is a mutation. */
 	private boolean mutant_ = false;
 
@@ -98,9 +94,6 @@ public class RelationalRule implements Serializable,
 
 	/** The number of states seen by this rule. */
 	private int statesSeen_ = 0;
-
-	/** The term replacement map built from the parameter members. */
-	private Map<String, String> termReplacements_;
 
 	/**
 	 * A private constructor used only for the clone.
@@ -170,22 +163,6 @@ public class RelationalRule implements Serializable,
 	public RelationalRule(String ruleString, List<String> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
-	}
-
-	/**
-	 * Builds the module replacement map which swaps the rule's query parameters
-	 * with module ones.
-	 */
-	private void buildModuleReplacementMap() {
-		termReplacements_ = new HashMap<String, String>();
-		if (queryParams_ == null)
-			return;
-
-		for (int i = 0; i < queryParams_.size(); i++) {
-			if (moduleParams_ != null)
-				termReplacements_
-						.put(queryParams_.get(i), moduleParams_.get(i));
-		}
 	}
 
 	/**
@@ -463,10 +440,6 @@ public class RelationalRule implements Serializable,
 		return Math.sqrt(internalS_ / (internalCount_ - 1));
 	}
 
-	public List<String> getModuleParameters() {
-		return moduleParams_;
-	}
-
 	public List<String> getParameters() {
 		return parameters_;
 	}
@@ -513,10 +486,12 @@ public class RelationalRule implements Serializable,
 	 * Grounds this rule into a rule without modular parameters by swapping the
 	 * rule conditions for the parameters.
 	 * 
+	 * @param paramReplacements
+	 *            The replacement map for goal terms.
 	 * @return A cloned, but modularly grounded, rule.
 	 */
-	public RelationalRule groundModular() {
-		if (moduleParams_ == null) {
+	public RelationalRule groundModular(Map<String, String> paramReplacements) {
+		if (paramReplacements == null || paramReplacements.isEmpty()) {
 			return clone(false);
 		}
 
@@ -524,11 +499,11 @@ public class RelationalRule implements Serializable,
 				ruleConditions_.comparator());
 		for (RelationalPredicate ruleCond : getConditions(true)) {
 			RelationalPredicate groundCond = new RelationalPredicate(ruleCond);
-			groundCond.replaceArguments(termReplacements_, true, false);
+			groundCond.replaceArguments(paramReplacements, true, false);
 			groundConditions.add(groundCond);
 		}
 		RelationalPredicate groundAction = new RelationalPredicate(ruleAction_);
-		groundAction.replaceArguments(termReplacements_, true, false);
+		groundAction.replaceArguments(paramReplacements, true, false);
 
 		RelationalRule groundRule = new RelationalRule(groundConditions,
 				groundAction, null);
@@ -685,20 +660,6 @@ public class RelationalRule implements Serializable,
 	}
 
 	/**
-	 * Sets the modular parameters (only when loading a modular rule). These are
-	 * a special case which direct the module parameters to the appropriate goal
-	 * parameters they are geared towards.
-	 * 
-	 * @param parameters
-	 *            The special module parameters which act as a bridge between
-	 *            the query params and the episodic parameters.
-	 */
-	public void setModularParameters(List<String> parameters) {
-		moduleParams_ = parameters;
-		buildModuleReplacementMap();
-	}
-
-	/**
 	 * Sets this rule as a mutant and adds the parent rule.
 	 * 
 	 * @param parent
@@ -722,6 +683,7 @@ public class RelationalRule implements Serializable,
 	 * @param parameterMap
 	 *            The map of parameters (a -> ?G_0).
 	 */
+	@Override
 	public void setParameters(BidiMap parameterMap) {
 		if (parameterMap == null) {
 			parameters_ = null;
@@ -735,12 +697,12 @@ public class RelationalRule implements Serializable,
 			for (int i = 0; i < parameterMap.size(); i++)
 				queryParams_.add(RelationalArgument.createGoalTerm(i));
 		}
-		
+
 		// Setting the parameters
 		parameters_ = new ArrayList<String>(parameterMap.size());
 		for (String queryParam : queryParams_)
 			parameters_.add((String) parameterMap.getKey(queryParam));
-		
+
 		if (!hasQueryParams)
 			findConstantsAndRanges();
 	}
@@ -776,11 +738,15 @@ public class RelationalRule implements Serializable,
 
 	/**
 	 * Outputs the rule in a simplified, but essentially equivalent (assuming
-	 * inequality and type definitions) format.
+	 * inequality and type definitions) format. Includes a replacement map to
+	 * modify the goal parameters.
 	 * 
+	 * @param paramReplacements
+	 *            A (possibly null) replacement map for replacing goal
+	 *            variables.
 	 * @return A nice, shortened version of the rule.
 	 */
-	public String toNiceString() {
+	public String toNiceString(Map<String, String> paramReplacements) {
 		StringBuffer niceString = new StringBuffer();
 
 		// Run through each condition, adding regular conditions and
@@ -793,10 +759,10 @@ public class RelationalRule implements Serializable,
 				// If a type predicate, only add it if it's non-standard
 				if (!standardType.contains(stringFact))
 					niceString.append(stringFact
-							.toNiceString(termReplacements_) + " ");
+							.toNiceString(paramReplacements) + " ");
 			} else if (!stringFact.getFactName().equals("test")) {
 				// If not a type or test, add the fact.
-				niceString.append(stringFact.toNiceString(termReplacements_)
+				niceString.append(stringFact.toNiceString(paramReplacements)
 						+ " ");
 
 				// Scan the arguments and extract the standard type preds
@@ -815,9 +781,20 @@ public class RelationalRule implements Serializable,
 				}
 			}
 		}
-		niceString.append("=> " + ruleAction_.toNiceString(termReplacements_));
+		niceString.append("=> " + ruleAction_.toNiceString(paramReplacements));
 
 		return niceString.toString();
+	}
+
+	/**
+	 * Outputs the rule in a simplified, but essentially equivalent (assuming
+	 * inequality and type definitions) format.
+	 * 
+	 * @return A nice, shortened version of the rule.
+	 */
+	@Override
+	public String toNiceString() {
+		return toNiceString(null);
 	}
 
 	@Override
@@ -873,5 +850,21 @@ public class RelationalRule implements Serializable,
 			conds.add(cond);
 		}
 		return conds;
+	}
+
+	@Override
+	public boolean shouldRegenerate() {
+		// Never regenerate.
+		return false;
+	}
+
+	@Override
+	public GoalCondition getGoalCondition() {
+		return getConstantCondition();
+	}
+
+	@Override
+	public int size() {
+		return 1;
 	}
 }

@@ -17,6 +17,7 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import jess.Rete;
 import cerrla.LocalCrossEntropyDistribution;
+import cerrla.ModularHole;
 import cerrla.ProgramArgument;
 
 import rrlFramework.RRLExperiment;
@@ -27,59 +28,55 @@ import util.Recursive;
 
 public class ModularPolicy extends RelationalPolicy implements
 		RelationallyEvaluatableObject {
+	/** The minimum 'goal-not-achieved' value. */
+	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
+
 	private static final long serialVersionUID = 7855536761222318011L;
 
 	/** The reward received at every step by the sub-goal. */
 	private static final double SUB_GOAL_REWARD = -1;
 
-	/** The minimum 'goal-not-achieved' value. */
-	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
-
 	/** The distribution that created this modular policy. */
 	private LocalCrossEntropyDistribution ceDistribution_;
-
-	/** The goal replacements for this episode ('?G_0 -> a' format). */
-	private transient BidiMap episodeGoalReplacements_;
-
-	/** A map for transforming goal replacements into the appropriate args. */
-	private Map<String, String> moduleParamReplacements_;
-
-	/** The policy containing this policy (if any). */
-	private ModularPolicy parentPolicy_;
 
 	/** The collection of policies this policy directly contains. */
 	private Map<SortedSet<RelationalPredicate>, ModularPolicy> childrenPolicies_;
 
-	/** A collection of the distributions (modules) used in this policy. */
-	private Collection<LocalCrossEntropyDistribution> relevantCEDistributions_;
+	/** The goal replacements for this episode ('?G_0 -> a' format). */
+	private transient BidiMap episodeGoalReplacements_;
+
+	/** The reward received this episode. */
+	private transient double episodeReward_;
+
+	/** Gets the rules that fired last step. */
+	private transient Set<RelationalRule> firedLastStep_ = new HashSet<RelationalRule>();
+
+	/** If the internal goal of this policy was achieved this episode. */
+	private transient boolean goalAchieved_;
+
+	/** The goal condition this policy is assigned to complete. */
+	private GoalCondition goalCondition_;
+
+	/** A map for transforming goal replacements into the appropriate args. */
+	private Map<String, String> moduleParamReplacements_;
+
+	/** The rewards this policy achieved for each episode. */
+	private transient ArrayList<Double> policyRewards_ = new ArrayList<Double>();
 
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
 
-	/** Gets the rules that fired last step. */
-	private Set<RelationalRule> firedLastStep_;
-
-	/** If the internal goal of this policy was achieved this episode. */
-	private boolean goalAchieved_;
-
-	/** The rewards this policy achieved for each episode. */
-	private final ArrayList<Double> policyRewards_;
-
-	/** The reward received this episode. */
-	private double episodeReward_;
-
-	public ModularPolicy(LocalCrossEntropyDistribution policyGenerator,
-			Map<String, String> paramReplacementMap) {
+	/**
+	 * A constructor for a blank modular policy.
+	 * 
+	 * @param policyGenerator
+	 *            The generator that created this policy.
+	 */
+	public ModularPolicy(LocalCrossEntropyDistribution policyGenerator) {
 		super();
-		policySize_ = 0;
 		ceDistribution_ = policyGenerator;
-		relevantCEDistributions_ = new HashSet<LocalCrossEntropyDistribution>();
-		relevantCEDistributions_.add(ceDistribution_);
-		moduleParamReplacements_ = paramReplacementMap;
 		triggeredRules_ = new HashSet<RelationalRule>();
-		firedLastStep_ = new HashSet<RelationalRule>();
 		childrenPolicies_ = new HashMap<SortedSet<RelationalPredicate>, ModularPolicy>();
-		policyRewards_ = new ArrayList<Double>();
 	}
 
 	/**
@@ -89,16 +86,44 @@ public class ModularPolicy extends RelationalPolicy implements
 	 *            The old policy.
 	 */
 	public ModularPolicy(ModularPolicy policy) {
-		this(policy.ceDistribution_, policy.moduleParamReplacements_);
-		for (RelationallyEvaluatableObject reo : policy.policyRules_) {
-			if (reo instanceof ModularPolicy) {
-				ModularPolicy subPolicy = new ModularPolicy((ModularPolicy) reo);
-				subPolicy.parentPolicy_ = this;
-				policyRules_.add(subPolicy);
-			} else
-				policyRules_.add(reo);
-		}
+		this(policy.ceDistribution_);
+		for (RelationallyEvaluatableObject reo : policy.policyRules_)
+			policyRules_.add(reo);
+
 		policySize_ = policy.policySize_;
+	}
+
+	/**
+	 * Creates a new modular policy from an existing basic relational policy.
+	 * 
+	 * @param basicPolicy
+	 *            The basic policy with rules to transfer to this policy.
+	 * @param policyGenerator
+	 *            The generator that created this policy.
+	 */
+	public ModularPolicy(RelationalPolicy newPol,
+			LocalCrossEntropyDistribution policyGenerator) {
+		this(policyGenerator);
+		policySize_ = newPol.policyRules_.size();
+
+		// Add the rules, creating ModularHoles where appropriate.
+		for (RelationallyEvaluatableObject reo : newPol.getRules()) {
+			if (reo instanceof RelationalRule) {
+				policyRules_.add(reo);
+
+				// Checking for sub-goals
+				GoalCondition ruleGCs = reo.getGoalCondition();
+				if (ruleGCs != null) {
+					if (ProgramArgument.MULTI_MODULES.booleanValue()) {
+						policyRules_.add(new ModularHole(ruleGCs));
+					} else {
+						for (GoalCondition splitGC : ruleGCs.splitCondition()) {
+							policyRules_.add(new ModularHole(splitGC));
+						}
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -174,7 +199,7 @@ public class ModularPolicy extends RelationalPolicy implements
 						}
 					}
 				}
-			} else {
+			} else if (polObject instanceof ModularPolicy) {
 				// Evaluate the internal policy.
 				ModularPolicy internalPolicy = (ModularPolicy) polObject;
 				internalPolicy.evaluateInternalPolicy(observations,
@@ -204,7 +229,8 @@ public class ModularPolicy extends RelationalPolicy implements
 				if (!onlyTriggered || triggeredRules_.contains(reo)) {
 					for (int i = 0; i < depth; i++)
 						buffer.append("  ");
-					buffer.append(reo.toNiceString());
+					buffer.append(((RelationalRule) reo)
+							.toNiceString(moduleParamReplacements_));
 					buffer.append("\n");
 				}
 			} else if (reo instanceof ModularPolicy)
@@ -266,11 +292,62 @@ public class ModularPolicy extends RelationalPolicy implements
 	public void addPolicy(SortedSet<RelationalPredicate> constantFacts,
 			ModularPolicy modularPolicy) {
 		policyRules_.add(modularPolicy);
-		modularPolicy.parentPolicy_ = this;
 		policySize_ += modularPolicy.policySize_;
-		relevantCEDistributions_.addAll(modularPolicy
-				.getRelevantCEDistributions());
 		childrenPolicies_.put(constantFacts, modularPolicy);
+	}
+
+	/**
+	 * Notes the final reward received for this episode.
+	 * 
+	 * @param reward
+	 *            The reward received for the episode.
+	 * @return True if the modular policy needs to be regenerated due to a
+	 *         part(s) of it being fully tested.
+	 */
+	@Recursive
+	public boolean endEpisode() {
+		// Modify the reward if the goal hasn't been achieved if a sub-goal
+		// generator
+		if (!ceDistribution_.getGoalCondition().isMainGoal() && !goalAchieved_)
+			episodeReward_ = MINIMUM_REWARD;
+
+		// Note the episode reward in the generator.
+		if (ceDistribution_.getGoalCondition().isMainGoal()
+				|| episodeReward_ != 0) {
+			policyRewards_.add(episodeReward_);
+		}
+
+		// End episode for all children.
+		boolean regeneratePolicy = false;
+		for (ModularPolicy child : childrenPolicies_.values())
+			regeneratePolicy |= child.endEpisode();
+
+		// Check if sample needs to be recorded
+		if (policyRewards_.size() >= ProgramArgument.POLICY_REPEATS.intValue()) {
+			// Record the sample.
+			ceDistribution_.recordSample(this,
+					policyRewards_.toArray(new Double[policyRewards_.size()]));
+			regeneratePolicy = true;
+		}
+		return regeneratePolicy;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ModularPolicy other = (ModularPolicy) obj;
+		if (moduleParamReplacements_ == null) {
+			if (other.moduleParamReplacements_ != null)
+				return false;
+		} else if (!moduleParamReplacements_
+				.equals(other.moduleParamReplacements_))
+			return false;
+		return true;
 	}
 
 	@Override
@@ -320,21 +397,135 @@ public class ModularPolicy extends RelationalPolicy implements
 		return triggeredRules_;
 	}
 
+	@Override
+	public GoalCondition getGoalCondition() {
+		return goalCondition_;
+	}
+
 	public LocalCrossEntropyDistribution getLocalCEDistribution() {
 		return ceDistribution_;
 	}
 
-	public ModularPolicy getParentPolicy() {
-		return parentPolicy_;
+	/**
+	 * Gets all the policies this policy contains (recursively), including
+	 * itself.
+	 * 
+	 * @param undertestedOnly
+	 *            If only collecting undertested policies.
+	 * @return A collection of policies of size at least 1.
+	 */
+	public Collection<ModularPolicy> getAllPolicies(boolean undertestedOnly,
+			Collection<ModularPolicy> recursiveCollection) {
+		// Initialise recursive collection.
+		if (recursiveCollection == null)
+			recursiveCollection = new HashSet<ModularPolicy>();
+		if (undertestedOnly && shouldRegenerate())
+			return recursiveCollection;
+
+		recursiveCollection.add(this);
+
+		// Run through all children policies
+		for (ModularPolicy child : childrenPolicies_.values())
+			child.getAllPolicies(undertestedOnly, recursiveCollection);
+
+		return recursiveCollection;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime
+				* result
+				+ ((moduleParamReplacements_ == null) ? 0
+						: moduleParamReplacements_.hashCode());
+		return result;
+	}
+
+	public boolean isFresh() {
+		return policyRewards_.isEmpty();
 	}
 
 	/**
-	 * Gets all relevant distributions (the modules used by this policy).
+	 * If the goal has been achieved.
 	 * 
-	 * @return A collection of all relevant distributions.
+	 * @return True if the goal has been achieved.
 	 */
-	public Collection<LocalCrossEntropyDistribution> getRelevantCEDistributions() {
-		return relevantCEDistributions_;
+	public boolean isGoalAchieved() {
+		return goalAchieved_;
+	}
+
+	/**
+	 * Notes the environment reward if main modular policy, otherwise it uses an
+	 * internal reward.
+	 */
+	@Recursive
+	public boolean noteStepReward(double reward) {
+		// Note reward if a rule in this policy fired (or it's the main policy).
+		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
+				|| !firedLastStep_.isEmpty();
+
+		// Drop down and reward from the bottom up.
+		for (ModularPolicy child : childrenPolicies_.values())
+			noteReward |= child.noteStepReward(reward);
+
+		// Only note the reward if a rule within this policy fired.
+		if (noteReward) {
+			// If this is an unachieved sub-goal, note reward.
+			if (!ceDistribution_.getGoalCondition().isMainGoal()) {
+				if (!goalAchieved_)
+					episodeReward_ += SUB_GOAL_REWARD;
+			} else
+				episodeReward_ += reward;
+		}
+
+		return noteReward;
+	}
+
+	/**
+	 * Replaces the index of an old {@link RelationallyEvaluatableObject} with a
+	 * undertested, potentially fresh, policy.
+	 * 
+	 * @param i
+	 *            The location of the item to replace.
+	 * @param replacement
+	 *            The replacement policy.
+	 */
+	public void replaceIndex(int i, RelationallyEvaluatableObject replacement) {
+		RelationallyEvaluatableObject oldObject = policyRules_.get(i);
+		policyRules_.set(i, replacement);
+		policySize_ += replacement.size() - oldObject.size();
+
+		if (replacement instanceof ModularPolicy) {
+			ModularPolicy modPol = (ModularPolicy) replacement;
+			modPol.goalCondition_ = oldObject.getGoalCondition();
+			childrenPolicies_.put(modPol.goalCondition_.getFacts(), modPol);
+		}
+	}
+
+	/**
+	 * Sets if the goal has been achieved.
+	 * 
+	 * @param b
+	 *            The state of goal achievement.
+	 */
+	public void setGoalAchieved(boolean b) {
+		goalAchieved_ = b;
+	}
+
+	/**
+	 * Sets the modular replacements for this policy.
+	 * 
+	 * @param paramReplacementMap
+	 *            The modular replacements to set.
+	 */
+	public void setModularParameters(Map<String, String> paramReplacementMap) {
+		moduleParamReplacements_ = paramReplacementMap;
+		// for (RelationallyEvaluatableObject reo : policyRules_) {
+		// if (reo instanceof RelationalRule)
+		// ((RelationalRule) reo)
+		// .setModularParameters(paramReplacementMap);
+		// }
 	}
 
 	@Override
@@ -342,8 +533,18 @@ public class ModularPolicy extends RelationalPolicy implements
 		BidiMap transformedArgs = transformGoalReplacements(goalArgs);
 		episodeGoalReplacements_ = transformedArgs;
 		for (RelationallyEvaluatableObject obj : policyRules_) {
-			obj.setParameters(transformedArgs);
+			obj.setParameters(goalArgs);
 		}
+	}
+
+	/**
+	 * If this policy should be replaced with another policy.
+	 * 
+	 * @return True if this policy has collected enough rewards to be noted.
+	 */
+	public boolean shouldRegenerate() {
+		return policyRewards_.size() >= ProgramArgument.POLICY_REPEATS
+				.intValue();
 	}
 
 	/**
@@ -352,11 +553,34 @@ public class ModularPolicy extends RelationalPolicy implements
 	 * @return True if any of the relevant distributions have recently removed
 	 *         rules via covering.
 	 */
+	@Recursive
 	public boolean shouldRestart() {
-		for (LocalCrossEntropyDistribution distribution : relevantCEDistributions_)
-			if (distribution.getPolicyGenerator().shouldRestart())
+		if (ceDistribution_.getPolicyGenerator().shouldRestart())
+			return true;
+
+		for (ModularPolicy children : childrenPolicies_.values()) {
+			if (children.shouldRestart())
 				return true;
+		}
 		return false;
+	}
+
+	@Override
+	public int size() {
+		return policySize_;
+	}
+
+	/**
+	 * Starts a new episode, so reward observation begins on a new episode.
+	 */
+	@Recursive
+	public void startEpisode() {
+		episodeReward_ = 0;
+		goalAchieved_ = false;
+
+		// Start episode for all children
+		for (ModularPolicy child : childrenPolicies_.values())
+			child.startEpisode();
 	}
 
 	@Override
@@ -387,103 +611,13 @@ public class ModularPolicy extends RelationalPolicy implements
 	}
 
 	/**
-	 * Notes the environment reward if main modular policy, otherwise it uses an
-	 * internal reward.
-	 */
-	@Recursive
-	public boolean noteStepReward(double reward) {
-		// Note reward if a rule in this policy fired (or it's the main policy).
-		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
-				|| !firedLastStep_.isEmpty();
-		
-		// Drop down and reward from the bottom up.
-		for (ModularPolicy child : childrenPolicies_.values())
-			noteReward |= child.noteStepReward(reward);
-
-		// Only note the reward if a rule within this policy fired.
-		if (noteReward) {
-			// If this is an unachieved sub-goal, note reward.
-			if (!ceDistribution_.getGoalCondition().isMainGoal()) {
-				if (!goalAchieved_)
-					episodeReward_ += SUB_GOAL_REWARD;
-			} else
-				episodeReward_ += reward;
-		}
-
-		return noteReward;
-	}
-
-	/**
-	 * Starts a new episode, so reward observation begins on a new episode.
-	 */
-	@Recursive
-	public void startEpisode() {
-		episodeReward_ = 0;
-		goalAchieved_ = false;
-		
-		// Start episode for all children
-		for (ModularPolicy child : childrenPolicies_.values())
-			child.startEpisode();
-	}
-
-	/**
-	 * Notes the final reward received for this episode.
+	 * Gets the modular replacement map.
 	 * 
-	 * @param reward
-	 *            The reward received for the episode.
-	 * @return True if this policy contains a rule that fired.
+	 * @return The replacement map for this policy.
 	 */
-	@Recursive
-	public void endEpisode() {
-		// Modify the reward if the goal hasn't been achieved if a sub-goal
-		// generator
-		if (!ceDistribution_.getGoalCondition().isMainGoal() && !goalAchieved_)
-			episodeReward_ = MINIMUM_REWARD;
-
-		// Note the episode reward in the generator.
-		if (ceDistribution_.getGoalCondition().isMainGoal()
-				|| episodeReward_ != 0) {
-			policyRewards_.add(episodeReward_);
-		}
-		
-		// End episode for all children.
-		for (ModularPolicy child : childrenPolicies_.values())
-			child.endEpisode();
+	public Map<String, String> getModularReplacementMap() {
+		return moduleParamReplacements_;
 	}
 
-	/**
-	 * Records this sample in its behaviour generator.
-	 */
-	@Recursive
-	public void recordSample() {
-		// If this policy was never used (sub-goal only), don't record it.
-		if (policyRewards_.isEmpty())
-			return;
 
-		// Record the sample.
-		ceDistribution_.recordSample(this,
-				policyRewards_.toArray(new Double[policyRewards_.size()]));
-
-		for (ModularPolicy child : childrenPolicies_.values())
-			child.recordSample();
-	}
-
-	/**
-	 * If the goal has been achieved.
-	 * 
-	 * @return True if the goal has been achieved.
-	 */
-	public boolean isGoalAchieved() {
-		return goalAchieved_;
-	}
-
-	/**
-	 * Sets if the goal has been achieved.
-	 * 
-	 * @param b
-	 *            The state of goal achievement.
-	 */
-	public void setGoalAchieved(boolean b) {
-		goalAchieved_ = b;
-	}
 }

@@ -4,14 +4,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 
 import relationalFramework.GoalCondition;
 import relationalFramework.ModularPolicy;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalArgument;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalRule;
 import relationalFramework.RelationallyEvaluatableObject;
 import relationalFramework.StateSpec;
 import rrlFramework.Config;
@@ -28,23 +27,182 @@ import util.Recursive;
  * @author Sam Sarjant
  */
 public class CERRLA implements RRLAgent {
-	/** The CEDistribution for the environment goal. */
-	private LocalCrossEntropyDistribution mainGoalCECortex_;
-
 	/** The modular policy being tested. */
 	private ModularPolicy currentPolicy_;
 
-	/** Notes the generators that will be involved in the update process. */
-	// private Collection<LocalCrossEntropyDistribution> relevantDistributions_;
+	/** The current run this learner was initialised with. */
+	private int currentRun_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
 
-	/** The number of episodes the policy has been involved in. */
-	private int policyEpisodes_;
+	/** The CEDistribution for the environment goal. */
+	private LocalCrossEntropyDistribution mainGoalCECortex_;
 
-	/** The current run this learner was initialised with. */
-	private int currentRun_;
+	/**
+	 * 
+	 * Inserts a modular policy within this policy.
+	 * 
+	 * @param index
+	 *            The index of the module to replace.
+	 * @param priorPolicies
+	 *            The collection of previous policies that were recursively
+	 *            added (to avoid infinite loops).
+	 * @param moduleReplacementMap
+	 *            The replacement map to use for the created modular policy.
+	 * @param modularPolicy
+	 *            The policy to add to.
+	 * @param goalCondition
+	 *            The goal condition to use.
+	 * @param subGoalPolicies
+	 *            The subgoal policies added to the main policy.
+	 */
+	private void addModuleToPolicy(int index,
+			Collection<GoalCondition> priorPolicies,
+			Map<String, String> moduleReplacementMap,
+			ModularPolicy modularPolicy, GoalCondition goalCondition,
+			Collection<ModularPolicy> subGoalPolicies) {
+		LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
+				.get(goalCondition);
+		// If there is an active module to replace this index, do so
+		if (moduleDistribution != null
+				&& moduleDistribution != mainGoalCECortex_
+				&& !priorPolicies.contains(goalCondition)) {
+			Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
+					priorPolicies);
+			modulePrior.add(goalCondition);
+
+			// Apply the replacement map
+			Map<String, String> newModuleReplacementMap = new HashMap<String, String>();
+			ArrayList<String> args = goalCondition.getConstantArgs();
+			for (int i = 0; i < args.size(); i++) {
+				String goalTerm = RelationalArgument.createGoalTerm(i);
+				String argTerm = args.get(i);
+				if (moduleReplacementMap == null
+						|| moduleReplacementMap.isEmpty())
+					newModuleReplacementMap.put(goalTerm, argTerm);
+				else
+					newModuleReplacementMap.put(goalTerm,
+							moduleReplacementMap.get(argTerm));
+			}
+
+			// Add the policy
+			modularPolicy.replaceIndex(
+					index,
+					regeneratePolicy(moduleDistribution, modulePrior,
+							newModuleReplacementMap, subGoalPolicies));
+		} else {
+			// Otherwise, insert a ModularHole
+			modularPolicy.replaceIndex(index, new ModularHole(goalCondition));
+		}
+	}
+
+	/**
+	 * Checks if a module needs to be learned. If so, it creates a new generator
+	 * for the sub-goal which will be used/improved throughout learning.
+	 */
+	private void checkForModularLearning() {
+		// Find the constants present in the rules of the main generator
+		if (mainGoalCECortex_.getLocalAgentObservations().isSettled()) {
+			for (GoalCondition gc : mainGoalCECortex_.getPotentialModuleGoals()) {
+				// Check if the goal condition already exists
+				if (!goalMappedGenerators_.containsKey(gc)) {
+					// Attempt to load it
+					LocalCrossEntropyDistribution loadedModule = LocalCrossEntropyDistribution
+							.loadModule(Config.getInstance()
+									.getEnvironmentClass(), gc);
+					if (loadedModule != null)
+						goalMappedGenerators_.put(gc, loadedModule);
+					else {
+						// The module may be learned
+						LocalCrossEntropyDistribution newModule = new LocalCrossEntropyDistribution(
+								gc);
+						goalMappedGenerators_.put(gc, newModule);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Evaluates the policy but also notes which CEDistributions are currently
+	 * being learned.
+	 * 
+	 * @param observations
+	 *            The relational observations for this state.
+	 * @return The actions the policy returned.
+	 */
+	private RRLActions evaluatePolicy(RRLObservations observations) {
+		PolicyActions policyActions = currentPolicy_.evaluatePolicy(
+				observations, StateSpec.getInstance().getNumReturnedActions());
+
+		return new RRLActions(policyActions);
+	}
+
+	/**
+	 * Recreates the current policy.
+	 */
+	private void recreateCurrentPolicy() {
+		// First, determine which policies already exist
+		Collection<ModularPolicy> subGoalPolicies = new HashSet<ModularPolicy>();
+		if (currentPolicy_ != null)
+			subGoalPolicies = currentPolicy_.getAllPolicies(true,
+					subGoalPolicies);
+
+		currentPolicy_ = regeneratePolicy(mainGoalCECortex_, null, null,
+				subGoalPolicies);
+	}
+
+	/**
+	 * Recursively (re)generates a modular and inspective policy which both
+	 * combines existing modules and also examines states for new information.
+	 * The policy may contain existing parts but also balnk parts to regenerate.
+	 * 
+	 * @param policyGenerator
+	 *            The distribution to generate the policy.
+	 * @param priorPolicies
+	 *            The goal condition policies already recursively used.
+	 * @param moduleReplacementMap
+	 *            The modular replacement map
+	 * @param subGoalPolicies
+	 *            The subgoal policies already existing in the main policy.
+	 * @return A modular policy, both utilising sub-behaviours and learning new
+	 *         behaviour.
+	 */
+	@Recursive
+	private ModularPolicy regeneratePolicy(
+			LocalCrossEntropyDistribution policyGenerator,
+			Collection<GoalCondition> priorPolicies,
+			Map<String, String> moduleReplacementMap,
+			Collection<ModularPolicy> subGoalPolicies) {
+		// Initialise null collections
+		if (priorPolicies == null)
+			priorPolicies = new HashSet<GoalCondition>();
+		if (subGoalPolicies == null)
+			subGoalPolicies = new HashSet<ModularPolicy>();
+
+		// Build the module parameter replacement map
+		ModularPolicy modularPolicy = policyGenerator
+				.generatePolicy(subGoalPolicies);
+		modularPolicy.setModularParameters(moduleReplacementMap);
+		subGoalPolicies.add(modularPolicy);
+
+		// TODO Disallow duplicate rules from policies - they have no use.
+		// Add all rules in the basic policy
+		int i = 0;
+		for (Iterator<RelationallyEvaluatableObject> iter = modularPolicy
+				.getRules().iterator(); iter.hasNext();) {
+			RelationallyEvaluatableObject reo = iter.next();
+			if (reo.shouldRegenerate()) {
+				addModuleToPolicy(i, priorPolicies, moduleReplacementMap,
+						modularPolicy, reo.getGoalCondition(), subGoalPolicies);
+			} else if (reo instanceof ModularPolicy)
+				subGoalPolicies.add((ModularPolicy) reo);
+			i++;
+		}
+
+		return modularPolicy;
+	}
 
 	@Override
 	public void cleanup() {
@@ -67,23 +225,10 @@ public class CERRLA implements RRLAgent {
 		}
 
 		// Note figures
-		policyEpisodes_++;
 		currentPolicy_.noteStepReward(observations.getReward());
-		currentPolicy_.endEpisode();
-
-		if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()) {
-			currentPolicy_.recordSample();
-			currentPolicy_ = null;
-
-			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-				System.out.println();
-		}
-
-		// Extra lines
-		if (policyEpisodes_ >= ProgramArgument.POLICY_REPEATS.intValue()
-				&& ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			System.out.println();
-		}
+		boolean regeneratePolicy = currentPolicy_.endEpisode();
+		if (regeneratePolicy)
+			recreateCurrentPolicy();
 	}
 
 	@Override
@@ -100,7 +245,6 @@ public class CERRLA implements RRLAgent {
 		mainGoalCECortex_ = new LocalCrossEntropyDistribution(mainGC, run);
 		goalMappedGenerators_.put(mainGC, mainGoalCECortex_);
 		currentPolicy_ = null;
-		policyEpisodes_ = 0;
 		currentRun_ = run;
 	}
 
@@ -115,160 +259,36 @@ public class CERRLA implements RRLAgent {
 		if (ProgramArgument.USE_MODULES.booleanValue())
 			checkForModularLearning();
 
-		if (currentPolicy_ == null) {
+		if (currentPolicy_ == null || currentPolicy_.shouldRegenerate()) {
 			// Generate a new policy
-			currentPolicy_ = generatePolicy(mainGoalCECortex_, null, null);
+			recreateCurrentPolicy();
+		}
+
+		if (currentPolicy_.isFresh()) {
 			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-				System.out.println(currentPolicy_);
 				System.out.println();
+				System.out.println(currentPolicy_);
 			}
-			policyEpisodes_ = 0;
 		}
 
 		currentPolicy_.startEpisode();
 
 		// Start the episode for each contained behaviour.
 		// TODO Deal with frozen distribution, etc.
-		mainGoalCECortex_.startEpisode();
-		for (LocalCrossEntropyDistribution dist : currentPolicy_
-				.getRelevantCEDistributions()) {
-			if (dist != mainGoalCECortex_) {
-				dist.startEpisode();
-				// If the main goal is frozen, freeze the others too.
-				if (mainGoalCECortex_.isFrozen() && !dist.isFrozen())
-					dist.freeze(true);
-			}
-		}
+		// mainGoalCECortex_.startEpisode();
+		// for (LocalCrossEntropyDistribution dist : currentPolicy_
+		// .getRelevantCEDistributions()) {
+		// if (dist != mainGoalCECortex_) {
+		// dist.startEpisode();
+		// // If the main goal is frozen, freeze the others too.
+		// if (mainGoalCECortex_.isFrozen() && !dist.isFrozen())
+		// dist.freeze(true);
+		// }
+		// }
 
 		currentPolicy_.parameterArgs(observations.getGoalReplacements());
 
 		return evaluatePolicy(observations);
-	}
-
-	/**
-	 * Recursively generates a modular and inspective policy which both combines
-	 * existing modules and also examines states for new information.
-	 * 
-	 * @param policyGenerator
-	 *            The distribution to generate the policy.
-	 * @param priorPolicies
-	 *            The goal condition policies already recursively used.
-	 * @param moduleParams
-	 *            The modular parameters to link this policy to the rule which
-	 *            fired it.
-	 * @return A modular policy, both utilising sub-behaviours and learning new
-	 *         behaviour.
-	 */
-	@Recursive
-	private ModularPolicy generatePolicy(
-			LocalCrossEntropyDistribution policyGenerator,
-			Collection<GoalCondition> priorPolicies,
-			ArrayList<String> moduleParams) {
-		if (priorPolicies == null)
-			priorPolicies = new HashSet<GoalCondition>();
-
-		// Build the module parameter replacement map
-		Map<String, String> paramReplacementMap = new HashMap<String, String>();
-		if (moduleParams != null && !moduleParams.isEmpty()) {
-			for (int i = 0; i < moduleParams.size(); i++)
-				paramReplacementMap.put(RelationalArgument.createGoalTerm(i),
-						moduleParams.get(i));
-		}
-		ModularPolicy modularPolicy = new ModularPolicy(policyGenerator,
-				paramReplacementMap);
-
-		RelationalPolicy mainPolicy = policyGenerator
-				.generatePolicy(modularPolicy);
-		// Dealing with re-tested policies.
-		if (mainPolicy instanceof ModularPolicy)
-			return (ModularPolicy) mainPolicy;
-
-		// TODO Disallow duplicate rules from policies - they have no use.
-		// Add all rules in the basic policy
-		for (RelationallyEvaluatableObject reo : mainPolicy.getRules()) {
-			RelationalRule rule = (RelationalRule) reo;
-
-			// Add the rule first
-			if (moduleParams != null)
-				rule.setModularParameters(moduleParams);
-			modularPolicy.addRule(rule);
-
-			GoalCondition ruleGCs = rule.getConstantCondition();
-			LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
-					.get(ruleGCs);
-			// Add modular rules as they come up (don't get into a potential
-			// circular loop though).
-			// TODO Split the GC for non multi-modules
-			if (ruleGCs != null && moduleDistribution != null
-					&& !priorPolicies.contains(ruleGCs)) {
-				Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
-						priorPolicies);
-				modulePrior.add(ruleGCs);
-
-				// Apply the replacement map
-				ArrayList<String> newModuleParams = new ArrayList<String>();
-				for (String constantArg : ruleGCs.getConstantArgs()) {
-					if (paramReplacementMap.isEmpty())
-						newModuleParams.add(constantArg);
-					else
-						newModuleParams.add(paramReplacementMap
-								.get(constantArg));
-				}
-
-				// Add the policy
-				modularPolicy.addPolicy(
-						ruleGCs.getFacts(),
-						generatePolicy(moduleDistribution, modulePrior,
-								newModuleParams));
-			}
-		}
-
-		return modularPolicy;
-	}
-
-	/**
-	 * Evaluates the policy but also notes which CEDistributions are currently
-	 * being learned.
-	 * 
-	 * @param observations
-	 *            The relational observations for this state.
-	 * @return The actions the policy returned.
-	 */
-	private RRLActions evaluatePolicy(RRLObservations observations) {
-		PolicyActions policyActions = currentPolicy_.evaluatePolicy(
-				observations, StateSpec.getInstance().getNumReturnedActions());
-
-		return new RRLActions(policyActions);
-	}
-
-	/**
-	 * Checks if a module needs to be learned. If so, it creates a new generator
-	 * for the sub-goal which will be used/improved throughout learning.
-	 */
-	private void checkForModularLearning() {
-		// Find the constants present in the rules of all policy generators
-		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
-				.values()) {
-			if (distribution.getLocalAgentObservations().isSettled()) {
-				for (GoalCondition gc : distribution.getPotentialModuleGoals()) {
-					// Check if the goal condition already exists
-					if (!goalMappedGenerators_.containsKey(gc)) {
-						// Attempt to load it
-						LocalCrossEntropyDistribution loadedModule = LocalCrossEntropyDistribution
-								.loadModule(Config.getInstance()
-										.getEnvironmentClass(), gc);
-						if (loadedModule != null)
-							goalMappedGenerators_.put(gc, loadedModule);
-						else {
-							// The module may be learned
-							LocalCrossEntropyDistribution newModule = new LocalCrossEntropyDistribution(
-									gc);
-							goalMappedGenerators_.put(gc, newModule);
-						}
-					}
-				}
-			}
-		}
 	}
 
 	@Override

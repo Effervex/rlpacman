@@ -216,11 +216,15 @@ public class Performance implements Serializable {
 		wr = new FileWriter(rawNumbers);
 		buf = new BufferedWriter(wr);
 
-		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
+		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
+				&& policyGenerator.getGoalCondition().isMainGoal())
 			System.out.println("Average episode scores:");
-			for (Integer episode : episodeMeans_.keySet()) {
-				buf.write(episode + "\t" + episodeMeans_.get(episode) + "\t"
-						+ episodeSDs_.get(episode) + "\n");
+		// Noting the raw numbers
+		for (Integer episode : episodeMeans_.keySet()) {
+			buf.write(episode + "\t" + episodeMeans_.get(episode) + "\t"
+					+ episodeSDs_.get(episode) + "\n");
+			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
+					&& policyGenerator.getGoalCondition().isMainGoal()) {
 				System.out.println(episode + "\t" + episodeMeans_.get(episode)
 						+ "\t" + SD_SYMBOL + "\t" + episodeSDs_.get(episode));
 			}
@@ -308,6 +312,7 @@ public class Performance implements Serializable {
 		String totalPercentStr = formatter.format(100 * totalRunComplete)
 				+ "% experiment complete.";
 		System.out.println(totalPercentStr);
+		System.out.println();
 	}
 
 	/**
@@ -378,7 +383,7 @@ public class Performance implements Serializable {
 		recentScores_.add(average);
 		if (noteScores)
 			recordPerformanceScore(currentEpisode);
-		
+
 		return average;
 	}
 
