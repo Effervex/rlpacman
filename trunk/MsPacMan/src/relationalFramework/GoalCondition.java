@@ -38,7 +38,7 @@ public class GoalCondition implements Serializable {
 	private String goalName_;
 
 	/** If this goal condition represents the environments main goal. */
-	private boolean isMainGoal_;
+	private transient boolean isMainGoal_;
 
 	/**
 	 * A goal condition for a single fact goal.

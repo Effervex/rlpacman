@@ -113,7 +113,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 	protected RelationalPolicy initialiseHandCodedPolicy() {
 		// Defining the optimal policy based on the goal
 		String[] rules = null;
-		if (envParameter_.equals("onab")) {
+		if (envParameter_.equals("onab") || envParameter_.equals("on$A$B")) {
 			rules = new String[3];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
@@ -127,11 +127,11 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
 			rules[0] = "(highest ?X) => (moveFloor ?X)";
-		} else if (envParameter_.equals("clearA")) {
+		} else if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
-		} else if (envParameter_.equals("highestA")) {
+		} else if (envParameter_.equals("highestA") || envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";

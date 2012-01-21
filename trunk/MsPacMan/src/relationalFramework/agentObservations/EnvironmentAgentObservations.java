@@ -63,14 +63,14 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	/** The condition observations. */
 	private ConditionObservations conditionObservations_;
 
-	/** The local, goal-orientated observations to serialise separately. */
-	// private transient LocalAgentObservations localAgentObservations_;
-
 	/** Records the last scanned state to prevent redundant scanning. */
 	private transient Collection<Fact> lastScannedState_;
 
 	/** A transient group of facts indexed by terms used within. */
 	private transient MultiMap<String, RelationalPredicate> termMappedFacts_;
+
+	/** The environment these observations are for. */
+	private String environment_;
 
 	/**
 	 * The constructor for the agent observations.
@@ -181,7 +181,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				ConditionComparator.getInstance());
 		if (variants == null)
 			return specialisations;
-		
+
 		for (RelationalPredicate condition : variants) {
 			// Check the non-negated version
 			condition = simplifyCondition(condition, action, localInvariants,
@@ -706,15 +706,14 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 * @return True If there were AgentObservations to load, false otherwise.
 	 */
 	protected static boolean loadAgentObservations() {
+		String environment = StateSpec.getInstance().getEnvironmentName();
 		// Only load them once.
-		if (instance_ != null)
+		if (instance_ != null && instance_.environment_.equals(environment))
 			return false;
 
 		try {
-			File globalObsFile = new File(AGENT_OBSERVATIONS_DIR, StateSpec
-					.getInstance().getEnvironmentName()
-					+ File.separatorChar
-					+ SERIALISATION_FILE);
+			File globalObsFile = new File(AGENT_OBSERVATIONS_DIR, environment
+					+ File.separatorChar + SERIALISATION_FILE);
 			if (globalObsFile.exists()) {
 				FileInputStream fis = new FileInputStream(globalObsFile);
 				ObjectInputStream ois = new ObjectInputStream(fis);
@@ -722,6 +721,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 						.readObject();
 				if (ao != null) {
 					instance_ = ao;
+					ao.environment_ = environment;
 
 					return true;
 				}

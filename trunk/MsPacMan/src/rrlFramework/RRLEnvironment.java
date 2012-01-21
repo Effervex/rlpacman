@@ -6,8 +6,6 @@ import jess.Rete;
 
 import org.apache.commons.collections.BidiMap;
 
-import cerrla.PolicyGenerator;
-
 import relationalFramework.PolicyActions;
 import relationalFramework.StateSpec;
 
@@ -54,7 +52,7 @@ public abstract class RRLEnvironment {
 				goalReplacementMap_ = StateSpec.getInstance().assertGoalPred(
 						goalArgs, rete);
 
-				if (PolicyGenerator.debugMode_) {
+				if (RRLExperiment.debugMode_) {
 					System.out.println(goalReplacementMap_.inverseBidiMap());
 				}
 			}

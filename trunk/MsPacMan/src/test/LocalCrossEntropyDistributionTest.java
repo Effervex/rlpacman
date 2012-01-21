@@ -71,7 +71,7 @@ public class LocalCrossEntropyDistributionTest {
 		BidiMap goalReplacements = new DualHashBidiMap();
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
-		List<RelationalRule> rlggRules = sut_.coverState(new RRLObservations(state,
+		List<RelationalRule> rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, goalReplacements, false), activatedActions, null);
 
 		// [e]
@@ -100,7 +100,7 @@ public class LocalCrossEntropyDistributionTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.coverState(new RRLObservations(state,
+		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, goalReplacements, false), activatedActions, null);
 
 		state.reset();
@@ -126,7 +126,7 @@ public class LocalCrossEntropyDistributionTest {
 		state.eval("(assert (block f))");
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
-		rlggRules = sut_.coverState(new RRLObservations(state,
+		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, goalReplacements, false), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
@@ -165,7 +165,7 @@ public class LocalCrossEntropyDistributionTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<RelationalRule> rlggRules = sut_.coverState(
+		List<RelationalRule> rlggRules = sut_.coverState(null, 
 				new RRLObservations(state, validActions, 0d,
 						new DualHashBidiMap(), false), activatedActions, null);
 
@@ -182,7 +182,7 @@ public class LocalCrossEntropyDistributionTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.coverState(new RRLObservations(state,
+		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, new DualHashBidiMap(), false),
 				activatedActions, null);
 
@@ -198,7 +198,7 @@ public class LocalCrossEntropyDistributionTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 		activatedActions.clear();
 
-		rlggRules = sut_.coverState(new RRLObservations(state,
+		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, new DualHashBidiMap(), false),
 				activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(

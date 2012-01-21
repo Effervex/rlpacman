@@ -6,6 +6,7 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 
 import java.io.BufferedWriter;
@@ -454,7 +455,9 @@ public class LocalAgentObservations extends SettlingScan implements
 			return false;
 		}
 
-		System.err.println(localGoal_ + " Covering " + getInactivity());
+		if (RRLExperiment.debugMode_)
+			System.out.println(localGoal_ + " Covering " + getInactivity());
+		
 		// The relevant facts which contain the key term
 		Rete state = observations.getState();
 		if (goalReplacements == null)
@@ -483,8 +486,6 @@ public class LocalAgentObservations extends SettlingScan implements
 
 		// If this didn't change, increment inactivity
 		if (changed) {
-			for (String action : StateSpec.getInstance().getActions().keySet())
-				ruleMutation_.recreateAllSpecialisations(action);
 			resetInactivity();
 		} else
 			incrementInactivity();

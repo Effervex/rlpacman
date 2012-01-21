@@ -28,6 +28,9 @@ public class RRLExperiment {
 	/** The random number generator. */
 	public static Random random_ = new Random(0);
 
+	/** If we're running the experiment in debug mode. */
+	public static boolean debugMode_ = false;
+	
 	/** The agent to use for experiments. */
 	private RRLAgent agent_;
 
