@@ -62,9 +62,6 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public static final double CONFIDENCE_INTERVAL = 6.0;
 
-	/** If we're running the experiment in debug mode. */
-	public static boolean debugMode_ = false;
-
 	/** The element delimiter between elements in the generator files. */
 	public static final String ELEMENT_DELIMITER = ",";
 
@@ -333,7 +330,7 @@ public final class PolicyGenerator implements Serializable {
 			boolean needToPause = false;
 			// Remove old rules if this rule is an LGG rule.
 			boolean removeOld = (baseRule.isMutant()) ? false : true;
-			if (debugMode_) {
+			if (RRLExperiment.debugMode_) {
 				try {
 					System.out.println(" [" + getGoalCondition()
 							+ "] MUTATING " + baseRule);
@@ -373,7 +370,7 @@ public final class PolicyGenerator implements Serializable {
 					if (!rr.isWithoutParents())
 						iter.remove();
 
-					if (debugMode_) {
+					if (RRLExperiment.debugMode_) {
 						System.out.println(" [" + getGoalCondition()
 								+ "] REMOVING MUTANT: " + rr);
 					}
@@ -399,7 +396,7 @@ public final class PolicyGenerator implements Serializable {
 				ruleSlot.addNewRule(rr);
 				currentRules_.add(rr);
 
-				if (debugMode_) {
+				if (RRLExperiment.debugMode_) {
 					if (previousChildren != null
 							&& previousChildren.contains(rr))
 						System.out.println(" [" + getGoalCondition()
@@ -415,7 +412,7 @@ public final class PolicyGenerator implements Serializable {
 			noteMutationTree(baseRule, parentLearner_.getCurrentEpisode());
 
 			// Debug text input
-			if (debugMode_ && needToPause) {
+			if (RRLExperiment.debugMode_ && needToPause) {
 				try {
 					System.out.println("Press Enter to continue.");
 					System.in.read();
@@ -552,7 +549,7 @@ public final class PolicyGenerator implements Serializable {
 			// Only re-split the slots if the observation hash has changed.
 			if (ruleCanMutate(rlgg, -1, parentLearner_
 					.getLocalAgentObservations().getObservationHash())) {
-				if (debugMode_) {
+				if (RRLExperiment.debugMode_) {
 					try {
 						System.out.println(" [" + getGoalCondition()
 								+ "] SPLITTING SLOT "
@@ -587,7 +584,7 @@ public final class PolicyGenerator implements Serializable {
 							slotGenerator_.remove(existingSlot);
 						}
 
-						if (debugMode_) {
+						if (RRLExperiment.debugMode_) {
 							try {
 								System.out.println(" [" + getGoalCondition()
 										+ "] EXISTING SLOT SEED: "
@@ -597,7 +594,7 @@ public final class PolicyGenerator implements Serializable {
 								e.printStackTrace();
 							}
 						}
-					} else if (debugMode_) {
+					} else if (RRLExperiment.debugMode_) {
 						try {
 							System.out.println(" [" + getGoalCondition()
 									+ "] NEW SLOT SEED: "
@@ -932,7 +929,7 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public boolean postUpdateOperations(int mutationUses) {
 		// Mutate the rules further
-		if (debugMode_) {
+		if (RRLExperiment.debugMode_) {
 			try {
 				System.out.println(" [" + getGoalCondition()
 						+ "] PERFORMING POST-UPDATE OPERATIONS");
@@ -1010,7 +1007,7 @@ public final class PolicyGenerator implements Serializable {
 		slotGenerator_.addAll(newSlots);
 
 		// Output the slot generator.
-		if (debugMode_) {
+		if (RRLExperiment.debugMode_) {
 			try {
 				System.out.println(slotGenerator_);
 			} catch (Exception e) {

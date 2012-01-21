@@ -187,7 +187,6 @@ public class CERRLA implements RRLAgent {
 		modularPolicy.setModularParameters(moduleReplacementMap);
 		subGoalPolicies.add(modularPolicy);
 
-		// TODO Disallow duplicate rules from policies - they have no use.
 		// Add all rules in the basic policy
 		int i = 0;
 		for (Iterator<RelationallyEvaluatableObject> iter = modularPolicy
@@ -273,18 +272,15 @@ public class CERRLA implements RRLAgent {
 
 		currentPolicy_.startEpisode();
 
-		// Start the episode for each contained behaviour.
-		// TODO Deal with frozen distribution, etc.
-		// mainGoalCECortex_.startEpisode();
-		// for (LocalCrossEntropyDistribution dist : currentPolicy_
-		// .getRelevantCEDistributions()) {
-		// if (dist != mainGoalCECortex_) {
-		// dist.startEpisode();
-		// // If the main goal is frozen, freeze the others too.
-		// if (mainGoalCECortex_.isFrozen() && !dist.isFrozen())
-		// dist.freeze(true);
-		// }
-		// }
+		// If the main generator is frozen, freeze the others too.
+		for (LocalCrossEntropyDistribution dist : goalMappedGenerators_
+				.values()) {
+			if (dist != mainGoalCECortex_) {
+				// If the main goal is frozen, freeze the others too.
+				if (mainGoalCECortex_.isFrozen() && !dist.isConverged())
+					dist.freeze(true);
+			}
+		}
 
 		currentPolicy_.parameterArgs(observations.getGoalReplacements());
 

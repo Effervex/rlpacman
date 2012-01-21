@@ -79,6 +79,8 @@ public enum ProgramArgument implements Serializable {
 	RETEST_STALE_POLICIES(true, "retestStale", null, ParameterType.SAMPLING,
 			"If stale policies should be immediately retested."),
 	RHO(0.05, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
+	SAVE_FILES(true, "saveFiles", "-m", ParameterType.EVALUATION,
+			"If agent observations and module files should be saved."),
 	SEED_MODULE_RULES(false, "seedModuleRules", null, ParameterType.SAMPLING,
 			"If module rules should just be loaded & seeded _once_."),
 	SLOT_FIXING(false, "slotFixing", null, ParameterType.CONVERGENCE,
@@ -93,8 +95,8 @@ public enum ProgramArgument implements Serializable {
 			"If just running tests"),
 	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
-	USE_GENERAL_MODULES(true, "useGeneralModules", null, ParameterType.SAMPLING,
-			"If using/learning general modules"),
+	USE_GENERAL_MODULES(true, "useGeneralModules", null,
+			ParameterType.SAMPLING, "If using/learning general modules"),
 	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
 			"If using weighted updates");
 

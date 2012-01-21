@@ -18,7 +18,6 @@ import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 
 import util.Pair;
-import cerrla.Module;
 import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 
@@ -132,13 +131,11 @@ public class Config {
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
 					// Enable debug mode
-					PolicyGenerator.debugMode_ = true;
+					RRLExperiment.debugMode_ = true;
 				else if (args[i].equals("-e"))
 					// Set the environment to experiment mode
 					RLGlue.RL_env_message("-e");
-				else if (args[i].equals("-m")) {
-					Module.saveAtEnd_ = true;
-				} else if (args[i].equals("-s")) {
+				else if (args[i].equals("-s")) {
 					i++;
 					serializedFile_ = new File(args[i]);
 				} else if (args[i].equals("-ruleFile")) {

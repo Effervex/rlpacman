@@ -92,7 +92,8 @@ public class ActionChoiceEnsemble {
 					bestActions.add(aa.getAction());
 				}
 			}
-			votedActions.addFiredRule(bestActions);
+			// TODO Error here. Can't be f'ed fixing it.
+			// votedActions.addFiredRule(bestActions);
 			if (firstRule) {
 				for (FiredAction fa : bestActions)
 					votedPolicies_.add(fa.getFiringPolicy());

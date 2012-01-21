@@ -293,7 +293,7 @@ public class RLMarioMovement {
 				assertThing(rete, environment, "brick", "brk", x, y, false,
 						levelObs, 1);
 
-				if (PolicyGenerator.debugMode_)
+				if (RRLExperiment.debugMode_)
 					System.out.print("b ");
 				break;
 			}
@@ -303,7 +303,7 @@ public class RLMarioMovement {
 				assertThing(rete, environment, "box", "box", x, y, false,
 						levelObs, 1);
 
-				if (PolicyGenerator.debugMode_)
+				if (RRLExperiment.debugMode_)
 					System.out.print("B ");
 				break;
 			}
@@ -315,18 +315,18 @@ public class RLMarioMovement {
 		case (ObservationConstants.LVL_FLOWER_POT_OR_CANNON):
 		case (ObservationConstants.LVL_BORDER_CANNOT_PASS_THROUGH):
 			checkForPit(rete, environment, levelObs, x, y);
-			if (PolicyGenerator.debugMode_)
+			if (RRLExperiment.debugMode_)
 				System.out.print("# ");
 			break;
 		// Coin
 		case (ObservationConstants.LVL_COIN):
 			assertThing(rete, environment, "coin", "coin", x, y, true,
 					levelObs, 1);
-			if (PolicyGenerator.debugMode_)
+			if (RRLExperiment.debugMode_)
 				System.out.print("c ");
 			break;
 		default:
-			if (PolicyGenerator.debugMode_) {
+			if (RRLExperiment.debugMode_) {
 				if (x == 9 && y == 9)
 					System.out.print("M ");
 				else
@@ -1041,7 +1041,7 @@ public class RLMarioMovement {
 				// Level objects, like coins and solid objects
 				assertLevelObjects(rete, environment, levelObs, enemyObs, x, y);
 			}
-			if (PolicyGenerator.debugMode_)
+			if (RRLExperiment.debugMode_)
 				System.out.println();
 		}
 
@@ -1261,7 +1261,7 @@ public class RLMarioMovement {
 			}
 
 			if (!selectedActions.isEmpty()) {
-				if (PolicyGenerator.debugMode_)
+				if (RRLExperiment.debugMode_)
 					System.out.println(bestAction);
 				break;
 			}

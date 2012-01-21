@@ -577,6 +577,8 @@ public class ModularPolicy extends RelationalPolicy implements
 	public void startEpisode() {
 		episodeReward_ = 0;
 		goalAchieved_ = false;
+		
+		ceDistribution_.startEpisode();
 
 		// Start episode for all children
 		for (ModularPolicy child : childrenPolicies_.values())

@@ -209,7 +209,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			// If action is null, thn this is the first episode.
 			initialiseBlocksState(numBlocks_);
 			optimalSteps_ = optimalSteps();
-			if (PolicyGenerator.debugMode_ || viewingMode_) {
+			if (RRLExperiment.debugMode_ || viewingMode_) {
 				System.out.println("\tAgent:\n" + state_);
 			}
 			steps_ = 0;
@@ -233,7 +233,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			actionFailed = true;
 
 		// Notify the user what the action is if outputting.
-		if ((PolicyGenerator.debugMode_ || viewingMode_) && !optimal_) {
+		if ((RRLExperiment.debugMode_ || viewingMode_) && !optimal_) {
 			if (actionFact != null)
 				System.out.println("\t" + actionFact + " ->\n" + newState);
 			else

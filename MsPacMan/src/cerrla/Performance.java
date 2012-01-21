@@ -265,11 +265,15 @@ public class Performance implements Serializable {
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 			return;
 
-		long currentTime = System.currentTimeMillis();
+		boolean mainGoal = goalCondition.isMainGoal();
 
-		long elapsedTime = currentTime - startTime_;
-		String elapsed = "Elapsed: " + RRLExperiment.toTimeFormat(elapsedTime);
-		System.out.println(elapsed);
+		if (mainGoal) {
+			long currentTime = System.currentTimeMillis();
+			long elapsedTime = currentTime - startTime_;
+			String elapsed = "Elapsed: "
+					+ RRLExperiment.toTimeFormat(elapsedTime);
+			System.out.println(elapsed);
+		}
 
 		boolean noUpdates = false;
 		if (convergence == PolicyGenerator.NO_UPDATES_CONVERGENCE) {
@@ -294,8 +298,11 @@ public class Performance implements Serializable {
 			percentStr = "~" + formatter.format(100 * convergence) + "% "
 					+ modular + "converged (" + numSlots + " slots).";
 		} else {
-			percentStr = formatter.format(100 * convergence) + "% " + modular
-					+ "test complete.";
+			if (convergence <= 1)
+				percentStr = formatter.format(100 * convergence) + "% "
+						+ modular + "test complete.";
+			else
+				percentStr = "---FULLY CONVERGED---";
 		}
 		System.out.println(percentStr);
 
@@ -309,10 +316,11 @@ public class Performance implements Serializable {
 			System.out.println(eliteString);
 		}
 
-		String totalPercentStr = formatter.format(100 * totalRunComplete)
-				+ "% experiment complete.";
-		System.out.println(totalPercentStr);
-		System.out.println();
+		if (mainGoal) {
+			String totalPercentStr = formatter.format(100 * totalRunComplete)
+					+ "% experiment complete.";
+			System.out.println(totalPercentStr);
+		}
 	}
 
 	/**
@@ -419,12 +427,10 @@ public class Performance implements Serializable {
 		// Determine the temp filenames
 		File tempPerf = null;
 		if (modularPerformance_) {
-			File modTemps = new File(LocalCrossEntropyDistribution.MODULE_DIR
-					+ File.separatorChar + Config.TEMP_FOLDER
-					+ File.separatorChar);
-			modTemps.mkdirs();
+			File modTemps = LocalCrossEntropyDistribution
+					.getModFolder(distribution.getGoalCondition().toString());
 			tempPerf = new File(modTemps, distribution.getGoalCondition()
-					+ Config.getInstance().getPerformanceFile().getName());
+					+ "performance.txt");
 		} else {
 			Config.TEMP_FOLDER.mkdir();
 			tempPerf = new File(Config.TEMP_FOLDER, Config.getInstance()

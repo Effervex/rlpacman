@@ -332,24 +332,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            To freeze or unfreeze
 	 */
 	public void freeze(boolean b) {
+		// If same instruction, do nothing.
+		if (frozen_ == b)
+			return;
+
 		frozen_ = b;
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
 		testEpisode_ = 0;
-
-		if (b) {
-			// Test the learned behaviour
-			System.out.println();
-			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-				System.out.println("Beginning [" + goalCondition_
-						+ "] testing for episode " + currentEpisode_ + ".");
-			else
-				System.out.println("Beginning ensemble testing for episode "
-						+ currentEpisode_ + ".");
-			System.out.println();
-			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-				System.out.println("Testing...");
-		}
 	}
 
 	/**
@@ -477,7 +467,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            The value of the sample.
 	 */
 	public void recordSample(ModularPolicy sample, Double[] values) {
-		currentEpisode_ += values.length;
+		if (!frozen_)
+			currentEpisode_ += values.length;
 		double average = performance_
 				.noteSampleRewards(values, currentEpisode_);
 
@@ -501,9 +492,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Output system output
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			System.out.println("[" + goalCondition_ + "] " + currentEpisode_
-					+ ": " + average);
-
 			// Estimate experiment convergence
 			double convergence = policyGenerator_.getConvergenceValue();
 			if (frozen_) {
@@ -514,6 +502,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			int numSlots = policyGenerator_.size();
 			performance_.estimateETA(convergence, numElites_, elites_,
 					numSlots, goalCondition_);
+
+			System.out.println("[" + goalCondition_ + "] " + currentEpisode_
+					+ ": " + average);
+			System.out.println();
 		}
 
 
@@ -542,6 +534,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public void saveCEDistribution(File serFile,
 			boolean saveEnvAgentObservations) {
+		// If not saving files, just return
+		if (!ProgramArgument.SAVE_FILES.booleanValue())
+			return;
+
 		try {
 			// Write the main behaviour to temp and module
 			if (goalCondition_.isMainGoal()) {
@@ -552,8 +548,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			}
 
 			// Write serialised to module
-			File moduleFolder = getModFolder(StateSpec.getInstance()
-					.getEnvironmentName(), goalCondition_.toString());
+			File moduleFolder = getModFolder(goalCondition_.toString());
 			serFile = new File(moduleFolder, goalCondition_.toString()
 					+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX);
 			serFile.createNewFile();
@@ -581,8 +576,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			return;
 
 		try {
-			File modFolder = getModFolder(StateSpec.getInstance()
-					.getEnvironmentName(), goalCondition_.toString());
+			File modFolder = getModFolder(goalCondition_.toString());
 			File genFile = new File(modFolder,
 					PolicyGenerator.SERIALISED_FILENAME);
 			genFile.createNewFile();
@@ -600,6 +594,18 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// Check for convergence
 		if (isConverged() && !frozen_) {
 			freeze(true);
+
+			// Test the learned behaviour
+			System.out.println();
+			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+				System.out.println("Beginning [" + goalCondition_
+						+ "] testing for episode " + currentEpisode_ + ".");
+			else
+				System.out.println("Beginning ensemble testing for episode "
+						+ currentEpisode_ + ".");
+			System.out.println();
+			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+				System.out.println("Testing...");
 		}
 	}
 
@@ -611,16 +617,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/**
 	 * Basic method which fetches a module location for a given environment and
 	 * local goal.
-	 * 
-	 * @param environmentName
-	 *            The name of the environment.
 	 * @param modName
 	 *            The name of the module.
+	 * 
 	 * @return The File path to the module.
 	 */
-	private static File getModFolder(String environmentName, String modName) {
+	public static File getModFolder(String modName) {
 		File modFolder = new File(MODULE_DIR + File.separatorChar
-				+ environmentName);
+				+ StateSpec.getInstance().getEnvironmentName());
 		modFolder.mkdir();
 		File goalModFolder = new File(modFolder, modName);
 		goalModFolder.mkdir();
@@ -645,8 +649,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			return null;
 
 		try {
-			File modFile = new File(getModFolder(StateSpec.getInstance()
-					.getEnvironmentName(), moduleName), moduleName
+			File modFile = new File(getModFolder(moduleName), moduleName
 					+ SERIALISED_SUFFIX);
 			if (modFile.exists()) {
 				// The file exists!
