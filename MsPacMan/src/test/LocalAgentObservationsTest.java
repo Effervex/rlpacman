@@ -70,7 +70,7 @@ public class LocalAgentObservationsTest {
 
 	@Test
 	public void testGetRLGGRules() {
-		List<RelationalRule> rlggRules = sut_.getRLGGRules();
+		Collection<RelationalRule> rlggRules = sut_.getRLGGRules();
 		for (RelationalRule rr : rlggRules) {
 			SortedSet<RelationalPredicate> conds = rr.getConditions(false);
 			if (rr.getActionPredicate().equals("move")) {
@@ -84,7 +84,7 @@ public class LocalAgentObservationsTest {
 				fact = new RelationalPredicate(StateSpec.getInstance()
 						.getPredicateByName("clear"), args);
 				assertTrue(conds.contains(fact));
-				
+
 				// 4 other conditions.
 				assertTrue(conds.size() == 6);
 			} else if (rr.getActionPredicate().equals("moveFloor")) {
@@ -93,7 +93,7 @@ public class LocalAgentObservationsTest {
 				RelationalPredicate fact = new RelationalPredicate(StateSpec
 						.getInstance().getPredicateByName("clear"), args);
 				assertTrue(conds.contains(fact));
-				
+
 				// 4 other conditions.
 				assertTrue(conds.size() == 4);
 			} else

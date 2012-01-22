@@ -306,12 +306,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			Collection<RelationalRule> oldRLGGs = new ArrayList<RelationalRule>(
 					policyGenerator_.getRLGGRules().values());
 			policyGenerator_.removeRLGGRules();
-			List<RelationalRule> covered = localAgentObservations_
+			Collection<RelationalRule> covered = localAgentObservations_
 					.getRLGGRules();
 
 			policyGenerator_.addRLGGRules(covered);
 			covered.removeAll(oldRLGGs);
-			return covered;
+			return new ArrayList<RelationalRule>(covered);
 		}
 
 		return null;
@@ -617,6 +617,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/**
 	 * Basic method which fetches a module location for a given environment and
 	 * local goal.
+	 * 
 	 * @param modName
 	 *            The name of the module.
 	 * 

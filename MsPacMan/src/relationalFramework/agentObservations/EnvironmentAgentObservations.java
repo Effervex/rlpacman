@@ -78,6 +78,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	private EnvironmentAgentObservations() {
 		conditionObservations_ = new ConditionObservations();
 		actionBasedObservations_ = new HashMap<String, ActionBasedObservations>();
+		environment_ = StateSpec.getInstance().getEnvironmentName();
 
 		AGENT_OBSERVATIONS_DIR.mkdir();
 	}
@@ -908,12 +909,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false, null);
-				if (rlggRule_ == null)
-					rlggRule_ = new RelationalRule(ruleConds, action_, null);
-				else {
-					rlggRule_.setConditions(ruleConds, false);
-					rlggRule_.setActionTerms(action_.getArguments());
-				}
+				rlggRule_ = new RelationalRule(ruleConds, action_, null);
 
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;

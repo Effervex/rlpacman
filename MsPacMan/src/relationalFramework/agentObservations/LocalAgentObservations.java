@@ -65,9 +65,9 @@ public class LocalAgentObservations extends SettlingScan implements
 
 	/**
 	 * The RLGG rules for this generator. Same form as environment RLGG rules,
-	 * but the query terms may differ.
+	 * but the query terms and slots may differ.
 	 */
-	private List<RelationalRule> rlggRules_;
+	private transient Map<String, RelationalRule> rlggRules_;
 
 	/** The internal rule creation class. */
 	private final RuleMutation ruleMutation_;
@@ -313,13 +313,14 @@ public class LocalAgentObservations extends SettlingScan implements
 	/**
 	 * Gets the RLGG rules with respect to the goal replacements for this goal.
 	 * 
-	 * @return A list of RLGG rules - at most one for each action.
+	 * @return A collection of RLGG rules - at most one for each action.
 	 */
-	public List<RelationalRule> getRLGGRules() {
+	public Collection<RelationalRule> getRLGGRules() {
 		// If the RLGG hasn't changed, return the already calculated RLGG rules.
 		if (EnvironmentAgentObservations.getInstance().isChanged()
 				|| rlggRules_ == null) {
-			rlggRules_ = new ArrayList<RelationalRule>();
+			if (rlggRules_ == null)
+				rlggRules_ = new HashMap<String, RelationalRule>();
 
 			// Get the RLGG from the invariant conditions from the action
 			// conditions.
@@ -329,12 +330,24 @@ public class LocalAgentObservations extends SettlingScan implements
 				queryTerms.add(RelationalArgument.createGoalTerm(i));
 			for (RelationalRule envRLGG : EnvironmentAgentObservations
 					.getInstance().getRLGGActionRules()) {
-				RelationalRule newRLGGRule = envRLGG.clone(true);
-				newRLGGRule.setQueryParams(queryTerms);
-				rlggRules_.add(newRLGGRule);
+				if (rlggRules_.containsKey(envRLGG.getActionPredicate())) {
+					// Modify the local RLGG rule
+					RelationalRule existingRLGG = rlggRules_.get(envRLGG
+							.getActionPredicate());
+					existingRLGG.setConditions(envRLGG.getConditions(false),
+							false);
+					existingRLGG.setActionTerms(envRLGG.getActionTerms());
+					existingRLGG.setQueryParams(queryTerms);
+				} else {
+					// Insert the new RLGG (with query params) into the rlgg
+					// rules.
+					RelationalRule newRLGGRule = envRLGG.clone(true);
+					newRLGGRule.setQueryParams(queryTerms);
+					rlggRules_.put(envRLGG.getActionPredicate(), newRLGGRule);
+				}
 			}
 		}
-		return rlggRules_;
+		return rlggRules_.values();
 	}
 
 	/**
@@ -457,7 +470,7 @@ public class LocalAgentObservations extends SettlingScan implements
 
 		if (RRLExperiment.debugMode_)
 			System.out.println(localGoal_ + " Covering " + getInactivity());
-		
+
 		// The relevant facts which contain the key term
 		Rete state = observations.getState();
 		if (goalReplacements == null)
@@ -726,9 +739,6 @@ public class LocalAgentObservations extends SettlingScan implements
 				ObjectInputStream ois = new ObjectInputStream(fis);
 				LocalAgentObservations lao = (LocalAgentObservations) ois
 						.readObject();
-				// Reset the rlgg rules so they can be recalculated for this
-				// generator.
-				lao.rlggRules_ = null;
 				if (lao != null) {
 					return lao;
 				}
