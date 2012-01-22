@@ -1348,6 +1348,7 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	protected void removeRLGGRules() {
 		currentRules_.removeAll(rlggRules_.values());
+		rlggRules_.clear();
 	}
 
 	/**
@@ -1356,7 +1357,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @param rlggRules
 	 *            The rlgg rules to add.
 	 */
-	protected void addRLGGRules(List<RelationalRule> rlggRules) {
+	protected void addRLGGRules(Collection<RelationalRule> rlggRules) {
 		currentRules_.addAll(rlggRules);
 
 		// Add remaining information to rules.

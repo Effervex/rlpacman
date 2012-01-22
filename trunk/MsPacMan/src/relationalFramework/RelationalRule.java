@@ -295,6 +295,13 @@ public class RelationalRule implements Serializable,
 		if (getClass() != obj.getClass())
 			return false;
 		RelationalRule other = (RelationalRule) obj;
+		if (rangeContexts_ == null) {
+			if (other.rangeContexts_ != null)
+				return false;
+		} else if (!rangeContexts_.containsAll(other.rangeContexts_))
+			return false;
+		else if (!other.rangeContexts_.containsAll(rangeContexts_))
+			return false;
 		if (ruleAction_ == null) {
 			if (other.ruleAction_ != null)
 				return false;
@@ -303,9 +310,9 @@ public class RelationalRule implements Serializable,
 		if (ruleConditions_ == null) {
 			if (other.ruleConditions_ != null)
 				return false;
-		} else if (other.ruleConditions_ == null)
+		} else if (!ruleConditions_.containsAll(other.ruleConditions_))
 			return false;
-		else if (!ruleConditions_.equals(other.ruleConditions_))
+		else if (!other.ruleConditions_.containsAll(ruleConditions_))
 			return false;
 		return true;
 	}
@@ -521,13 +528,21 @@ public class RelationalRule implements Serializable,
 		// Calculate the rule hash.
 		final int prime = 31;
 		ruleHash_ = 1;
+		// Rule action
 		ruleHash_ = prime * ruleHash_
 				+ ((ruleAction_ == null) ? 0 : ruleAction_.hashCode());
 		int conditionResult = 0;
+		// Rule conditions
 		if (ruleConditions_ != null)
 			for (RelationalPredicate condition : ruleConditions_)
 				conditionResult += condition.hashCode();
 		ruleHash_ = prime * ruleHash_ + conditionResult;
+		// Range contexts
+		int rangeResult = 0;
+		if (rangeContexts_ != null)
+			for (RangeContext condition : rangeContexts_)
+				rangeResult += condition.hashCode();
+		ruleHash_ = prime * ruleHash_ + rangeResult;
 		return ruleHash_;
 	}
 

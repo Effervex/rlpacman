@@ -195,8 +195,7 @@ public class CERRLA implements RRLAgent {
 			if (reo.shouldRegenerate()) {
 				addModuleToPolicy(i, priorPolicies, moduleReplacementMap,
 						modularPolicy, reo.getGoalCondition(), subGoalPolicies);
-			} else if (reo instanceof ModularPolicy)
-				subGoalPolicies.add((ModularPolicy) reo);
+			}
 			i++;
 		}
 
