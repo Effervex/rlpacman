@@ -38,6 +38,8 @@ public enum ProgramArgument implements Serializable {
 			ParameterType.EVALUATION, "If using ensemble evaluation"),
 	ENSEMBLE_SIZE(100, "ensembleSize", null, ParameterType.EVALUATION,
 			"The size of the ensemble"),
+	EXPERIMENT_MODE(false, "experimentMode", "-e", ParameterType.EVALUATION,
+			"If GUI elements are to be hidden."),
 	INHERIT_PARENT_SLOT_VALS(true, "inheritParent", null,
 			ParameterType.SPECIALISATION,
 			"If newly created slots inherit mu(S) and o(S) of the parent slot."),

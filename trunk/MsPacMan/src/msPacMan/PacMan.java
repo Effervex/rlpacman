@@ -7,8 +7,6 @@ import java.net.URL;
 
 import javax.swing.JFrame;
 
-import org.rlcommunity.rlglue.codec.*;
-
 
 public class PacMan {
 	private JFrame gui_;
@@ -24,7 +22,6 @@ public class PacMan {
 	protected int m_delay; // Milliseconds between ticks
 
 	/** The agent interfacing with this program. */
-	protected AgentInterface agent_;
 	protected PacManKeyAdapter keyAdapter_;
 
 	public void init(boolean experimentMode) {
