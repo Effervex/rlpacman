@@ -12,20 +12,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
-
 import cerrla.Unification;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.RangeContext;
 import util.ArgumentComparator;
 import util.MultiMap;
-import util.Pair;
-
 import jess.Fact;
 import jess.JessException;
 import jess.QueryResult;
@@ -109,7 +107,7 @@ public abstract class StateSpec {
 	private int queryCount_;
 
 	/** The mapping for rules to queries in the Rete object. */
-	private Map<Object, String> queryNames_;
+	private Map<RuleQuery, String> queryNames_;
 
 	/** The LogicFactory for the experiment. */
 	private Rete rete_;
@@ -210,7 +208,7 @@ public abstract class StateSpec {
 			// Initialise the optimal policy
 			handCodedPolicy_ = initialiseHandCodedPolicy();
 
-			queryNames_ = new HashMap<Object, String>();
+			queryNames_ = new HashMap<RuleQuery, String>();
 			queryCount_ = 0;
 
 			Unification.getInstance().resetRangeIndex();
@@ -330,6 +328,27 @@ public abstract class StateSpec {
 		return typeAssertions;
 	}
 
+	/**
+	 * Recurse through the parent types.
+	 * 
+	 * @param typePC
+	 *            The type Parent-Child relationship.
+	 * @param lineage
+	 *            The lineage to add to.
+	 */
+	private void recurseChildrenTypes(ParentChildren typePC,
+			Collection<String> lineage) {
+		if (typePC != null) {
+			Collection<String> children = typePC.getChildren();
+			if (children != null) {
+				for (String child : children) {
+					lineage.add(child);
+					recurseChildrenTypes(typeHierarchy_.get(child), lineage);
+				}
+			}
+		}
+	}
+
 	// /**
 	// * Forms the non-goals by negating the non-type conditions required for
 	// the
@@ -386,27 +405,6 @@ public abstract class StateSpec {
 	//
 	// return nonGoalStr.toString();
 	// }
-
-	/**
-	 * Recurse through the parent types.
-	 * 
-	 * @param typePC
-	 *            The type Parent-Child relationship.
-	 * @param lineage
-	 *            The lineage to add to.
-	 */
-	private void recurseChildrenTypes(ParentChildren typePC,
-			Collection<String> lineage) {
-		if (typePC != null) {
-			Collection<String> children = typePC.getChildren();
-			if (children != null) {
-				for (String child : children) {
-					lineage.add(child);
-					recurseChildrenTypes(typeHierarchy_.get(child), lineage);
-				}
-			}
-		}
-	}
 
 	/**
 	 * Recurse through the parent types.
@@ -655,85 +653,6 @@ public abstract class StateSpec {
 		return actionNum_;
 	}
 
-	public Map<String, RelationalPredicate> getPredicates() {
-		return predicates_;
-	}
-
-	public Rete getRete() {
-		return rete_;
-	}
-
-	/**
-	 * Gets or creates a rule query for a fact (an anonymous fact which only
-	 * matches the existence of the fact).
-	 * 
-	 * @param fact
-	 *            The anonymous fact.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(RelationalPredicate fact) {
-		String result = queryNames_.get(fact);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// Create the query
-				rete_.eval("(defquery " + result + " " + fact + ")");
-				queryNames_.put(fact, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
-	/**
-	 * Gets or creates a rule query for a guided rule.
-	 * 
-	 * @param gr
-	 *            The guided rule associated with a query.
-	 * @return The query from the rule (possibly newly created).
-	 */
-	public String getRuleQuery(RelationalRule gr) {
-		Pair<RelationalRule, List<String>> ruleQuery = new Pair<RelationalRule, List<String>>(
-				gr, gr.getQueryParameters());
-		String result = queryNames_.get(ruleQuery);
-		if (result == null) {
-			try {
-				result = POLICY_QUERY_PREFIX + queryCount_++;
-				// If the rule has parameters, declare them as variables.
-				if (gr.getQueryParameters() != null
-						&& !gr.getQueryParameters().isEmpty()
-						|| !gr.getRangeContexts().isEmpty()) {
-					StringBuffer declares = new StringBuffer(
-							"(declare (variables");
-
-					for (RangeContext rc : gr.getRangeContexts()) {
-						String rangeVariable = rc.getRangeVariable();
-						declares.append(" " + rangeVariable + RangeBound.MIN);
-						declares.append(" " + rangeVariable + RangeBound.MAX);
-					}
-					for (String param : gr.getQueryParameters()) {
-						declares.append(" " + param);
-					}
-					declares.append("))");
-
-					rete_.eval("(defquery " + result + " "
-							+ declares.toString() + " "
-							+ gr.getStringConditions() + ")");
-				} else {
-					rete_.eval("(defquery " + result + " "
-							+ gr.getStringConditions() + ")");
-				}
-				queryNames_.put(ruleQuery, result);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		}
-
-		return result;
-	}
-
 	/**
 	 * Gets a string fact by the fact name.
 	 * 
@@ -754,6 +673,34 @@ public abstract class StateSpec {
 		if (factName.equals(GOALARGS_PRED))
 			return goalStringFactDef_;
 		return null;
+	}
+
+	public Map<String, RelationalPredicate> getPredicates() {
+		return predicates_;
+	}
+
+	public Rete getRete() {
+		return rete_;
+	}
+
+	/**
+	 * Gets or creates a rule query for a guided rule.
+	 * 
+	 * @param gr
+	 *            The guided rule associated with a query.
+	 * @return The query from the rule (possibly newly created).
+	 * @throws Exception
+	 *             If an unqueriable object is given.
+	 */
+	public String getRuleQuery(Object queriable) throws Exception {
+		RuleQuery rq = new RuleQuery(queriable);
+		String result = queryNames_.get(rq);
+		if (result == null) {
+			result = rq.makeQuery();
+			queryNames_.put(rq, result);
+		}
+
+		return result;
 	}
 
 	/**
@@ -1163,6 +1110,125 @@ public abstract class StateSpec {
 
 		public void setParent(String parent) {
 			parent_ = parent;
+		}
+	}
+
+	private class RuleQuery {
+		/** The list of query parameters this rule takes. */
+		private final List<String> queryParams_;
+
+		/** The range context (if applicable) for this query. */
+		private final SortedSet<RangeContext> rangeContexts_;
+
+		/** The conditions of the rule. */
+		private final Collection<RelationalPredicate> ruleConds_;
+
+		/**
+		 * A rule query for a single rule and its query parameters.
+		 * 
+		 * @param queriable
+		 *            The rule to make a query from.
+		 * @throws Exception
+		 *             If the object passed as a parameter is not a valid query
+		 *             object.
+		 */
+		public RuleQuery(Object queriable) throws Exception {
+			if (queriable instanceof RelationalRule) {
+				RelationalRule rule = (RelationalRule) queriable;
+				ruleConds_ = rule.getConditions(false);
+				queryParams_ = rule.getQueryParameters();
+				rangeContexts_ = rule.getRangeContexts();
+			} else if (queriable instanceof RelationalPredicate) {
+				ruleConds_ = new ArrayList<RelationalPredicate>(1);
+				ruleConds_.add((RelationalPredicate) queriable);
+				queryParams_ = null;
+				rangeContexts_ = null;
+			} else {
+				queryParams_ = null;
+				ruleConds_ = null;
+				rangeContexts_ = null;
+				throw new Exception(queriable + " cannot be used as a query!");
+			}
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			RuleQuery other = (RuleQuery) obj;
+			if (queryParams_ == null) {
+				if (other.queryParams_ != null)
+					return false;
+			} else if (!queryParams_.equals(other.queryParams_))
+				return false;
+			if (ruleConds_ == null) {
+				if (other.ruleConds_ != null)
+					return false;
+			} else if (!ruleConds_.containsAll(other.ruleConds_))
+				return false;
+			else if (!other.ruleConds_.containsAll(ruleConds_))
+				return false;
+			return true;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result
+					+ ((queryParams_ == null) ? 0 : queryParams_.hashCode());
+			result = prime * result
+					+ ((ruleConds_ == null) ? 0 : ruleConds_.hashCode());
+			return result;
+		}
+
+		/**
+		 * Makes the Rete query for a given rule.
+		 * 
+		 * @return The name of the query that was made.
+		 */
+		public String makeQuery() {
+			try {
+				String result = POLICY_QUERY_PREFIX + queryCount_++;
+				// If the rule has parameters, declare them as variables.
+				if ((queryParams_ != null && !queryParams_.isEmpty())
+						|| (rangeContexts_ != null && !rangeContexts_.isEmpty())) {
+					StringBuffer declares = new StringBuffer(
+							"(declare (variables");
+
+					if (rangeContexts_ != null) {
+						for (RangeContext rc : rangeContexts_) {
+							String rangeVariable = rc.getRangeVariable();
+							declares.append(" " + rangeVariable
+									+ RangeBound.MIN);
+							declares.append(" " + rangeVariable
+									+ RangeBound.MAX);
+						}
+					}
+					if (queryParams_ != null) {
+						for (String param : queryParams_)
+							declares.append(" " + param);
+					}
+					declares.append("))");
+
+					rete_.eval("(defquery " + result + " "
+							+ declares.toString() + " "
+							+ conditionsToString(ruleConds_) + ")");
+				} else {
+					// Basic condition checking
+					rete_.eval("(defquery " + result + " "
+							+ conditionsToString(ruleConds_) + ")");
+				}
+
+				return result;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return null;
 		}
 	}
 }

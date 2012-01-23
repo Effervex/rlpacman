@@ -1356,9 +1356,13 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param rlggRules
 	 *            The rlgg rules to add.
+	 * @return A list of new covered rules which are only being added for the
+	 *         first time.
 	 */
-	protected void addRLGGRules(Collection<RelationalRule> rlggRules) {
+	protected List<RelationalRule> addRLGGRules(
+			Collection<RelationalRule> rlggRules) {
 		currentRules_.addAll(rlggRules);
+		List<RelationalRule> newlyCovered = new ArrayList<RelationalRule>();
 
 		// Add remaining information to rules.
 		for (RelationalRule coveredRule : rlggRules) {
@@ -1379,6 +1383,8 @@ public final class PolicyGenerator implements Serializable {
 				slotGenerator_.add(rlggSlot);
 				currentSlots_.clearValues(coveredRule.getActionPredicate());
 				currentSlots_.put(coveredRule.getActionPredicate(), rlggSlot);
+
+				newlyCovered.add(coveredRule);
 			}
 
 			// Add to the covered rules
@@ -1394,6 +1400,8 @@ public final class PolicyGenerator implements Serializable {
 		// Re-mutate all slot seed rules (if observations have changed)
 		for (Slot slot : slotGenerator_)
 			mutateRule(slot.getSeedRule(), slot, -1);
+
+		return newlyCovered;
 	}
 
 	public GoalCondition getGoalCondition() {

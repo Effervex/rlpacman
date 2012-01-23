@@ -159,6 +159,7 @@ public class ModularPolicy extends RelationalPolicy implements
 			// Add any new rules to the policy
 			for (RelationalRule gr : coveredRules) {
 				policyRules_.add(gr);
+				policySize_++;
 			}
 			// Add parameters to the rule.
 			parameterArgs(transformGoalReplacements(observations

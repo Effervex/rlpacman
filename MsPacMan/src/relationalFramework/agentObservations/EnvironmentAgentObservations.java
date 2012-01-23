@@ -914,8 +914,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
 			}
-
-			rlggRule_.incrementStatesCovered();
 			return rlggRule_;
 		}
 
