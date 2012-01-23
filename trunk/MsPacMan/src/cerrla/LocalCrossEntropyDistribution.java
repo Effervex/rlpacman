@@ -6,7 +6,6 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -284,7 +283,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @param moduleParamReplacements
 	 *            Optional module parameter replacements to apply to the current
 	 *            goal replacements.
-	 * @return Any newly created RLGG rules, or null if no change/no new rules.
+	 * @return Any newly created (not modified) RLGG rules, or null if no change/no new rules.
 	 */
 	@SuppressWarnings("unchecked")
 	public List<RelationalRule> coverState(ModularPolicy modularPolicy,
@@ -302,16 +301,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (!frozen_
 				&& localAgentObservations_.observeState(observations,
 						activatedActions, goalReplacements)) {
-			// Old RLGGs
-			Collection<RelationalRule> oldRLGGs = new ArrayList<RelationalRule>(
-					policyGenerator_.getRLGGRules().values());
+			// Remove the old RLGGs
 			policyGenerator_.removeRLGGRules();
 			Collection<RelationalRule> covered = localAgentObservations_
 					.getRLGGRules();
 
-			policyGenerator_.addRLGGRules(covered);
-			covered.removeAll(oldRLGGs);
-			return new ArrayList<RelationalRule>(covered);
+			return policyGenerator_.addRLGGRules(covered);
 		}
 
 		return null;

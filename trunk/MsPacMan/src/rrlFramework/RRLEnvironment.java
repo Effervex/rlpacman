@@ -52,7 +52,7 @@ public abstract class RRLEnvironment {
 				goalReplacementMap_ = StateSpec.getInstance().assertGoalPred(
 						goalArgs, rete);
 
-				if (RRLExperiment.debugMode_) {
+				if (RRLExperiment.debugMode_ && !goalReplacementMap_.isEmpty()) {
 					System.out.println(goalReplacementMap_.inverseBidiMap());
 				}
 			}

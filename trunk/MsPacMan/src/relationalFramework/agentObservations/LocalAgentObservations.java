@@ -330,21 +330,24 @@ public class LocalAgentObservations extends SettlingScan implements
 				queryTerms.add(RelationalArgument.createGoalTerm(i));
 			for (RelationalRule envRLGG : EnvironmentAgentObservations
 					.getInstance().getRLGGActionRules()) {
+				RelationalRule localisedRLGG = null;
 				if (rlggRules_.containsKey(envRLGG.getActionPredicate())) {
 					// Modify the local RLGG rule
-					RelationalRule existingRLGG = rlggRules_.get(envRLGG
-							.getActionPredicate());
-					existingRLGG.setConditions(envRLGG.getConditions(false),
+					localisedRLGG = rlggRules_
+							.get(envRLGG.getActionPredicate());
+					localisedRLGG.setConditions(envRLGG.getConditions(false),
 							false);
-					existingRLGG.setActionTerms(envRLGG.getActionTerms());
-					existingRLGG.setQueryParams(queryTerms);
+					localisedRLGG.setActionTerms(envRLGG.getActionTerms());
+					localisedRLGG.setQueryParams(queryTerms);
 				} else {
 					// Insert the new RLGG (with query params) into the rlgg
 					// rules.
-					RelationalRule newRLGGRule = envRLGG.clone(true);
-					newRLGGRule.setQueryParams(queryTerms);
-					rlggRules_.put(envRLGG.getActionPredicate(), newRLGGRule);
+					localisedRLGG = envRLGG.clone(true);
+					localisedRLGG.setQueryParams(queryTerms);
+					rlggRules_.put(envRLGG.getActionPredicate(), localisedRLGG);
 				}
+
+				localisedRLGG.incrementStatesCovered();
 			}
 		}
 		return rlggRules_.values();

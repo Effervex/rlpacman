@@ -18,8 +18,6 @@ import java.util.Map;
 
 import jess.Rete;
 
-import cerrla.PolicyGenerator;
-
 /**
  * The environment for the blocks world interface.
  * 

@@ -74,14 +74,16 @@ public class PacManStateSpec extends StateSpec {
 			envParameter_ = "10000";
 
 		String[] result = new String[2];
-		if (envParameter_.equals("lvl10")) {
+		if (envParameter_.equals("lvl10")
+				|| envParameter_.equals("10levels")) {
 			// Actual goal condition
 			result[0] = "10levels";
 			result[1] = "(level 11)";
 			return result;
 		}
 		
-		if (envParameter_.equals("10000")) {
+		if (envParameter_.equals("10000")
+				|| envParameter_.equals("10000points")) {
 			// Score maximisation
 			result[0] = "10000points";
 			result[1] = "(score ?Y&:(>= ?Y 10000))";
@@ -89,7 +91,8 @@ public class PacManStateSpec extends StateSpec {
 		}
 		
 		if (envParameter_.equals("levelMax")
-				|| envParameter_.equals("oneLevel")) {
+				|| envParameter_.equals("oneLevel")
+				|| envParameter_.equals("1Level")) {
 			// Score maximisation over a single level
 			result[0] = "1level";
 			result[1] = "(level 2)";

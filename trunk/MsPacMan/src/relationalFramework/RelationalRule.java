@@ -8,6 +8,7 @@ import relationalFramework.agentObservations.RangeContext;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -636,9 +637,14 @@ public class RelationalRule implements Serializable,
 	 * 
 	 * @param terms
 	 *            The new action terms.
+	 * @return True if the action changed as a result of this.
 	 */
-	public void setActionTerms(String[] terms) {
+	public boolean setActionTerms(String[] terms) {
+		boolean changed = !Arrays.equals(ruleAction_.getArguments(), terms);
+		if (changed)
+			statesSeen_ = 0;
 		ruleAction_ = new RelationalPredicate(ruleAction_, terms);
+		return changed;
 	}
 
 	public void setChildren(Collection<RelationalRule> children) {
@@ -653,13 +659,13 @@ public class RelationalRule implements Serializable,
 	 * @param removeUnnecessaryFacts
 	 *            If, during the setting process, facts not containing any of
 	 *            the action terms should be removed.
-	 * @return True if the newly set conditions are valid.
+	 * @return True if the newly set conditions are different from the old.
 	 */
 	public boolean setConditions(SortedSet<RelationalPredicate> conditions,
 			boolean removeUnnecessaryFacts) {
 		// If the conditions are the same, return true.
 		if (conditions.equals(ruleConditions_)) {
-			return true;
+			return false;
 		}
 
 		// Instead, introduce method (remove unnecessary conditions).
@@ -670,6 +676,7 @@ public class RelationalRule implements Serializable,
 		hasSpawned_ = null;
 		ruleConditions_ = conditions;
 		ruleUses_ = 0;
+		statesSeen_ = 0;
 		findConstantsAndRanges();
 		return true;
 	}
@@ -680,7 +687,7 @@ public class RelationalRule implements Serializable,
 	 * @param parent
 	 *            The parent rule to add.
 	 */
-	public void setMutant(RelationalRule parent) {
+	private void setMutant(RelationalRule parent) {
 		if (mutantParents_ == null) {
 			mutantParents_ = new ArrayList<RelationalRule>();
 			ancestryCount_ = parent.ancestryCount_ + 1;
@@ -728,13 +735,25 @@ public class RelationalRule implements Serializable,
 	 * 
 	 * @param queryParameters
 	 *            The parameters to set.
+	 * @param True
+	 *            if the query parameters changed as a result of this call.
 	 */
-	public void setQueryParams(List<String> queryParameters) {
-		if (queryParameters != null)
+	public boolean setQueryParams(List<String> queryParameters) {
+		boolean changed = false;
+		if (queryParameters != null) {
+			if (!queryParameters.equals(queryParams_))
+				changed = true;
 			queryParams_ = new ArrayList<String>(queryParameters);
-		else
+		} else {
 			queryParams_ = null;
+			changed = true;
+		}
 		findConstantsAndRanges();
+		
+		if (changed)
+			statesSeen_ = 0;
+		
+		return changed;
 	}
 
 	public void setSlot(Slot slot) {

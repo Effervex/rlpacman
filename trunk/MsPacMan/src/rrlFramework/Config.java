@@ -18,7 +18,6 @@ import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 
 import util.Pair;
-import cerrla.PolicyGenerator;
 import cerrla.ProgramArgument;
 
 /**
