@@ -9,6 +9,7 @@ import relationalFramework.PolicyActions;
 import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
 
+import cerrla.ProgramArgument;
 import ch.idsia.benchmark.mario.engine.GlobalOptions;
 import ch.idsia.benchmark.mario.environments.Environment;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
@@ -152,16 +153,14 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	public void initialise(int runIndex, String[] extraArgs) {
 		environment_ = MarioEnvironment.getInstance();
 		marioMovement_ = new RLMarioMovement();
-		cmdLineOptions_ = new MarioAIOptions();
-		cmdLineOptions_.setVisualization(!experimentMode_);
 
 		for (String arg0 : extraArgs) {
-			if (arg0.equals("-e")) {
-				// Run the program in experiment mode (No GUI).
-				experimentMode_ = true;
-			} else if (arg0.startsWith("Diff")) {
+			if (arg0.startsWith("Diff")) {
 				levelDifficulty_ = Integer.parseInt(arg0.split(" ")[1]);
 			}
 		}
+		
+		cmdLineOptions_ = new MarioAIOptions();
+		cmdLineOptions_.setVisualization(!ProgramArgument.EXPERIMENT_MODE.booleanValue());
 	}
 }

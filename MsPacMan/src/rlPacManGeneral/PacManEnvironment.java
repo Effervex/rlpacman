@@ -13,6 +13,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
+import cerrla.ProgramArgument;
+
 import jess.JessException;
 import jess.Rete;
 
@@ -556,7 +558,7 @@ public class PacManEnvironment extends RRLEnvironment {
 	@Override
 	public void initialise(int runIndex, String[] extraArg) {
 		environment_ = new PacMan();
-		environment_.init(experimentMode_);
+		environment_.init(ProgramArgument.EXPERIMENT_MODE.booleanValue());
 
 		model_ = environment_.getGameModel();
 
@@ -573,9 +575,6 @@ public class PacManEnvironment extends RRLEnvironment {
 				} else if (param.equals("noPowerDots")) {
 					model_.noPowerDots_ = true;
 				}
-			} else if (arg.equals("-e")) {
-				// Run the program in experiment mode (No GUI).
-				experimentMode_ = true;
 			} else {
 				try {
 					int delay = Integer.parseInt(arg);

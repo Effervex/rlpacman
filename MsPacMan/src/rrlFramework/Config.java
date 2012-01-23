@@ -12,8 +12,6 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.rlcommunity.rlglue.codec.RLGlue;
-
 import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 
@@ -131,9 +129,6 @@ public class Config {
 				if (args[i].equals("-d"))
 					// Enable debug mode
 					RRLExperiment.debugMode_ = true;
-				else if (args[i].equals("-e"))
-					// Set the environment to experiment mode
-					RLGlue.RL_env_message("-e");
 				else if (args[i].equals("-s")) {
 					i++;
 					serializedFile_ = new File(args[i]);
