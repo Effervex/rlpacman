@@ -1,4 +1,4 @@
-package relationalFramework;
+package cerrla.modular;
 
 import org.apache.commons.collections.BidiMap;
 
@@ -8,7 +8,7 @@ import org.apache.commons.collections.BidiMap;
  * 
  * @author Sam Sarjant
  */
-public interface RelationallyEvaluatableObject {
+public interface PolicyItem {
 
 	/**
 	 * The object needs to have goal parameters set to it.
@@ -30,14 +30,6 @@ public interface RelationallyEvaluatableObject {
 	 * @return True if the object should regenerate into a new modular policy.
 	 */
 	public boolean shouldRegenerate();
-
-	/**
-	 * Gets the goal condition this object either creates or is set to solve
-	 * (depending on context).
-	 * 
-	 * @return This object's defined/goal {@link GoalCondition}.
-	 */
-	public GoalCondition getGoalCondition();
 
 	/**
 	 * Gets the size of this object.

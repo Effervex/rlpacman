@@ -1,6 +1,5 @@
 package relationalFramework.agentObservations;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RangeBound;
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
@@ -31,8 +30,11 @@ import java.util.TreeSet;
 import jess.Fact;
 import jess.Rete;
 import cerrla.ProgramArgument;
+import cerrla.SpecialisationOperator;
 import cerrla.Unification;
 import cerrla.UnifiedFact;
+import cerrla.modular.GoalCondition;
+import cerrla.modular.SpecificGoalCondition;
 
 import util.MultiMap;
 
@@ -72,7 +74,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	/** The internal rule creation class. */
 	private final RuleMutation ruleMutation_;
 
-	/** The goal conditions tied to the observed goal predicates. */
+	/** The specific goal conditions tied to the observed goal predicates. */
 	private Collection<GoalCondition> specificGoalConds_;
 
 	/** The action conditions orientated towards the goal. */
@@ -295,8 +297,9 @@ public class LocalAgentObservations extends SettlingScan implements
 				variantGoalActionConditions_.get(action.getFactName()), null);
 
 		// If it changed, recreate the specialisations
-		if (changed)
+		if (changed) {
 			resetInactivity();
+		}
 
 		return changed;
 	}
@@ -313,14 +316,20 @@ public class LocalAgentObservations extends SettlingScan implements
 	/**
 	 * Gets the RLGG rules with respect to the goal replacements for this goal.
 	 * 
+	 * @param oldRLGGs
+	 *            The old RLGG rules to potentially modify.
 	 * @return A collection of RLGG rules - at most one for each action.
 	 */
-	public Collection<RelationalRule> getRLGGRules() {
+	public Collection<RelationalRule> getRLGGRules(
+			Collection<RelationalRule> oldRLGGs) {
 		// If the RLGG hasn't changed, return the already calculated RLGG rules.
 		if (EnvironmentAgentObservations.getInstance().isChanged()
 				|| rlggRules_ == null) {
-			if (rlggRules_ == null)
+			if (rlggRules_ == null) {
 				rlggRules_ = new HashMap<String, RelationalRule>();
+				for (RelationalRule oldRLGG : oldRLGGs)
+					rlggRules_.put(oldRLGG.getActionPredicate(), oldRLGG);
+			}
 
 			// Get the RLGG from the invariant conditions from the action
 			// conditions.
@@ -346,8 +355,6 @@ public class LocalAgentObservations extends SettlingScan implements
 					localisedRLGG.setQueryParams(queryTerms);
 					rlggRules_.put(envRLGG.getActionPredicate(), localisedRLGG);
 				}
-
-				localisedRLGG.incrementStatesCovered();
 			}
 		}
 		return rlggRules_.values();
@@ -363,28 +370,38 @@ public class LocalAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Gets a collection of goal conditions formulated from the goal predicates
-	 * which can be possible goals to achieve.
+	 * Gets a collection of specific goal conditions noted by the observations
+	 * which represent specific sub-goals to achieve.
 	 * 
-	 * TODO This could easily be used in online module learning.
-	 * 
-	 * @return A collection of goal conditions.
+	 * @return A collection of specific goal conditions.
 	 */
-	public Collection<GoalCondition> getSpecificGoalConditions() {
+	public Collection<GoalCondition> getObservedSubGoals() {
 		if (specificGoalConds_ == null) {
 			specificGoalConds_ = new HashSet<GoalCondition>();
-			for (RelationalPredicate gc : observedGoalPredicates_.values()) {
+			for (RelationalPredicate pred : observedGoalPredicates_.values()) {
 				// If the fact isn't an invariant, isn't negated, and isn't the
 				// goal args predicate, add it.
-				if (!localInvariants_.getSpecificInvariants().contains(gc)
-						&& !gc.isNegated()
-						&& !gc.getFactName().equals(StateSpec.GOALARGS_PRED)
-						&& gc.isFullyNotAnonymous()
-						&& !GoalCondition.formName(gc).equals(localGoal_))
-					specificGoalConds_.add(new GoalCondition(gc));
+				if (!localInvariants_.getSpecificInvariants().contains(pred)
+						&& !pred.isNegated()
+						&& !pred.getFactName().equals(StateSpec.GOALARGS_PRED)
+						&& pred.isFullyNotAnonymous()) {
+					GoalCondition goalCond = new SpecificGoalCondition(pred);
+					if (!goalCond.equals(localGoal_))
+						specificGoalConds_.add(goalCond);
+				}
 			}
 		}
-		return specificGoalConds_;
+
+		// Return either specific goal conds or all (depending on args).
+		if (!ProgramArgument.USE_GENERAL_MODULES.booleanValue())
+			return specificGoalConds_;
+		else {
+			Collection<GoalCondition> allGoals = new HashSet<GoalCondition>(
+					specificGoalConds_);
+			allGoals.addAll(EnvironmentAgentObservations.getInstance()
+					.getGeneralGoalConditions());
+			return allGoals;
+		}
 	}
 
 	/**
@@ -510,6 +527,12 @@ public class LocalAgentObservations extends SettlingScan implements
 		EnvironmentAgentObservations.getInstance().noteScannedState(stateFacts);
 
 		return observeState;
+	}
+
+	@Override
+	public void resetInactivity() {
+		super.resetInactivity();
+		ruleMutation_.specialisationConditions_ = null;
 	}
 
 	@Override
@@ -840,7 +863,8 @@ public class LocalAgentObservations extends SettlingScan implements
 			cloneConds.add(mutantFact);
 
 			RelationalRule mutant = new RelationalRule(cloneConds,
-					baseRule.getAction(), baseRule);
+					baseRule.getAction(), baseRule, new SpecialisationOperator(
+							subRangeArg));
 			mutant.setQueryParams(baseRule.getQueryParameters());
 			return mutant;
 		}
@@ -1044,7 +1068,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				// Create the mutant
 				RelationalRule mutant = new RelationalRule(specConditions,
 						new RelationalPredicate(rule.getAction(), newTerms),
-						rule);
+						rule, new SpecialisationOperator(oldTerms[i],
+								newTerms[i]));
 				mutant.setQueryParams(rule.getQueryParameters());
 				mutant.expandConditions();
 				return mutant;
@@ -1117,7 +1142,8 @@ public class LocalAgentObservations extends SettlingScan implements
 						conditions, condition, action, true);
 				if (specConditions != null) {
 					RelationalRule specialisation = new RelationalRule(
-							specConditions, action, rule);
+							specConditions, action, rule,
+							new SpecialisationOperator(condition));
 					specialisation.setQueryParams(rule.getQueryParameters());
 					specialisation.expandConditions();
 					if (!specialisations.contains(specialisation)

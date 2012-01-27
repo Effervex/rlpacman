@@ -6,7 +6,6 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.LocalAgentObservations;
 import rrlFramework.Config;
@@ -14,6 +13,7 @@ import rrlFramework.RRLObservations;
 import util.MultiMap;
 
 import cerrla.CERRLA;
+import cerrla.modular.GoalCondition;
 
 public class CERRLATest {
 	private CERRLA sut_;

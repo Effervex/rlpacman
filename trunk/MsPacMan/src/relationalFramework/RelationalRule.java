@@ -1,6 +1,5 @@
 package relationalFramework;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -10,6 +9,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -23,6 +23,10 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 
 import cerrla.Slot;
+import cerrla.SpecialisationOperator;
+import cerrla.modular.GeneralGoalCondition;
+import cerrla.modular.PolicyItem;
+import cerrla.modular.SpecificGoalCondition;
 
 import util.ConditionComparator;
 
@@ -33,7 +37,7 @@ import util.ConditionComparator;
  * @author Sam Sarjant
  */
 public class RelationalRule implements Serializable,
-		Comparable<RelationalRule>, RelationallyEvaluatableObject {
+		Comparable<RelationalRule>, PolicyItem {
 	private static final long serialVersionUID = -7517726681678896438L;
 
 	/**
@@ -42,11 +46,18 @@ public class RelationalRule implements Serializable,
 	 */
 	private static final int SETTLED_RULE_STATES = 50;
 
+	/** An abstract definition of this rule with regards to the RLGG. */
+	private SortedSet<SpecialisationOperator> abstractRule_;
+
 	/** The ancestry count of the rule (how far from the RLGG). */
 	private int ancestryCount_;
 
 	/** The constant facts in the rule conditions, if any. Excludes type conds. */
-	private GoalCondition constantCondition_;
+	private Collection<SpecificGoalCondition> constantCondition_;
+
+	/** The general conditions of this rule. */
+	@SuppressWarnings("unchecked")
+	private final Collection<GeneralGoalCondition>[] generalConditions_ = new Collection[2];
 
 	/** If this rule has spawned any mutant rules yet. */
 	private Integer hasSpawned_ = null;
@@ -106,7 +117,7 @@ public class RelationalRule implements Serializable,
 	 */
 	private RelationalRule(Collection<RelationalPredicate> cloneConds,
 			RelationalPredicate ruleAction) {
-		this(cloneConds, ruleAction, null);
+		this(cloneConds, ruleAction, null, null);
 	}
 
 	/**
@@ -120,7 +131,8 @@ public class RelationalRule implements Serializable,
 	 *            If this rule has a parent - hence is a mutant (null if not).
 	 */
 	public RelationalRule(Collection<RelationalPredicate> conditions,
-			RelationalPredicate action, RelationalRule parent) {
+			RelationalPredicate action, RelationalRule parent,
+			SpecialisationOperator specialisation) {
 		if (!(conditions instanceof SortedSet)) {
 			ruleConditions_ = new TreeSet<RelationalPredicate>(
 					ConditionComparator.getInstance());
@@ -134,6 +146,11 @@ public class RelationalRule implements Serializable,
 		slot_ = null;
 		findConstantsAndRanges();
 		ruleHash_ = hashCode();
+		abstractRule_ = new TreeSet<SpecialisationOperator>();
+		if (specialisation != null) {
+			abstractRule_.addAll(parent.abstractRule_);
+			abstractRule_.add(specialisation);
+		}
 	}
 
 	/**
@@ -151,6 +168,7 @@ public class RelationalRule implements Serializable,
 		ancestryCount_ = 0;
 		expandConditions();
 		findConstantsAndRanges();
+		abstractRule_ = new TreeSet<SpecialisationOperator>();
 	}
 
 	/**
@@ -170,8 +188,12 @@ public class RelationalRule implements Serializable,
 	 * Finds the constants in the rule conditions.
 	 */
 	private void findConstantsAndRanges() {
-		List<RelationalPredicate> constants = new ArrayList<RelationalPredicate>();
 		rangeContexts_ = new TreeSet<RangeContext>();
+		constantCondition_ = new HashSet<SpecificGoalCondition>();
+		generalConditions_[0] = new HashSet<GeneralGoalCondition>();
+		generalConditions_[1] = new HashSet<GeneralGoalCondition>();
+
+		Map<String, String> emptyReplacements = new HashMap<String, String>();
 		for (RelationalPredicate cond : ruleConditions_) {
 			// If the condition isn't a type predicate or test
 			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
@@ -191,18 +213,23 @@ public class RelationalRule implements Serializable,
 				}
 
 				if (isConstant) {
-					constants.add(cond);
+					constantCondition_.add(new SpecificGoalCondition(cond));
 				}
+
+				// Adding generalised condition
+				RelationalPredicate general = new RelationalPredicate(cond);
+				general.replaceArguments(emptyReplacements, false, false);
+				if (!general.isNegated())
+					generalConditions_[0]
+							.add(new GeneralGoalCondition(general));
+				else
+					generalConditions_[1]
+							.add(new GeneralGoalCondition(general));
 
 				// Checking for RangeContexts
 				rangeContexts_.addAll(cond.getRangeContexts());
 			}
 		}
-
-		if (constants.isEmpty())
-			constantCondition_ = null;
-		else
-			constantCondition_ = new GoalCondition(constants);
 	}
 
 	/**
@@ -263,6 +290,7 @@ public class RelationalRule implements Serializable,
 		if (!cloneInternalMembers)
 			return clone;
 
+		clone.abstractRule_ = new TreeSet<SpecialisationOperator>(abstractRule_);
 		clone.hasSpawned_ = hasSpawned_;
 		clone.statesSeen_ = statesSeen_;
 		clone.mutant_ = mutant_;
@@ -296,13 +324,6 @@ public class RelationalRule implements Serializable,
 		if (getClass() != obj.getClass())
 			return false;
 		RelationalRule other = (RelationalRule) obj;
-		if (rangeContexts_ == null) {
-			if (other.rangeContexts_ != null)
-				return false;
-		} else if (!rangeContexts_.containsAll(other.rangeContexts_))
-			return false;
-		else if (!other.rangeContexts_.containsAll(rangeContexts_))
-			return false;
 		if (ruleAction_ == null) {
 			if (other.ruleAction_ != null)
 				return false;
@@ -424,8 +445,12 @@ public class RelationalRule implements Serializable,
 		return new TreeSet<RelationalPredicate>(ruleConditions_);
 	}
 
-	public GoalCondition getConstantCondition() {
+	public Collection<SpecificGoalCondition> getSpecificSubGoals() {
 		return constantCondition_;
+	}
+
+	public Collection<GeneralGoalCondition>[] getGeneralisedConditions() {
+		return generalConditions_;
 	}
 
 	/**
@@ -514,7 +539,7 @@ public class RelationalRule implements Serializable,
 		groundAction.replaceArguments(paramReplacements, true, false);
 
 		RelationalRule groundRule = new RelationalRule(groundConditions,
-				groundAction, null);
+				groundAction, null, null);
 		groundRule.expandConditions();
 		groundRule.findConstantsAndRanges();
 
@@ -538,12 +563,6 @@ public class RelationalRule implements Serializable,
 			for (RelationalPredicate condition : ruleConditions_)
 				conditionResult += condition.hashCode();
 		ruleHash_ = prime * ruleHash_ + conditionResult;
-		// Range contexts
-		int rangeResult = 0;
-		if (rangeContexts_ != null)
-			for (RangeContext condition : rangeContexts_)
-				rangeResult += condition.hashCode();
-		ruleHash_ = prime * ruleHash_ + rangeResult;
 		return ruleHash_;
 	}
 
@@ -641,9 +660,10 @@ public class RelationalRule implements Serializable,
 	 */
 	public boolean setActionTerms(String[] terms) {
 		boolean changed = !Arrays.equals(ruleAction_.getArguments(), terms);
-		if (changed)
+		if (changed) {
 			statesSeen_ = 0;
-		ruleAction_ = new RelationalPredicate(ruleAction_, terms);
+			ruleAction_ = new RelationalPredicate(ruleAction_, terms);
+		}
 		return changed;
 	}
 
@@ -748,11 +768,10 @@ public class RelationalRule implements Serializable,
 			queryParams_ = null;
 			changed = true;
 		}
-		findConstantsAndRanges();
-		
+
 		if (changed)
 			statesSeen_ = 0;
-		
+
 		return changed;
 	}
 
@@ -837,6 +856,22 @@ public class RelationalRule implements Serializable,
 	}
 
 	/**
+	 * Prints this rule in abstract form of specialisations from the RLGG rule.
+	 * 
+	 * @return An abstract representation of the rule.
+	 */
+	public String toAbstractString() {
+		if (abstractRule_.isEmpty())
+			return getStringConditions() + " => " + ruleAction_;
+
+		StringBuffer buffer = new StringBuffer("RLGG");
+		for (SpecialisationOperator spec : abstractRule_) {
+			buffer.append("+" + spec.toString());
+		}
+		return buffer.toString();
+	}
+
+	/**
 	 * Updates the internal value of this rule, adjusting the rule mean and SD
 	 * appropriately.
 	 * 
@@ -890,11 +925,6 @@ public class RelationalRule implements Serializable,
 	public boolean shouldRegenerate() {
 		// Never regenerate.
 		return false;
-	}
-
-	@Override
-	public GoalCondition getGoalCondition() {
-		return getConstantCondition();
 	}
 
 	@Override

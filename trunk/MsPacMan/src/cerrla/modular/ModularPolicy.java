@@ -1,9 +1,8 @@
-package relationalFramework;
+package cerrla.modular;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -15,19 +14,22 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import jess.Rete;
 import cerrla.LocalCrossEntropyDistribution;
-import cerrla.ModularHole;
 import cerrla.ProgramArgument;
 
+import jess.Rete;
+
+import relationalFramework.FiredAction;
+import relationalFramework.PolicyActions;
+import relationalFramework.RelationalPolicy;
+import relationalFramework.RelationalRule;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
 import util.MultiMap;
 import util.Recursive;
 
-public class ModularPolicy extends RelationalPolicy implements
-		RelationallyEvaluatableObject {
+public class ModularPolicy extends RelationalPolicy {
 	/** The minimum 'goal-not-achieved' value. */
 	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
 
@@ -40,7 +42,7 @@ public class ModularPolicy extends RelationalPolicy implements
 	private LocalCrossEntropyDistribution ceDistribution_;
 
 	/** The collection of policies this policy directly contains. */
-	private Map<SortedSet<RelationalPredicate>, ModularPolicy> childrenPolicies_;
+	private MultiMap<RelationalRule, ModularSubGoal> childrenPolicies_;
 
 	/** The goal replacements for this episode ('?G_0 -> a' format). */
 	private transient BidiMap episodeGoalReplacements_;
@@ -54,14 +56,14 @@ public class ModularPolicy extends RelationalPolicy implements
 	/** If the internal goal of this policy was achieved this episode. */
 	private transient boolean goalAchieved_;
 
-	/** The goal condition this policy is assigned to complete. */
-	private GoalCondition goalCondition_;
-
 	/** A map for transforming goal replacements into the appropriate args. */
 	private Map<String, String> moduleParamReplacements_;
 
 	/** The rewards this policy achieved for each episode. */
-	private transient ArrayList<Double> policyRewards_ = new ArrayList<Double>();
+	private ArrayList<Double> policyRewards_;
+
+	/** The subgoal distributions for this policy. */
+	private Collection<LocalCrossEntropyDistribution> subGoalDists_;
 
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
@@ -76,7 +78,9 @@ public class ModularPolicy extends RelationalPolicy implements
 		super();
 		ceDistribution_ = policyGenerator;
 		triggeredRules_ = new HashSet<RelationalRule>();
-		childrenPolicies_ = new HashMap<SortedSet<RelationalPredicate>, ModularPolicy>();
+		childrenPolicies_ = MultiMap.createListMultiMap();
+		subGoalDists_ = new HashSet<LocalCrossEntropyDistribution>();
+		policyRewards_ = new ArrayList<Double>();
 	}
 
 	/**
@@ -87,10 +91,12 @@ public class ModularPolicy extends RelationalPolicy implements
 	 */
 	public ModularPolicy(ModularPolicy policy) {
 		this(policy.ceDistribution_);
-		for (RelationallyEvaluatableObject reo : policy.policyRules_)
+		for (PolicyItem reo : policy.policyRules_)
 			policyRules_.add(reo);
 
 		policySize_ = policy.policySize_;
+		childrenPolicies_ = new MultiMap<RelationalRule, ModularSubGoal>(
+				policy.childrenPolicies_);
 	}
 
 	/**
@@ -104,21 +110,41 @@ public class ModularPolicy extends RelationalPolicy implements
 	public ModularPolicy(RelationalPolicy newPol,
 			LocalCrossEntropyDistribution policyGenerator) {
 		this(policyGenerator);
-		policySize_ = newPol.policyRules_.size();
+		policySize_ = newPol.size();
 
 		// Add the rules, creating ModularHoles where appropriate.
-		for (RelationallyEvaluatableObject reo : newPol.getRules()) {
+		for (PolicyItem reo : newPol.getRules()) {
 			if (reo instanceof RelationalRule) {
+				RelationalRule rule = (RelationalRule) reo;
 				policyRules_.add(reo);
 
 				// Checking for sub-goals
-				GoalCondition ruleGCs = reo.getGoalCondition();
-				if (ruleGCs != null) {
-					if (ProgramArgument.MULTI_MODULES.booleanValue()) {
-						policyRules_.add(new ModularHole(ruleGCs));
-					} else {
-						for (GoalCondition splitGC : ruleGCs.splitCondition()) {
-							policyRules_.add(new ModularHole(splitGC));
+				if (ProgramArgument.USE_MODULES.booleanValue()) {
+					Collection<SpecificGoalCondition> goalConds = rule
+							.getSpecificSubGoals();
+					for (GoalCondition gc : goalConds) {
+						ModularSubGoal subGoal = new ModularSubGoal(gc, rule);
+						policyRules_.add(subGoal);
+						childrenPolicies_.put(rule, subGoal);
+					}
+
+					// General sub-goals
+					if (ProgramArgument.USE_GENERAL_MODULES.booleanValue()) {
+						Collection<GeneralGoalCondition>[] generalisedConds = rule
+								.getGeneralisedConditions();
+						// Add all general conditions, and fill in the blanks
+						// when necessary.
+						for (GoalCondition gc : generalisedConds[0]) {
+							ModularSubGoal subGoal = new ModularSubGoal(gc,
+									rule);
+							policyRules_.add(subGoal);
+							childrenPolicies_.put(rule, subGoal);
+						}
+						for (GoalCondition gc : generalisedConds[1]) {
+							ModularSubGoal subGoal = new ModularSubGoal(gc,
+									rule);
+							policyRules_.add(subGoal);
+							childrenPolicies_.put(rule, subGoal);
 						}
 					}
 				}
@@ -167,11 +193,14 @@ public class ModularPolicy extends RelationalPolicy implements
 		}
 
 
+		// TODO If the goal has been achieved, don't evaluate this policy
+		// if (goalAchieved_)
+		// return;
 
 		// Evaluate the rules/policies recursively.
 		Rete state = observations.getState();
 
-		Iterator<RelationallyEvaluatableObject> iter = policyRules_.iterator();
+		Iterator<PolicyItem> iter = policyRules_.iterator();
 		while (iter.hasNext() && actionsFound < actionsRequired) {
 			Object polObject = iter.next();
 			if (polObject instanceof RelationalRule) {
@@ -184,28 +213,22 @@ public class ModularPolicy extends RelationalPolicy implements
 				actionsFound += firedActions.size();
 
 				// If this rule created a sub-goal, mark the goal achieved.
-				GoalCondition gc = polRule.getConstantCondition();
-				if (gc != null && !firedActions.isEmpty()) {
-					if (ProgramArgument.MULTI_MODULES.booleanValue()) {
-						SortedSet<RelationalPredicate> goalFacts = gc
-								.getFacts();
-						if (childrenPolicies_.containsKey(goalFacts))
-							childrenPolicies_.get(goalFacts).goalAchieved_ = true;
-					} else {
-						for (GoalCondition splitGC : gc.splitCondition()) {
-							SortedSet<RelationalPredicate> goalFacts = splitGC
-									.getFacts();
-							if (childrenPolicies_.containsKey(goalFacts))
-								childrenPolicies_.get(goalFacts).goalAchieved_ = true;
-						}
-					}
+				if (childrenPolicies_.containsKey(polRule)
+						&& !firedActions.isEmpty()) {
+					for (ModularSubGoal modSubGoal : childrenPolicies_
+							.get(polRule))
+						// TODO Set unachieved if rule doesn't fire so policy
+						// can be re-evaluated
+						modSubGoal.setGoalAchieved(true);
 				}
-			} else if (polObject instanceof ModularPolicy) {
+			} else if (polObject instanceof ModularSubGoal) {
 				// Evaluate the internal policy.
-				ModularPolicy internalPolicy = (ModularPolicy) polObject;
-				internalPolicy.evaluateInternalPolicy(observations,
-						policyActions, activatedActions, actionsFound,
-						actionsRequired);
+				ModularPolicy internalPolicy = ((ModularSubGoal) polObject)
+						.getModularPolicy();
+				if (internalPolicy != null)
+					internalPolicy.evaluateInternalPolicy(observations,
+							policyActions, activatedActions, actionsFound,
+							actionsRequired);
 			}
 		}
 	}
@@ -223,20 +246,28 @@ public class ModularPolicy extends RelationalPolicy implements
 	@Recursive
 	private String recursePolicyToString(StringBuffer buffer, int depth,
 			boolean onlyTriggered) {
-		for (RelationallyEvaluatableObject reo : policyRules_) {
+		for (PolicyItem reo : policyRules_) {
 			if (reo instanceof RelationalRule) {
 				// If only triggered rules, just print rules that were
 				// triggered.
 				if (!onlyTriggered || triggeredRules_.contains(reo)) {
-					for (int i = 0; i < depth; i++)
-						buffer.append("  ");
+					for (int i = 0; i < depth; i++) {
+						if (i < depth - 1)
+							buffer.append("  ");
+						else
+							buffer.append(" |");
+					}
 					buffer.append(((RelationalRule) reo)
 							.toNiceString(moduleParamReplacements_));
 					buffer.append("\n");
 				}
-			} else if (reo instanceof ModularPolicy)
-				((ModularPolicy) reo).recursePolicyToString(buffer, depth + 1,
-						onlyTriggered);
+			} else if (reo instanceof ModularSubGoal) {
+				ModularPolicy internalPolicy = ((ModularSubGoal) reo)
+						.getModularPolicy();
+				if (internalPolicy != null)
+					internalPolicy.recursePolicyToString(buffer, depth + 1,
+							onlyTriggered);
+			}
 		}
 		return buffer.toString();
 	}
@@ -278,23 +309,10 @@ public class ModularPolicy extends RelationalPolicy implements
 	 * @return True if the rule was successfully added, or is already present.
 	 *         False if the rule was not allowed to be added.
 	 */
-	protected boolean addTriggeredRule(RelationalRule rule) {
+	public boolean addTriggeredRule(RelationalRule rule) {
 		triggeredRules_.add(rule);
 		firedLastStep_.add(rule);
 		return true;
-	}
-
-	/**
-	 * Adds a policy to this modular policy.
-	 * 
-	 * @param modularPolicy
-	 *            The policy to internally add to this policy.
-	 */
-	public void addPolicy(SortedSet<RelationalPredicate> constantFacts,
-			ModularPolicy modularPolicy) {
-		policyRules_.add(modularPolicy);
-		policySize_ += modularPolicy.policySize_;
-		childrenPolicies_.put(constantFacts, modularPolicy);
 	}
 
 	/**
@@ -320,8 +338,11 @@ public class ModularPolicy extends RelationalPolicy implements
 
 		// End episode for all children.
 		boolean regeneratePolicy = false;
-		for (ModularPolicy child : childrenPolicies_.values())
-			regeneratePolicy |= child.endEpisode();
+		for (ModularSubGoal child : childrenPolicies_.values()) {
+			ModularPolicy childPol = child.getModularPolicy();
+			if (childPol != null)
+				regeneratePolicy |= childPol.endEpisode();
+		}
 
 		// Check if sample needs to be recorded
 		if (policyRewards_.size() >= ProgramArgument.POLICY_REPEATS.intValue()) {
@@ -390,24 +411,6 @@ public class ModularPolicy extends RelationalPolicy implements
 	}
 
 	/**
-	 * Gets the rules that fired from this policy.
-	 * 
-	 * @return The rules that fired in this policy
-	 */
-	public Set<RelationalRule> getFiringRules() {
-		return triggeredRules_;
-	}
-
-	@Override
-	public GoalCondition getGoalCondition() {
-		return goalCondition_;
-	}
-
-	public LocalCrossEntropyDistribution getLocalCEDistribution() {
-		return ceDistribution_;
-	}
-
-	/**
 	 * Gets all the policies this policy contains (recursively), including
 	 * itself.
 	 * 
@@ -426,10 +429,44 @@ public class ModularPolicy extends RelationalPolicy implements
 		recursiveCollection.add(this);
 
 		// Run through all children policies
-		for (ModularPolicy child : childrenPolicies_.values())
-			child.getAllPolicies(undertestedOnly, recursiveCollection);
+		for (ModularSubGoal child : childrenPolicies_.values()) {
+			ModularPolicy childPol = child.getModularPolicy();
+			if (childPol != null)
+				childPol.getAllPolicies(undertestedOnly, recursiveCollection);
+		}
 
 		return recursiveCollection;
+	}
+
+	/**
+	 * Gets the rules that fired from this policy.
+	 * 
+	 * @return The rules that fired in this policy
+	 */
+	public Set<RelationalRule> getFiringRules() {
+		return triggeredRules_;
+	}
+
+	public LocalCrossEntropyDistribution getLocalCEDistribution() {
+		return ceDistribution_;
+	}
+
+	/**
+	 * Gets the modular replacement map.
+	 * 
+	 * @return The replacement map for this policy.
+	 */
+	public Map<String, String> getModularReplacementMap() {
+		return moduleParamReplacements_;
+	}
+
+	/**
+	 * Gets all associated sub-goals with this policy.
+	 * 
+	 * @return The associated sub-goals for this policy.
+	 */
+	public Collection<LocalCrossEntropyDistribution> getSubDistributions() {
+		return subGoalDists_;
 	}
 
 	@Override
@@ -467,8 +504,11 @@ public class ModularPolicy extends RelationalPolicy implements
 				|| !firedLastStep_.isEmpty();
 
 		// Drop down and reward from the bottom up.
-		for (ModularPolicy child : childrenPolicies_.values())
-			noteReward |= child.noteStepReward(reward);
+		for (ModularSubGoal child : childrenPolicies_.values()) {
+			ModularPolicy childPol = child.getModularPolicy();
+			if (childPol != null)
+				noteReward |= childPol.noteStepReward(reward);
+		}
 
 		// Only note the reward if a rule within this policy fired.
 		if (noteReward) {
@@ -481,27 +521,6 @@ public class ModularPolicy extends RelationalPolicy implements
 		}
 
 		return noteReward;
-	}
-
-	/**
-	 * Replaces the index of an old {@link RelationallyEvaluatableObject} with a
-	 * undertested, potentially fresh, policy.
-	 * 
-	 * @param i
-	 *            The location of the item to replace.
-	 * @param replacement
-	 *            The replacement policy.
-	 */
-	public void replaceIndex(int i, RelationallyEvaluatableObject replacement) {
-		RelationallyEvaluatableObject oldObject = policyRules_.get(i);
-		policyRules_.set(i, replacement);
-		policySize_ += replacement.size() - oldObject.size();
-
-		if (replacement instanceof ModularPolicy) {
-			ModularPolicy modPol = (ModularPolicy) replacement;
-			modPol.goalCondition_ = oldObject.getGoalCondition();
-			childrenPolicies_.put(modPol.goalCondition_.getFacts(), modPol);
-		}
 	}
 
 	/**
@@ -529,11 +548,10 @@ public class ModularPolicy extends RelationalPolicy implements
 		// }
 	}
 
-	@Override
 	public void setParameters(BidiMap goalArgs) {
 		BidiMap transformedArgs = transformGoalReplacements(goalArgs);
 		episodeGoalReplacements_ = transformedArgs;
-		for (RelationallyEvaluatableObject obj : policyRules_) {
+		for (PolicyItem obj : policyRules_) {
 			obj.setParameters(goalArgs);
 		}
 	}
@@ -559,14 +577,14 @@ public class ModularPolicy extends RelationalPolicy implements
 		if (ceDistribution_.getPolicyGenerator().shouldRestart())
 			return true;
 
-		for (ModularPolicy children : childrenPolicies_.values()) {
-			if (children.shouldRestart())
+		for (ModularSubGoal children : childrenPolicies_.values()) {
+			ModularPolicy childPol = children.getModularPolicy();
+			if (childPol != null && childPol.shouldRestart())
 				return true;
 		}
 		return false;
 	}
 
-	@Override
 	public int size() {
 		return policySize_;
 	}
@@ -578,15 +596,17 @@ public class ModularPolicy extends RelationalPolicy implements
 	public void startEpisode() {
 		episodeReward_ = 0;
 		goalAchieved_ = false;
-		
+
 		ceDistribution_.startEpisode();
 
 		// Start episode for all children
-		for (ModularPolicy child : childrenPolicies_.values())
-			child.startEpisode();
+		for (ModularSubGoal child : childrenPolicies_.values()) {
+			ModularPolicy childPol = child.getModularPolicy();
+			if (childPol != null)
+				childPol.startEpisode();
+		}
 	}
 
-	@Override
 	public String toNiceString() {
 		if (policyRules_.isEmpty())
 			return "<EMPTY POLICY>";
@@ -612,15 +632,4 @@ public class ModularPolicy extends RelationalPolicy implements
 	public String toString() {
 		return toNiceString();
 	}
-
-	/**
-	 * Gets the modular replacement map.
-	 * 
-	 * @return The replacement map for this policy.
-	 */
-	public Map<String, String> getModularReplacementMap() {
-		return moduleParamReplacements_;
-	}
-
-
 }

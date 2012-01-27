@@ -15,7 +15,9 @@ import java.util.TreeMap;
 import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
-import relationalFramework.GoalCondition;
+import cerrla.modular.GoalCondition;
+
+
 import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
 
@@ -308,11 +310,13 @@ public class Performance implements Serializable {
 
 		if (!frozen_) {
 			// Adjust numElites if using bounded elites
+			String best = (!elites.isEmpty()) ? ""
+					+ formatter.format(elites.first().getValue()) : "?";
+			String worst = (!elites.isEmpty()) ? ""
+					+ formatter.format(elites.last().getValue()) : "?";
 			String eliteString = "N_E: " + numElites + ", |E|: "
-					+ elites.size() + ", E_best: "
-					+ formatter.format(elites.first().getValue())
-					+ ", E_worst: "
-					+ formatter.format(elites.last().getValue());
+					+ elites.size() + ", E_best: " + best + ", E_worst: "
+					+ worst;
 			System.out.println(eliteString);
 		}
 
@@ -404,10 +408,12 @@ public class Performance implements Serializable {
 	 *            The current elites.
 	 * @param currentEpisode
 	 *            The current episode.
+	 * @param finalWrite
+	 *            If this write is the final write for this generator.
 	 */
 	public void saveFiles(LocalCrossEntropyDistribution distribution,
 			SortedSet<PolicyValue> elites, int currentEpisode,
-			boolean hasUpdated) {
+			boolean hasUpdated, boolean finalWrite) {
 		// Basic update of run
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 				&& !modularPerformance_) {
@@ -450,7 +456,7 @@ public class Performance implements Serializable {
 				saveElitePolicies(elites, distribution.getGoalCondition());
 				// Output the episode averages
 				savePerformance(distribution.getPolicyGenerator(), tempPerf,
-						frozen_);
+						finalWrite);
 			}
 			// Serialise the generator
 			distribution.saveCEDistribution(new File(tempPerf.getAbsolutePath()

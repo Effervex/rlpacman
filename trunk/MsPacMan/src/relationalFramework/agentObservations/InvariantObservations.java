@@ -39,6 +39,9 @@ public class InvariantObservations implements Serializable {
 	 */
 	private Collection<String> generalInvariants_;
 
+	/** The generalised 'existence' variants (sometimes present, sometimes not). */
+	private Collection<String> generalVariants_;
+
 	/** The predicates that have never been observed to be present. */
 	private Collection<String> neverPresent_;
 
@@ -69,12 +72,16 @@ public class InvariantObservations implements Serializable {
 		// If the first pass, invariants are just the state.
 		if (generalInvariants_ == null) {
 			generalInvariants_ = new TreeSet<String>(generalStateFacts);
+			generalVariants_ = new TreeSet<String>();
 			neverPresent_.removeAll(generalStateFacts);
 			return true;
 		}
 
 		// Otherwise, perform a basic retainAll operation
+		generalVariants_.addAll(generalStateFacts);
+		generalVariants_.addAll(generalInvariants_);
 		result |= generalInvariants_.retainAll(generalStateFacts);
+		generalVariants_.removeAll(generalInvariants_);
 		result |= neverPresent_.removeAll(generalStateFacts);
 		return result;
 	}
@@ -340,5 +347,9 @@ public class InvariantObservations implements Serializable {
 				System.arraycopy(factArgs[i].getExplicitRange(), 0, range, 0, 2);
 			}
 		}
+	}
+
+	public Collection<String> getVariants() {
+		return generalVariants_;
 	}
 }

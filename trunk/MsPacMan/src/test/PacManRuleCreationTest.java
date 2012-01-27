@@ -3,7 +3,6 @@ package test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.LocalAgentObservations;
@@ -13,6 +12,8 @@ import java.util.Set;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import cerrla.modular.GoalCondition;
 
 public class PacManRuleCreationTest {
 	private LocalAgentObservations.RuleMutation sut_;

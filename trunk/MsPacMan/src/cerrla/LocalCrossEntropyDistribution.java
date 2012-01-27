@@ -7,22 +7,26 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.apache.commons.collections.BidiMap;
 
+import cerrla.modular.GoalCondition;
+import cerrla.modular.ModularPolicy;
+import cerrla.modular.SpecificGoalCondition;
+
 import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.ModularPolicy;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -86,6 +90,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** The population value. */
 	private transient int population_;
 
+	/** A map of sub-goal distributions and the last time they were encountered. */
+	private transient Map<LocalCrossEntropyDistribution, Integer> relevantSubDistEpisodeMap_;
+
 	/** The current testing episode. */
 	private transient int testEpisode_;
 
@@ -115,8 +122,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (goal.isMainGoal())
 			goalCondition_ = goal;
 		else {
-			goalCondition_ = new GoalCondition(goal);
-			goalCondition_.normaliseArgs();
+			goalCondition_ = goal.clone();
+			if (goal instanceof SpecificGoalCondition)
+				((SpecificGoalCondition) goalCondition_).normaliseArgs();
 		}
 
 		policyGenerator_ = new PolicyGenerator(this);
@@ -202,9 +210,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// Form the goal rule
 		if (!goalCondition_.isMainGoal()) {
 			if (goalRule_ == null) {
-				SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>(
-						goalCondition_.getFacts());
-				goalRule_ = new RelationalRule(conditions, null, null);
+				SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>();
+				conditions.add(goalCondition_.getFact());
+				goalRule_ = new RelationalRule(conditions, null, null, null);
 				goalRule_.expandConditions();
 			}
 		} else
@@ -283,7 +291,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @param moduleParamReplacements
 	 *            Optional module parameter replacements to apply to the current
 	 *            goal replacements.
-	 * @return Any newly created (not modified) RLGG rules, or null if no change/no new rules.
+	 * @return Any newly created (not modified) RLGG rules, or null if no
+	 *         change/no new rules.
 	 */
 	@SuppressWarnings("unchecked")
 	public List<RelationalRule> coverState(ModularPolicy modularPolicy,
@@ -302,9 +311,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 				&& localAgentObservations_.observeState(observations,
 						activatedActions, goalReplacements)) {
 			// Remove the old RLGGs
-			policyGenerator_.removeRLGGRules();
+			Collection<RelationalRule> oldRLGGs = policyGenerator_
+					.removeRLGGRules();
 			Collection<RelationalRule> covered = localAgentObservations_
-					.getRLGGRules();
+					.getRLGGRules(oldRLGGs);
 
 			return policyGenerator_.addRLGGRules(covered);
 		}
@@ -317,7 +327,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public void finalWrite() {
 		// Finalise the testing
-		performance_.saveFiles(this, elites_, currentEpisode_, true);
+		performance_.saveFiles(this, elites_, currentEpisode_, true, true);
 	}
 
 	/**
@@ -393,13 +403,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
-	 * Gets a collection fo goal conditions that represent potential modules for
+	 * Gets a collection of goal conditions that represent potential modules for
 	 * the rules contained within this CE cortex.
 	 * 
 	 * @return All potential module conditions.
 	 */
 	public Collection<GoalCondition> getPotentialModuleGoals() {
-		return localAgentObservations_.getSpecificGoalConditions();
+		return localAgentObservations_.getObservedSubGoals();
 	}
 
 	/**
@@ -408,6 +418,16 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return True if the distribution is converged.
 	 */
 	public boolean isConverged() {
+		// Only converged if the relevant sub-goals are converged
+		if (relevantSubDistEpisodeMap_ == null)
+			relevantSubDistEpisodeMap_ = new HashMap<LocalCrossEntropyDistribution, Integer>();
+		for (LocalCrossEntropyDistribution subGoal : relevantSubDistEpisodeMap_
+				.keySet()) {
+			if (currentEpisode_ - relevantSubDistEpisodeMap_.get(subGoal) < population_
+					&& !subGoal.isConverged())
+				return false;
+		}
+
 		// Check performance convergence
 		if (ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue())
 			if (performance_.isConverged())
@@ -462,6 +482,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *            The value of the sample.
 	 */
 	public void recordSample(ModularPolicy sample, Double[] values) {
+		// Performance
 		if (!frozen_)
 			currentEpisode_ += values.length;
 		double average = performance_
@@ -469,7 +490,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		if (!frozen_) {
 			// Add sample to elites
-			// sample.setModularParameters(null);
 			PolicyValue pv = new PolicyValue(sample, average,
 					policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
@@ -481,6 +501,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					* ProgramArgument.RHO.doubleValue());
 			// Update distributions (depending on number of elites)
 			updateDistributions(elites_, population_, numElites_);
+
+			// Noting relevant sub-goal distributions
+			if (relevantSubDistEpisodeMap_ == null)
+				relevantSubDistEpisodeMap_ = new HashMap<LocalCrossEntropyDistribution, Integer>();
+			for (LocalCrossEntropyDistribution subDist : sample
+					.getSubDistributions()) {
+				relevantSubDistEpisodeMap_.put(subDist, currentEpisode_);
+			}
 		}
 
 
@@ -512,7 +540,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 							% ProgramArgument.PERFORMANCE_TESTING_SIZE
 									.doubleValue() == 1) {
 				performance_.saveFiles(this, elites_, currentEpisode_,
-						policyGenerator_.hasUpdated());
+						policyGenerator_.hasUpdated(), false);
 			}
 
 			oldAOSettled_ = localAgentObservations_.isSettled();
@@ -619,6 +647,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return The File path to the module.
 	 */
 	public static File getModFolder(String modName) {
+		File modDir = new File(MODULE_DIR);
+		modDir.mkdir();
 		File modFolder = new File(MODULE_DIR + File.separatorChar
 				+ StateSpec.getInstance().getEnvironmentName());
 		modFolder.mkdir();
@@ -628,8 +658,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
-	 * Loads a serialised {@link LocalCrossEntropyDistribution} from file (if it
-	 * exists).
+	 * Loads a module from the module directory.
 	 * 
 	 * @param environmentPrefix
 	 *            The environment prefix.
@@ -644,20 +673,33 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (nonExistantModule_.contains(moduleName))
 			return null;
 
+		return loadDistribution(new File(getModFolder(moduleName), moduleName
+				+ SERIALISED_SUFFIX));
+	}
+
+	/**
+	 * Loads a serialised {@link LocalCrossEntropyDistribution} from file (if it
+	 * exists).
+	 * 
+	 * @param serializedFile
+	 *            The serialised file.
+	 * @return The loaded distribution, or null.
+	 */
+	public static LocalCrossEntropyDistribution loadDistribution(
+			File serializedFile) {
 		try {
-			File modFile = new File(getModFolder(moduleName), moduleName
-					+ SERIALISED_SUFFIX);
-			if (modFile.exists()) {
+			if (serializedFile.exists()) {
 				// The file exists!
-				FileInputStream fis = new FileInputStream(modFile);
+				FileInputStream fis = new FileInputStream(serializedFile);
 				ObjectInputStream ois = new ObjectInputStream(fis);
 				LocalCrossEntropyDistribution lced = (LocalCrossEntropyDistribution) ois
 						.readObject();
 				ois.close();
+				fis.close();
 
 				// Load Local Agent Observations
 				lced.localAgentObservations_ = LocalAgentObservations
-						.loadAgentObservations(moduleGoal);
+						.loadAgentObservations(lced.goalCondition_);
 
 				return lced;
 			}

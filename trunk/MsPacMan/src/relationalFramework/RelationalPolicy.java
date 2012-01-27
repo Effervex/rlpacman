@@ -13,6 +13,9 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.BidiMap;
 
+import cerrla.modular.PolicyItem;
+
+
 import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 import rrlFramework.RRLObservations;
@@ -29,7 +32,7 @@ import jess.ValueVector;
 public class RelationalPolicy implements Serializable {
 	private static final long serialVersionUID = -5575181715619476335L;
 	/** The rules of this policy, organised in a deterministic list format. */
-	protected List<RelationallyEvaluatableObject> policyRules_;
+	protected List<PolicyItem> policyRules_;
 	/** The number of rules added to this policy (excluding modular) */
 	protected int policySize_;
 
@@ -37,7 +40,7 @@ public class RelationalPolicy implements Serializable {
 	 * Basic constructor.
 	 */
 	public RelationalPolicy() {
-		policyRules_ = new ArrayList<RelationallyEvaluatableObject>();
+		policyRules_ = new ArrayList<PolicyItem>();
 		policySize_ = 0;
 	}
 
@@ -183,7 +186,7 @@ public class RelationalPolicy implements Serializable {
 
 		try {
 			// Evaluate the policy rules.
-			Iterator<RelationallyEvaluatableObject> iter = policyRules_
+			Iterator<PolicyItem> iter = policyRules_
 					.iterator();
 			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
 				RelationalRule polRule = (RelationalRule) iter.next();
@@ -206,7 +209,7 @@ public class RelationalPolicy implements Serializable {
 	 * 
 	 * @return The rules/relationally evaluable objects of the policy.
 	 */
-	public List<RelationallyEvaluatableObject> getRules() {
+	public List<PolicyItem> getRules() {
 		return policyRules_;
 	}
 
@@ -227,7 +230,7 @@ public class RelationalPolicy implements Serializable {
 	 */
 	public void parameterArgs(BidiMap goalArgs) {
 		// Set the parameters for the policy rules.
-		for (RelationallyEvaluatableObject reo : policyRules_) {
+		for (PolicyItem reo : policyRules_) {
 			reo.setParameters(goalArgs);
 		}
 	}
@@ -241,7 +244,7 @@ public class RelationalPolicy implements Serializable {
 		buffer.append(":\n");
 
 		boolean first = true;
-		for (RelationallyEvaluatableObject reo : policyRules_) {
+		for (PolicyItem reo : policyRules_) {
 			if (!first)
 				buffer.append("\n");
 			buffer.append(reo.toNiceString());
@@ -270,5 +273,9 @@ public class RelationalPolicy implements Serializable {
 		br.close();
 		fr.close();
 		return policy;
+	}
+
+	public int size() {
+		return policySize_;
 	}
 }

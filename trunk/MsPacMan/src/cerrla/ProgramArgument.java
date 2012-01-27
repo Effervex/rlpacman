@@ -241,6 +241,8 @@ public enum ProgramArgument implements Serializable {
 						|| args[i].equals(pa.shortcut_)) {
 					i++;
 					pa.setValue(args[i]);
+					if (pa == ProgramArgument.EXPERIMENT_MODE)
+						return new Pair<Integer, String>(i, null);
 					argFound = true;
 					Object value = pa.getValue();
 					if (value instanceof Boolean) {

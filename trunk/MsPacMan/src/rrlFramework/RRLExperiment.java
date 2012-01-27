@@ -317,9 +317,6 @@ public class RRLExperiment {
 	public void run(int runIndex, int finiteEpisodes) {
 		// Initialise the agent and environment
 		random_ = new Random(runIndex);
-		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
-				Config.getInstance().getGoalString());
-		Config.getInstance().setGoal(StateSpec.getInstance().getGoalName());
 		System.out.println("Goal: " + StateSpec.getInstance().getGoalState());
 
 		agent_.initialise(runIndex);
@@ -350,6 +347,10 @@ public class RRLExperiment {
 	 *            if infinite).
 	 */
 	public void runExperiment() {
+		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
+				Config.getInstance().getGoalString());
+		Config.getInstance().setGoal(StateSpec.getInstance().getGoalName());
+		
 		long experimentStart = System.currentTimeMillis();
 
 		// Determine the initial run (as previous runs may have already been

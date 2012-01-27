@@ -5,7 +5,6 @@ import static org.junit.Assert.*;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -15,13 +14,12 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
-import relationalFramework.GoalCondition;
+import cerrla.modular.GoalCondition;
+
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
-import relationalFramework.agentObservations.BackgroundKnowledge;
-import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.LocalAgentObservations;
 import util.ConditionComparator;
 
@@ -70,7 +68,7 @@ public class LocalAgentObservationsTest {
 
 	@Test
 	public void testGetRLGGRules() {
-		Collection<RelationalRule> rlggRules = sut_.getRLGGRules();
+		Collection<RelationalRule> rlggRules = sut_.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
 			SortedSet<RelationalPredicate> conds = rr.getConditions(false);
 			if (rr.getActionPredicate().equals("move")) {

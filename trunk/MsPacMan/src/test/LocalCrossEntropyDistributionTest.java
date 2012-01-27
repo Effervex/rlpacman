@@ -2,7 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -20,6 +19,7 @@ import org.junit.Test;
 import cerrla.LocalCrossEntropyDistribution;
 import cerrla.ProgramArgument;
 import cerrla.Slot;
+import cerrla.modular.GoalCondition;
 
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
@@ -36,8 +36,6 @@ public class LocalCrossEntropyDistributionTest {
 
 	@Test
 	public void testCoverState() throws Exception {
-		ProgramArgument.DYNAMIC_SLOTS.setBooleanValue(false);
-
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (clear a))");
 		state.eval("(assert (clear b))");
@@ -73,6 +71,17 @@ public class LocalCrossEntropyDistributionTest {
 		goalReplacements.put("x", "?G_1");
 		List<RelationalRule> rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, goalReplacements, false), activatedActions, null);
+		RelationalRule rlggRule = new RelationalRule(
+				"(above ?X ?) (height ?X ?#_0) (clear ?X) => (moveFloor ?X)");
+		List<String> queryParameters = new ArrayList<String>();
+		queryParameters.add("?G_0");
+		queryParameters.add("?G_1");
+		rlggRule.setQueryParams(queryParameters);
+		assertTrue(rlggRules.contains(rlggRule));
+		rlggRule = new RelationalRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
+		rlggRule.setQueryParams(queryParameters);
+		assertTrue(rlggRules.contains(rlggRule));
+		assertEquals(rlggRules.size(), 2);
 
 		// [e]
 		// [b][d]
@@ -102,47 +111,16 @@ public class LocalCrossEntropyDistributionTest {
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, 0d, goalReplacements, false), activatedActions, null);
-
-		state.reset();
-		state.eval("(assert (clear d))");
-		state.eval("(assert (clear e))");
-		state.eval("(assert (clear c))");
-		state.eval("(assert (highest e))");
-		state.eval("(assert (on d a))");
-		state.eval("(assert (on e b))");
-		state.eval("(assert (on b f))");
-		state.eval("(assert (above e b))");
-		state.eval("(assert (above e f))");
-		state.eval("(assert (above b f))");
-		state.eval("(assert (above d a))");
-		state.eval("(assert (onFloor c))");
-		state.eval("(assert (onFloor a))");
-		state.eval("(assert (onFloor f))");
-		state.eval("(assert (block a))");
-		state.eval("(assert (block b))");
-		state.eval("(assert (block c))");
-		state.eval("(assert (block d))");
-		state.eval("(assert (block e))");
-		state.eval("(assert (block f))");
-		validActions = StateSpec.getInstance().generateValidActions(state);
-
-		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions, null);
-		RelationalRule rlggRule = new RelationalRule(
-				"(above ?X ?) (clear ?X) => (moveFloor ?X)");
-		List<String> queryParameters = new ArrayList<String>();
-		queryParameters.add("?G_0");
-		queryParameters.add("?G_1");
-		rlggRule.setQueryParams(queryParameters);
-		assertTrue(rlggRules.contains(rlggRule));
-		rlggRule = new RelationalRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
-		rlggRule.setQueryParams(queryParameters);
-		assertTrue(rlggRules.contains(rlggRule));
-		assertEquals(rlggRules.size(), 2);
+		assertTrue(rlggRules.isEmpty());
 
 		// Test the state of the slot generator
 		Collection<Slot> slotGenerator = sut_.getPolicyGenerator().getGenerator();
-		assertEquals(slotGenerator.size(), 12);
+		for (Slot slot : slotGenerator) {
+			if (slot.getAction().equals("move"))
+				assertEquals(slot.size(), 25);
+			else if (slot.getAction().equals("moveFloor"))
+				assertEquals(slot.size(), 11);
+		}
 	}
 
 	@Test

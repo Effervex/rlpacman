@@ -22,44 +22,28 @@ import java.util.TreeSet;
 public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		Serializable {
 	private static final long serialVersionUID = 6131063892766663639L;
-	/** The fact name. */
-	private String factName_;
-	/** If this fact is negated (prefixed by not) */
-	private boolean negated_ = false;
-	/** The types of the fact arguments. */
-	private String[] factTypes_;
 	/** The actual arguments of the fact. */
 	private RelationalArgument[] arguments_;
+	/** The fact name. */
+	private String factName_;
+	/** The types of the fact arguments. */
+	private String[] factTypes_;
+	/** If this fact is negated (prefixed by not) */
+	private boolean negated_ = false;
 	/** A collection of contexts which define ranges. */
 	private SortedSet<RangeContext> rangeContexts_;
 
 	/**
-	 * A basic definition constructor.
+	 * Constructor for a clone StringFact.
 	 * 
-	 * @param factName
-	 *            The name of the fact.
-	 * @param factTypes
-	 *            The types of the fact.
+	 * @param stringFact
+	 *            The StringFact to clone.
 	 */
-	public RelationalPredicate(String factName, String[] factTypes) {
-		factName_ = factName;
-		factTypes_ = factTypes;
-		arguments_ = new RelationalArgument[factTypes.length];
-		Arrays.fill(arguments_, RelationalArgument.ANONYMOUS);
-	}
-
-	/**
-	 * A filled fact constructor.
-	 * 
-	 * @param fact
-	 *            The fact definition to use.
-	 * @param arguments
-	 *            The arguments for the fact.
-	 */
-	public RelationalPredicate(RelationalPredicate fact, String[] arguments) {
-		factName_ = fact.factName_;
-		factTypes_ = fact.factTypes_;
-		arguments_ = cloneArgs(arguments);
+	public RelationalPredicate(RelationalPredicate stringFact) {
+		factName_ = stringFact.factName_;
+		negated_ = stringFact.negated_;
+		factTypes_ = stringFact.factTypes_;
+		arguments_ = cloneArgs(stringFact.arguments_);
 	}
 
 	/**
@@ -87,10 +71,24 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param negated
 	 *            If this is negated.
 	 */
-	public RelationalPredicate(RelationalPredicate fact, String[] arguments,
-			boolean negated) {
+	public RelationalPredicate(RelationalPredicate fact,
+			RelationalArgument[] arguments, boolean negated) {
 		this(fact, arguments);
 		negated_ = negated;
+	}
+
+	/**
+	 * A filled fact constructor.
+	 * 
+	 * @param fact
+	 *            The fact definition to use.
+	 * @param arguments
+	 *            The arguments for the fact.
+	 */
+	public RelationalPredicate(RelationalPredicate fact, String[] arguments) {
+		factName_ = fact.factName_;
+		factTypes_ = fact.factTypes_;
+		arguments_ = cloneArgs(arguments);
 	}
 
 	/**
@@ -103,35 +101,25 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param negated
 	 *            If this is negated.
 	 */
-	public RelationalPredicate(RelationalPredicate fact,
-			RelationalArgument[] arguments, boolean negated) {
+	public RelationalPredicate(RelationalPredicate fact, String[] arguments,
+			boolean negated) {
 		this(fact, arguments);
 		negated_ = negated;
 	}
 
 	/**
-	 * Constructor for a clone StringFact.
+	 * A basic definition constructor.
 	 * 
-	 * @param stringFact
-	 *            The StringFact to clone.
+	 * @param factName
+	 *            The name of the fact.
+	 * @param factTypes
+	 *            The types of the fact.
 	 */
-	public RelationalPredicate(RelationalPredicate stringFact) {
-		factName_ = stringFact.factName_;
-		negated_ = stringFact.negated_;
-		factTypes_ = stringFact.factTypes_;
-		arguments_ = cloneArgs(stringFact.arguments_);
-	}
-
-	private RelationalArgument[] cloneArgs(String[] arguments) {
-		rangeContexts_ = new TreeSet<RangeContext>();
-		RelationalArgument[] newArgs = new RelationalArgument[arguments.length];
-		for (int i = 0; i < arguments.length; i++) {
-			newArgs[i] = new RelationalArgument(arguments[i]);
-			RangeContext rc = newArgs[i].getRangeContext();
-			if (rc != null)
-				rangeContexts_.add(rc);
-		}
-		return newArgs;
+	public RelationalPredicate(String factName, String[] factTypes) {
+		factName_ = factName;
+		factTypes_ = factTypes;
+		arguments_ = new RelationalArgument[factTypes.length];
+		Arrays.fill(arguments_, RelationalArgument.ANONYMOUS);
 	}
 
 	private RelationalArgument[] cloneArgs(RelationalArgument[] arguments) {
@@ -146,147 +134,63 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return newArgs;
 	}
 
-	/**
-	 * Replaces all occurrences of an argument with another value.
-	 * 
-	 * @param replacementMap
-	 *            The replacement map for the arguments. Can be of type String
-	 *            or RelationalArgument.
-	 * @param retainOtherArgs
-	 *            If arguments that have no replacement should be retained (or
-	 *            turned anonymous).
-	 * @param retainNumbers
-	 *            If not retaining other arguments, if numbers should be an
-	 *            exception.
-	 * @return True if the fact is still valid (not anonymous)
-	 */
-	public boolean replaceArguments(Map<?, ?> replacementMap,
-			boolean retainOtherArgs, boolean retainNumbers) {
-		RelationalArgument[] newArguments = new RelationalArgument[arguments_.length];
-		boolean notAnonymous = false;
-		for (int i = 0; i < arguments_.length; i++) {
-			newArguments[i] = arguments_[i].clone();
-			boolean hasReplacement = false;
-
-			// Determine what type of map is being used for replacements
-			RelationalArgument replacement = (RelationalArgument) replacementMap
-					.get(arguments_[i]);
-			if (replacement == null) {
-				String strReplacement = (String) replacementMap
-						.get(arguments_[i].toString());
-				if (strReplacement != null)
-					replacement = new RelationalArgument(strReplacement);
-			}
-
-			// Apply the replacement (if not null)
-			if (replacement != null) {
-				newArguments[i] = replacement;
-				hasReplacement = true;
-			}
-
-			// Retaining args
-			if (!retainOtherArgs && !hasReplacement) {
-				if (!retainNumbers || !arguments_[i].isNumber())
-					newArguments[i] = RelationalArgument.ANONYMOUS;
-			}
-
-			// Anonymous checks.
-			if (!newArguments[i].equals(RelationalArgument.ANONYMOUS))
-				notAnonymous = true;
+	private RelationalArgument[] cloneArgs(String[] arguments) {
+		rangeContexts_ = new TreeSet<RangeContext>();
+		RelationalArgument[] newArgs = new RelationalArgument[arguments.length];
+		for (int i = 0; i < arguments.length; i++) {
+			newArgs[i] = new RelationalArgument(arguments[i]);
+			RangeContext rc = newArgs[i].getRangeContext();
+			if (rc != null)
+				rangeContexts_.add(rc);
 		}
-		arguments_ = newArguments;
-		return notAnonymous;
+		return newArgs;
 	}
 
 	/**
-	 * Replaces all variable indexed terms (?X,?Y,?Z...) with the given indexed
-	 * terms, be they variable or otherwise.
-	 * 
-	 * So if the fact is blah(?X ?Z ?Y) and the replacements given are [a, b, c]
-	 * then the result is blah(a, c, b)
-	 * 
-	 * @param replacements
-	 *            The terms to replace any variable terms with.
+	 * Removes any numerical ranges from this rule.
 	 */
-	public void replaceArguments(String[] replacements) {
-		// Run through the arguments, replacing variable args with the
-		// replacements.
+	public void clearRanges() {
 		for (int i = 0; i < arguments_.length; i++) {
-			int termIndex = arguments_[i].getVariableTermIndex();
-			if (termIndex != -1)
-				arguments_[i] = new RelationalArgument(replacements[termIndex]);
+			if (arguments_[i].isRange())
+				arguments_[i] = new RelationalArgument(
+						arguments_[i].getStringArg());
 		}
 	}
 
-	/**
-	 * Replaces a single argument by another.
-	 * 
-	 * @param replacedTerm
-	 *            The term to be replaced.
-	 * @param replacementTerm
-	 *            the term to replace the old term.
-	 * @param retainOtherArgs
-	 *            If retaining the other arguments.
-	 * @return True if the fact is still valid (not anonymous)
-	 */
-	public boolean replaceArguments(String replacedTerm,
-			String replacementTerm, boolean retainOtherArgs) {
-		boolean notAnonymous = false;
-		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].toString().equals(replacedTerm)) {
-				arguments_[i] = new RelationalArgument(replacementTerm);
-				notAnonymous = true;
-			} else if (!retainOtherArgs)
-				arguments_[i] = RelationalArgument.ANONYMOUS;
+	@Override
+	public int compareTo(RelationalPredicate sf) {
+		// Compare by negation
+		if (negated_ != sf.negated_) {
+			if (!negated_)
+				return -1;
+			else
+				return 1;
 		}
-		return notAnonymous;
-	}
 
-	/**
-	 * Replaces the args of a predicate with the replacement args, but replaces
-	 * any existing args with other variables so as not to compromise the
-	 * structure of the fact.
-	 * 
-	 * @param replacementMap
-	 */
-	public void safeReplaceArgs(Map<String, String> replacementMap) {
-		Map<String, String> tempRepl = new HashMap<String, String>(
-				arguments_.length);
-		int tempCounter = 0;
-		// Run through each argument, swapping existing args with unbound temp
-		// variables.
+		// Type predicates trump non-type predicates
+		if (StateSpec.getInstance().isTypePredicate(factName_)) {
+			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
+				return -1;
+		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
+			return 1;
+
+		// Compare by number of arguments (complexity)
+		int result = Double.compare(arguments_.length, sf.arguments_.length);
+		if (result != 0)
+			return result;
+
+		result = factName_.compareTo(sf.factName_);
+		if (result != 0)
+			return result;
+
+		// Fact Types should be the same if both names are the same
+		// Check arguments
 		for (int i = 0; i < arguments_.length; i++) {
-			// Increment tempCounter to an unbound variable
-			while (replacementMap.containsValue(RelationalArgument
-					.getVariableTermArg(tempCounter).toString()))
-				tempCounter++;
-
-			String arg = arguments_[i].toString();
-			if (replacementMap.containsKey(arg))
-				arguments_[i] = new RelationalArgument(replacementMap.get(arg));
-			else if (tempRepl.containsKey(arg))
-				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
-			else if (!arg.equals("?")) {
-				tempRepl.put(arg,
-						RelationalArgument.getVariableTermArg(tempCounter++)
-								.toString());
-				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
-			}
+			result = arguments_[i].compareTo(sf.arguments_[i]);
+			if (result != 0)
+				return result;
 		}
-	}
-
-	/**
-	 * Only retains the arguments in the array and modifies all other arguments
-	 * to anonymous terms.
-	 * 
-	 * @param retainedArgs
-	 *            The arguments to retain.
-	 */
-	public void retainArguments(Collection<String> retainedArgs) {
-		for (int i = 0; i < arguments_.length; i++) {
-			if (!retainedArgs.contains(arguments_[i].toString()))
-				arguments_[i] = RelationalArgument.ANONYMOUS;
-		}
+		return 0;
 	}
 
 	/**
@@ -362,13 +266,25 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return replacementMap;
 	}
 
-	/**
-	 * Gets the name of the fact.
-	 * 
-	 * @return The name of the fact.
-	 */
-	public String getFactName() {
-		return factName_;
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		RelationalPredicate other = (RelationalPredicate) obj;
+		if (!Arrays.equals(arguments_, other.arguments_))
+			return false;
+		if (factName_ == null) {
+			if (other.factName_ != null)
+				return false;
+		} else if (!factName_.equals(other.factName_))
+			return false;
+		if (negated_ != other.negated_)
+			return false;
+		return true;
 	}
 
 	/**
@@ -392,20 +308,32 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return argCopy;
 	}
 
-	public RelationalArgument[] getRelationalArguments() {
-		return cloneArgs(arguments_);
+	/**
+	 * Gets the name of the fact.
+	 * 
+	 * @return The name of the fact.
+	 */
+	public String getFactName() {
+		return factName_;
 	}
 
 	public SortedSet<RangeContext> getRangeContexts() {
 		return rangeContexts_;
 	}
 
-	public boolean isNegated() {
-		return negated_;
+	public RelationalArgument[] getRelationalArguments() {
+		return cloneArgs(arguments_);
 	}
 
-	public void swapNegated() {
-		negated_ = !negated_;
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + Arrays.hashCode(arguments_);
+		result = prime * result
+				+ ((factName_ == null) ? 0 : factName_.hashCode());
+		result = prime * result + (negated_ ? 1231 : 1237);
+		return result;
 	}
 
 	/**
@@ -432,6 +360,10 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return true;
 	}
 
+	public boolean isNegated() {
+		return negated_;
+	}
+
 	/**
 	 * If the predicate contains numerical args.
 	 * 
@@ -445,18 +377,161 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return false;
 	}
 
-	@Override
-	public String toString() {
-		StringBuffer buffer = new StringBuffer();
-		if (negated_)
-			buffer.append("(not ");
-		buffer.append("(" + factName_);
-		for (int i = 0; i < arguments_.length; i++)
-			buffer.append(" " + arguments_[i]);
-		buffer.append(")");
-		if (negated_)
-			buffer.append(")");
-		return buffer.toString();
+	/**
+	 * Replaces all occurrences of an argument with another value.
+	 * 
+	 * @param replacementMap
+	 *            The replacement map for the arguments. Can be of type String
+	 *            or RelationalArgument.
+	 * @param retainOtherArgs
+	 *            If arguments that have no replacement should be retained (or
+	 *            turned anonymous).
+	 * @param retainNumbers
+	 *            If not retaining other arguments, if numbers should be an
+	 *            exception.
+	 * @return True if the fact is still valid (not anonymous)
+	 */
+	public boolean replaceArguments(Map<?, ?> replacementMap,
+			boolean retainOtherArgs, boolean retainNumbers) {
+		RelationalArgument[] newArguments = new RelationalArgument[arguments_.length];
+		boolean notAnonymous = false;
+		for (int i = 0; i < arguments_.length; i++) {
+			newArguments[i] = arguments_[i].clone();
+			boolean hasReplacement = false;
+
+			// Determine what type of map is being used for replacements
+			RelationalArgument replacement = (RelationalArgument) replacementMap
+					.get(arguments_[i]);
+			if (replacement == null) {
+				String strReplacement = (String) replacementMap
+						.get(arguments_[i].toString());
+				if (strReplacement != null)
+					replacement = new RelationalArgument(strReplacement);
+			}
+
+			// Apply the replacement (if not null)
+			if (replacement != null) {
+				newArguments[i] = replacement;
+				hasReplacement = true;
+			}
+
+			// Retaining args
+			if (!retainOtherArgs && !hasReplacement) {
+				if (!retainNumbers || !arguments_[i].isNumber())
+					newArguments[i] = RelationalArgument.ANONYMOUS;
+			}
+
+			// Anonymous checks.
+			if (!newArguments[i].equals(RelationalArgument.ANONYMOUS))
+				notAnonymous = true;
+		}
+		arguments_ = newArguments;
+		return notAnonymous;
+	}
+
+	/**
+	 * Replaces a single argument by another.
+	 * 
+	 * @param replacedTerm
+	 *            The term to be replaced.
+	 * @param replacementTerm
+	 *            the term to replace the old term.
+	 * @param retainOtherArgs
+	 *            If retaining the other arguments.
+	 * @return True if the fact is still valid (not anonymous)
+	 */
+	public boolean replaceArguments(String replacedTerm,
+			String replacementTerm, boolean retainOtherArgs) {
+		boolean notAnonymous = false;
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].toString().equals(replacedTerm)) {
+				arguments_[i] = new RelationalArgument(replacementTerm);
+				notAnonymous = true;
+			} else if (!retainOtherArgs)
+				arguments_[i] = RelationalArgument.ANONYMOUS;
+		}
+		return notAnonymous;
+	}
+
+	/**
+	 * Replaces all variable indexed terms (?X,?Y,?Z...) with the given indexed
+	 * terms, be they variable or otherwise.
+	 * 
+	 * So if the fact is blah(?X ?Z ?Y) and the replacements given are [a, b, c]
+	 * then the result is blah(a, c, b)
+	 * 
+	 * @param replacements
+	 *            The terms to replace any variable terms with.
+	 */
+	public void replaceArguments(String[] replacements) {
+		// Run through the arguments, replacing variable args with the
+		// replacements.
+		for (int i = 0; i < arguments_.length; i++) {
+			int termIndex = arguments_[i].getVariableTermIndex();
+			if (termIndex != -1)
+				arguments_[i] = new RelationalArgument(replacements[termIndex]);
+		}
+	}
+
+	/**
+	 * Only retains the arguments in the array and modifies all other arguments
+	 * to anonymous terms.
+	 * 
+	 * @param retainedArgs
+	 *            The arguments to retain.
+	 */
+	public void retainArguments(Collection<String> retainedArgs) {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (!retainedArgs.contains(arguments_[i].toString()))
+				arguments_[i] = RelationalArgument.ANONYMOUS;
+		}
+	}
+
+	/**
+	 * Replaces the args of a predicate with the replacement args, but replaces
+	 * any existing args with other variables so as not to compromise the
+	 * structure of the fact.
+	 * 
+	 * @param replacementMap
+	 */
+	public void safeReplaceArgs(Map<String, String> replacementMap) {
+		Map<String, String> tempRepl = new HashMap<String, String>(
+				arguments_.length);
+		int tempCounter = 0;
+		// Run through each argument, swapping existing args with unbound temp
+		// variables.
+		for (int i = 0; i < arguments_.length; i++) {
+			// Increment tempCounter to an unbound variable
+			while (replacementMap.containsValue(RelationalArgument
+					.getVariableTermArg(tempCounter).toString()))
+				tempCounter++;
+
+			String arg = arguments_[i].toString();
+			if (replacementMap.containsKey(arg))
+				arguments_[i] = new RelationalArgument(replacementMap.get(arg));
+			else if (tempRepl.containsKey(arg))
+				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
+			else if (!arg.equals("?")) {
+				tempRepl.put(arg,
+						RelationalArgument.getVariableTermArg(tempCounter++)
+								.toString());
+				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
+			}
+		}
+	}
+
+	/**
+	 * Sets the arguments of this predicate. This method should be used
+	 * carefully, as the hashcode may change.
+	 * 
+	 * @param arguments The new arguments for the 
+	 */
+	public void setArguments(RelationalArgument[] actionArgs) {
+		arguments_ = cloneArgs(actionArgs);
+	}
+
+	public void swapNegated() {
+		negated_ = !negated_;
 	}
 
 	/**
@@ -483,91 +558,16 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	@Override
-	public int compareTo(RelationalPredicate sf) {
-		// Compare by negation
-		if (negated_ != sf.negated_) {
-			if (!negated_)
-				return -1;
-			else
-				return 1;
-		}
-
-		// Type predicates trump non-type predicates
-		if (StateSpec.getInstance().isTypePredicate(factName_)) {
-			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
-				return -1;
-		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
-			return 1;
-
-		// Compare by number of arguments (complexity)
-		int result = Double.compare(arguments_.length, sf.arguments_.length);
-		if (result != 0)
-			return result;
-
-		result = factName_.compareTo(sf.factName_);
-		if (result != 0)
-			return result;
-
-		// Fact Types should be the same if both names are the same
-		// Check arguments
-		for (int i = 0; i < arguments_.length; i++) {
-			result = arguments_[i].compareTo(sf.arguments_[i]);
-			if (result != 0)
-				return result;
-		}
-		return 0;
-	}
-
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + Arrays.hashCode(arguments_);
-		result = prime * result
-				+ ((factName_ == null) ? 0 : factName_.hashCode());
-		result = prime * result + (negated_ ? 1231 : 1237);
-		return result;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		RelationalPredicate other = (RelationalPredicate) obj;
-		if (!Arrays.equals(arguments_, other.arguments_))
-			return false;
-		if (factName_ == null) {
-			if (other.factName_ != null)
-				return false;
-		} else if (!factName_.equals(other.factName_))
-			return false;
-		if (negated_ != other.negated_)
-			return false;
-		return true;
-	}
-
-	/**
-	 * Removes any numerical ranges from this rule.
-	 */
-	public void clearRanges() {
-		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].isRange())
-				arguments_[i] = new RelationalArgument(
-						arguments_[i].getStringArg());
-		}
-	}
-
-	/**
-	 * Sets the arguments of this predicate. This method should be used
-	 * carefully, as the hashcode may change.
-	 * 
-	 * @param arguments The new arguments for the 
-	 */
-	public void setArguments(RelationalArgument[] actionArgs) {
-		arguments_ = cloneArgs(actionArgs);
+	public String toString() {
+		StringBuffer buffer = new StringBuffer();
+		if (negated_)
+			buffer.append("(not ");
+		buffer.append("(" + factName_);
+		for (int i = 0; i < arguments_.length; i++)
+			buffer.append(" " + arguments_[i]);
+		buffer.append(")");
+		if (negated_)
+			buffer.append(")");
+		return buffer.toString();
 	}
 }

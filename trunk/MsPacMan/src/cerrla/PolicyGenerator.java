@@ -1,11 +1,8 @@
 package cerrla;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.ModularPolicy;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
-import relationalFramework.RelationallyEvaluatableObject;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -28,6 +25,11 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
+import cerrla.modular.GoalCondition;
+import cerrla.modular.ModularPolicy;
+import cerrla.modular.ModularSubGoal;
+import cerrla.modular.PolicyItem;
 
 import relationalFramework.agentObservations.LocalAgentObservations.RuleMutation;
 import rrlFramework.RRLExperiment;
@@ -240,25 +242,25 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		// Recurse through the rule/policies, noting fired rules/policies.
-		for (RelationallyEvaluatableObject reo : policy.getRules()) {
+		for (PolicyItem reo : policy.getRules()) {
 			// If reo is another policy, get/create the corresponding rule
 			// in this generator.
-			if (reo instanceof ModularPolicy) {
+			if (reo instanceof ModularSubGoal) {
 				// TODO Not counting modular policies unless the module is
 				// converged
-				ModularPolicy modPol = (ModularPolicy) reo;
+				ModularPolicy modPol = ((ModularSubGoal) reo).getModularPolicy();
 				// Adding modular rules to the main policy only if the sub goal
 				// is converged.
-				if (modPol.getLocalCEDistribution().isConverged())
-					recurseCountPolicyRules(modPol, weight, meanNotedSlots, ed,
-							slotMean, orderedFiredSlots);
+//				if (modPol.getLocalCEDistribution().isConverged())
+//					recurseCountPolicyRules(modPol, weight, meanNotedSlots, ed,
+//							slotMean, orderedFiredSlots);
 			} else if (firingRules.contains(reo)) {
 				RelationalRule rule = ((RelationalRule) reo);
 				// May have to get/create new rule
 				// TODO Unsure about this...
-				if (!mainPolicy)
-					rule = getCreateCorrespondingRule(rule,
-							policy.getModularReplacementMap());
+//				if (!mainPolicy)
+//					rule = getCreateCorrespondingRule(rule,
+//							policy.getModularReplacementMap());
 
 				Slot ruleSlot = rule.getSlot();
 				// Slot counts
@@ -1199,7 +1201,7 @@ public final class PolicyGenerator implements Serializable {
 						.simplifyRule(ruleConds, null, seedRule.getAction(),
 								false);
 				seedRule = new RelationalRule(ruleConds, seedRule.getAction(),
-						null);
+						null, null);
 				createSeededSlot(seedRule);
 			}
 
@@ -1345,10 +1347,14 @@ public final class PolicyGenerator implements Serializable {
 
 	/**
 	 * Simply removes the RLGG rules from the current rules collection.
+	 * 
+	 * @return The removed RLGG rules.
 	 */
-	protected void removeRLGGRules() {
-		currentRules_.removeAll(rlggRules_.values());
+	protected Collection<RelationalRule> removeRLGGRules() {
+		Collection<RelationalRule> oldRLGGs = new HashSet<RelationalRule>(rlggRules_.values());
+		currentRules_.removeAll(oldRLGGs);
 		rlggRules_.clear();
+		return oldRLGGs;
 	}
 
 	/**
@@ -1367,6 +1373,7 @@ public final class PolicyGenerator implements Serializable {
 		// Add remaining information to rules.
 		for (RelationalRule coveredRule : rlggRules) {
 			Slot rlggSlot = coveredRule.getSlot();
+			coveredRule.incrementStatesCovered();
 			if (coveredRule.isRecentlyModified()) {
 				System.out.println(" [" + getGoalCondition()
 						+ "] COVERED RULE: " + coveredRule);
