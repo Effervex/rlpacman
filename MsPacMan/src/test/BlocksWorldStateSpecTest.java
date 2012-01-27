@@ -2,7 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -15,6 +14,9 @@ import jess.Rete;
 
 import org.junit.Before;
 import org.junit.Test;
+
+import cerrla.modular.GoalCondition;
+import cerrla.modular.SpecificGoalCondition;
 
 import util.MultiMap;
 
@@ -53,7 +55,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		GoalCondition constants = rule.getConstantCondition();
+		SpecificGoalCondition constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test for a constant
@@ -69,7 +71,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor a)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		RelationalPredicate strFact = StateSpec.getInstance().getPredicates()
 				.get("clear");
 		assertEquals(constants, new GoalCondition(new RelationalPredicate(
@@ -92,7 +94,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor a)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
 		Collection<RelationalPredicate> constantConds = new ArrayList<RelationalPredicate>();
 		constantConds
@@ -115,7 +117,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Multiple conditions, two terms
@@ -139,7 +141,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Variables and constants
@@ -169,7 +171,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test anonymous variable
@@ -187,7 +189,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test anonymous variables
@@ -215,7 +217,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("test"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test type predicate
@@ -225,7 +227,7 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test inequal type predicates
@@ -239,7 +241,7 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(test (<> ?Y ?X))")));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(move ?X ?Y)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test existing type predicate
@@ -251,7 +253,7 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Test inequals parsing
@@ -274,7 +276,7 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Testing module syntax
@@ -293,7 +295,7 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 5);
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Testing module constants
@@ -308,7 +310,7 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?G_0)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
 		assertEquals(constants, new GoalCondition(new RelationalPredicate(
 				strFact, new String[] { "?G_0" })));
@@ -325,7 +327,7 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 
 		// Testing negation (with extra terms)
@@ -340,7 +342,7 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getConstantCondition();
+		constants = rule.getSpecificSubGoals();
 		assertNull(constants);
 	}
 

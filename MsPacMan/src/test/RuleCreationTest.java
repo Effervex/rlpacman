@@ -2,7 +2,6 @@ package test;
 
 import static org.junit.Assert.*;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -11,6 +10,8 @@ import java.util.Collection;
 import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
+
+import cerrla.modular.GoalCondition;
 
 import relationalFramework.agentObservations.LocalAgentObservations;
 

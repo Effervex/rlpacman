@@ -169,6 +169,8 @@ public abstract class StateSpec {
 	 * @return The goal predicate to inject the variables.
 	 */
 	private String formGoalPred(Collection<String> constants) {
+		if (constants.isEmpty())
+			return "";
 		StringBuffer buffer = new StringBuffer("(" + GOALARGS_PRED + " "
 				+ goalName_);
 		for (String constant : constants)

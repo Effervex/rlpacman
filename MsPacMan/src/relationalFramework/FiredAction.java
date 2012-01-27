@@ -4,6 +4,7 @@ import relationalFramework.FiredAction;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import cerrla.Slot;
+import cerrla.modular.ModularPolicy;
 
 /**
  * An action fired from a rule (probably from within a policy) with the given

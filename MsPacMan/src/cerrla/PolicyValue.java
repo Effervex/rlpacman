@@ -2,7 +2,8 @@ package cerrla;
 
 import java.io.Serializable;
 
-import relationalFramework.ModularPolicy;
+import cerrla.modular.ModularPolicy;
+
 import relationalFramework.RelationalRule;
 
 /**

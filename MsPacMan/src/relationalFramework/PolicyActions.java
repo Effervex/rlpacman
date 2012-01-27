@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 
+
 /**
  * This class represents the chosen actions the agent returns when making a
  * decision.

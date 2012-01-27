@@ -7,11 +7,14 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
-import relationalFramework.GoalCondition;
-import relationalFramework.ModularPolicy;
+import cerrla.modular.GoalCondition;
+import cerrla.modular.ModularPolicy;
+import cerrla.modular.ModularSubGoal;
+import cerrla.modular.PolicyItem;
+import cerrla.modular.SpecificGoalCondition;
+
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalArgument;
-import relationalFramework.RelationallyEvaluatableObject;
 import relationalFramework.StateSpec;
 import rrlFramework.Config;
 import rrlFramework.RRLActions;
@@ -43,8 +46,8 @@ public class CERRLA implements RRLAgent {
 	 * 
 	 * Inserts a modular policy within this policy.
 	 * 
-	 * @param index
-	 *            The index of the module to replace.
+	 * @param subGoal
+	 *            The sub-goal of the policy to fill.
 	 * @param priorPolicies
 	 *            The collection of previous policies that were recursively
 	 *            added (to avoid infinite loops).
@@ -57,43 +60,46 @@ public class CERRLA implements RRLAgent {
 	 * @param subGoalPolicies
 	 *            The subgoal policies added to the main policy.
 	 */
-	private void addModuleToPolicy(int index,
+	private void addModuleToPolicy(ModularSubGoal subGoal,
 			Collection<GoalCondition> priorPolicies,
 			Map<String, String> moduleReplacementMap,
-			ModularPolicy modularPolicy, GoalCondition goalCondition,
+			ModularPolicy modularPolicy,
 			Collection<ModularPolicy> subGoalPolicies) {
+		GoalCondition subGoalCondition = subGoal.getGoalCondition();
 		LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
-				.get(goalCondition);
+				.get(subGoalCondition);
+
 		// If there is an active module to replace this index, do so
 		if (moduleDistribution != null
 				&& moduleDistribution != mainGoalCECortex_
-				&& !priorPolicies.contains(goalCondition)) {
+				&& !priorPolicies.contains(subGoalCondition)) {
 			Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
 					priorPolicies);
-			modulePrior.add(goalCondition);
+			modulePrior.add(subGoalCondition);
 
-			// Apply the replacement map
-			Map<String, String> newModuleReplacementMap = new HashMap<String, String>();
-			ArrayList<String> args = goalCondition.getConstantArgs();
-			for (int i = 0; i < args.size(); i++) {
-				String goalTerm = RelationalArgument.createGoalTerm(i);
-				String argTerm = args.get(i);
-				if (moduleReplacementMap == null
-						|| moduleReplacementMap.isEmpty())
-					newModuleReplacementMap.put(goalTerm, argTerm);
-				else
-					newModuleReplacementMap.put(goalTerm,
-							moduleReplacementMap.get(argTerm));
+			if (subGoalCondition instanceof SpecificGoalCondition) {
+				// Apply the replacement map
+				Map<String, String> newModuleReplacementMap = new HashMap<String, String>();
+				ArrayList<String> args = ((SpecificGoalCondition) subGoalCondition)
+						.getConstantArgs();
+				for (int i = 0; i < args.size(); i++) {
+					String goalTerm = RelationalArgument.createGoalTerm(i);
+					String argTerm = args.get(i);
+					if (moduleReplacementMap == null
+							|| moduleReplacementMap.isEmpty())
+						newModuleReplacementMap.put(goalTerm, argTerm);
+					else
+						newModuleReplacementMap.put(goalTerm,
+								moduleReplacementMap.get(argTerm));
+				}
+
+				// Add the policy
+				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
+						modulePrior, newModuleReplacementMap, subGoalPolicies));
+			} else {
+				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
+						modulePrior, moduleReplacementMap, subGoalPolicies));
 			}
-
-			// Add the policy
-			modularPolicy.replaceIndex(
-					index,
-					regeneratePolicy(moduleDistribution, modulePrior,
-							newModuleReplacementMap, subGoalPolicies));
-		} else {
-			// Otherwise, insert a ModularHole
-			modularPolicy.replaceIndex(index, new ModularHole(goalCondition));
 		}
 	}
 
@@ -188,15 +194,15 @@ public class CERRLA implements RRLAgent {
 		subGoalPolicies.add(modularPolicy);
 
 		// Add all rules in the basic policy
-		int i = 0;
-		for (Iterator<RelationallyEvaluatableObject> iter = modularPolicy
-				.getRules().iterator(); iter.hasNext();) {
-			RelationallyEvaluatableObject reo = iter.next();
+		for (Iterator<PolicyItem> iter = modularPolicy.getRules().iterator(); iter
+				.hasNext();) {
+			PolicyItem reo = iter.next();
+			// If there is a modular sub-goal that needs regenerating
 			if (reo.shouldRegenerate()) {
-				addModuleToPolicy(i, priorPolicies, moduleReplacementMap,
-						modularPolicy, reo.getGoalCondition(), subGoalPolicies);
+				ModularSubGoal subGoal = (ModularSubGoal) reo;
+				addModuleToPolicy(subGoal, priorPolicies, moduleReplacementMap,
+						modularPolicy, subGoalPolicies);
 			}
-			i++;
 		}
 
 		return modularPolicy;
@@ -240,7 +246,17 @@ public class CERRLA implements RRLAgent {
 	public void initialise(int run) {
 		goalMappedGenerators_ = new HashMap<GoalCondition, LocalCrossEntropyDistribution>();
 		GoalCondition mainGC = Config.getInstance().getGoal();
-		mainGoalCECortex_ = new LocalCrossEntropyDistribution(mainGC, run);
+		if (Config.getInstance().getSerializedFile() != null) {
+			mainGoalCECortex_ = LocalCrossEntropyDistribution
+					.loadDistribution(Config.getInstance().getSerializedFile());
+			if (mainGoalCECortex_ != null)
+				mainGoalCECortex_.getGoalCondition().setAsMainGoal();
+			else
+				System.out
+						.println("No serialised file found. Using new distribution.");
+		}
+		if (mainGoalCECortex_ == null)
+			mainGoalCECortex_ = new LocalCrossEntropyDistribution(mainGC, run);
 		goalMappedGenerators_.put(mainGC, mainGoalCECortex_);
 		currentPolicy_ = null;
 		currentRun_ = run;
@@ -268,6 +284,8 @@ public class CERRLA implements RRLAgent {
 				System.out.println(currentPolicy_);
 			}
 		}
+
+		// TODO Control when testing is performed for each generator
 
 		currentPolicy_.startEpisode();
 

@@ -12,11 +12,11 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import relationalFramework.GoalCondition;
 import relationalFramework.StateSpec;
 
 import util.Pair;
 import cerrla.ProgramArgument;
+import cerrla.modular.GoalCondition;
 
 /**
  * A singleton class containing configuration details loaded in at the start of
@@ -42,6 +42,8 @@ public class Config {
 	private long experimentStart_;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
+	/** The goal string provided by the file. */
+	private String goalArg_;
 	/** The number of episodes to run. */
 	private int maxEpisodes_;
 	/** The performance output file. */
@@ -59,6 +61,9 @@ public class Config {
 
 	/** The loaded serializable file. */
 	private File serializedFile_;
+
+	/** The handled arguments (passed in command line). */
+	private ArrayList<String> handledArgs_;
 
 	/** The singleton instance. */
 	private static Config instance_;
@@ -139,8 +144,11 @@ public class Config {
 					// Handle the argument
 					Pair<Integer, String> handled = ProgramArgument.handleArg(
 							i, args);
+
 					i = handled.objA_;
-					handledArgs.add(handled.objB_);
+					if (handled.objB_ != null) {
+						handledArgs.add(handled.objB_);
+					}
 				}
 			}
 
@@ -180,6 +188,7 @@ public class Config {
 		repetitionsStart_ = repetitionsStart;
 		repetitionsEnd_ = repetitionsEnd;
 		maxEpisodes_ = episodeCount;
+		handledArgs_ = handledArgs;
 
 		// Create temp folder
 		try {
@@ -188,19 +197,17 @@ public class Config {
 			e.printStackTrace();
 		}
 		extraArgs_ = extraArgs;
-		for (String extraArg : extraArgs)
-			if (extraArg.startsWith("goal"))
-				mainGoal_ = new GoalCondition(extraArg.substring(5));
-
-		// If the elites and performance file are null, generate filenames
-		if (elitesFile == null || performanceFile == null) {
-			String[] fileNames = generateFileNames(handledArgs);
-			elitesFile = fileNames[0];
-			performanceFile = fileNames[1];
+		for (String extraArg : extraArgs) {
+			if (extraArg.startsWith("goal")) {
+				goalArg_ = extraArg.substring(5);
+			}
 		}
 
-		elitesFile_ = new File(elitesFile);
-		performanceFile_ = new File(performanceFile);
+		// If the elites and performance file are null, generate filenames
+		if (elitesFile != null)
+			elitesFile_ = new File(elitesFile);
+		if (performanceFile != null)
+			performanceFile_ = new File(performanceFile);
 	}
 
 	/**
@@ -210,8 +217,7 @@ public class Config {
 	 *            The args added to the run begin.
 	 * @return The filenames for elites and performance.
 	 */
-	private String[] generateFileNames(ArrayList<String> handledArgs) {
-		String[] filenames = new String[2];
+	private void generateFileNames() {
 		StringBuffer buffer = new StringBuffer();
 		// First part: date
 		DateFormat dateFormat = new SimpleDateFormat("yyMMdd");
@@ -222,9 +228,9 @@ public class Config {
 
 		// Last part: params
 		StringBuffer argsBuffer = new StringBuffer();
-		for (String arg : handledArgs)
+		for (String arg : handledArgs_)
 			argsBuffer.append(arg);
-		if (handledArgs.isEmpty())
+		if (handledArgs_.isEmpty())
 			argsBuffer.append("Control");
 
 		File tempFile = null;
@@ -234,19 +240,17 @@ public class Config {
 			String extension = ".txt";
 			if (i > 0)
 				extension = "." + i + ".txt";
-			filenames[0] = buffer.toString() + "Elites" + argsBuffer.toString()
-					+ extension;
+			elitesFile_ = new File(buffer.toString() + "Elites"
+					+ argsBuffer.toString() + extension);
 			String goalName = StateSpec.getInstance().getGoalName();
-			filenames[1] = buffer.toString()
+			performanceFile_ = new File(buffer.toString()
 					+ goalName.substring(0, 1).toUpperCase()
-					+ goalName.substring(1) + argsBuffer.toString() + extension;
+					+ goalName.substring(1) + argsBuffer.toString() + extension);
 
 			// Check if the performance filename exists.
-			tempFile = new File(TEMP_FOLDER, filenames[1] + "0");
+			tempFile = new File(TEMP_FOLDER, performanceFile_ + "0");
 			i++;
 		} while (tempFile.exists());
-
-		return filenames;
 	}
 
 	/**
@@ -274,6 +278,8 @@ public class Config {
 	}
 
 	public File getPerformanceFile() {
+		if (performanceFile_ == null)
+			generateFileNames();
 		return performanceFile_;
 	}
 
@@ -286,6 +292,8 @@ public class Config {
 	}
 
 	public File getElitesFile() {
+		if (elitesFile_ == null)
+			generateFileNames();
 		return elitesFile_;
 	}
 
@@ -338,13 +346,13 @@ public class Config {
 	}
 
 	public void setGoal(String goalName) {
-		if (mainGoal_ == null || !mainGoal_.toString().equals(goalName))
-			mainGoal_ = new GoalCondition(goalName);
+		if (mainGoal_ == null || !mainGoal_.toString().equals(goalName)) {
+			mainGoal_ = GoalCondition.parseGoalCondition(goalName);
+			mainGoal_.setAsMainGoal();
+		}
 	}
 
 	public String getGoalString() {
-		if (mainGoal_ == null)
-			return null;
-		return mainGoal_.toString();
+		return goalArg_;
 	}
 }

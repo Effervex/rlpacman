@@ -26,7 +26,7 @@ import java.util.TreeSet;
 
 import cerrla.ProgramArgument;
 import cerrla.Unification;
-
+import cerrla.modular.GeneralGoalCondition;
 import jess.Fact;
 import jess.QueryResult;
 import jess.Rete;
@@ -63,14 +63,14 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	/** The condition observations. */
 	private ConditionObservations conditionObservations_;
 
+	/** The environment these observations are for. */
+	private String environment_;
+
 	/** Records the last scanned state to prevent redundant scanning. */
 	private transient Collection<Fact> lastScannedState_;
 
 	/** A transient group of facts indexed by terms used within. */
 	private transient MultiMap<String, RelationalPredicate> termMappedFacts_;
-
-	/** The environment these observations are for. */
-	private String environment_;
 
 	/**
 	 * The constructor for the agent observations.
@@ -141,20 +141,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		return null;
 	}
 
-	@Override
-	protected int updateHash() {
-		// Update the hash
-		final int prime = 31;
-		int newHash = 1;
-
-		// Note the condition observations
-		newHash = prime * newHash + conditionObservations_.hashCode();
-
-		// Note the action observations
-		newHash = prime * newHash + actionBasedObservations_.hashCode();
-		return newHash;
-	}
-
 	/**
 	 * Creates the set of specialisation conditions, which are basically the
 	 * variant conditions, both negated and normal, and simplified to exclude
@@ -214,6 +200,20 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		return specialisations;
+	}
+
+	@Override
+	protected int updateHash() {
+		// Update the hash
+		final int prime = 31;
+		int newHash = 1;
+
+		// Note the condition observations
+		newHash = prime * newHash + conditionObservations_.hashCode();
+
+		// Note the action observations
+		newHash = prime * newHash + actionBasedObservations_.hashCode();
+		return newHash;
 	}
 
 	public void clearActionBasedObservations() {
@@ -295,32 +295,23 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		return goalActionConds;
 	}
 
-	/**
-	 * Gets the maximal bounds of a numerical range using a specific range
-	 * context, if such a range exists.
-	 * 
-	 * @param rangeContext
-	 *            The context of the range being selected.
-	 * @return The maximal bounds of the range.
-	 */
-	public static double[] getActionRanges(RangeContext rangeContext) {
-		if (rangeContext.getAction() != null) {
-			// Get the range from the actions
-			return instance_.actionBasedObservations_.get(
-					rangeContext.getAction()).getActionRange(rangeContext);
-		} else {
-			// Get the range from the condition beliefs.
-			return instance_.conditionObservations_.conditionRanges_
-					.get(rangeContext);
-		}
-	}
-
 	public Map<String, ConditionBeliefs> getConditionBeliefs() {
 		return conditionObservations_.conditionBeliefs_;
 	}
 
 	public Collection<String> getGeneralInvariants() {
 		return conditionObservations_.invariants_.getGeneralInvariants();
+	}
+
+	/**
+	 * Gets a collection of general goal conditions noted by the observations
+	 * which represent general sub-goals to achieve. Note that these goal
+	 * conditions can be negated.
+	 * 
+	 * @return A collection of general sub-goals.
+	 */
+	public Collection<GeneralGoalCondition> getGeneralGoalConditions() {
+		return conditionObservations_.getGeneralGoalConditions();
 	}
 
 	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
@@ -441,45 +432,12 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		// Check for unseen predicates
-		if (checkForUnseenPreds(state)) {
+		if (conditionObservations_.checkForUnseenPreds(state)) {
 			return true;
 		}
 
 		boolean changed = isScanNeeded();
 		return changed;
-	}
-
-	/**
-	 * Runs through the set of unseen predicates to check if the state contains
-	 * them. This method is used to capture variant action conditions.
-	 * 
-	 * @param state
-	 *            The current state.
-	 * @return True if the state does need to be scanned.
-	 */
-	private boolean checkForUnseenPreds(Rete state) {
-		boolean triggerCovering = false;
-		try {
-			// Run through the unseen preds, checking if they are present.
-			Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
-			for (RelationalPredicate unseenPred : conditionObservations_.unseenPreds_) {
-				String query = StateSpec.getInstance().getRuleQuery(unseenPred);
-				QueryResult results = state.runQueryStar(query,
-						new ValueVector());
-				if (results.next()) {
-					// The unseen pred exists - trigger covering
-					triggerCovering = true;
-					removables.add(unseenPred);
-				}
-			}
-
-			// If any unseen preds are seen, trigger covering.
-			if (triggerCovering)
-				conditionObservations_.unseenPreds_.removeAll(removables);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return triggerCovering;
 	}
 
 	/**
@@ -492,11 +450,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		lastScannedState_ = stateFacts;
 	}
 
+	@Override
 	public void resetInactivity() {
 		super.resetInactivity();
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			abo.recreateRLGG_ = true;
 		}
+		conditionObservations_.generalGoalConds_ = null;
 	}
 
 	/**
@@ -735,6 +695,26 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
+	 * Gets the maximal bounds of a numerical range using a specific range
+	 * context, if such a range exists.
+	 * 
+	 * @param rangeContext
+	 *            The context of the range being selected.
+	 * @return The maximal bounds of the range.
+	 */
+	public static double[] getActionRanges(RangeContext rangeContext) {
+		if (rangeContext.getAction() != null) {
+			// Get the range from the actions
+			return instance_.actionBasedObservations_.get(
+					rangeContext.getAction()).getActionRange(rangeContext);
+		} else {
+			// Get the range from the condition beliefs.
+			return instance_.conditionObservations_.conditionRanges_
+					.get(rangeContext);
+		}
+	}
+
+	/**
 	 * An internal class to note the action-based observations.
 	 * 
 	 * @author Sam Sarjant
@@ -909,7 +889,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false, null);
-				rlggRule_ = new RelationalRule(ruleConds, action_, null);
+				rlggRule_ = new RelationalRule(ruleConds, action_, null, null);
 
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
@@ -962,6 +942,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 */
 		private Map<RangeContext, double[]> conditionRanges_;
 
+		/** The general goal conditions tied to the observed predicates. */
+		private Collection<GeneralGoalCondition> generalGoalConds_;
+
 		/** The observed invariants of the environment. */
 		private InvariantObservations invariants_;
 
@@ -996,6 +979,66 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					.values());
 			unseenPreds_.addAll(StateSpec.getInstance().getTypePredicates()
 					.values());
+		}
+
+		/**
+		 * Gets a collection of general goal conditions noted by the
+		 * observations which represent general sub-goals to achieve. Note that
+		 * these goal conditions can be negated.
+		 * 
+		 * @return A collection of general sub-goals.
+		 */
+		private Collection<GeneralGoalCondition> getGeneralGoalConditions() {
+			if (generalGoalConds_ == null) {
+				generalGoalConds_ = new HashSet<GeneralGoalCondition>();
+				for (String variant : invariants_.getVariants()) {
+					// Create both negated and non-negated versions
+					RelationalPredicate predicate = StateSpec.getInstance()
+							.getPredicateByName(variant);
+					generalGoalConds_.add(new GeneralGoalCondition(predicate));
+
+					RelationalPredicate negPred = new RelationalPredicate(
+							predicate);
+					negPred.swapNegated();
+					generalGoalConds_.add(new GeneralGoalCondition(negPred));
+				}
+			}
+			return generalGoalConds_;
+		}
+
+		/**
+		 * Runs through the set of unseen predicates to check if the state
+		 * contains them. This method is used to capture variant action
+		 * conditions.
+		 * 
+		 * @param state
+		 *            The current state.
+		 * @return True if the state does need to be scanned.
+		 */
+		private boolean checkForUnseenPreds(Rete state) {
+			boolean triggerCovering = false;
+			try {
+				// Run through the unseen preds, checking if they are present.
+				Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
+				for (RelationalPredicate unseenPred : unseenPreds_) {
+					String query = StateSpec.getInstance().getRuleQuery(
+							unseenPred);
+					QueryResult results = state.runQueryStar(query,
+							new ValueVector());
+					if (results.next()) {
+						// The unseen pred exists - trigger covering
+						triggerCovering = true;
+						removables.add(unseenPred);
+					}
+				}
+
+				// If any unseen preds are seen, trigger covering.
+				if (triggerCovering)
+					unseenPreds_.removeAll(removables);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return triggerCovering;
 		}
 
 		/**
