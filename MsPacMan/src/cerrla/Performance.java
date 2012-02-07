@@ -57,7 +57,7 @@ public class Performance implements Serializable {
 	private double minEpisodeReward_;
 	/** Notes the minimum and maximum reward recieved. */
 	private double[] minMaxReward_;
-	/** if this performance is for a modular generator. */
+	/** If this performance is for a modular generator. */
 	private boolean modularPerformance_;
 	/** A queue of the most recent episodic rewards. */
 	private Queue<Double> recentScores_;
@@ -285,7 +285,7 @@ public class Performance implements Serializable {
 		double totalRunComplete = (1.0 * runIndex_ + convergence)
 				/ Config.getInstance().getNumRepetitions();
 		if (frozen_)
-			totalRunComplete = (runIndex_ + 1)
+			totalRunComplete = 1.0 * (runIndex_ + 1)
 					/ Config.getInstance().getNumRepetitions();
 
 		DecimalFormat formatter = new DecimalFormat("#0.0000");

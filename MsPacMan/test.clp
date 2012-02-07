@@ -1,28 +1,36 @@
-(deftemplate validActions (multislot move) (multislot moveFloor))
+(reset)
 
 ;; Initial facts
 (assert (block a))
 (assert (block b))
 (assert (block c))
 (assert (block d))
-(assert (onFloor a))
-(assert (on b a))
-(assert (onFloor c))
-(assert (on d b))
-(assert (goalArgs onAB b a))
+(assert (floor floor))
+(assert (clear floor))
+(assert (on b d))
+(assert (on d floor))
+(assert (on a floor))
+(assert (on c floor))
 
 ;; define the terminal fact
 (deftemplate goal (slot goalMet))
 
-(defrule onAB
-    (goalArgs onAB ?G_0 ?G_1) (on ?G_0 ?G_1)
-	=> (assert (goal (goalMet TRUE))))
+(defrule clearRule
+    (logical (block ?Y) (not (on ? ?Y)))
+    =>
+    (assert (clear ?Y)))
 
+(defrule moveAction
+    ?action <- (move ?X ?Y) (clear ?X) (clear ?Y) ?oldOn <- (on ?X ?Z)
+    =>
+    (assert (on ?X ?Y)) (retract ?oldOn))
 
 (run)
 
 (facts)
 
-(reset)
+(assert (move a b))
+
 (run)
+
 (facts)

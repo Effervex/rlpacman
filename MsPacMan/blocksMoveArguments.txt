@@ -1,6 +1,6 @@
 blocksWorldMove.BlocksWorld
 10
-50
+-1
 blocksMoveElites.txt
 blocksMoveTest.txt
 10,"goal onab"

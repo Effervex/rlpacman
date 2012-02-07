@@ -19,6 +19,7 @@ import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
 import cerrla.modular.ModularSubGoal;
 import cerrla.modular.PolicyItem;
+import cerrla.modular.SpecificGoalCondition;
 
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
@@ -35,7 +36,7 @@ public class ModularPolicyTest {
 	@Test
 	public void testEquals() {
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
-				new GoalCondition("on$A$B"));
+				GoalCondition.parseGoalCondition("on$A$B"));
 		ModularPolicy modPolA = new ModularPolicy(lced);
 		modPolA.addRule(new RelationalRule("(clear ?A) => (move ?A ?A)"));
 
@@ -53,7 +54,7 @@ public class ModularPolicyTest {
 	public void testDeepModules() {
 		// Testing deep modules
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
-				new GoalCondition("on$A$B"));
+				GoalCondition.parseGoalCondition("on$A$B"));
 		RelationalPolicy relPolA = new RelationalPolicy();
 		RelationalRule rule = new RelationalRule(
 				"(highest ?G_1) => (move ?G_0 ?G_0)");
@@ -63,11 +64,12 @@ public class ModularPolicyTest {
 		rule.setQueryParams(queryParams);
 		relPolA.addRule(rule);
 		ModularPolicy modPolA = new ModularPolicy(relPolA, lced);
+		SpecificGoalCondition highGoal = new SpecificGoalCondition("highest$A");
+		assertEquals(modPolA.getRules().get(1), new ModularSubGoal(highGoal, rule));
 
 		// Highest module
 		Map<String, String> paramReplacementMap = new HashMap<String, String>();
 		paramReplacementMap.put("?G_0", "?G_1");
-		GoalCondition highGoal = new GoalCondition("highest$A");
 		lced = new LocalCrossEntropyDistribution(highGoal);
 		RelationalPolicy relPolB = new RelationalPolicy();
 		rule = new RelationalRule("(clear ?G_0) => (move ?G_0 ?G_0)");
@@ -77,12 +79,13 @@ public class ModularPolicyTest {
 		relPolB.addRule(rule);
 		ModularPolicy highest = new ModularPolicy(relPolB, lced);
 		highest.setModularParameters(paramReplacementMap);
-		modPolA.replaceIndex(1, highest);
+		SpecificGoalCondition clearGoal = new SpecificGoalCondition("clear$A");
+		assertEquals(highest.getRules().get(1), new ModularSubGoal(clearGoal, rule));
+		((ModularSubGoal) modPolA.getRules().get(1)).setModularPolicy(highest);
 
 		// Clear module
 		paramReplacementMap = new HashMap<String, String>();
 		paramReplacementMap.put("?G_0", "?G_1");
-		GoalCondition clearGoal = new GoalCondition("clear$A");
 		lced = new LocalCrossEntropyDistribution(clearGoal);
 		RelationalPolicy relPolC = new RelationalPolicy();
 		rule = new RelationalRule("(above ?X ?G_0) => (move ?X ?G_0)");
@@ -92,7 +95,7 @@ public class ModularPolicyTest {
 		relPolC.addRule(rule);
 		ModularPolicy clear = new ModularPolicy(relPolC, lced);
 		clear.setModularParameters(paramReplacementMap);
-		highest.replaceIndex(1, clear);
+		((ModularSubGoal) highest.getRules().get(1)).setModularPolicy(clear);
 
 		System.out.println(modPolA.toNiceString());
 	}
@@ -110,22 +113,22 @@ public class ModularPolicyTest {
 		relPol.addRule(rule);
 
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
-				new GoalCondition("on$A$B"));
+				GoalCondition.parseGoalCondition("on$A$B"));
 		ModularPolicy modPol = new ModularPolicy(relPol, lced);
 
 		List<PolicyItem> polRules = modPol.getRules();
 		// Should be three things in there: the rule, and two modular holes.
-		assertEquals(polRules.size(), 3);
+		assertEquals(polRules.size(), 6);
 		assertEquals(polRules.get(0), (rule));
 		RelationalPredicate clearFact = new RelationalPredicate(StateSpec
 				.getInstance().getPredicateByName("clear"),
 				new String[] { "?G_0" });
-		assertEquals(polRules.get(1), new ModularSubGoal(new GoalCondition(
-				clearFact)));
+		assertEquals(polRules.get(1), new ModularSubGoal(
+				new SpecificGoalCondition(clearFact), rule));
 		clearFact = new RelationalPredicate(StateSpec.getInstance()
 				.getPredicateByName("clear"), new String[] { "?G_1" });
-		assertEquals(polRules.get(2), new ModularSubGoal(new GoalCondition(
-				clearFact)));
+		assertEquals(polRules.get(2), new ModularSubGoal(
+				new SpecificGoalCondition(clearFact), rule));
 	}
 
 	@Test
@@ -141,7 +144,7 @@ public class ModularPolicyTest {
 		relPol.addRule(rule);
 
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
-				new GoalCondition("on$A$B"));
+				GoalCondition.parseGoalCondition("on$A$B"));
 		ModularPolicy modPol = new ModularPolicy(relPol, lced);
 		assertFalse(modPol.shouldRegenerate());
 		modPol.noteStepReward(-1);
@@ -150,11 +153,11 @@ public class ModularPolicyTest {
 		modPol.noteStepReward(-2);
 		modPol.endEpisode();
 		assertFalse(modPol.shouldRegenerate());
-		
+
 		assertTrue(modPol.getRules().contains(rule));
 		// Also contains the modular holes.
-		assertTrue(modPol.getRules().size() == 3);
-		
+		assertEquals(modPol.getRules().size(), 6);
+
 		File testFile = new File("testFile.ser");
 		testFile.createNewFile();
 		testFile.deleteOnExit();
@@ -163,19 +166,19 @@ public class ModularPolicyTest {
 		oos.writeObject(modPol);
 		oos.close();
 		fos.close();
-		
+
 		assertTrue(testFile.exists());
-		
+
 		FileInputStream fis = new FileInputStream(testFile);
 		ObjectInputStream ois = new ObjectInputStream(fis);
 		ModularPolicy serPol = (ModularPolicy) ois.readObject();
 		ois.close();
 		fis.close();
-		
+
 		assertNotNull(serPol);
 		assertTrue(serPol.getRules().contains(rule));
 		// Also contains the modular holes.
-		assertTrue(serPol.getRules().size() == 3);
+		assertEquals(serPol.getRules().size(), 6);
 		assertFalse(serPol.shouldRegenerate());
 	}
 }

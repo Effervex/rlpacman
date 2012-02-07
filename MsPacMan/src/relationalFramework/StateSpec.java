@@ -769,7 +769,7 @@ public abstract class StateSpec {
 	 * @return True if the predicate is useful, false if it is action, inequal
 	 *         or otherwise.
 	 */
-	public boolean isUsefulPredicate(String predicate) {
+	public boolean isNotInternalPredicate(String predicate) {
 		if (predicate.equals("test"))
 			return false;
 		if (predicate.equals(VALID_ACTIONS))

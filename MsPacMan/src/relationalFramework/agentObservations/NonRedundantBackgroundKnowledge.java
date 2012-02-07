@@ -1,23 +1,34 @@
 package relationalFramework.agentObservations;
 
+import java.io.Serializable;
 import java.util.Collection;
-import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
 import relationalFramework.RelationalPredicate;
 import util.MultiMap;
 
-public class NonRedundantBackgroundKnowledge {
+/**
+ * A class which records and organises learned background knowledge.
+ * 
+ * @author Sam Sarjant
+ */
+public class NonRedundantBackgroundKnowledge implements Serializable {
+	private static final long serialVersionUID = -7845690550224825015L;
+
 	/** The background knowledge rules ordered by what they simplify. */
 	private MultiMap<SortedSet<RelationalPredicate>, BackgroundKnowledge> currentKnowledge_;
 
-	/** The rules ordered by the predicates used within them. */
+	/** The rules mapped by the left side predicates (or either if equivalent). */
 	private MultiMap<String, BackgroundKnowledge> predicateMap_;
 
+	/** The rules mapped by the right side predicates (or either if equivalent). */
+	private MultiMap<String, BackgroundKnowledge> reversePredicateMap_;
+
 	public NonRedundantBackgroundKnowledge() {
-		currentKnowledge_ = MultiMap.createListMultiMap();
+		currentKnowledge_ = MultiMap.createSortedSetMultiMap();
 		predicateMap_ = MultiMap.createSortedSetMultiMap();
+		reversePredicateMap_ = MultiMap.createSortedSetMultiMap();
 	}
 
 	/**
@@ -39,23 +50,23 @@ public class NonRedundantBackgroundKnowledge {
 					&& currentKnowledge_.containsKey(preferredFacts)) {
 				// If the background knowledge rule is an equivalence rule, it
 				// may be redundant
-				List<BackgroundKnowledge> existingRules = currentKnowledge_
-						.getList(preferredFacts);
+				SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
+						.getSortedSet(preferredFacts);
 				// If the existing rules are only an equivalence rule, this
 				// rule is redundant
 				if (existingRules.size() == 1
-						&& existingRules.get(0).isEquivalence()) {
+						&& existingRules.first().isEquivalence()) {
 					return false;
 				}
 			} else if (currentKnowledge_.containsKey(nonPreferredFacts)) {
 
 				// Fact already exists in another rule - it may be redundant
-				List<BackgroundKnowledge> existingRules = currentKnowledge_
-						.getList(nonPreferredFacts);
+				SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
+						.getSortedSet(nonPreferredFacts);
 				if (!bckKnow.isEquivalence()) {
 					// Inference rule
 					if (existingRules.size() > 1
-							|| !existingRules.get(0).isEquivalence()) {
+							|| !existingRules.first().isEquivalence()) {
 						// Only add inference rules if there aren't any
 						// equivalence rules with the same non-preferred facts
 						// (so possibly more than one rule).
@@ -65,7 +76,7 @@ public class NonRedundantBackgroundKnowledge {
 				} else {
 
 					if (existingRules.size() > 1
-							|| !existingRules.get(0).isEquivalence()) {
+							|| !existingRules.first().isEquivalence()) {
 						// If the existing rules are inference rules, this rule
 						// trumps them all
 						removeRules(nonPreferredFacts);
@@ -74,7 +85,7 @@ public class NonRedundantBackgroundKnowledge {
 					} else {
 						// Check if this rule's preconditions are more general
 						// than the existing equivalence rule's
-						if (bckKnow.compareTo(existingRules.get(0)) == -1) {
+						if (bckKnow.compareTo(existingRules.first()) == -1) {
 							removeRules(nonPreferredFacts);
 							addRule(bckKnow, preferredFacts, nonPreferredFacts);
 							return true;
@@ -129,13 +140,15 @@ public class NonRedundantBackgroundKnowledge {
 			SortedSet<RelationalPredicate> preferredFacts,
 			SortedSet<RelationalPredicate> nonPreferredFacts) {
 		currentKnowledge_.put(nonPreferredFacts, bckKnow);
-		for (RelationalPredicate fact : bckKnow.getPreferredFacts())
+		for (RelationalPredicate fact : preferredFacts) {
 			predicateMap_.putContains(fact.getFactName(), bckKnow);
-
-		// If an equivalence rule, also put the non-preferred side in.
-		if (bckKnow.isEquivalence()) {
-			for (RelationalPredicate fact : nonPreferredFacts)
-				predicateMap_.putContains(fact.getFactName(), bckKnow);
+			if (bckKnow.isEquivalence())
+				reversePredicateMap_.put(fact.getFactName(), bckKnow);
+		}
+		for (RelationalPredicate fact : nonPreferredFacts) {
+			reversePredicateMap_.putContains(fact.getFactName(), bckKnow);
+			if (bckKnow.isEquivalence())
+				predicateMap_.put(fact.getFactName(), bckKnow);
 		}
 	}
 
@@ -150,5 +163,9 @@ public class NonRedundantBackgroundKnowledge {
 
 	public MultiMap<String, BackgroundKnowledge> getPredicateMappedRules() {
 		return predicateMap_;
+	}
+
+	public MultiMap<String, BackgroundKnowledge> getReversePredicateMappedRules() {
+		return reversePredicateMap_;
 	}
 }

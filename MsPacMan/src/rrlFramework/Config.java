@@ -9,6 +9,8 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -63,7 +65,7 @@ public class Config {
 	private File serializedFile_;
 
 	/** The handled arguments (passed in command line). */
-	private ArrayList<String> handledArgs_;
+	private SortedSet<String> handledArgs_;
 
 	/** The singleton instance. */
 	private static Config instance_;
@@ -129,7 +131,7 @@ public class Config {
 			bf.close();
 			reader.close();
 
-			ArrayList<String> handledArgs = new ArrayList<String>();
+			SortedSet<String> handledArgs = new TreeSet<String>();
 			for (int i = 1; i < args.length; i++) {
 				if (args[i].equals("-d"))
 					// Enable debug mode
@@ -183,7 +185,7 @@ public class Config {
 	 */
 	private void initialise(String environmentClass, int repetitionsStart,
 			int repetitionsEnd, int episodeCount, String elitesFile,
-			String performanceFile, ArrayList<String> handledArgs,
+			String performanceFile, SortedSet<String> handledArgs,
 			String[] extraArgs) {
 		repetitionsStart_ = repetitionsStart;
 		repetitionsEnd_ = repetitionsEnd;

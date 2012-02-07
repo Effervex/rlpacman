@@ -15,7 +15,7 @@ import jess.Rete;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.modular.GoalCondition;
+import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.SpecificGoalCondition;
 
 import util.MultiMap;
@@ -55,8 +55,19 @@ public class BlocksWorldStateSpecTest {
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		SpecificGoalCondition constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		Collection<SpecificGoalCondition> constants = rule
+				.getSpecificSubGoals();
+		assertTrue(constants.isEmpty());
+		Collection<GeneralGoalCondition>[] generalConds = rule
+				.getGeneralisedConditions();
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertTrue(generalConds[1].isEmpty());
+
 
 		// Test for a constant
 		rule = new RelationalRule("(clear a) => (moveFloor a)");
@@ -72,10 +83,20 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor a)"));
 		constants = rule.getSpecificSubGoals();
+		generalConds = rule.getGeneralisedConditions();
 		RelationalPredicate strFact = StateSpec.getInstance().getPredicates()
 				.get("clear");
-		assertEquals(constants, new GoalCondition(new RelationalPredicate(
-				strFact, new String[] { "a" })));
+		assertFalse(constants.isEmpty());
+		assertTrue(constants.contains(new SpecificGoalCondition(
+				new RelationalPredicate(strFact, new String[] { "a" }))));
+		assertEquals(constants.size(), 1);
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test for constants (no inequals)
 		rule = new RelationalRule("(clear a) (clear b) => (moveFloor a)");
@@ -95,13 +116,26 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor a)"));
 		constants = rule.getSpecificSubGoals();
+		generalConds = rule.getGeneralisedConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
 		Collection<RelationalPredicate> constantConds = new ArrayList<RelationalPredicate>();
 		constantConds
 				.add(new RelationalPredicate(strFact, new String[] { "a" }));
 		constantConds
 				.add(new RelationalPredicate(strFact, new String[] { "b" }));
-		assertEquals(constants, new GoalCondition(constantConds));
+		assertFalse(constants.isEmpty());
+		assertTrue(constants.contains(new SpecificGoalCondition(
+				new RelationalPredicate(strFact, new String[] { "a" }))));
+		assertTrue(constants.contains(new SpecificGoalCondition(
+				new RelationalPredicate(strFact, new String[] { "b" }))));
+		assertEquals(constants.size(), 2);
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Multiple conditions, one term
 		rule = new RelationalRule("(clear ?X) (highest ?X) => (moveFloor ?X)");
@@ -118,7 +152,17 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("highest"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Multiple conditions, two terms
 		rule = new RelationalRule("(clear ?X) (highest ?Y) => (moveFloor ?X)");
@@ -142,7 +186,17 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("highest"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Variables and constants
 		rule = new RelationalRule("(on ?X a) (above b ?Y) => (moveFloor ?X)");
@@ -172,7 +226,17 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("on"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("above"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test anonymous variable
 		rule = new RelationalRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
@@ -190,7 +254,17 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("on"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test anonymous variables
 		rule = new RelationalRule(
@@ -218,7 +292,17 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("on"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test type predicate
 		rule = new RelationalRule("(block ?X) => (moveFloor ?X)");
@@ -228,7 +312,13 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 1);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test inequal type predicates
 		rule = new RelationalRule("(block ?X) (block ?Y) => (move ?X ?Y)");
@@ -242,7 +332,14 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(move ?X ?Y)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 1);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test existing type predicate
 		rule = new RelationalRule("(clear ?X) (block ?X) => (moveFloor ?X)");
@@ -254,7 +351,15 @@ public class BlocksWorldStateSpecTest {
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Test inequals parsing
 		rule = new RelationalRule(
@@ -277,26 +382,44 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
 				.getStringConditions().indexOf("test"));
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Testing module syntax
 		rule = new RelationalRule(
-				"(above ?X ?_MOD_a) (clear ?X) => (moveFloor ?X)");
+				"(above ?X ?G_0) (clear ?X) => (moveFloor ?X)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?_MOD_a)")));
+				StateSpec.toRelationalPredicate("(block ?G_0)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?X ?_MOD_a)")));
+				StateSpec.toRelationalPredicate("(above ?X ?G_0)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(test (<> ?_MOD_a ?X))")));
+				StateSpec.toRelationalPredicate("(test (<> ?X ?G_0))")));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 5);
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("above"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Testing module constants
 		rule = new RelationalRule(
@@ -311,9 +434,21 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(moveFloor ?G_0)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getSpecificSubGoals();
+		generalConds = rule.getGeneralisedConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");
-		assertEquals(constants, new GoalCondition(new RelationalPredicate(
-				strFact, new String[] { "?G_0" })));
+		assertFalse(constants.isEmpty());
+		assertTrue(constants.contains(new SpecificGoalCondition(
+				new RelationalPredicate(strFact, new String[] { "?G_0" }))));
+		assertEquals(constants.size(), 1);
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("on"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 3);
+		assertTrue(generalConds[1].isEmpty());
 
 		// Testing negation
 		rule = new RelationalRule(
@@ -328,22 +463,21 @@ public class BlocksWorldStateSpecTest {
 				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
 		assertEquals(rule.getConditions(false).size(), 3);
 		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
-
-		// Testing negation (with extra terms)
-		rule = new RelationalRule(
-				"(clear ?X) (not (highest ?X)) => (moveFloor ?X)");
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?X)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (highest ?X))")));
-		assertEquals(rule.getAction(),
-				StateSpec.toRelationalPredicate("(moveFloor ?X)"));
-		assertEquals(rule.getConditions(false).size(), 3);
-		constants = rule.getSpecificSubGoals();
-		assertNull(constants);
+		generalConds = rule.getGeneralisedConditions();
+		assertTrue(constants.isEmpty());
+		assertFalse(generalConds[0].isEmpty());
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("clear"))));
+		assertTrue(generalConds[0].contains(new GeneralGoalCondition(StateSpec
+				.getInstance().getPredicateByName("block"))));
+		assertEquals(generalConds[0].size(), 2);
+		assertFalse(generalConds[1].isEmpty());
+		RelationalPredicate negHighest = (StateSpec.getInstance()
+				.getPredicateByName("highest"));
+		negHighest.swapNegated();
+		assertTrue(generalConds[1]
+				.contains(new GeneralGoalCondition(negHighest)));
+		assertEquals(generalConds[1].size(), 1);
 	}
 
 	@Test
@@ -441,7 +575,7 @@ public class BlocksWorldStateSpecTest {
 		// Not condition
 		result = StateSpec.splitFact("(not (clear ?X))");
 		assertArrayEquals(new String[] { "not", "(clear ?X)" }, result);
-		
+
 		// Add condition
 		result = StateSpec.splitFact("(height ?X (+ ?N 1))");
 		assertArrayEquals(new String[] { "height", "?X", "(+ ?N 1)" }, result);

@@ -460,7 +460,11 @@ public class MultiMap<K, V> implements Serializable {
 	 * @return All the values present in the multimap.
 	 */
 	public Collection<V> values() {
-		Collection<V> values = new ArrayList<V>();
+		Collection<V> values = null;
+		if (collectionType_ == LIST_COLLECTION)
+			values = new ArrayList<V>();
+		else if (collectionType_ == SORTED_SET_COLLECTION)
+			values = new TreeSet<V>();
 		for (Collection<V> valueCollections : valuesCollections()) {
 			values.addAll(valueCollections);
 		}

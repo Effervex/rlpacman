@@ -106,12 +106,6 @@ public final class PolicyGenerator implements Serializable {
 	/** Total policies evaluated. */
 	private int policiesEvaluated_;
 
-	/**
-	 * A flag for when the experiment needs to restart (due to new rules being
-	 * added/removed)
-	 */
-	private transient boolean restart_ = false;
-
 	/** The set of rlgg rules, some which may be LGG, others not. */
 	private Map<String, RelationalRule> rlggRules_;
 
@@ -380,7 +374,6 @@ public final class PolicyGenerator implements Serializable {
 
 				// Setting the restart value.
 				if (!removables.isEmpty()) {
-					restart_ = true;
 					baseRule.getSlot().resetPolicyCount();
 				}
 
@@ -388,8 +381,6 @@ public final class PolicyGenerator implements Serializable {
 					currentRules_.removeAll(removables);
 					ruleSlot.getGenerator().normaliseProbs();
 				}
-			} else {
-				restart_ = false;
 			}
 
 			// Add all mutants to the ruleSlot
@@ -1216,21 +1207,6 @@ public final class PolicyGenerator implements Serializable {
 		policiesEvaluated_ = pe;
 	}
 
-	/**
-	 * If the experiment should restart learning because the rules have changed.
-	 * When this method is called, the restart is no longer active until
-	 * triggered again.
-	 * 
-	 * @return True if rules have recently changed, false otherwise.
-	 */
-	public boolean shouldRestart() {
-		if (restart_) {
-			restart_ = false;
-			return true;
-		}
-		return false;
-	}
-
 	public int size() {
 		return slotGenerator_.size();
 	}
@@ -1378,7 +1354,6 @@ public final class PolicyGenerator implements Serializable {
 				System.out.println(" [" + getGoalCondition()
 						+ "] COVERED RULE: " + coveredRule);
 				if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
-					restart_ = true;
 					if (rlggSlot != null)
 						rlggSlot.resetPolicyCount();
 				}

@@ -189,45 +189,49 @@ public class RelationalRule implements Serializable,
 	 */
 	private void findConstantsAndRanges() {
 		rangeContexts_ = new TreeSet<RangeContext>();
-		constantCondition_ = new HashSet<SpecificGoalCondition>();
+		constantCondition_ = new ArrayList<SpecificGoalCondition>();
 		generalConditions_[0] = new HashSet<GeneralGoalCondition>();
 		generalConditions_[1] = new HashSet<GeneralGoalCondition>();
 
 		Map<String, String> emptyReplacements = new HashMap<String, String>();
 		for (RelationalPredicate cond : ruleConditions_) {
 			// If the condition isn't a type predicate or test
-			if (!StateSpec.getInstance().isTypePredicate(cond.getFactName())
-					&& StateSpec.getInstance().isUsefulPredicate(
-							cond.getFactName()) && !cond.isNegated()) {
-				// If the condition doesn't contain variables - except modular
-				// variables
-				boolean isConstant = true;
-				for (RelationalArgument argument : cond
-						.getRelationalArguments()) {
-					// If the arg isn't a constant or a goal term, the condition
-					// isn't a constant condition.
-					if (!argument.isConstant()) {
-						isConstant = false;
-						break;
+			if (StateSpec.getInstance().isNotInternalPredicate(
+					cond.getFactName())) {
+				if (!StateSpec.getInstance()
+						.isTypePredicate(cond.getFactName())
+						&& !cond.isNegated()) {
+					// If the condition doesn't contain variables - except
+					// modular variables
+					boolean isConstant = true;
+					for (RelationalArgument argument : cond
+							.getRelationalArguments()) {
+						// If the arg isn't a constant or a goal term, the
+						// condition isn't a constant condition.
+						if (!argument.isConstant()) {
+							isConstant = false;
+							break;
+						}
 					}
-				}
 
-				if (isConstant) {
-					constantCondition_.add(new SpecificGoalCondition(cond));
+					if (isConstant) {
+						constantCondition_.add(new SpecificGoalCondition(cond));
+					}
+
+					// Checking for RangeContexts
+					rangeContexts_.addAll(cond.getRangeContexts());
 				}
 
 				// Adding generalised condition
 				RelationalPredicate general = new RelationalPredicate(cond);
 				general.replaceArguments(emptyReplacements, false, false);
-				if (!general.isNegated())
+				if (!cond.isNegated())
 					generalConditions_[0]
 							.add(new GeneralGoalCondition(general));
-				else
+				else {
 					generalConditions_[1]
 							.add(new GeneralGoalCondition(general));
-
-				// Checking for RangeContexts
-				rangeContexts_.addAll(cond.getRangeContexts());
+				}
 			}
 		}
 	}
@@ -350,7 +354,7 @@ public class RelationalRule implements Serializable,
 		Set<String> variableTerms = new TreeSet<String>();
 		Set<String> constantTerms = new TreeSet<String>();
 		for (RelationalPredicate condition : ruleConditions_) {
-			if (StateSpec.getInstance().isUsefulPredicate(
+			if (StateSpec.getInstance().isNotInternalPredicate(
 					condition.getFactName())) {
 				Map<String, RelationalPredicate> predicates = StateSpec
 						.getInstance().getPredicates();

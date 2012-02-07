@@ -1,3 +1,0 @@
-A typical policy:
-(clear a) (clear b) => (move a b)
-(on ?X ?) (above ?X ?) (clear ?X) => (moveFloor ?X)

@@ -180,17 +180,19 @@ public class InvariantObservations implements Serializable {
 
 	@Override
 	public String toString() {
-		StringBuffer buffer = new StringBuffer("Invariants (" + counter_
-				+ " counts):\n");
+		StringBuffer buffer = new StringBuffer();
 		if (specificInvariants_ == null) {
 			buffer.append("NONE RECORDED");
 			return buffer.toString();
 		}
 
-		buffer.append("Specific: " + specificInvariants_.toString());
+		buffer.append("Specific Invariants: " + specificInvariants_.toString());
 		if (generalInvariants_ != null)
-			buffer.append("\n" + "General: " + generalInvariants_.toString());
+			buffer.append("\n" + "General Invariants: " + generalInvariants_.toString());
+		if (generalVariants_ != null)
+			buffer.append("\n" + "General Variants: " + generalVariants_.toString());
 		buffer.append("\n" + "Never Present: " + neverPresent_.toString());
+		buffer.append("\n" + "Invariants count: " + counter_);
 		return buffer.toString();
 	}
 

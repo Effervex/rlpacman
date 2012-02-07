@@ -310,6 +310,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	/**
 	 * Checks if a rule is illegal in regards to this background knowledge.
 	 * 
+	 * @param ruleConds The rule conditions to evaluate.
+	 * @param fixRule If the rule should be modified to become legal.
 	 * @return True if the conditions are illegal.
 	 */
 	public boolean checkIllegalRule(SortedSet<RelationalPredicate> ruleConds,

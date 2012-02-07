@@ -1,6 +1,4 @@
 blocksWorld.BlocksWorld
 10
-50
-blocksElites.txt
-blocksTest.txt
+-1
 10,"goal onab"

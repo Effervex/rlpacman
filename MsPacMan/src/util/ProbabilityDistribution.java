@@ -10,6 +10,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * A class representing a probability distribution of values. These values are
@@ -24,6 +26,13 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	/** The instances in the distribution with associated weights. */
 	// TODO Change this to a sorted structure (Ensure to re-sort on update)
 	private Map<T, Double> itemProbs_;
+
+	/**
+	 * The probability tree representing the summed probabilities of the
+	 * elements for quick access.
+	 */
+	private transient SortedMap<Double, T> probTree_;
+
 	/** The random number generator. */
 	protected Random random_;
 
@@ -47,46 +56,40 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Samples a random weighted element from the distribution. This assumes all
-	 * probabilities sum to 1.
-	 * 
-	 * @param useMostLikely
-	 *            If we sample the most likely element.
-	 * @return The element sampled, according to weight, or null.
+	 * Builds the probability tree by summing probabilities and storing them in
+	 * sorted order. It is assumed that the probabilities sum to one.
 	 */
-	public T sample(boolean useMostLikely) {
-		if (itemProbs_.size() == 0)
-			return null;
-
-		// If using most likely, just get the highest prob one
-		if (useMostLikely)
-			return getOrderedElements().get(0);
-
-		double val = random_.nextDouble();
-		double tally = 0;
-		T lastItem = null;
+	private void buildProbTree() {
+		probTree_ = new TreeMap<Double, T>();
+		// Iterate through the items
+		double sumProb = 0;
 		for (T item : itemProbs_.keySet()) {
-			tally += itemProbs_.get(item);
-			if (val < tally)
-				return item;
+			if (sumProb >= 1)
+				break;
 
-			// Just in case
-			lastItem = item;
+			sumProb += itemProbs_.get(item);
+			if (!probTree_.containsKey(sumProb))
+				probTree_.put(sumProb, item);
 		}
-		return lastItem;
 	}
 
 	/**
-	 * Samples a random weighted element from the distribution and removes it.
+	 * Calculates the KL divergence between two probability values.
 	 * 
-	 * @param useMostLikely
-	 *            If we sample the most likely element.
-	 * @return An element sampled from the distribution with removal.
+	 * @param newValue
+	 *            The new value.
+	 * @param oldValue
+	 *            The old value.
+	 * 
+	 * @return The KL divergence between the values.
 	 */
-	public T sampleWithRemoval(boolean useMostLikely) {
-		T result = sample(useMostLikely);
-		remove(result);
-		normaliseProbs();
+	private double klDivergence(double newValue, double oldValue) {
+		if (newValue == 0)
+			return 0;
+		if (oldValue == 0)
+			return Double.POSITIVE_INFINITY;
+
+		double result = newValue * Math.log(newValue / oldValue);
 		return result;
 	}
 
@@ -101,6 +104,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public boolean add(T element) {
 		itemProbs_.put(element, 1d);
+		probTree_ = null;
 		return true;
 	}
 
@@ -115,53 +119,8 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public boolean add(T element, double prob) {
 		itemProbs_.put(element, prob);
+		probTree_ = null;
 		return true;
-	}
-
-	/**
-	 * Gets the probability for an element if it is present.
-	 * 
-	 * @param element
-	 *            The element with a probability.
-	 * @return The probability of the rule, or -1 if it isn't present.
-	 */
-	public Double getProb(T element) {
-		return itemProbs_.get(element);
-	}
-
-	/**
-	 * Gets the element equal to the argument element.
-	 * 
-	 * @param equalElement
-	 *            The element equal to another element in this distribution.
-	 * @return The element or null.
-	 */
-	public T getElement(T equalElement) {
-		Iterator<T> iter = iterator();
-		while (iter.hasNext()) {
-			T element = iter.next();
-			if (element.equals(equalElement))
-				return element;
-		}
-		return null;
-	}
-
-	/**
-	 * Sets the probability of an element to a new probability. This may affect
-	 * the 'sums-to-one' criteria.
-	 * 
-	 * @param element
-	 *            The element being set.
-	 * @param newProb
-	 *            The new probability of the value.
-	 * @return True if this contains the element, false otherwise.
-	 */
-	public boolean set(T element, double newProb) {
-		if (itemProbs_.containsKey(element)) {
-			itemProbs_.put(element, newProb);
-			return true;
-		}
-		return false;
 	}
 
 	/**
@@ -221,46 +180,6 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Checks if the probabilities sum to one.
-	 * 
-	 * @return True if the probabilities all sum to one.
-	 */
-	public boolean sumsToOne() {
-		double sum = 0;
-		for (Double d : itemProbs_.values()) {
-			sum += d;
-		}
-		if ((sum >= 0.9999) && (sum <= 1.0001))
-			return true;
-		return false;
-	}
-
-	/**
-	 * Normalises the probabilities to sum to one.
-	 */
-	public void normaliseProbs() {
-		// Get total
-		double sum = 0;
-		for (Double d : itemProbs_.values()) {
-			sum += d;
-		}
-
-		// If already at 1, just return.
-		if ((sum >= 0.9999) && (sum <= 1.0001))
-			return;
-
-		// Normalise
-		int count = itemProbs_.size();
-		for (T element : itemProbs_.keySet()) {
-			// If the sum is 0, everything is equal.
-			if (sum == 0)
-				itemProbs_.put(element, 1.0 / count);
-			else
-				itemProbs_.put(element, itemProbs_.get(element) / sum);
-		}
-	}
-
-	/**
 	 * Creates a clone distribution and restricts the values of the distribution
 	 * to 0 or 1, in the case of binary. When binary, this is determined by
 	 * whether the value is above or below 0.5. When not binary, all values
@@ -294,17 +213,53 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		return clone;
 	}
 
-	/**
-	 * Gets the elements of this distribution in an ordered list, from most
-	 * likely to least.
-	 * 
-	 * @return The elements of the distribution in order.
-	 */
-	public ArrayList<T> getOrderedElements() {
-		ArrayList<T> ordered = new ArrayList<T>(itemProbs_.keySet());
-		Collections.sort(ordered, new ProbabilityComparator<T>());
+	@Override
+	public void clear() {
+		itemProbs_.clear();
+		probTree_ = null;
+	}
 
-		return ordered;
+	/**
+	 * Clones this distribution. This is a shallow clone that does not clone the
+	 * elements. Also, the random generator is not cloned.
+	 * 
+	 * @return A clone of this distribution (but not the elements contained
+	 *         within).
+	 */
+	@Override
+	public ProbabilityDistribution<T> clone() {
+		ProbabilityDistribution<T> clone = new ProbabilityDistribution<T>(
+				random_);
+		clone.itemProbs_ = new MutableKeyMap<T, Double>(itemProbs_);
+		return clone;
+	}
+
+	@Override
+	public boolean contains(Object arg0) {
+		return itemProbs_.containsKey(arg0);
+	}
+
+	@Override
+	public boolean containsAll(Collection<?> arg0) {
+		return itemProbs_.keySet().containsAll(arg0);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ProbabilityDistribution<T> other = (ProbabilityDistribution<T>) obj;
+		if (itemProbs_ == null) {
+			if (other.itemProbs_ != null)
+				return false;
+		} else if (!itemProbs_.keySet().equals(other.itemProbs_.keySet()))
+			return false;
+		return true;
 	}
 
 	/**
@@ -327,19 +282,20 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Gets the elements of this distribution in an ordered list, from most
-	 * likely to least, excluding zero-probability elements.
+	 * Gets the element equal to the argument element.
 	 * 
-	 * @return The non-zero elements of the distribution in order.
+	 * @param equalElement
+	 *            The element equal to another element in this distribution.
+	 * @return The element or null.
 	 */
-	public ArrayList<T> getNonZeroOrderedElements() {
-		ArrayList<T> ordered = getOrderedElements();
-		for (Iterator<T> iter = ordered.iterator(); iter.hasNext();) {
+	public T getElement(T equalElement) {
+		Iterator<T> iter = iterator();
+		while (iter.hasNext()) {
 			T element = iter.next();
-			if (itemProbs_.get(element) == 0)
-				iter.remove();
+			if (element.equals(equalElement))
+				return element;
 		}
-		return ordered;
+		return null;
 	}
 
 	/**
@@ -358,159 +314,63 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Updates this distribution using the cross-entropy method.
+	 * Gets the elements of this distribution in an ordered list, from most
+	 * likely to least, excluding zero-probability elements.
 	 * 
-	 * @param numSamples
-	 *            The number of samples used for the counts.
-	 * @param counts
-	 *            The counts of each of the elements.
-	 * @param stepSize
-	 *            The step size for the update.
-	 * @return The absolute amount of difference in the probabilities for each
-	 *         element.
+	 * @return The non-zero elements of the distribution in order.
 	 */
-	public double updateDistribution(double numSamples, Map<T, Double> counts,
-			double stepSize) {
-		double absoluteChange = 0;
-		if (numSamples != 0) {
-			// For each of the rules within the distribution
-			for (T element : itemProbs_.keySet()) {
-				// Update every element within the distribution
-				Double itemCount = counts.get(element);
-				if (itemCount == null)
-					itemCount = 0d;
-				absoluteChange += updateElement(element, numSamples,
-						itemCount, stepSize);
-			}
-
-			// Normalise the probabilities
-			normaliseProbs();
+	public ArrayList<T> getNonZeroOrderedElements() {
+		ArrayList<T> ordered = getOrderedElements();
+		for (Iterator<T> iter = ordered.iterator(); iter.hasNext();) {
+			T element = iter.next();
+			if (itemProbs_.get(element) == 0)
+				iter.remove();
 		}
-
-		return absoluteChange;
+		return ordered;
 	}
 
 	/**
-	 * Updates the probability distribution using given step sizes.
+	 * Gets the elements of this distribution in an ordered list, from most
+	 * likely to least.
 	 * 
-	 * @param observedDistribution
-	 *            The observed distribution to step towards.
-	 * @param stepSizes
-	 *            The step sizes for each individual element.
-	 * @return The absolute amount of difference in the probabilities for each
-	 *         element.
+	 * @return The elements of the distribution in order.
 	 */
-	public double updateDistribution(
-			ProbabilityDistribution<T> observedDistribution,
-			Map<T, Double> stepSizes) {
-		double absoluteChange = 0;
-		for (T element : itemProbs_.keySet()) {
-			// Update every element within the distribution
-			Double ratio = observedDistribution.getProb(element);
-			if (ratio == null)
-				ratio = 0d;
-			absoluteChange += updateElement(element, 1, ratio,
-					stepSizes.get(element));
-		}
+	public ArrayList<T> getOrderedElements() {
+		ArrayList<T> ordered = new ArrayList<T>(itemProbs_.keySet());
+		Collections.sort(ordered, new ProbabilityComparator<T>());
 
-		// Normalise the probabilities
-		normaliseProbs();
-
-		return absoluteChange;
+		return ordered;
 	}
 
 	/**
-	 * Updates the probability distribution using a constant step size.
-	 * 
-	 * @param observedDistribution
-	 *            The observed distribution to step towards.
-	 * @param stepSize
-	 *            The constant step size.
-	 * @return The absolute amount of difference in the probabilities for each
-	 *         element.
-	 */
-	public double updateDistribution(
-			ProbabilityDistribution<T> observedDistribution, double stepSize) {
-		double absoluteChange = 0;
-		for (T element : itemProbs_.keySet()) {
-			// Update every element within the distribution
-			Double ratio = observedDistribution.getProb(element);
-			if (ratio == null)
-				ratio = 0d;
-			absoluteChange += updateElement(element, 1, ratio,
-					stepSize);
-		}
-
-		// Normalise the probabilities
-		normaliseProbs();
-
-		return absoluteChange;
-	}
-
-	/**
-	 * Updates a single element within the distribution.
+	 * Gets the probability for an element if it is present.
 	 * 
 	 * @param element
-	 *            The element being updated.
-	 * @param numSamples
-	 *            The number of samples used for the counts.
-	 * @param count
-	 *            The count for this element.
-	 * @param stepSize
-	 *            The step size for the update.
-	 * @return The absolute difference of the update.
+	 *            The element with a probability.
+	 * @return The probability of the rule, or -1 if it isn't present.
 	 */
-	public double updateElement(T element, double numSamples, double count,
-			double stepSize) {
-		double oldValue = itemProbs_.get(element);
-		// Calculate the new ratio.
-		double ratio = count / numSamples;
-		// Update the value
-		double newValue = stepSize * ratio + (1 - stepSize) * oldValue;
-		// Set the new value.
-		itemProbs_.put(element, newValue);
-
-		return Math.abs(newValue - oldValue);
+	public Double getProb(T element) {
+		return itemProbs_.get(element);
 	}
 
-	/**
-	 * Calculates the KL divergence between two probability values.
-	 * 
-	 * @param newValue
-	 *            The new value.
-	 * @param oldValue
-	 *            The old value.
-	 * 
-	 * @return The KL divergence between the values.
-	 */
-	private double klDivergence(double newValue, double oldValue) {
-		if (newValue == 0)
-			return 0;
-		if (oldValue == 0)
-			return Double.POSITIVE_INFINITY;
-
-		double result = newValue * Math.log(newValue / oldValue);
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 0;
+		for (T element : itemProbs_.keySet())
+			result += element.hashCode();
+		result = prime * result + 1;
 		return result;
 	}
 
-	/**
-	 * Clones this distribution. This is a shallow clone that does not clone the
-	 * elements. Also, the random generator is not cloned.
-	 * 
-	 * @return A clone of this distribution (but not the elements contained
-	 *         within).
-	 */
 	@Override
-	public ProbabilityDistribution<T> clone() {
-		ProbabilityDistribution<T> clone = new ProbabilityDistribution<T>(
-				random_);
-		clone.itemProbs_ = new MutableKeyMap<T, Double>(itemProbs_);
-		return clone;
+	public boolean isEmpty() {
+		return itemProbs_.isEmpty();
 	}
 
 	@Override
-	public int size() {
-		return itemProbs_.size();
+	public Iterator<T> iterator() {
+		return itemProbs_.keySet().iterator();
 	}
 
 	/**
@@ -536,55 +396,38 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	}
 
 	/**
-	 * Resets the probabilities to an equal distribution.
+	 * Normalises the probabilities to sum to one.
 	 */
-	public void resetProbs() {
-		// Set all probabilities to one.
-		for (T element : itemProbs_.keySet()) {
-			itemProbs_.put(element, 1.0 / itemProbs_.size());
+	public void normaliseProbs() {
+		// Get total
+		double sum = 0;
+		for (Double d : itemProbs_.values()) {
+			sum += d;
 		}
-	}
 
-	/**
-	 * Resets the probabilities to a given value.
-	 */
-	public void resetProbs(double prob) {
-		// Set all probabilities to a given value.
+		// If already at 1, just return.
+		if ((sum >= 0.9999) && (sum <= 1.0001))
+			return;
+
+		// Normalise
+		int count = itemProbs_.size();
 		for (T element : itemProbs_.keySet()) {
-			itemProbs_.put(element, prob);
+			// If the sum is 0, everything is equal.
+			if (sum == 0)
+				itemProbs_.put(element, 1.0 / count);
+			else
+				itemProbs_.put(element, itemProbs_.get(element) / sum);
 		}
-	}
-
-	@Override
-	public void clear() {
-		itemProbs_.clear();
-	}
-
-	@Override
-	public boolean contains(Object arg0) {
-		return itemProbs_.containsKey(arg0);
-	}
-
-	@Override
-	public boolean containsAll(Collection<?> arg0) {
-		return itemProbs_.keySet().containsAll(arg0);
-	}
-
-	@Override
-	public boolean isEmpty() {
-		return itemProbs_.isEmpty();
-	}
-
-	@Override
-	public Iterator<T> iterator() {
-		return itemProbs_.keySet().iterator();
+		probTree_ = null;
 	}
 
 	@Override
 	public boolean remove(Object arg0) {
 		Double val = itemProbs_.remove(arg0);
-		if (val != null)
+		if (val != null) {
+			probTree_ = null;
 			return true;
+		}
 		return false;
 	}
 
@@ -595,6 +438,28 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			changed |= remove(obj);
 		}
 		return changed;
+	}
+
+	/**
+	 * Resets the probabilities to an equal distribution.
+	 */
+	public void resetProbs() {
+		// Set all probabilities to one.
+		for (T element : itemProbs_.keySet()) {
+			itemProbs_.put(element, 1.0 / itemProbs_.size());
+		}
+		probTree_ = null;
+	}
+
+	/**
+	 * Resets the probabilities to a given value.
+	 */
+	public void resetProbs(double prob) {
+		// Set all probabilities to a given value.
+		for (T element : itemProbs_.keySet()) {
+			itemProbs_.put(element, prob);
+		}
+		probTree_ = null;
 	}
 
 	@Override
@@ -615,6 +480,69 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 
 		normaliseProbs();
 		return true;
+	}
+
+	/**
+	 * Samples a random weighted element from the distribution. This assumes all
+	 * probabilities sum to 1.
+	 * 
+	 * @param useMostLikely
+	 *            If we sample the most likely element.
+	 * @return The element sampled, according to weight, or null.
+	 */
+	public T sample(boolean useMostLikely) {
+		if (itemProbs_.isEmpty())
+			return null;
+
+		// If using most likely, just get the highest prob one
+		if (useMostLikely)
+			return getOrderedElements().get(0);
+
+		if (probTree_ == null)
+			buildProbTree();
+
+		double val = random_.nextDouble();
+		SortedMap<Double, T> tailMap = probTree_.tailMap(val);
+		double itemKey = tailMap.firstKey();
+		return tailMap.get(itemKey);
+	}
+
+	/**
+	 * Samples a random weighted element from the distribution and removes it.
+	 * 
+	 * @param useMostLikely
+	 *            If we sample the most likely element.
+	 * @return An element sampled from the distribution with removal.
+	 */
+	public T sampleWithRemoval(boolean useMostLikely) {
+		T result = sample(useMostLikely);
+		remove(result);
+		normaliseProbs();
+		return result;
+	}
+
+	/**
+	 * Sets the probability of an element to a new probability. This may affect
+	 * the 'sums-to-one' criteria.
+	 * 
+	 * @param element
+	 *            The element being set.
+	 * @param newProb
+	 *            The new probability of the value.
+	 * @return True if this contains the element, false otherwise.
+	 */
+	public boolean set(T element, double newProb) {
+		if (itemProbs_.containsKey(element)) {
+			itemProbs_.put(element, newProb);
+			probTree_ = null;
+			return true;
+		}
+		return false;
+	}
+
+	@Override
+	public int size() {
+		return itemProbs_.size();
 	}
 
 	@Override
@@ -671,32 +599,120 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		return buffer.toString();
 	}
 
-	@Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 0;
-		for (T element : itemProbs_.keySet())
-			result += element.hashCode();
-		result = prime * result + 1;
-		return result;
+	/**
+	 * Updates this distribution using the cross-entropy method.
+	 * 
+	 * @param numSamples
+	 *            The number of samples used for the counts.
+	 * @param counts
+	 *            The counts of each of the elements.
+	 * @param stepSize
+	 *            The step size for the update.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
+	 */
+	public double updateDistribution(double numSamples, Map<T, Double> counts,
+			double stepSize) {
+		double absoluteChange = 0;
+		if (numSamples != 0) {
+			// For each of the rules within the distribution
+			for (T element : itemProbs_.keySet()) {
+				// Update every element within the distribution
+				Double itemCount = counts.get(element);
+				if (itemCount == null)
+					itemCount = 0d;
+				absoluteChange += updateElement(element, numSamples, itemCount,
+						stepSize);
+			}
+
+			// Normalise the probabilities
+			normaliseProbs();
+		}
+
+		return absoluteChange;
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		ProbabilityDistribution<T> other = (ProbabilityDistribution<T>) obj;
-		if (itemProbs_ == null) {
-			if (other.itemProbs_ != null)
-				return false;
-		} else if (!itemProbs_.keySet().equals(other.itemProbs_.keySet()))
-			return false;
-		return true;
+	/**
+	 * Updates the probability distribution using a constant step size.
+	 * 
+	 * @param observedDistribution
+	 *            The observed distribution to step towards.
+	 * @param stepSize
+	 *            The constant step size.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
+	 */
+	public double updateDistribution(
+			ProbabilityDistribution<T> observedDistribution, double stepSize) {
+		double absoluteChange = 0;
+		for (T element : itemProbs_.keySet()) {
+			// Update every element within the distribution
+			Double ratio = observedDistribution.getProb(element);
+			if (ratio == null)
+				ratio = 0d;
+			absoluteChange += updateElement(element, 1, ratio, stepSize);
+		}
+
+		// Normalise the probabilities
+		normaliseProbs();
+
+		return absoluteChange;
+	}
+
+	/**
+	 * Updates the probability distribution using given step sizes.
+	 * 
+	 * @param observedDistribution
+	 *            The observed distribution to step towards.
+	 * @param stepSizes
+	 *            The step sizes for each individual element.
+	 * @return The absolute amount of difference in the probabilities for each
+	 *         element.
+	 */
+	public double updateDistribution(
+			ProbabilityDistribution<T> observedDistribution,
+			Map<T, Double> stepSizes) {
+		double absoluteChange = 0;
+		for (T element : itemProbs_.keySet()) {
+			// Update every element within the distribution
+			Double ratio = observedDistribution.getProb(element);
+			if (ratio == null)
+				ratio = 0d;
+			absoluteChange += updateElement(element, 1, ratio,
+					stepSizes.get(element));
+		}
+
+		// Normalise the probabilities
+		normaliseProbs();
+
+		return absoluteChange;
+	}
+
+	/**
+	 * Updates a single element within the distribution.
+	 * 
+	 * @param element
+	 *            The element being updated.
+	 * @param numSamples
+	 *            The number of samples used for the counts.
+	 * @param count
+	 *            The count for this element.
+	 * @param stepSize
+	 *            The step size for the update.
+	 * @return The absolute difference of the update.
+	 */
+	public double updateElement(T element, double numSamples, double count,
+			double stepSize) {
+		double oldValue = itemProbs_.get(element);
+		// Calculate the new ratio.
+		double ratio = count / numSamples;
+		// Update the value
+		double newValue = stepSize * ratio + (1 - stepSize) * oldValue;
+		// Set the new value.
+		itemProbs_.put(element, newValue);
+		probTree_ = null;
+
+		return Math.abs(newValue - oldValue);
 	}
 
 	/**
