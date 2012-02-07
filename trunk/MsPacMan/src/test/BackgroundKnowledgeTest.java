@@ -11,7 +11,10 @@ import java.util.TreeSet;
 import org.junit.Before;
 import org.junit.Test;
 
+import cerrla.modular.GoalCondition;
+
 import relationalFramework.agentObservations.BackgroundKnowledge;
+import relationalFramework.agentObservations.LocalAgentObservations;
 
 public class BackgroundKnowledgeTest {
 	@Before
@@ -43,13 +46,12 @@ public class BackgroundKnowledgeTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above b a)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
-		
+
 		// Different rule
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above b a)"));
-		bk = new BackgroundKnowledge(
-				"(clear ?X) (above ?Y ?X) <=> (floor ?X)");
+		bk = new BackgroundKnowledge("(clear ?X) (above ?Y ?X) <=> (floor ?X)");
 		result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec

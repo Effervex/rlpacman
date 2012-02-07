@@ -42,10 +42,10 @@ import util.MultiMap;
  */
 public final class EnvironmentAgentObservations extends SettlingScan implements
 		Serializable {
+	private static final long serialVersionUID = 3176852561676107021L;
+
 	/** The AgentObservations instance. */
 	private static EnvironmentAgentObservations instance_;
-
-	private static final long serialVersionUID = -3485610187532540886L;
 
 	public static final String ACTION_CONDITIONS_FILE = "actionConditions&Ranges.txt";
 
@@ -315,7 +315,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	public Collection<BackgroundKnowledge> getLearnedBackgroundKnowledge() {
-		return conditionObservations_.learnedEnvironmentRules_;
+		return conditionObservations_.inferredRules_
+				.getAllBackgroundKnowledge();
 	}
 
 	public Map<String, Map<IntegerArray, ConditionBeliefs>> getNegatedConditionBeliefs() {
@@ -324,6 +325,12 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 	public Collection<String> getNeverSeenInvariants() {
 		return conditionObservations_.invariants_.getNeverSeenPredicates();
+	}
+
+	public Collection<BackgroundKnowledge> getReverseMappedConditions(
+			String condition) {
+		return conditionObservations_.inferredRules_
+				.getReversePredicateMappedRules().get(condition);
 	}
 
 	/**
@@ -549,7 +556,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Ignore the type, goal, inequal and actions pred
 				if (strFact != null) {
-					if (StateSpec.getInstance().isUsefulPredicate(
+					if (StateSpec.getInstance().isNotInternalPredicate(
 							strFact.getFactName())) {
 						stateFacts.add(strFact);
 						generalStateFacts.add(strFact.getFactName());
@@ -584,10 +591,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		return goalFacts;
-	}
-
-	public void setBackgroundKnowledge(SortedSet<BackgroundKnowledge> backKnow) {
-		conditionObservations_.learnedEnvironmentRules_ = backKnow;
 	}
 
 	/**
@@ -931,7 +934,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 * 
 	 */
 	public class ConditionObservations implements Serializable {
-		private static final long serialVersionUID = -3548961174011793059L;
+		private static final long serialVersionUID = 8571836859159633591L;
 
 		/** The agent's beliefs about the condition inter-relations. */
 		private Map<String, ConditionBeliefs> conditionBeliefs_;
@@ -943,19 +946,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		private Map<RangeContext, double[]> conditionRanges_;
 
 		/** The general goal conditions tied to the observed predicates. */
-		private Collection<GeneralGoalCondition> generalGoalConds_;
+		private transient Collection<GeneralGoalCondition> generalGoalConds_;
 
 		/** The observed invariants of the environment. */
 		private InvariantObservations invariants_;
 
 		/** The rules about the environment learned by the agent. */
-		private SortedSet<BackgroundKnowledge> learnedEnvironmentRules_;
-
-		/**
-		 * The same rules organised into a mapping based on what predicates are
-		 * present in the rule.
-		 */
-		private MultiMap<String, BackgroundKnowledge> mappedEnvironmentRules_;
+		private NonRedundantBackgroundKnowledge inferredRules_;;
 
 		/**
 		 * The agent's beliefs about the negated condition inter-relations (when
@@ -970,7 +967,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		public ConditionObservations() {
 			conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
 			negatedConditionBeliefs_ = new TreeMap<String, Map<IntegerArray, ConditionBeliefs>>();
-			learnedEnvironmentRules_ = formBackgroundKnowledge();
+			inferredRules_ = formBackgroundKnowledge();
 			invariants_ = new InvariantObservations();
 			conditionRanges_ = new HashMap<RangeContext, double[]>();
 
@@ -1044,7 +1041,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		/**
 		 * Forms the background knowledge from the condition beliefs.
 		 */
-		private SortedSet<BackgroundKnowledge> formBackgroundKnowledge() {
+		private NonRedundantBackgroundKnowledge formBackgroundKnowledge() {
 			SortedSet<BackgroundKnowledge> backgroundKnowledge = new TreeSet<BackgroundKnowledge>();
 
 			// Run through every condition in the beliefs
@@ -1068,10 +1065,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			}
 			backgroundKnowledge.addAll(currentKnowledge
 					.getAllBackgroundKnowledge());
-			mappedEnvironmentRules_ = MultiMap.createSortedSetMultiMap();
-			mappedEnvironmentRules_.putAll(currentKnowledge
-					.getPredicateMappedRules());
-			return backgroundKnowledge;
+			return currentKnowledge;
 		}
 
 		/**
@@ -1174,7 +1168,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			}
 
 			if (changed) {
-				learnedEnvironmentRules_ = formBackgroundKnowledge();
+				inferredRules_ = formBackgroundKnowledge();
 			}
 			return changed;
 		}
@@ -1313,7 +1307,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			}
 			buf.write("\n");
 			buf.write("Background Knowledge\n");
-			for (BackgroundKnowledge bk : conditionObservations_.learnedEnvironmentRules_) {
+			for (BackgroundKnowledge bk : conditionObservations_.inferredRules_
+					.getAllBackgroundKnowledge()) {
 				buf.write(bk.toString() + "\n");
 			}
 
@@ -1427,6 +1422,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 			// Check each fact for simplifications, and check new facts when
 			// they're added
+			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
+					.getPredicateMappedRules();
 			while (changedThisIter) {
 				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
 				changedThisIter = false;
@@ -1437,12 +1434,11 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					// simplified and facts associated with rules.
 					if (!testedFacts.contains(fact)
 							&& simplified.contains(fact)
-							&& mappedEnvironmentRules_.containsKey(fact
-									.getFactName())) {
+							&& mappedRules.containsKey(fact.getFactName())) {
 						// Test against every background knowledge regarding
 						// this fact pred.
-						for (BackgroundKnowledge bckKnow : mappedEnvironmentRules_
-								.get(fact.getFactName())) {
+						for (BackgroundKnowledge bckKnow : mappedRules.get(fact
+								.getFactName())) {
 							// If the knowledge hasn't been tested and is an
 							// equivalence if only testing equivalences
 							if (!testedBackground.contains(bckKnow)

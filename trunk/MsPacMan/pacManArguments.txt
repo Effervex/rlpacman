@@ -1,6 +1,6 @@
 rlPacMan.PacMan
 10
-100
+-1
 pacManElites.txt
 pacManTest.txt
 "goal levelMax"

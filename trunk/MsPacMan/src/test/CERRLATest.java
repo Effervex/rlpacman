@@ -1,7 +1,5 @@
 package test;
 
-import static org.junit.Assert.*;
-
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
@@ -22,9 +20,10 @@ public class CERRLATest {
 	public void setUp() {
 		sut_ = new CERRLA();
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
-		LocalAgentObservations.loadAgentObservations(new GoalCondition(
-				StateSpec.getInstance().getGoalName()));
-		Config.newInstance(new String[] { "blocksMoveArguments.txt"});
+
+		LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+		Config.newInstance(new String[] { "blocksMoveArguments.txt" });
 		sut_.initialise(0);
 	}
 

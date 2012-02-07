@@ -31,7 +31,8 @@ public class LocalCrossEntropyDistributionTest {
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = new LocalCrossEntropyDistribution(new GoalCondition("on$A$B"), 0);
+		sut_ = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("on$A$B"), 0);
 	}
 
 	@Test
@@ -69,8 +70,9 @@ public class LocalCrossEntropyDistributionTest {
 		BidiMap goalReplacements = new DualHashBidiMap();
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
-		List<RelationalRule> rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions, null);
+		List<RelationalRule> rlggRules = sut_.coverState(null,
+				new RRLObservations(state, validActions, 0d, goalReplacements,
+						false), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (height ?X ?#_0) (clear ?X) => (moveFloor ?X)");
 		List<String> queryParameters = new ArrayList<String>();
@@ -110,11 +112,13 @@ public class LocalCrossEntropyDistributionTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions, null);
+				validActions, 0d, goalReplacements, false), activatedActions,
+				null);
 		assertTrue(rlggRules.isEmpty());
 
 		// Test the state of the slot generator
-		Collection<Slot> slotGenerator = sut_.getPolicyGenerator().getGenerator();
+		Collection<Slot> slotGenerator = sut_.getPolicyGenerator()
+				.getGenerator();
 		for (Slot slot : slotGenerator) {
 			if (slot.getAction().equals("move"))
 				assertEquals(slot.size(), 25);
@@ -127,7 +131,8 @@ public class LocalCrossEntropyDistributionTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new LocalCrossEntropyDistribution(new GoalCondition("levelmax"), 0);
+		sut_ = new LocalCrossEntropyDistribution(GoalCondition.parseGoalCondition("levelmax"),
+				0);
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -143,7 +148,7 @@ public class LocalCrossEntropyDistributionTest {
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
-		List<RelationalRule> rlggRules = sut_.coverState(null, 
+		List<RelationalRule> rlggRules = sut_.coverState(null,
 				new RRLObservations(state, validActions, 0d,
 						new DualHashBidiMap(), false), activatedActions, null);
 
@@ -190,7 +195,8 @@ public class LocalCrossEntropyDistributionTest {
 		assertEquals(rlggRules.size(), 2);
 
 		// Test the state of the slot generator
-		Collection<Slot> slotGenerator = sut_.getPolicyGenerator().getGenerator();
+		Collection<Slot> slotGenerator = sut_.getPolicyGenerator()
+				.getGenerator();
 		assertEquals(slotGenerator.size(), 10);
 	}
 }

@@ -33,6 +33,7 @@ import cerrla.ProgramArgument;
 import cerrla.SpecialisationOperator;
 import cerrla.Unification;
 import cerrla.UnifiedFact;
+import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.SpecificGoalCondition;
 
@@ -47,9 +48,9 @@ import util.MultiMap;
  */
 public class LocalAgentObservations extends SettlingScan implements
 		Serializable {
-	private static final String SERIALISATION_FILE = "localObservations.ser";
+	private static final long serialVersionUID = -8851699143692096901L;
 
-	private static final long serialVersionUID = -7205802892263530446L;
+	private static final String SERIALISATION_FILE = "localObservations.ser";
 
 	public static final String LOCAL_GOAL_COND_FILE = "observedGoalFacts.txt";
 
@@ -339,11 +340,11 @@ public class LocalAgentObservations extends SettlingScan implements
 				queryTerms.add(RelationalArgument.createGoalTerm(i));
 			for (RelationalRule envRLGG : EnvironmentAgentObservations
 					.getInstance().getRLGGActionRules()) {
+				String actionPred = envRLGG.getActionPredicate();
 				RelationalRule localisedRLGG = null;
-				if (rlggRules_.containsKey(envRLGG.getActionPredicate())) {
+				if (rlggRules_.containsKey(actionPred)) {
 					// Modify the local RLGG rule
-					localisedRLGG = rlggRules_
-							.get(envRLGG.getActionPredicate());
+					localisedRLGG = rlggRules_.get(actionPred);
 					localisedRLGG.setConditions(envRLGG.getConditions(false),
 							false);
 					localisedRLGG.setActionTerms(envRLGG.getActionTerms());
@@ -353,7 +354,50 @@ public class LocalAgentObservations extends SettlingScan implements
 					// rules.
 					localisedRLGG = envRLGG.clone(true);
 					localisedRLGG.setQueryParams(queryTerms);
-					rlggRules_.put(envRLGG.getActionPredicate(), localisedRLGG);
+					rlggRules_.put(actionPred, localisedRLGG);
+				}
+
+				// Add the negated general goal conditions and check the RLGG is
+				// still valid.
+				if (localGoal_ instanceof GeneralGoalCondition) {
+					// First check that the RLGG doesn't contain the goal
+					SortedSet<RelationalPredicate> rlggConds = localisedRLGG
+							.getConditions(false);
+					boolean validRLGG = true;
+					for (RelationalPredicate rlggCond : rlggConds) {
+						if (rlggCond.getFactName().equals(
+								localGoal_.getFactName())
+								&& rlggCond.isNegated() == localGoal_.getFact()
+										.isNegated()) {
+							// The rule is invalid for this sub-goal and won't
+							// be used.
+							rlggRules_.remove(actionPred);
+							validRLGG = false;
+							break;
+						}
+					}
+
+					// Next, add the general RLGG conditions to the rule
+					// (various negations of the goal).
+					if (validRLGG) {
+						Collection<RelationalPredicate> generalRLGGConds = ruleMutation_
+								.getGeneralRLGGConds(actionPred);
+						if (generalRLGGConds != null
+								&& !generalRLGGConds.isEmpty()) {
+
+							rlggConds.addAll(generalRLGGConds);
+							rlggConds = simplifyRule(rlggConds, null,
+									localisedRLGG.getAction(), true);
+
+							// Checking the RLGG is still valid.
+							if (rlggConds == null)
+								rlggRules_.remove(actionPred);
+							else {
+								localisedRLGG.setConditions(rlggConds, false);
+								localisedRLGG.expandConditions();
+							}
+						}
+					}
 				}
 			}
 		}
@@ -488,8 +532,12 @@ public class LocalAgentObservations extends SettlingScan implements
 			return false;
 		}
 
-		if (RRLExperiment.debugMode_)
+		if (RRLExperiment.debugMode_) {
+			System.out.println("Environment Covering "
+					+ EnvironmentAgentObservations.getInstance()
+							.getInactivity());
 			System.out.println(localGoal_ + " Covering " + getInactivity());
+		}
 
 		// The relevant facts which contain the key term
 		Rete state = observations.getState();
@@ -533,6 +581,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	public void resetInactivity() {
 		super.resetInactivity();
 		ruleMutation_.specialisationConditions_ = null;
+		ruleMutation_.localRLGGConditions_ = null;
 	}
 
 	@Override
@@ -715,15 +764,13 @@ public class LocalAgentObservations extends SettlingScan implements
 		if (exitIfIllegalRule && result == -1)
 			return null;
 
-		// If no change from original condition, return null
-		if (simplified.equals(ruleConds))
-			return null;
-
 		// Check the rule contains only valid goal facts
 		Map<String, String> replacementMap = new HashMap<String, String>();
 		for (String goalTerm : observedGoalPredicates_.keySet())
 			replacementMap.put(goalTerm, goalTerm);
 
+		// Check that all conditions are valid with regards to observed goal
+		// conditions.
 		for (RelationalPredicate sf : simplified)
 			if (!isValidGoalCondition(sf, replacementMap))
 				return null;
@@ -790,6 +837,9 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * then simplified.
 		 */
 		private transient MultiMap<String, RelationalPredicate> specialisationConditions_;
+
+		/** Localised RLGG conds to add to the RLGG for general goals. */
+		private transient MultiMap<String, RelationalPredicate> localRLGGConditions_;
 
 		/**
 		 * Creates a range using the minimum and maximum observed ranges.
@@ -883,6 +933,22 @@ public class LocalAgentObservations extends SettlingScan implements
 					|| specialisationConditions_.get(actionPred) == null)
 				recreateAllSpecialisations(actionPred);
 			return specialisationConditions_.get(actionPred);
+		}
+
+		/**
+		 * Gets the conditions which are always true whenever the goal is.
+		 * 
+		 * @param actionPred
+		 *            The action for getting the conditions.
+		 * @return A collection of conditions that are RLGG conds for this
+		 *         general goal.
+		 */
+		public Collection<RelationalPredicate> getGeneralRLGGConds(
+				String actionPred) {
+			if (localRLGGConditions_ == null
+					|| localRLGGConditions_.get(actionPred) == null)
+				recreateAllSpecialisations(actionPred);
+			return localRLGGConditions_.get(actionPred);
 		}
 
 		/**
@@ -1092,22 +1158,66 @@ public class LocalAgentObservations extends SettlingScan implements
 			else
 				specialisationConditions_.clear();
 
+			if (localRLGGConditions_ == null)
+				localRLGGConditions_ = MultiMap.createSortedSetMultiMap();
+			else
+				localRLGGConditions_.clear();
+
 			// Add the environment specialisation conditions
-			specialisationConditions_.putCollection(actionPred,
-					EnvironmentAgentObservations.getInstance()
-							.getSpecialisationConditions(actionPred));
-			specialisationConditions_.putCollection(
-					actionPred,
-					EnvironmentAgentObservations.getInstance()
-							.createSpecialisations(
-									variantGoalActionConditions_
-											.get(actionPred),
-									false,
-									actionPred,
-									invariantGoalActionConditions_
-											.get(actionPred),
-									variantGoalActionConditions_
-											.get(actionPred)));
+			for (RelationalPredicate specialisation : EnvironmentAgentObservations
+					.getInstance().getSpecialisationConditions(actionPred)) {
+				// If not a general goal, or not the general goal predicate
+				if (!(localGoal_ instanceof GeneralGoalCondition && specialisation
+						.getFactName().equals(localGoal_.getFactName())))
+					specialisationConditions_.put(actionPred, specialisation);
+				else if (specialisation.isNegated() != localGoal_.getFact()
+						.isNegated())
+					localRLGGConditions_.put(actionPred, specialisation);
+			}
+
+			if (localGoal_ instanceof SpecificGoalCondition) {
+				// Adding specific goal-orientated conditions for specific goal
+				// conds
+				specialisationConditions_.putCollection(
+						actionPred,
+						EnvironmentAgentObservations.getInstance()
+								.createSpecialisations(
+										variantGoalActionConditions_
+												.get(actionPred),
+										false,
+										actionPred,
+										invariantGoalActionConditions_
+												.get(actionPred),
+										variantGoalActionConditions_
+												.get(actionPred)));
+			}/*
+			 * else if (localGoal_ instanceof GeneralGoalCondition) { //
+			 * Removing specialisation preds that include the goal (both //
+			 * negated and non-negated) and all facts that imply the fact. try {
+			 * Collection<RelationalPredicate> removables = new
+			 * ArrayList<RelationalPredicate>(); SortedSet<RelationalPredicate>
+			 * specialisations = specialisationConditions_
+			 * .getSortedSet(actionPred); String localGoalStr =
+			 * localGoal_.getFact().getFactName();
+			 * 
+			 * // TODO Remove all conditions that imply this condition //
+			 * (blinking -> edible) // Collection<BackgroundKnowledge> impliers
+			 * = // EnvironmentAgentObservations //
+			 * .getInstance().getReverseMappedConditions( // localGoalStr); //
+			 * if (impliers != null) { // for (BackgroundKnowledge bckKnow :
+			 * impliers) { // Collection<RelationalPredicate> thisFact = bckKnow
+			 * // .getNonPreferredFacts(); // Collection<RelationalPredicate>
+			 * implierFacts = bckKnow // .getPreferredFacts(); // // TODO
+			 * Extract it appropriately. // } // }
+			 * 
+			 * for (RelationalPredicate pred : specialisations) { if
+			 * (pred.getFactName().equals(localGoalStr)) removables.add(pred); }
+			 * 
+			 * Collection<RelationalPredicate> goalRelatedConditions =
+			 * getGoalRelatedSpecialisationConditions(specialisations);
+			 * specialisations.removeAll(removables); } catch (Exception e) {
+			 * e.printStackTrace(); } }
+			 */
 		}
 
 		/**
@@ -1140,7 +1250,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				// Check for the regular condition
 				SortedSet<RelationalPredicate> specConditions = simplifyRule(
 						conditions, condition, action, true);
-				if (specConditions != null) {
+				if (specConditions != null && !specConditions.equals(conditions)) {
 					RelationalRule specialisation = new RelationalRule(
 							specConditions, action, rule,
 							new SpecialisationOperator(condition));

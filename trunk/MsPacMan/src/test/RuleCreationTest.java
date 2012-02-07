@@ -22,7 +22,8 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"));
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 	}
@@ -213,7 +214,8 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"));
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 
@@ -309,7 +311,8 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinorBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"));
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 
@@ -329,9 +332,9 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinorMario() {
 		StateSpec.initInstance("mario.RLMario");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("cool"));
+				.loadAgentObservations(GoalCondition.parseGoalCondition("cool"));
 		sut_ = lao.getRuleMutation();
-		
+
 		RelationalRule rule = new RelationalRule("(thing ?X) (canJumpOn ?X) "
 				+ "(distance ?X ?#_2&:(<= -159.0 ?#_2 160.0)) "
 				+ "(heightDiff ?X ?#_3&:(<= -242.0 ?#_3 87.0)) "

@@ -29,16 +29,17 @@ public class LocalAgentObservationsTest {
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = LocalAgentObservations.loadAgentObservations(new GoalCondition(
-				StateSpec.getInstance().getGoalName()));
+		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
 		assertNotNull("No loaded onAB agent observations. Cannot run test.",
 				sut_);
 	}
 
 	@Test
 	public void testHashCode() throws JessException {
-		sut_ = new LocalAgentObservations(new GoalCondition(StateSpec
-				.getInstance().getGoalName()));
+		sut_ = new LocalAgentObservations(
+				GoalCondition.parseGoalCondition(StateSpec.getInstance()
+						.getGoalName()));
 		int prevHash = sut_.hashCode();
 
 		Rete state = StateSpec.getInstance().getRete();
@@ -68,9 +69,10 @@ public class LocalAgentObservationsTest {
 
 	@Test
 	public void testGetRLGGRules() {
-		Collection<RelationalRule> rlggRules = sut_.getRLGGRules(new HashSet<RelationalRule>());
+		Collection<RelationalRule> rlggRules = sut_
+				.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
-			SortedSet<RelationalPredicate> conds = rr.getConditions(false);
+			SortedSet<RelationalPredicate> conds = rr.getConditions(true);
 			if (rr.getActionPredicate().equals("move")) {
 				// Clear ?X and Clear ?Y
 				RelationalArgument[] args = { new RelationalArgument("?X") };
@@ -195,8 +197,18 @@ public class LocalAgentObservationsTest {
 				StateSpec.toRelationalPredicate("(above ?X ?)"), null, false);
 		assertNull(results);
 
+		// Illegal rule
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?)"));
+		results = sut_
+				.simplifyRule(ruleConds,
+						StateSpec.toRelationalPredicate("(not (on ?X ?))"),
+						null, false);
+		assertNull(results);
+		
+		// Illegal rule
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Y)"));
 		results = sut_
 				.simplifyRule(ruleConds,
 						StateSpec.toRelationalPredicate("(not (on ?X ?))"),
@@ -354,8 +366,8 @@ public class LocalAgentObservationsTest {
 	@Test
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
-		sut_ = LocalAgentObservations.loadAgentObservations(new GoalCondition(
-				StateSpec.getInstance().getGoalName()));
+		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
 		assertNotNull("No loaded onAB agent observations. Cannot run test.",
 				sut_);
 
@@ -473,6 +485,46 @@ public class LocalAgentObservationsTest {
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(not (above ?X ?Y))")));
 		assertEquals(results.size(), 3);
+	}
+
+	@Test
+	public void testSimplifyNegatedGeneralGoal() {
+		StateSpec.initInstance("rlPacManGeneral.PacMan", "levelMax");
+		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+		assertNotNull("No loaded agent observations. Cannot run test.", sut_);
+
+		// Basic rule
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
+		ruleConds.add(StateSpec.toRelationalPredicate("(edible ?X)"));
+		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(blinking ?X)")));
+		assertEquals(results.size(), 1);
+
+		// Negated rule (illegal rule)
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
+		assertNull(results);
+		
+		// Negated anon rule (illegal rule)
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
+		assertNull(results);
+
+		// Fully negated
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
+		results = sut_.simplifyRule(ruleConds,
+				StateSpec.toRelationalPredicate("(not (blinking ?X))"), null, true);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(not (edible ?X))")));
+		assertEquals(results.size(), 1);
 	}
 
 	@Test

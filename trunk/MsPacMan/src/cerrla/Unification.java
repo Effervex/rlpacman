@@ -118,7 +118,7 @@ public class Unification {
 							.getResultReplacements();
 
 					int generalisationValue = recursivelyUnify(reducedOldState,
-							newState, recursiveOldTerms, recursiveReplacements)
+							reducedNewState, recursiveOldTerms, recursiveReplacements)
 							+ modFact.getGeneralisation();
 
 					// Note the best unification

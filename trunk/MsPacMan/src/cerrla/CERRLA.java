@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
 import cerrla.modular.ModularSubGoal;
@@ -32,9 +33,6 @@ import util.Recursive;
 public class CERRLA implements RRLAgent {
 	/** The modular policy being tested. */
 	private ModularPolicy currentPolicy_;
-
-	/** The current run this learner was initialised with. */
-	private int currentRun_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
@@ -76,6 +74,12 @@ public class CERRLA implements RRLAgent {
 			Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
 					priorPolicies);
 			modulePrior.add(subGoalCondition);
+			// If the condition is general, then also note that the opposite of
+			// the general is used (aka always true when this is false)
+			if (subGoalCondition instanceof GeneralGoalCondition) {
+				modulePrior.add(((GeneralGoalCondition) subGoalCondition)
+						.getNegation());
+			}
 
 			if (subGoalCondition instanceof SpecificGoalCondition) {
 				// Apply the replacement map
@@ -218,16 +222,13 @@ public class CERRLA implements RRLAgent {
 			else
 				lced.saveModule();
 		}
+
+		mainGoalCECortex_ = null;
+		goalMappedGenerators_.clear();
 	}
 
 	@Override
 	public void endEpisode(RRLObservations observations) {
-		// Check for restart flag
-		if (currentPolicy_.shouldRestart()) {
-			currentPolicy_ = null;
-			return;
-		}
-
 		// Note figures
 		currentPolicy_.noteStepReward(observations.getReward());
 		boolean regeneratePolicy = currentPolicy_.endEpisode();
@@ -259,7 +260,6 @@ public class CERRLA implements RRLAgent {
 			mainGoalCECortex_ = new LocalCrossEntropyDistribution(mainGC, run);
 		goalMappedGenerators_.put(mainGC, mainGoalCECortex_);
 		currentPolicy_ = null;
-		currentRun_ = run;
 	}
 
 	@Override
@@ -278,16 +278,14 @@ public class CERRLA implements RRLAgent {
 			recreateCurrentPolicy();
 		}
 
+		currentPolicy_.startEpisode();
+
 		if (currentPolicy_.isFresh()) {
 			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
 				System.out.println();
 				System.out.println(currentPolicy_);
 			}
 		}
-
-		// TODO Control when testing is performed for each generator
-
-		currentPolicy_.startEpisode();
 
 		// If the main generator is frozen, freeze the others too.
 		for (LocalCrossEntropyDistribution dist : goalMappedGenerators_

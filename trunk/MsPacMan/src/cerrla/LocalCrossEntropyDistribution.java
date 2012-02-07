@@ -32,6 +32,7 @@ import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.LocalAgentObservations;
+import rrlFramework.Config;
 import rrlFramework.RRLObservations;
 import util.MultiMap;
 
@@ -76,7 +77,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private transient LocalAgentObservations localAgentObservations_;
 
 	/** The minimum number of elites value. */
-	private transient int numElites_;
+	private int numElites_ = Integer.MAX_VALUE;
 
 	/** If the AgentObsrvations were settled last episode. */
 	private boolean oldAOSettled_;
@@ -88,7 +89,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private final PolicyGenerator policyGenerator_;
 
 	/** The population value. */
-	private transient int population_;
+	private int population_ = Integer.MAX_VALUE;
 
 	/** A map of sub-goal distributions and the last time they were encountered. */
 	private transient Map<LocalCrossEntropyDistribution, Integer> relevantSubDistEpisodeMap_;
@@ -98,6 +99,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 	/** A stack of policies that have not been tested fully. */
 	private transient Queue<ModularPolicy> undertestedPolicies_;
+
+	/**
+	 * The ID counter for making each policy unique, even if it has the same
+	 * rules.
+	 */
+	private transient int policyIDCounter_;
 
 	/**
 	 * Create new sub-goal behaviour using information from another
@@ -133,14 +140,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		else
 			performance_ = new Performance(run);
 		elites_ = new TreeSet<PolicyValue>();
-		population_ = Integer.MAX_VALUE;
-		numElites_ = Integer.MAX_VALUE;
 
 		undertestedPolicies_ = new LinkedList<ModularPolicy>();
 
 		// Load the local agent observations
 		localAgentObservations_ = LocalAgentObservations
 				.loadAgentObservations(goal);
+		policyIDCounter_ = 0;
 	}
 
 	/**
@@ -204,7 +210,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	private boolean processInternalGoal(ModularPolicy modularPolicy,
 			RRLObservations observations, BidiMap goalReplacements) {
-		if (modularPolicy.isGoalAchieved())
+		if (modularPolicy.isGoalCurrentlyAchieved())
 			return true;
 
 		// Form the goal rule
@@ -233,13 +239,15 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 			// If results, then the goal has been met!
 			if (results.next()) {
-				modularPolicy.setGoalAchieved(true);
+				modularPolicy.setGoalAchieved();
+			} else {
+				modularPolicy.setGoalUnachieved(true);
 			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return modularPolicy.isGoalAchieved();
+		return modularPolicy.isGoalCurrentlyAchieved();
 	}
 
 	/**
@@ -272,9 +280,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Run the post update operations
 		boolean resetElites = policyGenerator_.postUpdateOperations(numElites);
-
-		// Clear the restart
-		policyGenerator_.shouldRestart();
 		return resetElites;
 	}
 
@@ -369,10 +374,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			if (undertested.shouldRegenerate())
 				// If the element is fully tested, remove it.
 				iter.remove();
-			else if (!existingSubGoals.contains(undertested))
+			else if (!existingSubGoals.contains(undertested)) {
 				// If the parent policy doesn't already contain the undertested
 				// policy, return it.
+				undertested.clearChildren();
 				return undertested;
+			}
 		}
 
 		// Otherwise generate a new policy
@@ -505,9 +512,12 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			// Noting relevant sub-goal distributions
 			if (relevantSubDistEpisodeMap_ == null)
 				relevantSubDistEpisodeMap_ = new HashMap<LocalCrossEntropyDistribution, Integer>();
-			for (LocalCrossEntropyDistribution subDist : sample
-					.getSubDistributions()) {
-				relevantSubDistEpisodeMap_.put(subDist, currentEpisode_);
+			Collection<ModularPolicy> subPols = sample.getAllPolicies(false,
+					null);
+			for (ModularPolicy subPol : subPols) {
+				if (subPol != sample)
+					relevantSubDistEpisodeMap_.put(
+							subPol.getLocalCEDistribution(), currentEpisode_);
 			}
 		}
 
@@ -557,10 +567,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public void saveCEDistribution(File serFile,
 			boolean saveEnvAgentObservations) {
-		// If not saving files, just return
-		if (!ProgramArgument.SAVE_FILES.booleanValue())
-			return;
-
 		try {
 			// Write the main behaviour to temp and module
 			if (goalCondition_.isMainGoal()) {
@@ -654,6 +660,15 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		modFolder.mkdir();
 		File goalModFolder = new File(modFolder, modName);
 		goalModFolder.mkdir();
+		if (ProgramArgument.SAVE_EXPERIMENT_FILES.booleanValue()) {
+			String performanceFile = Config.getInstance().getPerformanceFile()
+					.toString();
+			performanceFile = performanceFile.substring(0,
+					performanceFile.length() - 4);
+			goalModFolder = new File(goalModFolder, performanceFile
+					+ File.separator);
+			goalModFolder.mkdir();
+		}
 		return goalModFolder;
 	}
 
@@ -707,5 +722,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	/**
+	 * Generates a unique policy ID (at least local to this unserialised run).
+	 * 
+	 * @return A String with a unique policy ID.
+	 */
+	public String generateUniquePolicyID() {
+		return goalCondition_.toString() + "_" + policyIDCounter_++;
 	}
 }

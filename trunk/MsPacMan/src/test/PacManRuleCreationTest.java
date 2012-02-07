@@ -9,7 +9,6 @@ import relationalFramework.agentObservations.LocalAgentObservations;
 
 import java.util.Set;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -22,7 +21,7 @@ public class PacManRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacMan.PacMan");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("blah"));
+				.loadAgentObservations(GoalCondition.parseGoalCondition("blah"));
 		sut_ = lao.getRuleMutation();
 	}
 

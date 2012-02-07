@@ -524,7 +524,8 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * Sets the arguments of this predicate. This method should be used
 	 * carefully, as the hashcode may change.
 	 * 
-	 * @param arguments The new arguments for the 
+	 * @param arguments
+	 *            The new arguments for the
 	 */
 	public void setArguments(RelationalArgument[] actionArgs) {
 		arguments_ = cloneArgs(actionArgs);

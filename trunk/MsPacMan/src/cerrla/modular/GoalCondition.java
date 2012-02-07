@@ -217,4 +217,10 @@ public abstract class GoalCondition implements Serializable {
 			return StateSpec.getInstance().getConstants().size();
 		return 0;
 	}
+
+	public String getFactName() {
+		if (fact_ == null)
+			return goalName_;
+		return fact_.getFactName();
+	}
 }

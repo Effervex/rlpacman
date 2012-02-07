@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-
 import relationalFramework.NumberEnum;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
@@ -21,37 +20,14 @@ public class CarcassonneStateSpec extends StateSpec {
 	@Override
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
-		// Movement entails getting to a point by moving in that direction at
-		// speed and jumping if stuck until at the point (or jumping fails)
-		preconds.put("move", "(canJumpOn ?X) (thing ?X) "
-				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
-		// Search entails being under a searchable block and moving towards it
-		// (possibly jumping).
-		preconds.put(
-				"search",
-				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(<= -32 ?D 32)) "
-						+ "(heightDiff ?X ?Y&:(<= 16 ?Y 80))");
-		// Jump onto entails jumping onto a specific thing, moving towards it if
-		// necessary.
-		preconds.put("jumpOnto",
-				"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(<= -160 ?Y 160))");
-		// Jump over entails jumping over a specific thing, moving towards it if
-		// necessary.
-		preconds.put("jumpOver", "(canJumpOver ?X) (thing ?X) "
-				+ "(distance ?X ?Y&:(<= -160 ?Y 160)) (width ?X ?Z)");
+		// A tile may be placed if all edges fit nicely
+		preconds.put("placeTile",
+				"(validLoc ?L ?O) (location ?L) (orientation ?O)");
 
-		// Pickup a shell
-		preconds.put("pickup",
-				"(canJumpOn ?X) (passive ?X) (shell ?X) (distance ?X ?Y)");
-
-		// Shoot a fireball at an enemy
-		preconds.put("shootFireball", "(marioPower ?Z&:(= ?Z fire)) "
-				+ "(distance ?X ?Y) "
-				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
-
-		// Shoot a held shell at an enemy
-		preconds.put("shootShell", "(carrying ?Z) (shell ?Z) (distance ?X ?Y) "
-				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
+		// A meeple can be played when it is meeple playing stage on the placed
+		// tile
+		preconds.put("placeMeeple",
+				"(meepleLoc ?L ?X) (location ?L) (orientation ?O)");
 
 		return preconds;
 	}
@@ -84,6 +60,14 @@ public class CarcassonneStateSpec extends StateSpec {
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
 
+		// Edge axioms
+		bckKnowledge.put("edgeAxiomGround", new BackgroundKnowledge(
+				"(edge north) => (assert (cEdge north east) "
+						+ "(ccEdge north west) (oppEdge north south))", true));
+		bckKnowledge.put("edgeAxiomClockwise", new BackgroundKnowledge(
+				"(cEdge ?N ?E) (ccEdge ?N ?W) (oppEdge ?N ?S) => (assert (cEdge ?E ?S) "
+						+ "(ccEdge ?E ?N) (oppEdge ?E ?W))", true));
+
 		return bckKnowledge;
 	}
 
@@ -105,37 +89,67 @@ public class CarcassonneStateSpec extends StateSpec {
 	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
 		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
+		// The current tile
+		// TODO Won't work due to multiple terrains per side (road+farms)
 		String[] structure = new String[4];
 		structure[0] = "terrain";
 		structure[1] = "terrain";
 		structure[2] = "terrain";
 		structure[3] = "terrain";
 		predicates.add(new RelationalPredicate("currentTile", structure));
-		
-		structure = new String[2];
-		structure[0] = "location";
-		structure[1] = "terrain";
-		predicates.add(new RelationalPredicate("nextTo", structure));
-		
+
+		// What a particular location is next to. (The meat of the observations)
 		structure = new String[3];
-		structure[0] = "terrain";
-		structure[1] = "player";
+		structure[0] = "location";
+		structure[1] = "edge";
+		structure[2] = "terrain";
+		predicates.add(new RelationalPredicate("nextTo", structure));
+
+		// The owner of a particular terrain feature
+		structure = new String[2];
+		structure[0] = "player";
+		structure[1] = "terrain";
+		predicates.add(new RelationalPredicate("controls", structure));
+
+		// The claimants to a terrain (with count)
+		structure = new String[3];
+		structure[0] = "player";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("owner", structure));
-		
+		structure[2] = "terrain";
+		predicates.add(new RelationalPredicate("meeples", structure));
+
+		// The current worth of a terrain feature
 		structure = new String[2];
 		structure[0] = "terrain";
 		structure[1] = NumberEnum.Integer.toString();
 		predicates.add(new RelationalPredicate("worth", structure));
-		
+
+		// Each player's current score.
 		structure = new String[2];
 		structure[0] = "player";
 		structure[1] = NumberEnum.Integer.toString();
 		predicates.add(new RelationalPredicate("score", structure));
-		
+
+		// The number of tiles left
 		structure = new String[1];
-		structure[1] = NumberEnum.Integer.toString();
+		structure[0] = NumberEnum.Integer.toString();
 		predicates.add(new RelationalPredicate("tilesLeft", structure));
+
+		// Edge axioms
+		structure = new String[2];
+		structure[0] = "edge";
+		structure[1] = "edge";
+		predicates.add(new RelationalPredicate("cEdge", structure));
+
+		structure = new String[2];
+		structure[0] = "edge";
+		structure[1] = "edge";
+		predicates.add(new RelationalPredicate("ccEdge", structure));
+
+		structure = new String[2];
+		structure[0] = "edge";
+		structure[1] = "edge";
+		predicates.add(new RelationalPredicate("oppEdge", structure));
 
 		return predicates;
 	}
@@ -152,9 +166,10 @@ public class CarcassonneStateSpec extends StateSpec {
 		types.put("cloister", "terrain");
 
 		// Abstract types
-		types.put("location", null);
-		types.put("player", null);
-		types.put("orientation", null);
+		types.put("location", null); // At least 4 locations, many at the end
+		types.put("player", null); // Possibly multiple players
+		types.put("edge", null); // Four possible edges
+		types.put("orientation", null); // Four possible orientations
 
 		return types;
 	}

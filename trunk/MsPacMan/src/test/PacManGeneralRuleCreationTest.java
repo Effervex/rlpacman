@@ -21,7 +21,7 @@ public class PacManGeneralRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacManGeneral.PacMan");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(new GoalCondition("blah"));
+				.loadAgentObservations(GoalCondition.parseGoalCondition("blah"));
 		sut_ = lao.getRuleMutation();
 	}
 

@@ -79,6 +79,15 @@ public class ModularSubGoal implements PolicyItem, Serializable {
 		return result;
 	}
 
+	public void setGoalAchieved(boolean achieved) {
+		if (filledPolicy_ != null) {
+			if (achieved)
+				filledPolicy_.setGoalAchieved();
+			else
+				filledPolicy_.setGoalUnachieved(false);
+		}
+	}
+
 	public void setModularPolicy(ModularPolicy policy) {
 		filledPolicy_ = policy;
 	}
@@ -115,10 +124,5 @@ public class ModularSubGoal implements PolicyItem, Serializable {
 			return "Modular Sub-goal " + subgoal_;
 		else
 			return filledPolicy_.toString();
-	}
-
-	public void setGoalAchieved(boolean b) {
-		if (filledPolicy_ != null)
-			filledPolicy_.setGoalAchieved(true);
 	}
 }
