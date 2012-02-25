@@ -17,8 +17,6 @@ import util.Pair;
 import jess.JessException;
 import jess.Rete;
 
-import cerrla.ProgramArgument;
-
 import com.jcloisterzone.Expansion;
 import com.jcloisterzone.Player;
 import com.jcloisterzone.UserInterface;

@@ -17,6 +17,7 @@ import com.jcloisterzone.figure.SmallFollower;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.phase.ActionPhase;
+import com.jcloisterzone.game.phase.DrawPhase;
 import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
 import com.jcloisterzone.game.phase.TilePhase;
@@ -118,6 +119,27 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			} catch (Exception e) {
 			}
 		}
+
+		runPhases();
+	}
+
+	/**
+	 * Cycles through the phases whenever necessary. Also replaces the
+	 * proxy-based DrawPhase with a proxyless version.
+	 */
+	private void runPhases() {
+		Phase phase = environment_.getPhase();
+
+		// Cycle through (probably only once) to keep the game moving.
+		while (phase != null && !phase.isEntered()) {
+			// Modifying DrawPhase to proxyless version
+			if (phase.getClass().equals(DrawPhase.class))
+				phase = environment_.getPhases().get(ProxylessDrawPhase.class);
+
+			phase.setEntered(true);
+			phase.enter();
+			phase = environment_.getPhase();
+		}
 	}
 
 	@Override
@@ -139,14 +161,15 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			// If no action, place no figure
 			if (action.equals(CarcassonneRelationalWrapper.NO_ACTION)) {
 				server_.placeNoFigure();
-				return;
+			} else {
+				// Place a meeple
+				Feature feature = (Feature) action;
+				server_.deployMeeple(feature.getTile().getPosition(),
+						feature.getLocation(), SmallFollower.class);
 			}
-
-			// Place a meeple
-			Feature feature = (Feature) action;
-			server_.deployMeeple(feature.getTile().getPosition(),
-					feature.getLocation(), SmallFollower.class);
 		}
+
+		runPhases();
 	}
 
 	@Override
