@@ -30,7 +30,7 @@ public class RRLExperiment {
 
 	/** If we're running the experiment in debug mode. */
 	public static boolean debugMode_ = false;
-	
+
 	/** The agent to use for experiments. */
 	private RRLAgent agent_;
 
@@ -327,12 +327,17 @@ public class RRLExperiment {
 		if (finiteEpisodes == -1)
 			finiteEpisodes = Integer.MAX_VALUE;
 		int episodeCount = 0;
+		long startTime = System.currentTimeMillis();
 		while (!agent_.isLearningComplete()) {
 			episode();
 
 			episodeCount++;
 			if (episodeCount >= finiteEpisodes)
 				agent_.freeze(true);
+
+			long endTime = System.currentTimeMillis();
+			System.out.println("Av time (" + episodeCount + "): "
+					+ (endTime - startTime) / episodeCount);
 		}
 
 		agent_.cleanup();
@@ -352,7 +357,7 @@ public class RRLExperiment {
 		StateSpec.initInstance(Config.getInstance().getEnvironmentClass(),
 				Config.getInstance().getGoalString());
 		Config.getInstance().setGoal(StateSpec.getInstance().getGoalName());
-		
+
 		long experimentStart = System.currentTimeMillis();
 
 		// Determine the initial run (as previous runs may have already been
