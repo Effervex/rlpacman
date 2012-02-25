@@ -1,6 +1,5 @@
 package jCloisterZone;
 
-import java.lang.reflect.Proxy;
 import java.util.EnumSet;
 
 import org.ini4j.Ini;
@@ -23,7 +22,6 @@ import com.jcloisterzone.game.Snapshot;
 import com.jcloisterzone.game.phase.CreateGamePhase;
 import com.jcloisterzone.game.phase.Phase;
 import com.jcloisterzone.rmi.ServerIF;
-import com.jcloisterzone.rmi.mina.ClientStub;
 import com.jcloisterzone.ui.Client;
 
 public class LocalCarcassonneClient implements RRLJCloisterClient,
@@ -34,7 +32,6 @@ public class LocalCarcassonneClient implements RRLJCloisterClient,
 	private boolean running_;
 
 	private ServerIF server;
-	private LocalCarcassonneClientStub clientStub_;
 
 	public LocalCarcassonneClient(String configFile) {
 		config = new Ini();
@@ -56,16 +53,18 @@ public class LocalCarcassonneClient implements RRLJCloisterClient,
 	public void createGame() {
 		// Initialise the server
 		if (server == null) {
-			clientStub_ = new LocalCarcassonneClientStub();
-			LocalCarcassonneServer localServer = new LocalCarcassonneServer(
-					clientStub_.getGame());
-			clientStub_.setServerProxy(localServer);
-			
-			server = (ServerIF) Proxy.newProxyInstance(
-					ServerIF.class.getClassLoader(),
-					new Class[] { ServerIF.class }, clientStub_);
-			
-			game = clientStub_.getGame();
+			game = new Game();
+			server = new LocalCarcassonneServer(game);
+			// clientStub_ = new LocalCarcassonneClientStub();
+			// LocalCarcassonneServer localServer = new LocalCarcassonneServer(
+			// clientStub_.getGame());
+			// clientStub_.setServerProxy(localServer);
+			//
+			// server = (ServerIF) Proxy.newProxyInstance(
+			// ServerIF.class.getClassLoader(),
+			// new Class[] { ServerIF.class }, clientStub_);
+			//
+			// game = clientStub_.getGame();
 			game.addGameListener(this);
 			game.getPhases().put(CreateGamePhase.class,
 					new CreateGamePhase(game, server));
@@ -80,11 +79,7 @@ public class LocalCarcassonneClient implements RRLJCloisterClient,
 
 	@Override
 	public long getClientId() {
-		return getClientStub().getClientId();
-	}
-
-	private ClientStub getClientStub() {
-		return clientStub_;
+		return 1;
 	}
 
 	@Override

@@ -2,7 +2,6 @@ package jCloisterZone;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.EnumSet;
 import java.util.Random;
 
@@ -17,6 +16,8 @@ import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.GameSettings;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.PlayerSlot.SlotType;
+import com.jcloisterzone.game.phase.DrawPhase;
+import com.jcloisterzone.game.phase.Phase;
 import com.jcloisterzone.rmi.CallMessage;
 import com.jcloisterzone.rmi.ClientIF;
 import com.jcloisterzone.rmi.ServerIF;
@@ -25,27 +26,27 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 		InvocationHandler {
 	private Random random = new Random();
 
-	private ClientIF stub;
+	private Game game;
 
 	protected final PlayerSlot[] slots;
 
 	public LocalCarcassonneServer(Game game) {
 		slots = new PlayerSlot[PlayerSlot.COUNT];
-		LocalCarcassonneServerStub handler = new LocalCarcassonneServerStub(
-				game);
-		stub = (ClientIF) Proxy.newProxyInstance(
-				ClientIF.class.getClassLoader(),
-				new Class[] { ClientIF.class }, handler);
+		this.game = game;
+	}
+
+	private ClientIF getStub() {
+		return game.getPhase();
 	}
 
 	@Override
 	public void updateExpansion(Expansion expansion, Boolean enabled) {
-		stub.updateExpansion(expansion, enabled);
+		getStub().updateExpansion(expansion, enabled);
 	}
 
 	@Override
 	public void updateCustomRule(CustomRule rule, Boolean enabled) {
-		stub.updateCustomRule(rule, enabled);
+		getStub().updateCustomRule(rule, enabled);
 	}
 
 	@Override
@@ -58,74 +59,81 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 			updateSlot(slot, null);
 		}
 
-		// TODO Add BASIC expansion.
+		// Add BASIC expansion.
 		getExpansions().add(Expansion.BASIC);
-		stub.updateExpansion(Expansion.BASIC, true);
+		getStub().updateExpansion(Expansion.BASIC, true);
 
 		// Start the game
-		stub.startGame();
+		getStub().startGame();
+
+		// Modify the phases
+		Phase drawPhase = game.getPhases().get(DrawPhase.class);
+		ProxylessDrawPhase proxylessDrawPhase = new ProxylessDrawPhase(game,
+				this);
+		proxylessDrawPhase.setDefaultNext(drawPhase.getDefaultNext());
+		game.getPhases().put(ProxylessDrawPhase.class, proxylessDrawPhase);
 	}
 
 	@Override
 	public void placeNoFigure() {
-		stub.placeNoFigure();
+		getStub().placeNoFigure();
 	}
 
 	@Override
 	public void placeNoTile() {
-		stub.placeNoTile();
+		getStub().placeNoTile();
 	}
 
 	@Override
 	public void placeTile(Rotation rotation, Position position) {
-		stub.placeTile(rotation, position);
+		getStub().placeTile(rotation, position);
 	}
 
 	@Override
 	public void deployMeeple(Position p, Location d,
 			Class<? extends Meeple> meepleType) {
-		stub.deployMeeple(p, d, meepleType);
+		getStub().deployMeeple(p, d, meepleType);
 	}
 
 	@Override
 	public void placeTowerPiece(Position p) {
-		stub.placeTowerPiece(p);
+		getStub().placeTowerPiece(p);
 	}
 
 	@Override
 	public void escapeFromCity(Position p, Location d) {
-		stub.escapeFromCity(p, d);
+		getStub().escapeFromCity(p, d);
 	}
 
 	@Override
 	public void removeKnightWithPrincess(Position p, Location d) {
-		stub.removeKnightWithPrincess(p, d);
+		getStub().removeKnightWithPrincess(p, d);
 	}
 
 	@Override
 	public void captureFigure(Position p, Location d) {
-		stub.captureFigure(p, d);
+		getStub().captureFigure(p, d);
 	}
 
 	@Override
 	public void placeTunnelPiece(Position p, Location d, boolean isSecondPiece) {
-		stub.placeTunnelPiece(p, d, isSecondPiece);
+		getStub().placeTunnelPiece(p, d, isSecondPiece);
 	}
 
 	@Override
 	public void moveFairy(Position p) {
-		stub.moveFairy(p);
+		getStub().moveFairy(p);
 	}
 
 	@Override
 	public void moveDragon(Position p) {
-		stub.moveDragon(p);
+		getStub().moveDragon(p);
 	}
 
 	@Override
 	public void payRansom(Integer playerIndexToPay,
 			Class<? extends Follower> meepleType) {
-		stub.payRansom(playerIndexToPay, meepleType);
+		getStub().payRansom(playerIndexToPay, meepleType);
 	}
 
 	@Override
@@ -139,13 +147,13 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 			slot.setAiClassName(null);
 		}
 		slots[slot.getNumber()] = slot;
-		stub.updateSlot(slot);
+		getStub().updateSlot(slot);
 	}
 
 	@Override
 	public void selectTile(Integer tiles) {
 		// generate random tile
-		stub.nextTile(random.nextInt(tiles));
+		getStub().nextTile(random.nextInt(tiles));
 	}
 
 	@Override
