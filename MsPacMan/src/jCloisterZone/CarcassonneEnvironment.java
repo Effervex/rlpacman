@@ -8,6 +8,8 @@ import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
 import util.Pair;
 
+import cerrla.ProgramArgument;
+
 import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.feature.Feature;
@@ -23,7 +25,7 @@ import com.jcloisterzone.rmi.mina.ClientStub;
 
 public class CarcassonneEnvironment extends RRLEnvironment {
 	private Game environment_;
-	private boolean guiMode_ = false;
+	private boolean guiMode_ = true;
 	private int prevScore_;
 	private RRLJCloisterClient client_;
 	private ServerIF server_;
@@ -161,6 +163,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 	@Override
 	public void initialise(int runIndex, String[] extraArg) {
+		guiMode_ = !ProgramArgument.EXPERIMENT_MODE.booleanValue();
+
 		if (guiMode_) {
 			client_ = new GuiCarcassonneClient("config.ini", true);
 			try {
