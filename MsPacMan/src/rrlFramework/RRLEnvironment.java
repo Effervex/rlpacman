@@ -70,22 +70,6 @@ public abstract class RRLEnvironment {
 	}
 
 	/**
-	 * Applies an action to the state, or initialises the state if no action.
-	 * All information is stored in private members.
-	 * 
-	 * @param action
-	 *            The action to apply on the environment (if first state, action
-	 *            is null).
-	 */
-	private void applyActionToState(Object action) {
-		if (action == null) {
-			startState();
-		} else {
-			stepState(action);
-		}
-	}
-
-	/**
 	 * Starts the episode by initialising the environment state.
 	 */
 	protected abstract void startState();
@@ -184,7 +168,7 @@ public abstract class RRLEnvironment {
 	 */
 	public final RRLObservations startEpisode() {
 		// Initialise the environment observations
-		applyActionToState(null);
+		startState();
 
 		// Form the relational observations
 		return formObservations(getGoalArgs(), true);
@@ -203,7 +187,7 @@ public abstract class RRLEnvironment {
 		Object groundAction = groundActions(actions);
 
 		// Apply the action to the state
-		applyActionToState(groundAction);
+		stepState(groundAction);
 
 		// Form the relational observations
 		return formObservations(getGoalArgs(), false);

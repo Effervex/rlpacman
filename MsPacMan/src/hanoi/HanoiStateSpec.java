@@ -167,4 +167,10 @@ public class HanoiStateSpec extends StateSpec {
 
 		return typePreds;
 	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

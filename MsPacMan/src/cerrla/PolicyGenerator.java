@@ -1374,7 +1374,6 @@ public final class PolicyGenerator implements Serializable {
 		}
 
 		// If not using dynamic slots, split the slots now.
-		// TODO Creating an initial burst may be worth it...
 		if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
 			splitRLGGSlots();
 		}

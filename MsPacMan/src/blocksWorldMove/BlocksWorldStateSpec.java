@@ -223,4 +223,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		return typePreds;
 	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		Collection<String> constants = new ArrayList<String>();
+		// The floor is constant.
+		constants.add("(floor floor)");
+		return constants;
+	}
 }

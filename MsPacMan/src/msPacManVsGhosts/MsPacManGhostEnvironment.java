@@ -5,6 +5,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
+import cerrla.ProgramArgument;
+
 import jess.JessException;
 import jess.Rete;
 import game.controllers.GhostController;
@@ -369,7 +371,7 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 		game_ = new _G_();
 
 		for (String arg : extraArgs) {
-			if (arg.equals("-e")) {
+			if (arg.equals("-e") || ProgramArgument.EXPERIMENT_MODE.booleanValue()) {
 				// Run the program in experiment mode (No GUI).
 				experimentMode_ = true;
 			}

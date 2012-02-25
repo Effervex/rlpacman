@@ -56,7 +56,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 				+ " => (assert (onFloor ?X)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
-	
+
 	@Override
 	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
 		Map<String, BackgroundKnowledge> bkMap = new HashMap<String, BackgroundKnowledge>();
@@ -128,11 +128,13 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
 			rules[0] = "(highest ?X) => (moveFloor ?X)";
-		} else if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
+		} else if (envParameter_.equals("clearA")
+				|| envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
-		} else if (envParameter_.equals("highestA") || envParameter_.equals("highest$A")) {
+		} else if (envParameter_.equals("highestA")
+				|| envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
@@ -194,5 +196,10 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		typePreds.put("block", null);
 
 		return typePreds;
+	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		return null;
 	}
 }

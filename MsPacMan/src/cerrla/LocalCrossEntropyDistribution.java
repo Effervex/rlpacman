@@ -346,6 +346,20 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (frozen_ == b)
 			return;
 
+		if (!frozen_ && goalCondition_.isMainGoal()) {
+			// Test the learned behaviour
+			System.out.println();
+			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
+				System.out.println("Beginning [" + goalCondition_
+						+ "] testing for episode " + currentEpisode_ + ".");
+			else
+				System.out.println("Beginning ensemble testing for episode "
+						+ currentEpisode_ + ".");
+			System.out.println();
+			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
+				System.out.println("Testing...");
+		}
+
 		frozen_ = b;
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
@@ -523,19 +537,19 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 
 
+		// Estimate experiment convergence
+		double convergence = policyGenerator_.getConvergenceValue();
+		if (frozen_) {
+			testEpisode_++;
+			convergence = testEpisode_
+					/ ProgramArgument.TEST_ITERATIONS.doubleValue();
+		}
+		int numSlots = policyGenerator_.size();
+		performance_.estimateETA(convergence, numElites_, elites_, numSlots,
+				goalCondition_);
+
 		// Output system output
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
-			// Estimate experiment convergence
-			double convergence = policyGenerator_.getConvergenceValue();
-			if (frozen_) {
-				testEpisode_++;
-				convergence = testEpisode_
-						/ ProgramArgument.TEST_ITERATIONS.doubleValue();
-			}
-			int numSlots = policyGenerator_.size();
-			performance_.estimateETA(convergence, numElites_, elites_,
-					numSlots, goalCondition_);
-
 			System.out.println("[" + goalCondition_ + "] " + currentEpisode_
 					+ ": " + average);
 			System.out.println();
@@ -621,21 +635,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public void startEpisode() {
 		// Check for convergence
-		if (isConverged() && !frozen_) {
+		if (isConverged())
 			freeze(true);
-
-			// Test the learned behaviour
-			System.out.println();
-			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-				System.out.println("Beginning [" + goalCondition_
-						+ "] testing for episode " + currentEpisode_ + ".");
-			else
-				System.out.println("Beginning ensemble testing for episode "
-						+ currentEpisode_ + ".");
-			System.out.println();
-			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
-				System.out.println("Testing...");
-		}
 	}
 
 	@Override

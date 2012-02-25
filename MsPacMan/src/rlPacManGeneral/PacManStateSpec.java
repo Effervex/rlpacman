@@ -321,4 +321,9 @@ public class PacManStateSpec extends StateSpec {
 
 		return 1.0 / distance;
 	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		return null;
+	}
 }

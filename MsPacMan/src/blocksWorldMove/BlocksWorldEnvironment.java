@@ -1,6 +1,5 @@
 package blocksWorldMove;
 
-import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
@@ -11,11 +10,9 @@ import rrlFramework.RRLObservations;
 import util.Pair;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 
 import jess.Rete;
 
@@ -28,20 +25,10 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	/** The minimal reward the agent can receive. */
 	private static final float MINIMAL_REWARD = -10;
 
-	/** The number of blocks. Default 5. */
-	protected int numBlocks_ = 5;
+	private List<String> goalArgs_;
 
-	/** The probability of an action succeeding (assuming it is legal). */
-	protected double actionSuccess_ = 1.0;
-
-	/** The maximum number of steps the agent is allocated. */
-	protected int maxSteps_;
-
-	/** The state of the blocks world. */
-	protected BlocksState state_;
-
-	/** The number of steps taken. */
-	protected int steps_;
+	/** If we're running an optimal agent. */
+	private boolean optimal_ = false;
 
 	/** The optimal number of steps for a state to be solved. */
 	private Map<BlocksState, Integer> optimalMap_ = new HashMap<BlocksState, Integer>();
@@ -49,36 +36,154 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	/** The optimal number of steps. */
 	private int optimalSteps_;
 
-	/** If we're running an optimal agent. */
-	private boolean optimal_ = false;
-
 	/** Similar to debug mode, but only shows ASCII representation of blocks. */
 	private boolean viewingMode_ = false;
 
-	private List<String> goalArgs_;
+	/** The probability of an action succeeding (assuming it is legal). */
+	protected double actionSuccess_ = 1.0;
 
-	@Override
-	public void cleanup() {
-		state_ = null;
+	/** The maximum number of steps the agent is allocated. */
+	protected int maxSteps_;
+
+	/** The number of blocks. Default 5. */
+	protected int numBlocks_ = 5;
+
+	/** The state of the blocks world. */
+	protected BlocksState state_;
+
+	/** The number of steps taken. */
+	protected int steps_;
+
+	/**
+	 * Calculates the optimal number of steps to solve the problem.
+	 * 
+	 * @return The minimal number of steps to take for solving.
+	 */
+	private int optimalSteps() {
+		RelationalPolicy optimalPolicy = StateSpec.getInstance()
+				.getHandCodedPolicy();
+		steps_ = 0;
+
+		// Check it hasn't already solved the state
+		if (optimalMap_.containsKey(state_)) {
+			// System.out.println("\t\t\tAlready calculated ("
+			// + optimalMap_.get(state_) + ")");
+			return optimalMap_.get(state_);
+		}
+
+		optimal_ = true;
+		BlocksState initialState = state_.clone();
+		// Run the policy through the environment until goal is satisfied.
+		double oldActionSuccess = actionSuccess_;
+		actionSuccess_ = 1.0;
+
+		// Loop until the task is complete
+		int numActions = StateSpec.getInstance().getNumReturnedActions();
+		RRLObservations obs = startEpisode();
+		while (!obs.isTerminal()) {
+			// Check if the optimal policy has already seen this state
+			if (optimalMap_.containsKey(state_)) {
+				steps_ += optimalMap_.get(state_);
+				break;
+			}
+
+			// Apply the policy
+			PolicyActions actions = optimalPolicy.evaluatePolicy(obs,
+					numActions);
+			obs = step(actions);
+		}
+
+		// Return the state to normal
+		state_ = initialState;
+		actionSuccess_ = oldActionSuccess;
+		// formState(state_);
+		optimalMap_.put(state_, steps_);
+		optimal_ = false;
+		return steps_;
 	}
 
 	@Override
-	public void initialise(int runIndex, String[] extraArgs) {
-		for (String arg : extraArgs) {
-			if ((arg.startsWith("goal"))) {
-				StateSpec.reinitInstance(arg.substring(5));
-			} else if (arg.startsWith("nonDet")) {
-				actionSuccess_ = Double.parseDouble(arg.substring(6));
+	protected void assertStateFacts(Rete rete, List<String> goalArgs)
+			throws Exception {
+		if (steps_ != 0) {
+			// Apply the action
+			rete.run();
+			return;
+		}
+
+		// Assert the floor
+		rete.assertString("(floor floor)");
+
+		Integer[] intState = state_.getState();
+
+		// Scanning through, making predicates (On)
+		for (int i = 0; i < state_.length; i++) {
+			// On the floor
+			if (intState[i] == 0) {
+				rete.assertString("(on " + (char) ('a' + i) + " floor)");
 			} else {
-				try {
-					numBlocks_ = Integer.parseInt(arg);
-					optimalMap_ = new HashMap<BlocksState, Integer>();
-				} catch (Exception e) {
-				}
+				// On another block
+				rete.assertString("(on " + (char) ('a' + i) + " "
+						+ (char) ('a' + intState[i] - 1) + ")");
+			}
+
+			// Assert the blocks
+			rete.assertString("(block " + (char) ('a' + i) + ")");
+		}
+	}
+
+	@Override
+	protected double calculateReward(boolean isTerminal) {
+		if (isTerminal || steps_ == maxSteps_) {
+			if (optimalSteps_ >= maxSteps_)
+				return 0;
+			else
+				return MINIMAL_REWARD * (steps_ - optimalSteps_)
+						/ (maxSteps_ - optimalSteps_);
+		}
+		return 0;
+	}
+
+	@Override
+	protected List<String> getGoalArgs() {
+		return goalArgs_;
+	}
+
+	@Override
+	protected Object groundActions(PolicyActions actions) {
+		RelationalPredicate action = null;
+		if (!actions.isEmpty()) {
+			action = actions.getFirstRandomAction();
+
+			// Assert the action to the Rete object.
+			try {
+				StateSpec.getInstance().getRete()
+						.assertString(action.toString());
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 
-		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
+		if (action == null)
+			return state_;
+
+		BlocksState newState = state_.clone();
+
+		// Finding the block objects
+		int[] indices = new int[2];
+
+		// Convert the blocks to indices
+		for (int i = 0; i < indices.length; i++) {
+			if (action.getArguments()[i].equals("floor"))
+				indices[i] = -1;
+			else
+				indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
+		}
+
+		// Perform the action
+		newState.getState()[indices[0]] = indices[1] + 1;
+
+		return new Pair<BlocksState, RelationalPredicate>(newState, action);
 	}
 
 	/**
@@ -101,8 +206,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 		while (!blocksLeft.isEmpty()) {
 			// Get a random block
-			Integer block = blocksLeft
-					.remove(RRLExperiment.random_.nextInt(blocksLeft.size()));
+			Integer block = blocksLeft.remove(RRLExperiment.random_
+					.nextInt(blocksLeft.size()));
 
 			// Put the block in a random position, influenced by the number of
 			// free blocks.
@@ -153,53 +258,14 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		state_ = new BlocksState(worldState);
 	}
 
-	/**
-	 * Calculates the optimal number of steps to solve the problem.
-	 * 
-	 * @return The minimal number of steps to take for solving.
-	 */
-	private int optimalSteps() {
-		RelationalPolicy optimalPolicy = StateSpec.getInstance()
-				.getHandCodedPolicy();
-		steps_ = 0;
+	@Override
+	protected boolean isReteDriven() {
+		return true;
+	}
 
-		// Check it hasn't already solved the state
-		if (optimalMap_.containsKey(state_)) {
-			// System.out.println("\t\t\tAlready calculated ("
-			// + optimalMap_.get(state_) + ")");
-			return optimalMap_.get(state_);
-		}
-
-		optimal_ = true;
-		BlocksState initialState = state_.clone();
-		// Run the policy through the environment until goal is satisfied.
-		double oldActionSuccess = actionSuccess_;
-		actionSuccess_ = 1.0;
-
-		// Loop until the task is complete
-		int numActions = StateSpec.getInstance()
-				.getNumReturnedActions();
-		RRLObservations obs = startEpisode();
-		while (!obs.isTerminal()) {
-			// Check if the optimal policy has already seen this state
-			if (optimalMap_.containsKey(state_)) {
-				steps_ += optimalMap_.get(state_);
-				break;
-			}
-
-			// Apply the policy
-			PolicyActions actions = optimalPolicy.evaluatePolicy(obs,
-					numActions);
-			obs = step(actions);
-		}
-
-		// Return the state to normal
-		state_ = initialState;
-		actionSuccess_ = oldActionSuccess;
-		// formState(state_);
-		optimalMap_.put(state_, steps_);
-		optimal_ = false;
-		return steps_;
+	@Override
+	protected boolean isTerminal() {
+		return steps_ == maxSteps_ || super.isTerminal();
 	}
 
 	@Override
@@ -254,102 +320,26 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected void assertStateFacts(Rete rete, List<String> goalArgs)
-			throws Exception {
-		if (steps_ != 0) {
-			// Apply the action
-			rete.run();
-			return;
-		}
+	public void cleanup() {
+		state_ = null;
+	}
 
-		// Assert the floor
-		rete.assertString("(floor floor)");
-
-		Integer[] intState = state_.getState();
-
-		// Scanning through, making predicates (On)
-		for (int i = 0; i < state_.length; i++) {
-			// On the floor
-			if (intState[i] == 0) {
-				rete.assertString("(on " + (char) ('a' + i) + " floor)");
+	@Override
+	public void initialise(int runIndex, String[] extraArgs) {
+		for (String arg : extraArgs) {
+			if ((arg.startsWith("goal"))) {
+				StateSpec.reinitInstance(arg.substring(5));
+			} else if (arg.startsWith("nonDet")) {
+				actionSuccess_ = Double.parseDouble(arg.substring(6));
 			} else {
-				// On another block
-				rete.assertString("(on " + (char) ('a' + i) + " "
-						+ (char) ('a' + intState[i] - 1) + ")");
-			}
-
-			// Assert the blocks
-			rete.assertString("(block " + (char) ('a' + i) + ")");
-		}
-	}
-
-	@Override
-	protected double calculateReward(boolean isTerminal) {
-		if (isTerminal || steps_ == maxSteps_) {
-			if (optimalSteps_ >= maxSteps_)
-				return 0;
-			else
-				return MINIMAL_REWARD * (steps_ - optimalSteps_)
-						/ (maxSteps_ - optimalSteps_);
-		}
-		return 0;
-	}
-
-	@Override
-	protected boolean isTerminal() {
-		return steps_ == maxSteps_ || super.isTerminal();
-	}
-
-	@Override
-	protected Object groundActions(PolicyActions actions) {
-		Collection<FiredAction> firedActions = actions.getFirstActionList();
-		RelationalPredicate action = null;
-		if (firedActions != null) {
-			List<FiredAction> actionsList = new ArrayList<FiredAction>(
-					firedActions);
-			FiredAction selectedAction = actionsList
-					.get(RRLExperiment.random_.nextInt(actionsList.size()));
-			selectedAction.triggerRule();
-			action = selectedAction.getAction();
-
-			// Assert the action to the Rete object.
-			try {
-				StateSpec.getInstance().getRete()
-						.assertString(action.toString());
-			} catch (Exception e) {
-				e.printStackTrace();
+				try {
+					numBlocks_ = Integer.parseInt(arg);
+					optimalMap_ = new HashMap<BlocksState, Integer>();
+				} catch (Exception e) {
+				}
 			}
 		}
 
-		if (action == null)
-			return state_;
-
-		BlocksState newState = state_.clone();
-
-		// Finding the block objects
-		int[] indices = new int[2];
-
-		// Convert the blocks to indices
-		for (int i = 0; i < indices.length; i++) {
-			if (action.getArguments()[i].equals("floor"))
-				indices[i] = -1;
-			else
-				indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
-		}
-
-		// Perform the action
-		newState.getState()[indices[0]] = indices[1] + 1;
-
-		return new Pair<BlocksState, RelationalPredicate>(newState, action);
-	}
-
-	@Override
-	protected boolean isReteDriven() {
-		return true;
-	}
-
-	@Override
-	protected List<String> getGoalArgs() {
-		return goalArgs_;
+		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
 	}
 }

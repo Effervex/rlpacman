@@ -133,6 +133,7 @@ public class SpecialisationOperator implements Serializable,
 			result = swappedTerm_[1].compareTo(o.swappedTerm_[1]);
 			if (result != 0)
 				return result;
+			break;
 		case RANGE_SPLIT:
 			return splitRange_.compareTo(o.splitRange_);
 		}
