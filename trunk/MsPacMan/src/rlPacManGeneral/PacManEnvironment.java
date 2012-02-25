@@ -64,14 +64,14 @@ public class PacManEnvironment extends RRLEnvironment {
 			Player pacMan, Rete rete) throws JessException {
 		if (distanceGrid_[thing.m_locX][thing.m_locY] != null) {
 			// Use Ms. PacMan's natural distance (manhatten)
-			rete.eval("(assert (distance " + thingName + " "
+			rete.assertString("(distance " + thingName + " "
 					+ distanceGrid_[thing.m_locX][thing.m_locY].getDistance()
-					+ "))");
+					+ ")");
 		} else {
 			// Use Euclidean distance, rounding
 			int distance = (int) Math.round(Point2D.distance(thing.m_locX,
 					thing.m_locY, pacMan.m_locX, pacMan.m_locY));
-			rete.eval("(assert (distance " + thingName + " " + distance + "))");
+			rete.assertString("(distance " + thingName + " " + distance + ")");
 		}
 	}
 
@@ -187,14 +187,14 @@ public class PacManEnvironment extends RRLEnvironment {
 			// Don't note ghost if it is running back to hideout or if it is
 			// in hideout
 			if ((ghost.m_nTicks2Exit <= 0) && (!ghost.m_bEaten)) {
-				rete.eval("(assert (ghost " + ghost + "))");
+				rete.assertString("(ghost " + ghost + ")");
 				// If edible, add assertion
 				if (ghost.isEdible()) {
-					rete.eval("(assert (edible " + ghost + "))");
+					rete.assertString("(edible " + ghost + ")");
 				}
 				// If flashing, add assertion
 				if (ghost.isBlinking()) {
-					rete.eval("(assert (blinking " + ghost + "))");
+					rete.assertString("(blinking " + ghost + ")");
 				}
 
 				// Distances from pacman to ghost
@@ -205,7 +205,7 @@ public class PacManEnvironment extends RRLEnvironment {
 				for (Junction junc : closeJunctions_) {
 					if (!junctionsNoted) {
 						// Assert types
-						rete.eval("(assert (junction " + junc + "))");
+						rete.assertString("(junction " + junc + ")");
 						// Max safety
 						junc.setSafety(model_.m_gameSizeX);
 					}
@@ -255,14 +255,14 @@ public class PacManEnvironment extends RRLEnvironment {
 		for (Junction junc : closeJunctions_) {
 			if (!junctionsNoted) {
 				// Assert types
-				rete.eval("(assert (junction " + junc + "))");
+				rete.assertString("(junction " + junc + ")");
 				// Max safety
 				junc.setSafety(model_.m_gameSizeX);
 			}
 
 			// Assert safety
-			rete.eval("(assert (junctionSafety " + junc + " "
-					+ junc.getSafety() + "))");
+			rete.assertString("(junctionSafety " + junc + " "
+					+ junc.getSafety() + ")");
 		}
 
 		// Assert ghost centres
@@ -280,14 +280,14 @@ public class PacManEnvironment extends RRLEnvironment {
 			centrePoint.y /= ghostCount;
 			GhostCentre gc = new GhostCentre(centrePoint);
 
-			rete.eval("(assert (ghostCentre " + gc + "))");
+			rete.assertString("(ghostCentre " + gc + ")");
 
 			distanceAssertions(gc, gc.toString(), model_.m_player, rete);
 		}
 
 		// Dots
 		for (Dot dot : model_.m_dots.values()) {
-			rete.eval("(assert (dot " + dot + "))");
+			rete.assertString("(dot " + dot + ")");
 
 			// Distances
 			distanceAssertions(dot, dot.toString(), model_.m_player, rete);
@@ -295,7 +295,7 @@ public class PacManEnvironment extends RRLEnvironment {
 
 		// Powerdots
 		for (PowerDot powerdot : model_.m_powerdots.values()) {
-			rete.eval("(assert (powerDot " + powerdot + "))");
+			rete.assertString("(powerDot " + powerdot + ")");
 
 			// Distances
 			distanceAssertions(powerdot, powerdot.toString(), model_.m_player,
@@ -304,7 +304,7 @@ public class PacManEnvironment extends RRLEnvironment {
 
 		// Fruit
 		if (model_.m_fruit.isEdible()) {
-			rete.eval("(assert (fruit " + model_.m_fruit + "))");
+			rete.assertString("(fruit " + model_.m_fruit + ")");
 
 			// Distances
 			distanceAssertions(model_.m_fruit, model_.m_fruit.toString(),
@@ -312,10 +312,10 @@ public class PacManEnvironment extends RRLEnvironment {
 		}
 
 		// Score, level, lives, highScore
-		rete.eval("(assert (level " + model_.m_stage + "))");
-		rete.eval("(assert (lives " + model_.m_nLives + "))");
-		rete.eval("(assert (score " + model_.m_player.m_score + "))");
-		rete.eval("(assert (highScore " + model_.m_highScore + "))");
+		rete.assertString("(level " + model_.m_stage + ")");
+		rete.assertString("(lives " + model_.m_nLives + ")");
+		rete.assertString("(score " + model_.m_player.m_score + ")");
+		rete.assertString("(highScore " + model_.m_highScore + ")");
 	}
 
 	@Override

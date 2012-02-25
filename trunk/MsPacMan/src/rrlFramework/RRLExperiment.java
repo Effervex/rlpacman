@@ -327,10 +327,12 @@ public class RRLExperiment {
 		if (finiteEpisodes == -1)
 			finiteEpisodes = Integer.MAX_VALUE;
 		int episodeCount = 0;
-		while (!agent_.isLearningComplete() && episodeCount < finiteEpisodes) {
+		while (!agent_.isLearningComplete()) {
 			episode();
 
 			episodeCount++;
+			if (episodeCount >= finiteEpisodes)
+				agent_.freeze(true);
 		}
 
 		agent_.cleanup();

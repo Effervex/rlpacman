@@ -200,8 +200,10 @@ public abstract class StateSpec {
 			// Actions
 			initialiseActionPredicates();
 
-			// Initialise the background knowledge rules
+			// Initialise the constant facts
+			initialiseDefFacts();
 
+			// Initialise the background knowledge rules
 			initialiseBackgroundRules(typeAssertions);
 
 			// Initialise the goal state rules
@@ -217,6 +219,19 @@ public abstract class StateSpec {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void initialiseDefFacts() throws JessException {
+		Collection<String> constantFacts = initialiseConstantFacts();
+		if (constantFacts == null)
+			return;
+
+		StringBuffer buffer = new StringBuffer("(deffacts constants");
+		for (String fact : constantFacts) {
+			buffer.append(" " + fact);
+		}
+		buffer.append(")");
+		rete_.eval(buffer.toString());
 	}
 
 	private void initialiseActionPredicates() throws JessException {
@@ -464,6 +479,14 @@ public abstract class StateSpec {
 	 *         post).
 	 */
 	protected abstract Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge();
+
+	/**
+	 * Initialises the constant facts (facts that are always true) for the
+	 * environment.
+	 * 
+	 * @return A collection of facts in JESS String form.
+	 */
+	protected abstract Collection<String> initialiseConstantFacts();
 
 	/**
 	 * Initialises the goal state.

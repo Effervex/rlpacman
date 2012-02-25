@@ -1015,8 +1015,6 @@ public class RLMarioMovement {
 			throws Exception {
 		initialiseExtraEnvironmentObservations(environment);
 
-		// Player
-		rete.assertString("(mario player))");
 		// Mario state
 		switch (environment.getMarioMode()) {
 		case 2:
@@ -1067,13 +1065,9 @@ public class RLMarioMovement {
 			}
 		}
 		shellPositions_ = currentShells;
-
-		// Ever present goal
-		rete.assertString("(flag goal))");
+		
 		rete.assertString("(distance goal " + marioCentreX_
 				* LevelScene.cellSize + ")");
-		rete.assertString("(canJumpOn goal)");
-		rete.assertString("(heightDiff goal 0)");
 	}
 
 	/**

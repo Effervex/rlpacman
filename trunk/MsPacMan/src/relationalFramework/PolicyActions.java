@@ -2,10 +2,12 @@ package relationalFramework;
 
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
+import rrlFramework.RRLExperiment;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 
 /**
@@ -81,6 +83,23 @@ public class PolicyActions {
 		return activeActions_.get(0);
 	}
 
+	/**
+	 * Gets a random action from the collection of fired actions in the action
+	 * list.
+	 * 
+	 * @return A random action from the first collection of fired actions.
+	 */
+	public RelationalPredicate getFirstRandomAction() {
+		Collection<FiredAction> firedActions = getFirstActionList();
+		if (firedActions == null)
+			return null;
+		List<FiredAction> actionsList = new ArrayList<FiredAction>(firedActions);
+		FiredAction selectedAction = actionsList.get(RRLExperiment.random_
+				.nextInt(actionsList.size()));
+		selectedAction.triggerRule();
+		return selectedAction.getAction();
+	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -114,5 +133,9 @@ public class PolicyActions {
 	 */
 	public Collection<RelationalPolicy> getFiredPolicies() {
 		return firedPolicies_;
+	}
+
+	public boolean isEmpty() {
+		return activeActions_.isEmpty();
 	}
 }

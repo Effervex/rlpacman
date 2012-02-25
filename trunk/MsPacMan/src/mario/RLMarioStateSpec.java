@@ -327,4 +327,16 @@ public class RLMarioStateSpec extends StateSpec {
 
 		return new Point(localX, localY);
 	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		Collection<String> constants = new ArrayList<String>();
+		constants.add("(mario player)");
+
+		// Ever present goal
+		constants.add("(flag goal)");
+		constants.add("(canJumpOn goal)");
+		constants.add("(heightDiff goal 0)");
+		return constants;
+	}
 }
