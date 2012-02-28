@@ -1,0 +1,6 @@
+jCloisterZone.Carcassonne
+10
+-1
+carcassonneElites.txt
+carcassonneTest.txt
+"multi AI 6"

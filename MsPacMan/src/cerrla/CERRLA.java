@@ -32,6 +32,7 @@ import util.Recursive;
  */
 public class CERRLA implements RRLAgent {
 	/** The modular policy being tested. */
+	// TODO Modify this to maintain multiple policies for multiple agents.
 	private ModularPolicy currentPolicy_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */

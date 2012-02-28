@@ -1,0 +1,6 @@
+blocksWorldBounded.BlocksWorld
+10
+-1
+blocksActiveElites.txt
+blocksActiveTest.txt
+10,"goal onab"

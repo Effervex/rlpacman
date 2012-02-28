@@ -48,6 +48,7 @@ import com.jcloisterzone.game.CustomRule;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.Snapshot;
+import com.jcloisterzone.game.PlayerSlot.SlotType;
 import com.jcloisterzone.game.phase.ActionPhase;
 import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
@@ -566,8 +567,10 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 
 	@Override
 	public synchronized void selectAction(List<PlayerAction> actions) {
-		actions_ = actions;
-		readyToExecute_.countDown();
+		if (environment_.getTurnPlayer().getSlot().getType() == SlotType.PLAYER) {
+			actions_ = actions;
+			readyToExecute_.countDown();
+		}
 	}
 
 	@Override
@@ -578,8 +581,10 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	@Override
 	public synchronized void selectTilePlacement(
 			Map<Position, Set<Rotation>> placements) {
-		tilePositions_ = placements;
-		readyToExecute_.countDown();
+		if (environment_.getTurnPlayer().getSlot().getType() == SlotType.PLAYER) {
+			tilePositions_ = placements;
+			readyToExecute_.countDown();
+		}
 	}
 
 	@Override
@@ -694,6 +699,10 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	@Override
 	public void undeployed(Meeple meeple) {
 		// N/A
+	}
+
+	public void setGame(Game game) {
+		environment_ = game;
 	}
 
 }

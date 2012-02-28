@@ -10,6 +10,9 @@ import util.Pair;
 
 import cerrla.ProgramArgument;
 
+import com.jcloisterzone.ai.AiPlayer;
+import com.jcloisterzone.ai.LegacyAiPlayer;
+import com.jcloisterzone.ai.RandomAIPlayer;
 import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.feature.Feature;
@@ -25,13 +28,51 @@ import com.jcloisterzone.rmi.ServerIF;
 import com.jcloisterzone.rmi.mina.ClientStub;
 
 public class CarcassonneEnvironment extends RRLEnvironment {
-	private Game environment_;
-	private boolean guiMode_ = true;
-	private int prevScore_;
+	/** The Carcassonne client. */
 	private RRLJCloisterClient client_;
-	private ServerIF server_;
-	private CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
+	/** If the game should exit early. */
 	private boolean earlyExit_;
+	/** The current environment. */
+	private Game environment_;
+	/** If viewing experiment in GUI. */
+	private boolean guiMode_ = true;
+	/** The player delay when viewing GUI version. */
+	private int playerDelay = 0;
+	/** The previous score. */
+	private int prevScore_;
+	/** The relational wrapper for (de)relationalising the game. */
+	private CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
+	/** The Carcassonne server. */
+	private ServerIF server_;
+	/** The AI players. */
+	private AiPlayer[] players_ = {};
+
+	/**
+	 * Cycles through the phases whenever necessary. Also replaces the
+	 * proxy-based DrawPhase with a proxyless version.
+	 */
+	private void runPhases() {
+		// Sleep for visual aid.
+		if (playerDelay > 0) {
+			try {
+				Thread.sleep(playerDelay);
+			} catch (InterruptedException e) {
+			}
+		}
+
+		Phase phase = environment_.getPhase();
+
+		// Cycle through (probably only once) to keep the game moving.
+		while (phase != null && !phase.isEntered()) {
+			// Modifying DrawPhase to proxyless version
+			if (phase.getClass().equals(DrawPhase.class))
+				phase = environment_.getPhases().get(ProxylessDrawPhase.class);
+
+			phase.setEntered(true);
+			phase.enter();
+			phase = environment_.getPhase();
+		}
+	}
 
 	@Override
 	protected void assertStateFacts(Rete rete, List<String> goalArgs)
@@ -64,6 +105,20 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
+	protected boolean isTerminal() {
+		boolean terminal = earlyExit_
+				|| environment_.getPhase() instanceof GameOverPhase
+				|| super.isTerminal();
+		if (terminal && playerDelay > 0) {
+			try {
+				Thread.sleep(playerDelay * 10);
+			} catch (InterruptedException e) {
+			}
+		}
+		return terminal;
+	}
+
+	@Override
 	protected void startState() {
 		relationalWrapper_.startState();
 
@@ -92,10 +147,20 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			server_.setRandomGenerator(RRLExperiment.random_);
 
 			// Handle number of players playing
-			PlayerSlot slot = new PlayerSlot(0, PlayerSlot.SlotType.PLAYER,
-					"CERRLA", clientID);
-			slot.setOwner(clientID);
+			int slotIndex = 0;
+			PlayerSlot slot = new PlayerSlot(slotIndex++,
+					PlayerSlot.SlotType.PLAYER, "CERRLA", clientID);
 			server_.updateSlot(slot, null);
+			// AI Players
+			for (AiPlayer ai : players_) {
+				slot = new PlayerSlot(slotIndex, PlayerSlot.SlotType.AI, "AI"
+						+ slotIndex, clientID);
+				slot.setAiClassName(RandomAIPlayer.class.getName());
+				server_.updateSlot(slot, LegacyAiPlayer.supportedExpansions());
+				slotIndex++;
+			}
+
+			// Start the game.
 			environment_ = client_.getGame();
 			while (environment_ == null) {
 				try {
@@ -104,6 +169,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 				}
 				environment_ = client_.getGame();
 			}
+			relationalWrapper_.setGame(environment_);
 			environment_.addUserInterface(relationalWrapper_);
 			environment_.addGameListener(relationalWrapper_);
 		}
@@ -121,25 +187,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		}
 
 		runPhases();
-	}
-
-	/**
-	 * Cycles through the phases whenever necessary. Also replaces the
-	 * proxy-based DrawPhase with a proxyless version.
-	 */
-	private void runPhases() {
-		Phase phase = environment_.getPhase();
-
-		// Cycle through (probably only once) to keep the game moving.
-		while (phase != null && !phase.isEntered()) {
-			// Modifying DrawPhase to proxyless version
-			if (phase.getClass().equals(DrawPhase.class))
-				phase = environment_.getPhases().get(ProxylessDrawPhase.class);
-
-			phase.setEntered(true);
-			phase.enter();
-			phase = environment_.getPhase();
-		}
 	}
 
 	@Override
@@ -173,12 +220,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected boolean isTerminal() {
-		return earlyExit_ || environment_.getPhase() instanceof GameOverPhase
-				|| super.isTerminal();
-	}
-
-	@Override
 	public void cleanup() {
 		// TODO Auto-generated method stub
 
@@ -188,13 +229,35 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	public void initialise(int runIndex, String[] extraArg) {
 		guiMode_ = !ProgramArgument.EXPERIMENT_MODE.booleanValue();
 
-		if (guiMode_) {
-			client_ = new GuiCarcassonneClient("config.ini", true);
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
+		// Only initialise the client if it's not already initialised.
+		if (client_ == null) {
+			// Parse play speed
+			for (String arg : extraArg) {
+				// Setting up multiple agents
+				if (arg.startsWith("multi")) {
+					String[] split = arg.split(" ");
+					if (split[1].equals("AI")) {
+						players_ = new AiPlayer[Integer.parseInt(split[2]) - 1];
+						for (int i = 0; i < players_.length; i++)
+							players_[i] = new LegacyAiPlayer();
+					}
+				}
+				try {
+					int playSpeed = Integer.parseInt(arg);
+					if (guiMode_)
+						playerDelay = playSpeed;
+				} catch (Exception e) {
+				}
 			}
-		} else
-			client_ = new LocalCarcassonneClient("config.ini");
+
+			if (guiMode_) {
+				client_ = new GuiCarcassonneClient("config.ini", true);
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+				}
+			} else
+				client_ = new LocalCarcassonneClient("config.ini");
+		}
 	}
 }

@@ -97,7 +97,6 @@ public class PolicyEnsemble {
 	 *            If the policies note rules fired as triggered.
 	 * @return The selected action choice (decided by ensemble vote).
 	 */
-	@SuppressWarnings("unchecked")
 	public PolicyActions evaluatePolicy(RRLObservations observations,
 			int numReturnedActions) {
 		ActionChoiceEnsemble ace = new ActionChoiceEnsemble();
@@ -128,7 +127,6 @@ public class PolicyEnsemble {
 	 * @param goalArgs
 	 *            The goal args.
 	 */
-	@SuppressWarnings("unchecked")
 	public void parameterArgs(BidiMap goalArgs) {
 		for (RelationalPolicy pol : policies_)
 			pol.parameterArgs(goalArgs);

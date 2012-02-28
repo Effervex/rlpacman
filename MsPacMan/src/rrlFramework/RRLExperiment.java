@@ -321,23 +321,22 @@ public class RRLExperiment {
 
 		agent_.initialise(runIndex);
 		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
+		
+		if (ProgramArgument.TESTING.booleanValue())
+			agent_.freeze(true);
 
 		// Continue to run episodes until either the agent states it is
 		// converged, or a finite pre-specified number of episodes have passed.
 		if (finiteEpisodes == -1)
 			finiteEpisodes = Integer.MAX_VALUE;
 		int episodeCount = 0;
-		long startTime = System.currentTimeMillis();
-		while (!agent_.isLearningComplete()) {
+		while (!agent_.isLearningComplete()
+				|| ProgramArgument.TESTING.booleanValue()) {
 			episode();
 
 			episodeCount++;
 			if (episodeCount >= finiteEpisodes)
 				agent_.freeze(true);
-
-			long endTime = System.currentTimeMillis();
-			System.out.println("Av time (" + episodeCount + "): "
-					+ (endTime - startTime) / episodeCount);
 		}
 
 		agent_.cleanup();
