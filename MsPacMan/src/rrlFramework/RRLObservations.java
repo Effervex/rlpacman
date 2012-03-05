@@ -1,5 +1,7 @@
 package rrlFramework;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.SortedSet;
 
 import org.apache.commons.collections.BidiMap;
@@ -14,11 +16,11 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public class RRLObservations {
-	/** The goal replacement map (a -> ?G_0) form. */
-	private BidiMap goalReplacements_;
+	/** If an observation or turn applies to all players. */
+	public static final String ALL_PLAYERS = "ALL";
 
-	/** The reward received (if any). */
-	private double reward_;
+	/** All observations regarding player-mapped information. */
+	private Map<String, Double> agentRewards_;
 
 	/** The current relational state. */
 	private Rete state_;
@@ -29,8 +31,14 @@ public class RRLObservations {
 	/** The valid actions the agent can take. */
 	private MultiMap<String, String[]> validActions_;
 
+	/** Defines which agent's turn it is. */
+	private String agentTurn_;
+
+	/** The goal replacement map (a -> ?G_0) form. */
+	private BidiMap goalReplacements_;
+
 	/**
-	 * A constructor with a goal observations and a reward.
+	 * An RRLObservations constructor for a single agent.
 	 * 
 	 * @param state
 	 *            The state of the system.
@@ -45,23 +53,67 @@ public class RRLObservations {
 	 */
 	public RRLObservations(Rete state, MultiMap<String, String[]> validActions,
 			double reward, BidiMap goalReplacements, boolean terminal) {
+		this(state, validActions, terminal, goalReplacements, ALL_PLAYERS);
+		agentRewards_.put(ALL_PLAYERS, reward);
+		agentTurn_ = ALL_PLAYERS;
+	}
+
+	/**
+	 * A smaller constructor, which only defines some of the observations. The
+	 * rest are added in following calls with accompanied player IDs.
+	 * 
+	 * @param state
+	 *            The state of the system.
+	 * @param validActions
+	 *            The valid actions within the system.
+	 * @param terminal
+	 *            If this state is terminal.
+	 * @param goalReplacements
+	 *            The replacements for the goal terms.
+	 */
+	public RRLObservations(Rete state, MultiMap<String, String[]> validActions,
+			boolean terminal, BidiMap goalReplacements, String agentTurn) {
 		state_ = state;
-		validActions_ = validActions;
 		goalReplacements_ = goalReplacements;
-		reward_ = reward;
+		validActions_ = validActions;
 		terminal_ = terminal;
+		agentTurn_ = agentTurn;
+		agentRewards_ = new HashMap<String, Double>();
+	}
+
+	/**
+	 * Adds player-specific observations.
+	 * 
+	 * @param player
+	 *            The observation player.
+	 * @param reward
+	 *            The reward for the player.
+	 */
+	public void addPlayerObservations(String player, double reward) {
+		agentRewards_.put(player, reward);
 	}
 
 	public BidiMap getGoalReplacements() {
 		return goalReplacements_;
 	}
 
-	public double getReward() {
-		return reward_;
+	public double getReward(String player) {
+		return agentRewards_.get(player);
+	}
+
+	public double getReward() throws IllegalAccessException {
+		if (!agentRewards_.containsKey(ALL_PLAYERS))
+			throw new IllegalAccessException(
+					"Cannot get reward for all players.");
+		return agentRewards_.get(ALL_PLAYERS);
 	}
 
 	public Rete getState() {
 		return state_;
+	}
+
+	public String getAgentTurn() {
+		return agentTurn_;
 	}
 
 	/**
@@ -79,7 +131,7 @@ public class RRLObservations {
 		}
 		return null;
 	}
-	
+
 	public MultiMap<String, String[]> getValidActions() {
 		return validActions_;
 	}

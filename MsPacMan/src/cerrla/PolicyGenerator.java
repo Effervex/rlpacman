@@ -242,19 +242,20 @@ public final class PolicyGenerator implements Serializable {
 			if (reo instanceof ModularSubGoal) {
 				// TODO Not counting modular policies unless the module is
 				// converged
-				ModularPolicy modPol = ((ModularSubGoal) reo).getModularPolicy();
+				ModularPolicy modPol = ((ModularSubGoal) reo)
+						.getModularPolicy();
 				// Adding modular rules to the main policy only if the sub goal
 				// is converged.
-//				if (modPol.getLocalCEDistribution().isConverged())
-//					recurseCountPolicyRules(modPol, weight, meanNotedSlots, ed,
-//							slotMean, orderedFiredSlots);
+				// if (modPol.getLocalCEDistribution().isConverged())
+				// recurseCountPolicyRules(modPol, weight, meanNotedSlots, ed,
+				// slotMean, orderedFiredSlots);
 			} else if (firingRules.contains(reo)) {
 				RelationalRule rule = ((RelationalRule) reo);
 				// May have to get/create new rule
 				// TODO Unsure about this...
-//				if (!mainPolicy)
-//					rule = getCreateCorrespondingRule(rule,
-//							policy.getModularReplacementMap());
+				// if (!mainPolicy)
+				// rule = getCreateCorrespondingRule(rule,
+				// policy.getModularReplacementMap());
 
 				Slot ruleSlot = rule.getSlot();
 				// Slot counts
@@ -648,8 +649,9 @@ public final class PolicyGenerator implements Serializable {
 	public int determinePopulation() {
 		// N_E = Max(average # rules in high mu(S) slots, Sum mu(S))
 		double maxWeightedRuleCount = 0;
+		double maxAbsWeightedRuleCount = 0;
 		double maxSlotMean = 0;
-		double sumWeightedRuleCount = 0;
+		double sumKLWeightedRuleCount = 0;
 		double sumSlotMean = 0;
 		for (Slot slot : slotGenerator_) {
 			// If using slot fixing, don't count fixed slots.
@@ -663,9 +665,13 @@ public final class PolicyGenerator implements Serializable {
 				// Use klSize to determine the skew of the slot size
 				double klSize = slot.klSize();
 				double weightedRuleCount = klSize * weight;
-				sumWeightedRuleCount += weightedRuleCount;
+				sumKLWeightedRuleCount += weightedRuleCount;
 				if (weightedRuleCount > maxWeightedRuleCount)
 					maxWeightedRuleCount = weightedRuleCount;
+
+				double absWeightedRuleCount = slot.size() * weight;
+				if (absWeightedRuleCount > maxAbsWeightedRuleCount)
+					maxAbsWeightedRuleCount = absWeightedRuleCount;
 			}
 		}
 
@@ -678,7 +684,7 @@ public final class PolicyGenerator implements Serializable {
 			break;
 		case ProgramArgument.ELITES_SIZE_SUM_RULES:
 			// Elites is equal to the total number of rules (KL sized)
-			population = Math.max(sumWeightedRuleCount, sumSlotMean) / rho;
+			population = Math.max(sumKLWeightedRuleCount, sumSlotMean) / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULES:
 			// Elites is equal to the (weighted) maximum slot size
@@ -694,7 +700,7 @@ public final class PolicyGenerator implements Serializable {
 		default:
 			// Elites is equal to the average number of rules in high mean
 			// slots.
-			population = Math.max(sumWeightedRuleCount / sumSlotMean,
+			population = Math.max(sumKLWeightedRuleCount / sumSlotMean,
 					sumSlotMean) / rho;
 		}
 
@@ -909,6 +915,17 @@ public final class PolicyGenerator implements Serializable {
 				return false;
 		}
 		return true;
+	}
+
+	/**
+	 * If a rule is within this policy generator.
+	 * 
+	 * @param rule
+	 *            The rule being checked.
+	 * @return True if the rule exists within this generator.
+	 */
+	public boolean isRuleExists(RelationalRule rule) {
+		return currentRules_.contains(rule);
 	}
 
 	/**
@@ -1327,7 +1344,8 @@ public final class PolicyGenerator implements Serializable {
 	 * @return The removed RLGG rules.
 	 */
 	protected Collection<RelationalRule> removeRLGGRules() {
-		Collection<RelationalRule> oldRLGGs = new HashSet<RelationalRule>(rlggRules_.values());
+		Collection<RelationalRule> oldRLGGs = new HashSet<RelationalRule>(
+				rlggRules_.values());
 		currentRules_.removeAll(oldRLGGs);
 		rlggRules_.clear();
 		return oldRLGGs;

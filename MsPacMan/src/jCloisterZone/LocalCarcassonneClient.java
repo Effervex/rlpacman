@@ -10,6 +10,7 @@ import com.jcloisterzone.board.Location;
 import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventListener;
+import com.jcloisterzone.feature.Castle;
 import com.jcloisterzone.feature.Completable;
 import com.jcloisterzone.feature.Feature;
 import com.jcloisterzone.feature.visitor.score.CompletableScoreContext;
@@ -55,24 +56,16 @@ public class LocalCarcassonneClient implements RRLJCloisterClient,
 		if (server == null) {
 			game = new Game();
 			server = new LocalCarcassonneServer(game);
-			// clientStub_ = new LocalCarcassonneClientStub();
-			// LocalCarcassonneServer localServer = new LocalCarcassonneServer(
-			// clientStub_.getGame());
-			// clientStub_.setServerProxy(localServer);
-			//
-			// server = (ServerIF) Proxy.newProxyInstance(
-			// ServerIF.class.getClassLoader(),
-			// new Class[] { ServerIF.class }, clientStub_);
-			//
-			// game = clientStub_.getGame();
+			
 			game.addGameListener(this);
-			game.getPhases().put(CreateGamePhase.class,
-					new CreateGamePhase(game, server));
+			game.getPhases().put(ProxylessCreateGamePhase.class,
+					new ProxylessCreateGamePhase(game, server));
 			game.setConfig(config);
 		}
 
 		// Start the game.
-		Phase createGamePhase = game.getPhases().get(CreateGamePhase.class);
+		Phase createGamePhase = game.getPhases().get(
+				ProxylessCreateGamePhase.class);
 		game.setPhase(createGamePhase);
 		running_ = true;
 	}
@@ -198,5 +191,15 @@ public class LocalCarcassonneClient implements RRLJCloisterClient,
 	@Override
 	public void gameOver() {
 		closeGame(true);
+	}
+
+	@Override
+	public void bridgeDeployed(Position pos, Location loc) {
+		// N/A
+	}
+
+	@Override
+	public void castleDeployed(Castle castle1, Castle castle2) {
+		// N/A
 	}
 }

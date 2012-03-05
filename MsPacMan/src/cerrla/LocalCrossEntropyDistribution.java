@@ -21,6 +21,8 @@ import org.apache.commons.collections.BidiMap;
 
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
+import cerrla.modular.ModularSubGoal;
+import cerrla.modular.PolicyItem;
 import cerrla.modular.SpecificGoalCondition;
 
 import jess.QueryResult;
@@ -509,17 +511,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		double average = performance_
 				.noteSampleRewards(values, currentEpisode_);
 
-		if (!frozen_) {
+		// Calculate the population and number of elites
+		population_ = policyGenerator_.determinePopulation();
+		numElites_ = (int) Math.ceil(population_
+				* ProgramArgument.RHO.doubleValue());
+		if (!frozen_ && isValidSample(sample)) {
 			// Add sample to elites
 			PolicyValue pv = new PolicyValue(sample, average,
 					policyGenerator_.getPoliciesEvaluated());
 			elites_.add(pv);
 			policyGenerator_.incrementPoliciesEvaluated();
 
-			// Calculate the population and number of elites
-			population_ = policyGenerator_.determinePopulation();
-			numElites_ = (int) Math.ceil(population_
-					* ProgramArgument.RHO.doubleValue());
 			// Update distributions (depending on number of elites)
 			updateDistributions(elites_, population_, numElites_);
 
@@ -569,6 +571,33 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 			oldAOSettled_ = localAgentObservations_.isSettled();
 		}
+	}
+
+	/**
+	 * If the sample being recorded is a valid sample (consists of current
+	 * rules).
+	 * 
+	 * @param sample
+	 *            The sample being recorded.
+	 * @return True if the sample contains only valid rules, false if it
+	 *         contains old, invalid rules.
+	 */
+	private boolean isValidSample(ModularPolicy sample) {
+		for (PolicyItem pi : sample.getRules()) {
+			if (pi instanceof RelationalRule) {
+				// Check that the rule is valid within this distribution
+				if (!policyGenerator_.isRuleExists((RelationalRule) pi))
+					return false;
+			} else if (pi instanceof ModularSubGoal) {
+				ModularPolicy innerModPol = ((ModularSubGoal) pi)
+						.getModularPolicy();
+				if (innerModPol != null
+						&& !innerModPol.getLocalCEDistribution().isValidSample(
+								innerModPol))
+					return false;
+			}
+		}
+		return true;
 	}
 
 	/**
