@@ -69,9 +69,9 @@ public class RuleCreationTest {
 		mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
@@ -88,9 +88,9 @@ public class RuleCreationTest {
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule("(clear a) (above a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (on a ?G_0) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?) (on a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (on a ?G_1) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?) (on a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
@@ -112,10 +112,10 @@ public class RuleCreationTest {
 				"(clear a) (clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?X) (on ?X ?G_0) => (moveFloor ?X)");
+				"(clear a) (clear ?X) (above ?X ?) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?X) (on ?X ?G_1) => (moveFloor ?X)");
+				"(clear a) (clear ?X) (above ?X ?) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
