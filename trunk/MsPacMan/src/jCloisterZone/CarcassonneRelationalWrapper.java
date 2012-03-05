@@ -29,6 +29,7 @@ import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.board.Tile;
 import com.jcloisterzone.event.GameEventListener;
+import com.jcloisterzone.feature.Castle;
 import com.jcloisterzone.feature.City;
 import com.jcloisterzone.feature.Cloister;
 import com.jcloisterzone.feature.Completable;
@@ -69,12 +70,14 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	private Map<String, Feature> featureMap_ = new HashMap<String, Feature>();
 	/** A map for storing valid locations. */
 	private Map<String, Position> locationMap_ = new HashMap<String, Position>();
+	/** If no action (a random action) was selected in the last step. */
+	private boolean randomActionSelected_;
+	/** If this thread is safe to execute. */
+	private volatile CountDownLatch readyToExecute_;
 	/** The count of tiles for unique IDs. */
 	private int tileCount_ = 0;
 	/** The available tile positions per tile phase. */
 	private Map<Position, Set<Rotation>> tilePositions_;
-	/** If this thread is safe to execute. */
-	private volatile CountDownLatch readyToExecute_;
 
 	/**
 	 * Asserts a city.
@@ -113,7 +116,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 		rete.assertString("(cloister " + cloisterName + ")");
 		// Don't assert other information about unplaced cloisters.
 		if (cloister.getNeighbouring() != null) {
-			if (cloister.isFeatureCompleted())
+			if (cloister.getScoreContext().isCompleted())
 				rete.assertString("(completed " + cloisterName + ")");
 			else {
 				rete.assertString("(worth " + cloisterName + " "
@@ -312,7 +315,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 
 		// Assert the number of surrounding tiles
 		int numAdjacentAndDiagonal = environment_.getBoard()
-				.getAllNeigbourTiles(position).size();
+				.getAdjacentTilesMap(position).size();
 		rete.assertString("(numSurroundingTiles " + loc + " "
 				+ numAdjacentAndDiagonal + ")");
 
@@ -432,6 +435,59 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	}
 
 	/**
+	 * Selects a random tile placement.
+	 * 
+	 * @param game
+	 *            The current state of the game.
+	 * @return A valid placed Pair of position and rotation.
+	 */
+	private Pair<Position, Rotation> randomTilePlacement(Game game) {
+		Map<Position, Set<Rotation>> placements = game.getBoard()
+				.getAvailablePlacements();
+		int selected = RRLExperiment.random_.nextInt(placements.size());
+		// Random position
+		for (Position pos : placements.keySet()) {
+			if (selected == 0) {
+				Set<Rotation> rots = placements.get(pos);
+				selected = RRLExperiment.random_.nextInt(rots.size());
+				// Random rotation
+				for (Rotation rot : rots) {
+					if (selected == 0) {
+						return new Pair<Position, Rotation>(pos, rot);
+					} else
+						selected--;
+				}
+			} else
+				selected--;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Sleeps (yields thread) until the game is ready to accept actions.
+	 * 
+	 * @param game
+	 *            The game.
+	 * @return True if the game is over.
+	 */
+	private boolean sleepUntilReady(Game game) {
+		// Wait for the game.
+		try {
+			readyToExecute_.await();
+		} catch (Exception e) {
+		}
+
+		// If the game is over, return true.
+		if (game.getPhase() instanceof GameOverPhase)
+			return true;
+
+		// Restart the counter.
+		readyToExecute_ = new CountDownLatch(1);
+		return false;
+	}
+
+	/**
 	 * Asserts the facts of the state.
 	 * 
 	 * @param rete
@@ -483,26 +539,37 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	}
 
 	/**
-	 * Sleeps (yields thread) until the game is ready to accept actions.
+	 * Was no tile placed in the previous iteration?
 	 * 
-	 * @param game
-	 *            The game.
-	 * @return True if the game is over.
+	 * @return True if no tile was placed in the previous iteration.
 	 */
-	private boolean sleepUntilReady(Game game) {
-		// Wait for the game.
-		try {
-			readyToExecute_.await();
-		} catch (Exception e) {
-		}
+	public boolean wasNoTilePlaced() {
+		return randomActionSelected_;
+	}
 
-		// If the game is over, return true.
-		if (game.getPhase() instanceof GameOverPhase)
-			return true;
+	@Override
+	public void completed(Completable feature, CompletableScoreContext ctx) {
+		// N/A
+	}
 
-		// Restart the counter.
-		readyToExecute_ = new CountDownLatch(1);
-		return false;
+	@Override
+	public void deployed(Meeple meeple) {
+		// N/A
+	}
+
+	@Override
+	public void dragonMoved(Position p) {
+		// N/A
+	}
+
+	@Override
+	public void fairyMoved(Position p) {
+		// N/A
+	}
+
+	@Override
+	public void gameOver() {
+		readyToExecute_.countDown();
 	}
 
 	/**
@@ -514,21 +581,33 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	 *            The actions to ground
 	 * @param game
 	 *            The current state of the game.
+	 * @param alwaysAction
+	 *            If, in the TilePhase, an action is always selected.
 	 * @return Either a location and rotation to place a tile, or a location to
 	 *         place a meeple (or null for no action).
 	 */
-	public Object groundActions(PolicyActions actions, Game game) {
+	public Object groundActions(PolicyActions actions, Game game,
+			boolean alwaysAction) {
+		randomActionSelected_ = false;
 		Phase phase = environment_.getPhase();
 		RelationalPredicate action = actions.getFirstRandomAction();
 		if (phase instanceof TilePhase) {
 			// Exit the game if no action choice made.
 			if (action == null) {
-				readyToExecute_.countDown();
-
 				if (RRLExperiment.debugMode_) {
 					System.out.println("Tile phase: NO ACTION SELECTED");
 				}
-				return null;
+
+				if (alwaysAction) {
+					// Select a random tile placement.
+					randomActionSelected_ = true;
+					return randomTilePlacement(game);
+				} else {
+					// Exit the episode.
+					readyToExecute_.countDown();
+
+					return null;
+				}
 			}
 
 			// Get position and rotation
@@ -558,6 +637,29 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			return featureMap_.get(args[2]);
 		}
 		return null;
+	}
+
+	@Override
+	public void playerActivated(Player turnPlayer, Player activePlayer) {
+		// N/A
+	}
+
+	@Override
+	public void ransomPaid(Player from, Player to, Follower meeple) {
+		// N/A
+	}
+
+
+	@Override
+	public void scored(Feature feature, int points, String label,
+			Meeple meeple, boolean isFinal) {
+		// N/A
+	}
+
+	@Override
+	public void scored(Position position, Player player, int points,
+			String label, boolean isFinal) {
+		// N/A
 	}
 
 	@Override
@@ -592,35 +694,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 		// N/A
 	}
 
-	public void startState() {
-		readyToExecute_ = new CountDownLatch(1);
-	}
-
-	@Override
-	public void gameOver() {
-		readyToExecute_.countDown();
-	}
-
-
-	// ////////////////// UNUSED METHODS ///////////////
-	@Override
-	public void updateSlot(PlayerSlot slot) {
-		// N/A
-	}
-
-	@Override
-	public void updateExpansion(Expansion expansion, Boolean enabled) {
-		// N/A
-	}
-
-	@Override
-	public void updateCustomRule(CustomRule rule, Boolean enabled) {
-		// N/A
-	}
-
-	@Override
-	public void updateSupportedExpansions(EnumSet<Expansion> expansions) {
-		// N/A
+	public void setGame(Game game) {
+		environment_ = game;
 	}
 
 	@Override
@@ -628,13 +703,12 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 		// N/A
 	}
 
-	@Override
-	public void playerActivated(Player turnPlayer, Player activePlayer) {
-		// N/A
+	public void startState() {
+		readyToExecute_ = new CountDownLatch(1);
 	}
 
 	@Override
-	public void ransomPaid(Player from, Player to, Follower meeple) {
+	public void tileDiscarded(String tileId) {
 		// N/A
 	}
 
@@ -644,22 +718,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	}
 
 	@Override
-	public void tileDiscarded(String tileId) {
-		// N/A
-	}
-
-	@Override
 	public void tilePlaced(Tile tile) {
-		// N/A
-	}
-
-	@Override
-	public void dragonMoved(Position p) {
-		// N/A
-	}
-
-	@Override
-	public void fairyMoved(Position p) {
 		// N/A
 	}
 
@@ -675,34 +734,44 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	}
 
 	@Override
-	public void completed(Completable feature, CompletableScoreContext ctx) {
-		// N/A
-	}
-
-	@Override
-	public void scored(Feature feature, int points, String label,
-			Meeple meeple, boolean isFinal) {
-		// N/A
-	}
-
-	@Override
-	public void scored(Position position, Player player, int points,
-			String label, boolean isFinal) {
-		// N/A
-	}
-
-	@Override
-	public void deployed(Meeple meeple) {
-		// N/A
-	}
-
-	@Override
 	public void undeployed(Meeple meeple) {
 		// N/A
 	}
 
-	public void setGame(Game game) {
-		environment_ = game;
+	@Override
+	public void updateCustomRule(CustomRule rule, Boolean enabled) {
+		// N/A
+	}
+
+	@Override
+	public void updateExpansion(Expansion expansion, Boolean enabled) {
+		// N/A
+	}
+
+	// ////////////////// UNUSED METHODS ///////////////
+	@Override
+	public void updateSlot(PlayerSlot slot) {
+		// N/A
+	}
+
+	@Override
+	public void updateSupportedExpansions(EnumSet<Expansion> expansions) {
+		// N/A
+	}
+
+	@Override
+	public void showWarning(String title, String message) {
+		// N/A
+	}
+
+	@Override
+	public void bridgeDeployed(Position pos, Location loc) {
+		// N/A
+	}
+
+	@Override
+	public void castleDeployed(Castle castle1, Castle castle2) {
+		// N/A
 	}
 
 }

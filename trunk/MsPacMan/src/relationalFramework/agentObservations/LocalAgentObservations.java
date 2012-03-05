@@ -1049,9 +1049,9 @@ public class LocalAgentObservations extends SettlingScan implements
 					for (int i = 0; i < condition.getArguments().length; i++) {
 						RelationalArgument arg = condition
 								.getRelationalArguments()[i];
-						// If the arg is a number
+						// If the arg is a variable number
 						if (StateSpec.isNumberType(argTypes[i])
-								&& !arg.equals(RelationalArgument.ANONYMOUS)) {
+								&& arg.isVariable()) {
 							RangeContext context = new RangeContext(i,
 									condition, baseRule.getAction());
 							// If the arg is a range or represents a range, can

@@ -35,7 +35,7 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 		this.game = game;
 	}
 
-	private ClientIF getStub() {
+	public ClientIF getStub() {
 		return game.getPhase();
 	}
 
@@ -167,6 +167,16 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 		CallMessage msg = new CallMessage(method, args);
 		msg.call(this, ServerIF.class);
 		return null;
+	}
+
+	@Override
+	public void deployBridge(Position pos, Location loc) {
+		// N/A
+	}
+
+	@Override
+	public void deployCastle(Position pos, Location loc) {
+		// N/A
 	}
 
 }

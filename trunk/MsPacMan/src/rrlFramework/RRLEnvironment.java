@@ -8,6 +8,7 @@ import org.apache.commons.collections.BidiMap;
 
 import relationalFramework.PolicyActions;
 import relationalFramework.StateSpec;
+import util.MultiMap;
 
 /**
  * An interface for a RRL environment.
@@ -64,9 +65,37 @@ public abstract class RRLEnvironment {
 		}
 
 		boolean isTerminal = isTerminal();
-		return new RRLObservations(rete, StateSpec.getInstance()
-				.generateValidActions(rete), calculateReward(isTerminal),
-				goalReplacementMap_, isTerminal);
+		return compileObservation(rete, StateSpec.getInstance()
+				.generateValidActions(rete), goalReplacementMap_, isTerminal);
+	}
+
+	/**
+	 * Compiles the RRLObservations object (default single player).
+	 * 
+	 * @param rete
+	 *            The current Rete state.
+	 * @param validActions
+	 *            The computed valid actions for the state.
+	 * @param goalReplacements
+	 *            The goal replacement map (if any).
+	 * @param isTerminal
+	 *            If this is the terminal state.
+	 * @return An RRLObservations object.
+	 */
+	protected RRLObservations compileObservation(Rete rete,
+			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
+			boolean isTerminal) {
+		return new RRLObservations(rete, validActions,
+				calculateReward(isTerminal), goalReplacements, isTerminal);
+	}
+
+	/**
+	 * Gets the player ID (for multi-agent environments).
+	 * 
+	 * @return A blank string in this, single-player, case.
+	 */
+	protected String getPlayerID() {
+		return "";
 	}
 
 	/**

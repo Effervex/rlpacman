@@ -1,18 +1,27 @@
 package jCloisterZone;
 
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.collections.BidiMap;
+
 import jess.Rete;
 import relationalFramework.PolicyActions;
 import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
+import rrlFramework.RRLObservations;
+import util.MultiMap;
 import util.Pair;
 
 import cerrla.ProgramArgument;
 
-import com.jcloisterzone.ai.AiPlayer;
-import com.jcloisterzone.ai.LegacyAiPlayer;
-import com.jcloisterzone.ai.RandomAIPlayer;
+import com.jcloisterzone.Player;
+import com.jcloisterzone.UserInterface;
+import com.jcloisterzone.ai.legacyplayer.LegacyAiPlayer;
 import com.jcloisterzone.board.Position;
 import com.jcloisterzone.board.Rotation;
 import com.jcloisterzone.feature.Feature;
@@ -20,6 +29,7 @@ import com.jcloisterzone.figure.SmallFollower;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.phase.ActionPhase;
+import com.jcloisterzone.game.phase.CreateGamePhase;
 import com.jcloisterzone.game.phase.DrawPhase;
 import com.jcloisterzone.game.phase.GameOverPhase;
 import com.jcloisterzone.game.phase.Phase;
@@ -28,6 +38,9 @@ import com.jcloisterzone.rmi.ServerIF;
 import com.jcloisterzone.rmi.mina.ClientStub;
 
 public class CarcassonneEnvironment extends RRLEnvironment {
+	private static final String CERRLA_NAME = "CERRLA";
+	private static final String AI_NAME = "AI";
+	private static final int NO_ACTION_PENALTY = -1000;
 	/** The Carcassonne client. */
 	private RRLJCloisterClient client_;
 	/** If the game should exit early. */
@@ -39,13 +52,21 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	/** The player delay when viewing GUI version. */
 	private int playerDelay = 0;
 	/** The previous score. */
-	private int prevScore_;
+	private Map<Player, Integer> prevScores_ = new HashMap<Player, Integer>();
 	/** The relational wrapper for (de)relationalising the game. */
 	private CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
 	/** The Carcassonne server. */
 	private ServerIF server_;
 	/** The AI players. */
-	private AiPlayer[] players_ = {};
+	private String[] players_;
+	/** If there are multiple learning agents at once. */
+	private boolean multiLearners_ = false;
+	/** The current players of the game. */
+	private ArrayList<PlayerSlot> slots_;
+	/** The user interface for the client. */
+	private UserInterface clientInterface_;
+	/** The current player. */
+	private Player currentPlayer_;
 
 	/**
 	 * Cycles through the phases whenever necessary. Also replaces the
@@ -64,9 +85,15 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 		// Cycle through (probably only once) to keep the game moving.
 		while (phase != null && !phase.isEntered()) {
-			// Modifying DrawPhase to proxyless version
-			if (phase.getClass().equals(DrawPhase.class))
-				phase = environment_.getPhases().get(ProxylessDrawPhase.class);
+			// Modifying phases to proxyless versions
+			if (!guiMode_) {
+				if (phase.getClass().equals(CreateGamePhase.class))
+					phase = environment_.getPhases().get(
+							ProxylessCreateGamePhase.class);
+				if (phase.getClass().equals(DrawPhase.class))
+					phase = environment_.getPhases().get(
+							ProxylessDrawPhase.class);
+			}
 
 			phase.setEntered(true);
 			phase.enter();
@@ -78,14 +105,59 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	protected void assertStateFacts(Rete rete, List<String> goalArgs)
 			throws Exception {
 		relationalWrapper_.assertStateFacts(rete, environment_);
+		if (currentPlayer_ == null)
+			currentPlayer_ = environment_.getTurnPlayer();
 	}
 
 	@Override
 	protected double calculateReward(boolean isTerminal) {
-		int currentScore = environment_.getTurnPlayer().getPoints();
-		int diff = currentScore - prevScore_;
-		prevScore_ = currentScore;
+		return calculateReward(currentPlayer_);
+	}
+
+	@Override
+	protected RRLObservations compileObservation(Rete rete,
+			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
+			boolean isTerminal) {
+		// If only a single leaerner, proceed as normal
+		if (!multiLearners_)
+			return super.compileObservation(rete, validActions,
+					goalReplacements, isTerminal);
+
+		// Otherwise note the individual rewards
+		RRLObservations rrlObs = new RRLObservations(rete, validActions,
+				isTerminal, goalReplacements, environment_.getTurnPlayer()
+						.getNick());
+		for (Player p : environment_.getAllPlayers()) {
+			String playerName = p.getNick();
+			if (playerName.startsWith(CERRLA_NAME)) {
+				double playerReward = calculateReward(p);
+				rrlObs.addPlayerObservations(playerName, playerReward);
+			}
+		}
+		return rrlObs;
+	}
+
+	/**
+	 * Calculates a player's reward between steps.
+	 * 
+	 * @param player
+	 *            The player to calculate reward for.
+	 * @return The reward received in one step.
+	 */
+	private double calculateReward(Player player) {
+		int prevScore = getPlayerPrevScore(player);
+
+		int currentScore = player.getPoints();
+		int diff = currentScore - prevScore;
+		prevScores_.put(player, currentScore);
 		return diff;
+	}
+
+	private int getPlayerPrevScore(Player player) {
+		if (!prevScores_.containsKey(player))
+			prevScores_.put(player, 0);
+		int prevScore = prevScores_.get(player);
+		return prevScore;
 	}
 
 	@Override
@@ -96,7 +168,15 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 	@Override
 	protected Object groundActions(PolicyActions actions) {
-		return relationalWrapper_.groundActions(actions, environment_);
+		Object action = relationalWrapper_.groundActions(actions, environment_,
+				multiLearners_);
+		// Check for no tile placement
+		if (relationalWrapper_.wasNoTilePlaced()) {
+			Player p = environment_.getTurnPlayer();
+			int prevScore = getPlayerPrevScore(p);
+			prevScores_.put(p, prevScore - NO_ACTION_PENALTY);
+		}
+		return action;
 	}
 
 	@Override
@@ -130,7 +210,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		}
 		client_.createGame();
 		earlyExit_ = false;
-		prevScore_ = 0;
+		prevScores_.clear();
 
 		if (environment_ == null) {
 			// Sleep only as long as it needs to to get the clientID.
@@ -147,16 +227,22 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			server_.setRandomGenerator(RRLExperiment.random_);
 
 			// Handle number of players playing
+			slots_ = new ArrayList<PlayerSlot>(players_.length);
 			int slotIndex = 0;
-			PlayerSlot slot = new PlayerSlot(slotIndex++,
-					PlayerSlot.SlotType.PLAYER, "CERRLA", clientID);
-			server_.updateSlot(slot, null);
-			// AI Players
-			for (AiPlayer ai : players_) {
-				slot = new PlayerSlot(slotIndex, PlayerSlot.SlotType.AI, "AI"
-						+ slotIndex, clientID);
-				slot.setAiClassName(RandomAIPlayer.class.getName());
-				server_.updateSlot(slot, LegacyAiPlayer.supportedExpansions());
+			for (String playerName : players_) {
+				if (playerName.equals(CERRLA_NAME)) {
+					// Agent-controlled
+					slots_.add(new PlayerSlot(slotIndex,
+							PlayerSlot.SlotType.PLAYER, "CERRLA" + slotIndex,
+							clientID));
+				} else if (playerName.equals(AI_NAME)) {
+					// AI controlled
+					PlayerSlot slot = new PlayerSlot(slotIndex,
+							PlayerSlot.SlotType.AI, playerName + slotIndex,
+							clientID);
+					slot.setAiClassName(LegacyAiPlayer.class.getName());
+					slots_.add(slot);
+				}
 				slotIndex++;
 			}
 
@@ -170,8 +256,28 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 				environment_ = client_.getGame();
 			}
 			relationalWrapper_.setGame(environment_);
-			environment_.addUserInterface(relationalWrapper_);
 			environment_.addGameListener(relationalWrapper_);
+			clientInterface_ = environment_.getUserInterface();
+		} else if (players_.length > 1) {
+			// Reset the UIs
+			environment_.clearUserInterface();
+			environment_.addUserInterface(clientInterface_);
+
+			// Clear the slots and re-add them.
+			for (int i = 0; i < PlayerSlot.COUNT; i++) {
+				server_.updateSlot(new PlayerSlot(i), null);
+			}
+		}
+		environment_.addUserInterface(relationalWrapper_);
+
+		// Randomise the slots
+		Collections.shuffle(slots_, RRLExperiment.random_);
+		for (int i = 0; i < slots_.size(); i++) {
+			PlayerSlot slot = slots_.get(i);
+			PlayerSlot cloneSlot = new PlayerSlot(i, slot.getType(),
+					slot.getNick(), slot.getOwner());
+			cloneSlot.setAiClassName(slot.getAiClassName());
+			server_.updateSlot(cloneSlot, LegacyAiPlayer.supportedExpansions());
 		}
 
 		server_.startGame();
@@ -187,6 +293,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		}
 
 		runPhases();
+
+		currentPlayer_ = null;
 	}
 
 	@Override
@@ -220,6 +328,11 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
+	protected String getPlayerID() {
+		return environment_.getTurnPlayer().getNick();
+	}
+
+	@Override
 	public void cleanup() {
 		// TODO Auto-generated method stub
 
@@ -233,21 +346,19 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		if (client_ == null) {
 			// Parse play speed
 			for (String arg : extraArg) {
-				// Setting up multiple agents
-				if (arg.startsWith("multi")) {
-					String[] split = arg.split(" ");
-					if (split[1].equals("AI")) {
-						players_ = new AiPlayer[Integer.parseInt(split[2]) - 1];
-						for (int i = 0; i < players_.length; i++)
-							players_[i] = new LegacyAiPlayer();
-					}
-				}
+				checkMultiplayer(arg);
 				try {
 					int playSpeed = Integer.parseInt(arg);
 					if (guiMode_)
 						playerDelay = playSpeed;
 				} catch (Exception e) {
 				}
+			}
+
+			// If single player
+			if (players_ == null) {
+				players_ = new String[1];
+				players_[0] = CERRLA_NAME;
 			}
 
 			if (guiMode_) {
@@ -258,6 +369,38 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 				}
 			} else
 				client_ = new LocalCarcassonneClient("config.ini");
+		}
+	}
+
+	/**
+	 * Checks if the game should be initialised with multiple players.
+	 * 
+	 * @param arg
+	 *            The arg to check.
+	 */
+	private void checkMultiplayer(String arg) {
+		// Setting up multiple agents
+		if (arg.startsWith("multi [")) {
+			// Using a defined list of players
+			String playerList = arg.substring(7, arg.indexOf("]"));
+			String[] split = playerList.split(",");
+			players_ = new String[split.length];
+			for (int i = 0; i < split.length; i++) {
+				players_[i] = split[i].trim();
+			}
+			multiLearners_ = true;
+		} else if (arg.startsWith("multi")) {
+			// 1 agent + X other players.
+			String[] split = arg.split(" ");
+			players_ = new String[Integer.parseInt(split[2])];
+			// At least one learner
+			players_[0] = CERRLA_NAME;
+			// The rest of the learners
+			for (int i = 1; i < players_.length; i++) {
+				players_[i] = split[1];
+				if (players_[i].equals(CERRLA_NAME))
+					multiLearners_ = true;
+			}
 		}
 	}
 }

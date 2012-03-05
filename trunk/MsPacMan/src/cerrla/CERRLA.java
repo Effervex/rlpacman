@@ -31,9 +31,11 @@ import util.Recursive;
  * @author Sam Sarjant
  */
 public class CERRLA implements RRLAgent {
-	/** The modular policy being tested. */
-	// TODO Modify this to maintain multiple policies for multiple agents.
-	private ModularPolicy currentPolicy_;
+	/** The current modular policy being tested per agent. */
+	private Map<String, ModularPolicy> agentPolicy_;
+
+	/** A map of agents that have started the episode (for mid-episode starts). */
+	private Collection<String> startedAgents_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
@@ -112,7 +114,7 @@ public class CERRLA implements RRLAgent {
 	 * Checks if a module needs to be learned. If so, it creates a new generator
 	 * for the sub-goal which will be used/improved throughout learning.
 	 */
-	private void checkForModularLearning() {
+	private void checkForModularGoals() {
 		// Find the constants present in the rules of the main generator
 		if (mainGoalCECortex_.getLocalAgentObservations().isSettled()) {
 			for (GoalCondition gc : mainGoalCECortex_.getPotentialModuleGoals()) {
@@ -144,24 +146,28 @@ public class CERRLA implements RRLAgent {
 	 * @return The actions the policy returned.
 	 */
 	private RRLActions evaluatePolicy(RRLObservations observations) {
-		PolicyActions policyActions = currentPolicy_.evaluatePolicy(
-				observations, StateSpec.getInstance().getNumReturnedActions());
+		PolicyActions policyActions = agentPolicy_.get(
+				observations.getAgentTurn()).evaluatePolicy(observations,
+				StateSpec.getInstance().getNumReturnedActions());
 
 		return new RRLActions(policyActions);
 	}
 
 	/**
 	 * Recreates the current policy.
+	 * 
+	 * @param currentPolicy
+	 *            The policy to recreate.
+	 * @return The recreated policy. May or may not be the same object.
 	 */
-	private void recreateCurrentPolicy() {
+	private ModularPolicy recreateCurrentPolicy(
+			Collection<ModularPolicy> existingPolicies) {
 		// First, determine which policies already exist
 		Collection<ModularPolicy> subGoalPolicies = new HashSet<ModularPolicy>();
-		if (currentPolicy_ != null)
-			subGoalPolicies = currentPolicy_.getAllPolicies(true,
-					subGoalPolicies);
+		for (ModularPolicy modPol : existingPolicies)
+			subGoalPolicies = modPol.getAllPolicies(true, subGoalPolicies);
 
-		currentPolicy_ = regeneratePolicy(mainGoalCECortex_, null, null,
-				subGoalPolicies);
+		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies);
 	}
 
 	/**
@@ -226,15 +232,21 @@ public class CERRLA implements RRLAgent {
 
 		mainGoalCECortex_ = null;
 		goalMappedGenerators_.clear();
+		agentPolicy_.clear();
+		startedAgents_.clear();
 	}
 
 	@Override
 	public void endEpisode(RRLObservations observations) {
-		// Note figures
-		currentPolicy_.noteStepReward(observations.getReward());
-		boolean regeneratePolicy = currentPolicy_.endEpisode();
-		if (regeneratePolicy)
-			recreateCurrentPolicy();
+		// End the episode for ALL players
+		for (String player : agentPolicy_.keySet()) {
+			ModularPolicy currentPolicy = agentPolicy_.get(player);
+			currentPolicy.noteStepReward(observations.getReward(player));
+			boolean regeneratePolicy = currentPolicy.endEpisode();
+			if (regeneratePolicy)
+				agentPolicy_.put(player, recreateCurrentPolicy(agentPolicy_.values()));
+		}
+		startedAgents_.clear();
 	}
 
 	@Override
@@ -260,7 +272,8 @@ public class CERRLA implements RRLAgent {
 		if (mainGoalCECortex_ == null)
 			mainGoalCECortex_ = new LocalCrossEntropyDistribution(mainGC, run);
 		goalMappedGenerators_.put(mainGC, mainGoalCECortex_);
-		currentPolicy_ = null;
+		agentPolicy_ = new HashMap<String, ModularPolicy>();
+		startedAgents_ = new HashSet<String>();
 	}
 
 	@Override
@@ -272,19 +285,26 @@ public class CERRLA implements RRLAgent {
 	public RRLActions startEpisode(RRLObservations observations) {
 		// Check for module stuff
 		if (ProgramArgument.USE_MODULES.booleanValue())
-			checkForModularLearning();
+			checkForModularGoals();
 
-		if (currentPolicy_ == null || currentPolicy_.shouldRegenerate()) {
+		String playerID = observations.getAgentTurn();
+		startedAgents_.add(playerID);
+		ModularPolicy currentPolicy = agentPolicy_.get(playerID);
+		if (currentPolicy == null || currentPolicy.shouldRegenerate()) {
 			// Generate a new policy
-			recreateCurrentPolicy();
+			currentPolicy = recreateCurrentPolicy(agentPolicy_.values());
+			agentPolicy_.put(playerID, currentPolicy);
 		}
 
-		currentPolicy_.startEpisode();
+		currentPolicy.startEpisode();
 
-		if (currentPolicy_.isFresh()) {
+		if (currentPolicy.isFresh()) {
 			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()) {
 				System.out.println();
-				System.out.println(currentPolicy_);
+				if (playerID.equals(RRLObservations.ALL_PLAYERS))
+					System.out.println(currentPolicy);
+				else
+					System.out.println(playerID + ": " + currentPolicy);
 			}
 		}
 
@@ -298,15 +318,21 @@ public class CERRLA implements RRLAgent {
 			}
 		}
 
-		currentPolicy_.parameterArgs(observations.getGoalReplacements());
+		currentPolicy.parameterArgs(observations.getGoalReplacements());
 
 		return evaluatePolicy(observations);
 	}
 
 	@Override
 	public RRLActions stepEpisode(RRLObservations observations) {
+		String playerID = observations.getAgentTurn();
+		// If agent hasn't started, do that.
+		if (!startedAgents_.contains(playerID))
+			return startEpisode(observations);
+
 		// Note the reward for the relevant distributions
-		currentPolicy_.noteStepReward(observations.getReward());
+		agentPolicy_.get(playerID).noteStepReward(
+				observations.getReward(playerID));
 
 		// Evaluate the policy.
 		return evaluatePolicy(observations);

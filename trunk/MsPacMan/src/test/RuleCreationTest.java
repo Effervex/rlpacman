@@ -326,6 +326,54 @@ public class RuleCreationTest {
 		mutant = new RelationalRule("(clear ?G_1) (floor ?Y) => (move ?G_1 ?Y)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 2);
+
+		// Test splitting a (variable) numerical condition
+		rule = new RelationalRule(
+				"(clear ?X) (height ?X ?#_0) (floor ?Y) => (move ?X ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+		mutant = new RelationalRule(
+				"(clear ?G_0) (height ?G_0 ?#_0) (floor ?Y) => (move ?G_0 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?G_1) (height ?G_1 ?#_0) (floor ?Y) => (move ?G_1 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X ?#_0&:(range ?#_0min 0 ?#_0 ?#_0max 0.5)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X ?#_0&:(range ?#_0min 0.5 ?#_0 ?#_0max 1)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X ?#_0&:(range ?#_0min 0.25 ?#_0 ?#_0max 0.75)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertTrue(results.contains(mutant));
+		assertEquals(results.size(), 5);
+		
+		// Test NOT splitting a CONSTANT numerical condition
+		rule = new RelationalRule(
+				"(clear ?X) (height ?X 1) (floor ?Y) => (move ?X ?Y)");
+		results = sut_.specialiseRuleMinor(rule);
+		mutant = new RelationalRule(
+				"(clear ?G_0) (height ?G_0 1) (floor ?Y) => (move ?G_0 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?G_1) (height ?G_1 1) (floor ?Y) => (move ?G_1 ?Y)");
+		assertTrue(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X 1&:(range 1min 0 1 1max 0.5)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X 1&:(range 1min 0.5 1 1max 1)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (height ?X 1&:(range 1min 0.25 1 1max 0.75)) "
+						+ "(floor ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
+		assertEquals(results.size(), 2);
 	}
 
 	@Test
