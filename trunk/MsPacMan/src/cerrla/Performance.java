@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.Serializable;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -17,9 +18,9 @@ import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
 import cerrla.modular.GoalCondition;
 
-
 import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
+import rrlFramework.RRLObservations;
 
 /**
  * This object notes performance of the agent with regards to a particular goal.
@@ -358,30 +359,37 @@ public class Performance implements Serializable {
 	/**
 	 * Notes the rewards the sample received.
 	 * 
-	 * @param sampleRewards
+	 * @param policyRewards
 	 *            The rewards the sample received.
 	 * @param currentEpisode
 	 *            The current episode.
-	 * @return The computed average of the three values.
+	 * @return The computed average of the internal rewards.
 	 */
-	public double noteSampleRewards(Double[] sampleRewards, int currentEpisode) {
+	public double noteSampleRewards(ArrayList<double[]> policyRewards,
+			int currentEpisode) {
 		// First pass through the rewards to determine min reward.
-		double average = 0;
+		double environmentAverage = 0;
+		double internalAverage = 0;
 		minEpisodeReward_ = Float.MAX_VALUE;
-		for (double reward : sampleRewards) {
-			minEpisodeReward_ = Math.min(reward, minEpisodeReward_);
-			minMaxReward_[0] = Math.min(reward, minMaxReward_[0]);
-			minMaxReward_[1] = Math.max(reward, minMaxReward_[1]);
-			average += reward;
+		for (double[] reward : policyRewards) {
+			double internalReward = reward[RRLObservations.INTERNAL_INDEX];
+			minEpisodeReward_ = Math.min(internalReward, minEpisodeReward_);
+			minMaxReward_[0] = Math.min(internalReward, minMaxReward_[0]);
+			minMaxReward_[1] = Math.max(internalReward, minMaxReward_[1]);
+			internalAverage += internalReward;
+
+			environmentAverage += reward[RRLObservations.ENVIRONMENTAL_INDEX];
 		}
-		average /= sampleRewards.length;
+		internalAverage /= policyRewards.size();
+		environmentAverage /= policyRewards.size();
 
 		// Second pass through to note the internal policy SDs
-		for (double reward : sampleRewards) {
+		for (double[] reward : policyRewards) {
 			if (internalSDs_.size() == ProgramArgument.PERFORMANCE_TESTING_SIZE
 					.intValue() * ProgramArgument.POLICY_REPEATS.intValue())
 				internalSDs_.poll();
-			internalSDs_.add(reward - minEpisodeReward_);
+			internalSDs_.add(reward[RRLObservations.ENVIRONMENTAL_INDEX]
+					- minEpisodeReward_);
 		}
 
 		// Note scores only if there are enough to average (or simply frozen).
@@ -392,11 +400,11 @@ public class Performance implements Serializable {
 			recentScores_.poll();
 			noteScores = true;
 		}
-		recentScores_.add(average);
+		recentScores_.add(environmentAverage);
 		if (noteScores)
 			recordPerformanceScore(currentEpisode);
 
-		return average;
+		return internalAverage;
 	}
 
 	/**

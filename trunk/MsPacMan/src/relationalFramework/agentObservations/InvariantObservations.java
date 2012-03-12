@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.TreeSet;
 
+import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.Unification;
@@ -188,9 +189,11 @@ public class InvariantObservations implements Serializable {
 
 		buffer.append("Specific Invariants: " + specificInvariants_.toString());
 		if (generalInvariants_ != null)
-			buffer.append("\n" + "General Invariants: " + generalInvariants_.toString());
+			buffer.append("\n" + "General Invariants: "
+					+ generalInvariants_.toString());
 		if (generalVariants_ != null)
-			buffer.append("\n" + "General Variants: " + generalVariants_.toString());
+			buffer.append("\n" + "General Variants: "
+					+ generalVariants_.toString());
 		buffer.append("\n" + "Never Present: " + neverPresent_.toString());
 		buffer.append("\n" + "Invariants count: " + counter_);
 		return buffer.toString();
@@ -240,6 +243,7 @@ public class InvariantObservations implements Serializable {
 	 *            The observed ranges for various conditions.
 	 * @return True if the action conditions changed, false otherwise.
 	 */
+	@SuppressWarnings("unchecked")
 	public static boolean intersectActionConditions(
 			RelationalPredicate newAction, RelationalPredicate oldAction,
 			Collection<RelationalPredicate> actionConds,
@@ -251,72 +255,69 @@ public class InvariantObservations implements Serializable {
 		// Generalise the action if necessary
 		RelationalArgument[] actionArgs = (oldAction != null) ? oldAction
 				.getRelationalArguments() : new RelationalArgument[0];
+		BidiMap replacementMap = new DualHashBidiMap();
 		for (int i = 0; i < actionArgs.length; i++) {
 			RelationalArgument argument = actionArgs[i];
+			RelationalArgument variableArg = RelationalArgument
+					.createVariableTermArg(i);
+			replacementMap.put(variableArg, variableArg);
 
 			// If the action isn't variable, but doesn't match with the
 			// current action, generalise it.
 			if (!argument.isVariable()
 					&& !argument.isNumber()
 					&& (!argument.equals(newAction.getRelationalArguments()[i]))) {
-				actionArgs[i] = RelationalArgument.getVariableTermArg(i);
+				actionArgs[i] = variableArg;
 				changed = true;
 			}
 		}
-
-		Collection<RelationalPredicate> newInvariantConditions = new HashSet<RelationalPredicate>();
 
 		// Run through each invariant fact
-		for (RelationalPredicate invFact : invariants) {
-			// Merge any numerical ranges
-			Collection<UnifiedFact> mergedFacts = Unification.getInstance()
-					.unifyFact(invFact, actionConds, null, actionArgs, false,
-							true);
-			if (mergedFacts != null && !mergedFacts.isEmpty()) {
-				for (UnifiedFact uf : mergedFacts) {
-					RelationalPredicate unifiedFact = uf.getResultFact();
-					changed |= !invFact.equals(unifiedFact);
-					newInvariantConditions.add(unifiedFact);
-					actionConds.remove(uf.getUnityFact());
-					System.arraycopy(uf.getFactTerms(), 0, actionArgs, 0,
-							actionArgs.length);
+		Collection<RelationalPredicate> variantActionConds = new HashSet<RelationalPredicate>(
+				actionConds);
+		int result = Unification.getInstance().unifyStatesWithUnunified(
+				invariants, variantActionConds, replacementMap, false);
+		if (result == Unification.UNIFIED_CHANGE)
+			changed = true;
 
-					if (oldAction != null)
-						noteRange(oldAction.getFactName(), unifiedFact,
-								actionRanges);
-				}
-			} else {
-				variants.add(invFact);
-				changed = true;
-			}
+		// Note ranges
+		for (RelationalPredicate invFact : invariants) {
+			if (invFact.isNumerical())
+				noteRange(oldAction.getFactName(), invFact, actionRanges);
 		}
-		invariants.clear();
-		invariants.addAll(newInvariantConditions);
 
 		// Add any remaining action conds to the variants, merging any
 		// numerical ranges together
 		Collection<RelationalPredicate> newVariantConditions = new HashSet<RelationalPredicate>();
 		for (RelationalPredicate variant : variants) {
 			Collection<UnifiedFact> mergedFacts = Unification.getInstance()
-					.unifyFact(variant, actionConds, new DualHashBidiMap(),
-							actionArgs, false, true);
+					.unifyFactToState(variant, variantActionConds,
+							replacementMap.inverseBidiMap(), actionArgs, false);
 			if (mergedFacts != null && !mergedFacts.isEmpty()) {
 				for (UnifiedFact uf : mergedFacts) {
 					RelationalPredicate unifiedFact = uf.getResultFact();
+					unifiedFact.replaceUnboundWithAnonymous();
 					changed |= !variant.equals(unifiedFact);
-					newVariantConditions.add(unifiedFact);
-					actionConds.remove(uf.getUnityFact());
-
-					if (oldAction != null)
-						noteRange(oldAction.getFactName(), unifiedFact,
-								actionRanges);
+					variantActionConds.remove(uf.getUnityFact());
+					if (newVariantConditions.add(unifiedFact)) {
+						if (oldAction != null)
+							noteRange(oldAction.getFactName(), unifiedFact,
+									actionRanges);
+					}
 				}
 			} else
 				newVariantConditions.add(variant);
 		}
 		variants.clear();
 		variants.addAll(newVariantConditions);
-		changed |= variants.addAll(actionConds);
+		BidiMap inverseReplMap = replacementMap.inverseBidiMap();
+		// Add the action conds (with inverse replacements so they don't match
+		// invariants).
+		for (RelationalPredicate variantActionCond : variantActionConds) {
+			variantActionCond.replaceArguments(inverseReplMap, true, true);
+			variantActionCond.replaceUnboundWithAnonymous();
+			changed |= variants.add(variantActionCond);
+		}
 
 		if (changed && oldAction != null)
 			oldAction.setArguments(actionArgs);

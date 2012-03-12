@@ -1203,13 +1203,13 @@ public final class PolicyGenerator implements Serializable {
 			String input = null;
 			while ((input = br.readLine()) != null) {
 				RelationalRule seedRule = new RelationalRule(input);
-				SortedSet<RelationalPredicate> ruleConds = seedRule
+				List<RelationalPredicate> ruleConds = seedRule
 						.getConditions(false);
 				ruleConds = parentLearner_.getLocalAgentObservations()
 						.simplifyRule(ruleConds, null, seedRule.getAction(),
 								false);
 				seedRule = new RelationalRule(ruleConds, seedRule.getAction(),
-						null, null);
+						null);
 				createSeededSlot(seedRule);
 			}
 

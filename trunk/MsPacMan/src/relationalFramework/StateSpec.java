@@ -156,7 +156,7 @@ public abstract class StateSpec {
 	private List<String> formActionTerms(RelationalPredicate action) {
 		List<String> terms = new ArrayList<String>(action.getArgTypes().length);
 		for (int i = 0; i < action.getArgTypes().length; i++)
-			terms.add(RelationalArgument.getVariableTermArg(i).toString()
+			terms.add(RelationalArgument.createVariableTermArg(i).toString()
 					.substring(1));
 		return terms;
 	}
@@ -550,7 +550,7 @@ public abstract class StateSpec {
 		int i = 0;
 		for (String goalTerm : goalArgs) {
 			if (!goalReplacements.containsKey(goalTerm))
-				goalReplacements.put(goalTerm,
+				goalReplacements.put(new RelationalArgument(goalTerm),
 						RelationalArgument.createGoalTerm(i));
 			i++;
 		}
@@ -575,7 +575,8 @@ public abstract class StateSpec {
 
 		String[] types = fact.getArgTypes();
 		for (int i = 0; i < types.length; i++) {
-			if (!fact.getArguments()[i].equals("?")) {
+			if (!fact.getRelationalArguments()[i]
+					.equals(RelationalArgument.ANONYMOUS)) {
 				RelationalPredicate typeFact = typePredicates_.get(types[i]);
 				if (typeFact != null) {
 					typeConds.add(new RelationalPredicate(typeFact,
@@ -878,49 +879,6 @@ public abstract class StateSpec {
 	}
 
 	/**
-	 * Creates the inequals tests from the terms given. Note anonymous terms are
-	 * special in that they aren't inequal to one-another.
-	 * 
-	 * @return The string for detailing inequality '(test (<> ?X a b ?Y ?_0))
-	 *         (test (<> ?Y a ...))'
-	 */
-	public static Collection<RelationalPredicate> createInequalityTests(
-			Collection<String> variableTerms, Collection<String> constantTerms) {
-		Collection<RelationalPredicate> tests = new ArrayList<RelationalPredicate>();
-
-		// Run through each variable term
-		for (Iterator<String> termIter = variableTerms.iterator(); termIter
-				.hasNext();) {
-			String varTermA = termIter.next();
-			StringBuffer buffer = new StringBuffer("(<> " + varTermA);
-			boolean isValid = false;
-			// Adding other variable terms
-			for (Iterator<String> subIter = variableTerms.iterator(); subIter
-					.hasNext();) {
-				String varTermB = subIter.next();
-				if (varTermB != varTermA) {
-					isValid = true;
-					buffer.append(" " + varTermB);
-				} else
-					break;
-			}
-
-			// Adding constant terms
-			for (String constant : constantTerms) {
-				isValid = true;
-				buffer.append(" " + constant);
-			}
-
-			if (isValid) {
-				buffer.append(")");
-				tests.add(new RelationalPredicate(TEST_DEFINITION,
-						new String[] { buffer.toString() }));
-			}
-		}
-		return tests;
-	}
-
-	/**
 	 * Extracts a collection of facts from the state.
 	 * 
 	 * @param state
@@ -1140,7 +1098,7 @@ public abstract class StateSpec {
 
 	private class RuleQuery {
 		/** The list of query parameters this rule takes. */
-		private final List<String> queryParams_;
+		private final List<RelationalArgument> queryParams_;
 
 		/** The range context (if applicable) for this query. */
 		private final SortedSet<RangeContext> rangeContexts_;
@@ -1235,7 +1193,7 @@ public abstract class StateSpec {
 						}
 					}
 					if (queryParams_ != null) {
-						for (String param : queryParams_)
+						for (RelationalArgument param : queryParams_)
 							declares.append(" " + param);
 					}
 					declares.append("))");

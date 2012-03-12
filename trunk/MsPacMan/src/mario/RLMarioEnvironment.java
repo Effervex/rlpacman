@@ -67,17 +67,20 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	 * @return The reward received from the environment.
 	 */
 	@Override
-	protected double calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(boolean isTerminal) {
+		double[] reward = new double[2];
 		if (isTerminal) {
 			if (noActionCount_ >= TIMEOUT_THRESHOLD) {
 				EvaluationInfo ei = environment_.getEvaluationInfo();
 				ei.timeSpent += ei.timeLeft;
 				ei.timeLeft = 0;
-				return ei.computeWeightedFitness();
-			}
-			return environment_.getEvaluationInfo().computeWeightedFitness();
+				reward[0] = ei.computeWeightedFitness();
+			} else
+				reward[1] = environment_.getEvaluationInfo()
+						.computeWeightedFitness();
 		}
-		return 0;
+		reward[1] = reward[0];
+		return reward;
 	}
 
 	@Override
@@ -112,7 +115,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 			// Idle...
 			environment_.tick();
 		}
-		
+
 		noActionCount_ = 0;
 	}
 
@@ -133,7 +136,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 			environment_.tick();
 		}
 	}
-	
+
 	@Override
 	protected boolean isTerminal() {
 		boolean result = super.isTerminal();
@@ -159,8 +162,9 @@ public class RLMarioEnvironment extends RRLEnvironment {
 				levelDifficulty_ = Integer.parseInt(arg0.split(" ")[1]);
 			}
 		}
-		
+
 		cmdLineOptions_ = new MarioAIOptions();
-		cmdLineOptions_.setVisualization(!ProgramArgument.EXPERIMENT_MODE.booleanValue());
+		cmdLineOptions_.setVisualization(!ProgramArgument.EXPERIMENT_MODE
+				.booleanValue());
 	}
 }

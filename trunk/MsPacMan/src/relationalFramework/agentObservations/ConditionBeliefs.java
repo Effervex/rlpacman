@@ -34,7 +34,7 @@ public class ConditionBeliefs implements Serializable {
 	 * The argument index for the condition belief. Only used for negated
 	 * condition beliefs.
 	 */
-	private String[] args_ = null;
+	private RelationalArgument[] args_ = null;
 
 	/** The fact this {@link ConditionBeliefs} represents. */
 	private RelationalPredicate cbFact_;
@@ -77,7 +77,7 @@ public class ConditionBeliefs implements Serializable {
 	 * @param untrueFactArgs
 	 *            The arguments this condition beliefs object represents.
 	 */
-	public ConditionBeliefs(String factName, String[] untrueFactArgs) {
+	public ConditionBeliefs(String factName, RelationalArgument[] untrueFactArgs) {
 		this(factName);
 		args_ = untrueFactArgs;
 		formCBFact();
@@ -92,20 +92,20 @@ public class ConditionBeliefs implements Serializable {
 	 *            The predicate to form action term map from.
 	 * @return The mapping of argument type classes to argument variables.
 	 */
-	private MultiMap<String, String> createActionTerms(
+	private MultiMap<String, RelationalArgument> createActionTerms(
 			RelationalPredicate predicate) {
-		MultiMap<String, String> actionTerms = MultiMap.createListMultiMap();
+		MultiMap<String, RelationalArgument> actionTerms = MultiMap
+				.createListMultiMap();
 
 		String[] argTypes = predicate.getArgTypes();
 		for (int i = 0; i < argTypes.length; i++) {
 			if (!StateSpec.isNumberType(argTypes[i])) {
-				String varName = null;
+				RelationalArgument varName = null;
 				if (args_ != null)
 					varName = args_[i];
 				else
-					varName = RelationalArgument.getVariableTermArg(i)
-							.toString();
-				if (!varName.equals("?")) {
+					varName = RelationalArgument.createVariableTermArg(i);
+				if (!varName.isAnonymous()) {
 					actionTerms.putContains(argTypes[i], varName);
 					// Also put any parent type of the given type
 					Collection<String> parentTypes = new HashSet<String>();
@@ -165,7 +165,7 @@ public class ConditionBeliefs implements Serializable {
 	 *         predicates.
 	 */
 	private Collection<RelationalPredicate> createPossibleFacts(String pred,
-			MultiMap<String, String> possibleTerms) {
+			MultiMap<String, RelationalArgument> possibleTerms) {
 		Collection<RelationalPredicate> shapedFacts = new HashSet<RelationalPredicate>();
 
 		// Run through each base fact, shaping as it goes.
@@ -176,18 +176,20 @@ public class ConditionBeliefs implements Serializable {
 		if (StateSpec.getInstance().isTypePredicate(condition_)
 				&& StateSpec.getInstance().isTypePredicate(pred)) {
 			predFact = new RelationalPredicate(predFact,
-					new String[] { possibleTerms.values().iterator().next() });
+					new RelationalArgument[] { possibleTerms.values()
+							.iterator().next() });
 			shapedFacts.add(predFact);
 		} else {
-			formPossibleFact(new String[predFact.getArguments().length], 0,
+			formPossibleFact(
+					new RelationalArgument[predFact.getArgTypes().length], 0,
 					possibleTerms, predFact, shapedFacts);
 		}
 
 		// Removing the base condition fact itself
 		if (args_ == null && pred.equals(condition_)) {
-			String[] baseArgs = new String[predFact.getArguments().length];
+			String[] baseArgs = new String[predFact.getArgTypes().length];
 			for (int i = 0; i < baseArgs.length; i++)
-				baseArgs[i] = RelationalArgument.getVariableTermArg(i)
+				baseArgs[i] = RelationalArgument.createVariableTermArg(i)
 						.toString();
 			shapedFacts.remove(new RelationalPredicate(predFact, baseArgs));
 		}
@@ -235,11 +237,11 @@ public class ConditionBeliefs implements Serializable {
 		if (!otherCond.getFactName().equals(condition_)) {
 			// Form the anti
 			BidiMap replacementMap = new DualHashBidiMap();
-			String[] otherArgs = otherCond.getArguments();
+			RelationalArgument[] otherArgs = otherCond.getRelationalArguments();
 			for (int i = 0; i < otherArgs.length; i++) {
-				if (!otherArgs[i].equals("?"))
-					replacementMap.put(otherArgs[i], RelationalArgument
-							.getVariableTermArg(i).toString());
+				if (!otherArgs[i].isAnonymous())
+					replacementMap.put(otherArgs[i],
+							RelationalArgument.createVariableTermArg(i));
 			}
 
 			// If the sets are equal, the relations are equivalent!
@@ -282,11 +284,11 @@ public class ConditionBeliefs implements Serializable {
 	 */
 	private void formCBFact() {
 		cbFact_ = StateSpec.getInstance().getPredicateByName(condition_);
-		String[] arguments = new String[cbFact_.getArguments().length];
+		RelationalArgument[] arguments = new RelationalArgument[cbFact_
+				.getArgTypes().length];
 		for (int i = 0; i < arguments.length; i++) {
 			if (args_ == null)
-				arguments[i] = RelationalArgument.getVariableTermArg(i)
-						.toString();
+				arguments[i] = RelationalArgument.createVariableTermArg(i);
 			else
 				arguments[i] = args_[i];
 		}
@@ -311,8 +313,8 @@ public class ConditionBeliefs implements Serializable {
 	 * @param possibleFacts
 	 *            The list of facts to fill.
 	 */
-	private void formPossibleFact(String[] arguments, int index,
-			MultiMap<String, String> possibleTerms,
+	private void formPossibleFact(RelationalArgument[] arguments, int index,
+			MultiMap<String, RelationalArgument> possibleTerms,
 			RelationalPredicate baseFact,
 			Collection<RelationalPredicate> possibleFacts) {
 		// Base case, if index is outside arguments, build the fact
@@ -322,7 +324,7 @@ public class ConditionBeliefs implements Serializable {
 			// the condition itself.
 			boolean keepRule = false;
 			for (int i = 0; i < arguments.length; i++) {
-				if (!arguments[i].equals("?")) {
+				if (!arguments[i].isAnonymous()) {
 					keepRule = true;
 					break;
 				}
@@ -340,14 +342,14 @@ public class ConditionBeliefs implements Serializable {
 		}
 
 		// Use all terms for the slot and '?'
-		List<String> terms = new ArrayList<String>();
-		terms.add("?");
+		List<RelationalArgument> terms = new ArrayList<RelationalArgument>();
+		terms.add(RelationalArgument.ANONYMOUS);
 		if (possibleTerms.containsKey(argTypes[index])) {
 			terms.addAll(possibleTerms.get(argTypes[index]));
 		}
 
 		// For each term
-		for (String term : terms) {
+		for (RelationalArgument term : terms) {
 			arguments[index] = term;
 
 			// Recurse further
@@ -478,7 +480,7 @@ public class ConditionBeliefs implements Serializable {
 	 */
 	private boolean isUsefulRelation(RelationalPredicate relativeFact,
 			boolean isAlwaysTrue, TypedBeliefs typeBeliefs,
-			Map<String, String> typeVarReplacements) {
+			Map<RelationalArgument, RelationalArgument> typeVarReplacements) {
 		// If the predicate is a never-seen invariant, return false
 		if (EnvironmentAgentObservations.getInstance().getNeverSeenInvariants()
 				.contains(relativeFact.getFactName()))
@@ -537,15 +539,16 @@ public class ConditionBeliefs implements Serializable {
 	 * @return A cloned set of the factSet with less facts.
 	 */
 	private Set<RelationalPredicate> shapeFacts(
-			Set<RelationalPredicate> factSet, Map<String, String> keptArgs,
+			Set<RelationalPredicate> factSet,
+			Map<RelationalArgument, RelationalArgument> keptArgs,
 			boolean removeFacts, boolean replaceArgs) {
 		Set<RelationalPredicate> newFactSet = new HashSet<RelationalPredicate>();
 		for (RelationalPredicate fact : factSet) {
 			boolean keepFact = true;
-			for (String arg : fact.getArguments()) {
+			for (RelationalArgument arg : fact.getRelationalArguments()) {
 				// If the arg isn't anonymous and isn't a valid variable, don't
 				// note it.
-				if (!arg.equals("?") && !keptArgs.containsKey(arg)) {
+				if (!arg.isAnonymous() && !keptArgs.containsKey(arg)) {
 					keepFact = false;
 					break;
 				}
@@ -584,7 +587,7 @@ public class ConditionBeliefs implements Serializable {
 			if (isUsefulType(type)) {
 				TypedBeliefs beliefs = typedCondBeliefs_.get(type);
 				TypedBeliefs typeBeliefs = null;
-				Map<String, String> typeVarReplacements = null;
+				Map<RelationalArgument, RelationalArgument> typeVarReplacements = null;
 				if (type == cbFact_)
 					type = null;
 				else {
@@ -748,9 +751,10 @@ public class ConditionBeliefs implements Serializable {
 				// Replace variables with types
 				if (type != cbFact_) {
 					String arg = null;
-					for (int i = 0; i < type.getArguments().length; i++) {
-						arg = type.getArguments()[i];
-						if (!arg.equals("?"))
+					for (RelationalArgument relArg : type
+							.getRelationalArguments()) {
+						arg = relArg.toString();
+						if (!relArg.isAnonymous())
 							break;
 					}
 					int index = buffer.indexOf(arg);
@@ -864,7 +868,7 @@ public class ConditionBeliefs implements Serializable {
 
 			// Run through every possible string fact and add those not present
 			// in the other lists.
-			MultiMap<String, String> possibleTerms = createActionTerms(StateSpec
+			MultiMap<String, RelationalArgument> possibleTerms = createActionTerms(StateSpec
 					.getInstance().getPredicateByName(condition_));
 
 			// Run by the predicates
@@ -910,17 +914,18 @@ public class ConditionBeliefs implements Serializable {
 				// Run through each possible binary implementation of the
 				// arguments,
 				// adding to the added args. (ignoring first and last case)
-				for (int b = 1; b < Math.pow(2, baseFact.getArguments().length) - 1; b++) {
-					String[] factArgs = baseFact.getArguments();
+				for (int b = 1; b < Math.pow(2, baseFact.getArgTypes().length) - 1; b++) {
+					RelationalArgument[] factArgs = baseFact
+							.getRelationalArguments();
 					// Change each argument based on the binary representation.
 					boolean changed = false;
 					boolean anonymous = true;
 					for (int i = 0; i < factArgs.length; i++) {
 						// If the argument originally isn't anonymous
-						if (!factArgs[i].equals("?")) {
+						if (!factArgs[i].isAnonymous()) {
 							// Make it anonymous
 							if ((b & (int) Math.pow(2, i)) == 0) {
-								factArgs[i] = "?";
+								factArgs[i] = RelationalArgument.ANONYMOUS;
 								changed = true;
 							} else
 								anonymous = false;

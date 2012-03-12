@@ -31,7 +31,8 @@ public class CERRLATest {
 	public void testStartEpisode() {
 		MultiMap<String, String[]> validActions = MultiMap.createListMultiMap();
 		RRLObservations obs = new RRLObservations(StateSpec.getInstance()
-				.getRete(), validActions, 0d, new DualHashBidiMap(), false);
+				.getRete(), validActions, new double[] { 0, 0 },
+				new DualHashBidiMap(), false);
 		sut_.startEpisode(obs);
 	}
 

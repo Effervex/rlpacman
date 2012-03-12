@@ -49,18 +49,18 @@ public class RuleCreationTest {
 	public void testSpecialiseRule() {
 		// Basic single action specialisation
 		RelationalRule rule = new RelationalRule(
-				"(clear ?X) (above ?X ?) => (moveFloor ?X)");
+				"(clear ?X) (above ?X ?Y) => (moveFloor ?X)");
 		Collection<RelationalRule> results = sut_.specialiseRule(rule);
 
 		RelationalRule mutant = new RelationalRule(
-				"(above ?X ?) (highest ?X) => (moveFloor ?X)");
+				"(above ?X ?Y) (highest ?X) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
+				"(clear ?X) (above ?X ?Y) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		// No onFloor rules for moveFloor
 		mutant = new RelationalRule(
-				"(clear ?X) (above ?X ?) (onFloor ?X) => (moveFloor ?X)");
+				"(clear ?X) (above ?X ?Y) (onFloor ?X) => (moveFloor ?X)");
 		assertFalse(results.contains(mutant));
 		// Local specialisations
 		mutant = new RelationalRule(
@@ -69,41 +69,41 @@ public class RuleCreationTest {
 		mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (above ?X ?) (on ?X ?G_0) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (above ?X ?) (on ?X ?G_1) => (moveFloor ?X)");
+		mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
 		// Constant term in action
-		rule = new RelationalRule("(clear a) (above a ?) => (moveFloor a)");
+		rule = new RelationalRule("(clear a) (above a ?Y) => (moveFloor a)");
 		results = sut_.specialiseRule(rule);
 
-		mutant = new RelationalRule("(highest a) (above a ?) => (moveFloor a)");
+		mutant = new RelationalRule("(highest a) (above a ?Y) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (not (highest a)) (above a ?) => (moveFloor a)");
+				"(clear a) (not (highest a)) (above a ?Y) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule("(clear a) (above a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule("(clear a) (above a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (above a ?) (on a ?G_0) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?Y) (on a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (above a ?) (on a ?G_1) => (moveFloor a)");
+		mutant = new RelationalRule("(clear a) (above a ?Y) (on a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
 		// Constant term in rule
 		rule = new RelationalRule(
-				"(clear a) (above ?X ?) (clear ?X) => (moveFloor ?X)");
+				"(clear a) (above ?X ?Y) (clear ?X) => (moveFloor ?X)");
 		results = sut_.specialiseRule(rule);
 
 		mutant = new RelationalRule(
-				"(clear a) (above ?X ?) (highest ?X) => (moveFloor ?X)");
+				"(clear a) (above ?X ?Y) (highest ?X) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?X) (above ?X ?) (not (highest ?X)) => (moveFloor ?X)");
+				"(clear a) (clear ?X) (above ?X ?Y) (not (highest ?X)) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
 				"(clear a) (clear ?X) (above ?X ?G_0) => (moveFloor ?X)");
@@ -112,10 +112,10 @@ public class RuleCreationTest {
 				"(clear a) (clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?X) (above ?X ?) (on ?X ?G_0) => (moveFloor ?X)");
+				"(clear a) (clear ?X) (above ?X ?Y) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?X) (above ?X ?) (on ?X ?G_1) => (moveFloor ?X)");
+				"(clear a) (clear ?X) (above ?X ?Y) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
@@ -124,10 +124,10 @@ public class RuleCreationTest {
 		results = sut_.specialiseRule(rule);
 
 		mutant = new RelationalRule(
-				"(clear a) (clear ?Y) (above a ?) => (move a ?Y)");
+				"(clear a) (clear ?Y) (above a ?Y) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(clear a) (clear ?Y) (above ?Y ?) => (move a ?Y)");
+				"(clear a) (clear ?Y) (above ?Y ?Y) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule("(clear ?Y) (highest a) => (move a ?Y)");
 		assertTrue(results.contains(mutant));
@@ -266,14 +266,14 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinor() {
 		// Basic moveFloor variable swapping
 		RelationalRule rule = new RelationalRule(
-				"(above ?X ?) (highest ?X) => (moveFloor ?X)");
+				"(above ?X ?Y) (highest ?X) => (moveFloor ?X)");
 		Collection<RelationalRule> results = sut_.specialiseRuleMinor(rule);
 
 		RelationalRule mutant = new RelationalRule(
-				"(above ?G_0 ?) (highest ?G_0) => (moveFloor ?G_0)");
+				"(above ?G_0 ?Y) (highest ?G_0) => (moveFloor ?G_0)");
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule(
-				"(above ?G_1 ?) (highest ?G_1) => (moveFloor ?G_1)");
+				"(above ?G_1 ?Y) (highest ?G_1) => (moveFloor ?G_1)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 2);
 

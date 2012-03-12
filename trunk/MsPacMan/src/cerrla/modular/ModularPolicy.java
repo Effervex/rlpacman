@@ -21,6 +21,7 @@ import jess.Rete;
 
 import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalRule;
 import rrlFramework.RRLExperiment;
@@ -48,7 +49,7 @@ public class ModularPolicy extends RelationalPolicy {
 	private transient BidiMap episodeGoalReplacements_;
 
 	/** The reward received this episode. */
-	private transient double episodeReward_;
+	private transient double[] episodeReward_;
 
 	/** If this learning episode has started where the goal is unachieved. */
 	private transient boolean episodeStarted_;
@@ -63,10 +64,10 @@ public class ModularPolicy extends RelationalPolicy {
 	private transient boolean goalAchievedEpisode_;
 
 	/** A map for transforming goal replacements into the appropriate args. */
-	private Map<String, String> moduleParamReplacements_;
+	private Map<RelationalArgument, RelationalArgument> moduleParamReplacements_;
 
 	/** The rewards this policy achieved for each episode. */
-	private ArrayList<Double> policyRewards_;
+	private ArrayList<double[]> policyRewards_;
 
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
@@ -85,7 +86,7 @@ public class ModularPolicy extends RelationalPolicy {
 		ceDistribution_ = policyGenerator;
 		triggeredRules_ = new HashSet<RelationalRule>();
 		childrenPolicies_ = MultiMap.createListMultiMap();
-		policyRewards_ = new ArrayList<Double>();
+		policyRewards_ = new ArrayList<double[]>();
 
 		uniqueID_ = ceDistribution_.generateUniquePolicyID();
 	}
@@ -298,8 +299,10 @@ public class ModularPolicy extends RelationalPolicy {
 				&& !moduleParamReplacements_.isEmpty()) {
 			// Swap any terms shown in the replacements
 			BidiMap modGoalReplacements = new DualHashBidiMap();
-			for (String ruleParam : moduleParamReplacements_.keySet()) {
-				String goalParam = moduleParamReplacements_.get(ruleParam);
+			for (RelationalArgument ruleParam : moduleParamReplacements_
+					.keySet()) {
+				RelationalArgument goalParam = moduleParamReplacements_
+						.get(ruleParam);
 				modGoalReplacements.put(goalReplacements.getKey(goalParam),
 						ruleParam);
 			}
@@ -349,12 +352,14 @@ public class ModularPolicy extends RelationalPolicy {
 		// Modify the reward if the goal hasn't been achieved if a sub-goal
 		// generator
 		if (!ceDistribution_.getGoalCondition().isMainGoal()
-				&& !goalAchievedEpisode_)
-			episodeReward_ = MINIMUM_REWARD;
+				&& !goalAchievedEpisode_) {
+			episodeReward_[0] = MINIMUM_REWARD;
+			episodeReward_[1] = MINIMUM_REWARD;
+		}
 
 		// Note the episode reward in the generator.
 		if (ceDistribution_.getGoalCondition().isMainGoal()
-				|| episodeReward_ != 0) {
+				|| episodeReward_[0] != 0) {
 			policyRewards_.add(episodeReward_);
 		}
 
@@ -369,8 +374,7 @@ public class ModularPolicy extends RelationalPolicy {
 		// Check if sample needs to be recorded
 		if (policyRewards_.size() >= ProgramArgument.POLICY_REPEATS.intValue()) {
 			// Record the sample.
-			ceDistribution_.recordSample(this,
-					policyRewards_.toArray(new Double[policyRewards_.size()]));
+			ceDistribution_.recordSample(this, policyRewards_);
 			regeneratePolicy = true;
 		}
 		return regeneratePolicy;
@@ -485,7 +489,7 @@ public class ModularPolicy extends RelationalPolicy {
 	 * 
 	 * @return The replacement map for this policy.
 	 */
-	public Map<String, String> getModularReplacementMap() {
+	public Map<RelationalArgument, RelationalArgument> getModularReplacementMap() {
 		return moduleParamReplacements_;
 	}
 
@@ -520,7 +524,7 @@ public class ModularPolicy extends RelationalPolicy {
 	 * internal reward.
 	 */
 	@Recursive
-	public boolean noteStepReward(double reward) {
+	public boolean noteStepReward(double[] reward) {
 		// Note reward if a rule in this policy fired (or it's the main policy).
 		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
 				|| !firedLastStep_.isEmpty();
@@ -538,10 +542,14 @@ public class ModularPolicy extends RelationalPolicy {
 			if (!ceDistribution_.getGoalCondition().isMainGoal()) {
 				// If the episode has started and the goal hasn't been achieved,
 				// note reward.
-				if (episodeStarted_ && !goalAchievedEpisode_)
-					episodeReward_ += SUB_GOAL_REWARD;
-			} else
-				episodeReward_ += reward;
+				if (episodeStarted_ && !goalAchievedEpisode_) {
+					episodeReward_[0] += SUB_GOAL_REWARD;
+					episodeReward_[1] += SUB_GOAL_REWARD;
+				}
+			} else {
+				episodeReward_[0] += reward[0];
+				episodeReward_[1] += reward[1];
+			}
 		}
 
 		return noteReward;
@@ -574,13 +582,9 @@ public class ModularPolicy extends RelationalPolicy {
 	 * @param paramReplacementMap
 	 *            The modular replacements to set.
 	 */
-	public void setModularParameters(Map<String, String> paramReplacementMap) {
+	public void setModularParameters(
+			Map<RelationalArgument, RelationalArgument> paramReplacementMap) {
 		moduleParamReplacements_ = paramReplacementMap;
-		// for (RelationallyEvaluatableObject reo : policyRules_) {
-		// if (reo instanceof RelationalRule)
-		// ((RelationalRule) reo)
-		// .setModularParameters(paramReplacementMap);
-		// }
 	}
 
 	public void setParameters(BidiMap goalArgs) {
@@ -610,7 +614,7 @@ public class ModularPolicy extends RelationalPolicy {
 	 */
 	@Recursive
 	public void startEpisode() {
-		episodeReward_ = 0;
+		episodeReward_ = new double[2];
 		if (ceDistribution_.getGoalCondition().isMainGoal())
 			episodeStarted_ = true;
 		else

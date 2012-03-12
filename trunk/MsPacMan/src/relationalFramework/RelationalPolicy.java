@@ -99,8 +99,8 @@ public class RelationalPolicy implements Serializable {
 		}
 		if (rule.getQueryParameters() != null) {
 			if (rule.getParameters() != null) {
-				for (String param : rule.getParameters())
-					vv.add(param);
+				for (RelationalArgument param : rule.getParameters())
+					vv.add(param.toString());
 			} else {
 				// Use anonymous placeholder
 				for (int i = 0; i < rule.getQueryParameters().size(); i++)
