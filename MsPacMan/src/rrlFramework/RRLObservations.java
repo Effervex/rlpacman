@@ -19,8 +19,14 @@ public class RRLObservations {
 	/** If an observation or turn applies to all players. */
 	public static final String ALL_PLAYERS = "ALL";
 
+	/** The index of the internal reward. */
+	public static final int INTERNAL_INDEX = 1;
+
+	/** The index of the environmental reward. */
+	public static final int ENVIRONMENTAL_INDEX = 0;
+
 	/** All observations regarding player-mapped information. */
-	private Map<String, Double> agentRewards_;
+	private Map<String, double[]> agentRewards_;
 
 	/** The current relational state. */
 	private Rete state_;
@@ -52,7 +58,7 @@ public class RRLObservations {
 	 *            If this state is terminal.
 	 */
 	public RRLObservations(Rete state, MultiMap<String, String[]> validActions,
-			double reward, BidiMap goalReplacements, boolean terminal) {
+			double[] reward, BidiMap goalReplacements, boolean terminal) {
 		this(state, validActions, terminal, goalReplacements, ALL_PLAYERS);
 		agentRewards_.put(ALL_PLAYERS, reward);
 		agentTurn_ = ALL_PLAYERS;
@@ -78,7 +84,7 @@ public class RRLObservations {
 		validActions_ = validActions;
 		terminal_ = terminal;
 		agentTurn_ = agentTurn;
-		agentRewards_ = new HashMap<String, Double>();
+		agentRewards_ = new HashMap<String, double[]>();
 	}
 
 	/**
@@ -89,7 +95,7 @@ public class RRLObservations {
 	 * @param reward
 	 *            The reward for the player.
 	 */
-	public void addPlayerObservations(String player, double reward) {
+	public void addPlayerObservations(String player, double[] reward) {
 		agentRewards_.put(player, reward);
 	}
 
@@ -97,15 +103,12 @@ public class RRLObservations {
 		return goalReplacements_;
 	}
 
-	public double getReward(String player) {
-		return agentRewards_.get(player);
+	public double getInternalReward(String player) {
+		return agentRewards_.get(player)[INTERNAL_INDEX];
 	}
 
-	public double getReward() throws IllegalAccessException {
-		if (!agentRewards_.containsKey(ALL_PLAYERS))
-			throw new IllegalAccessException(
-					"Cannot get reward for all players.");
-		return agentRewards_.get(ALL_PLAYERS);
+	public double getEnvironmentReward(String player) {
+		return agentRewards_.get(player)[ENVIRONMENTAL_INDEX];
 	}
 
 	public Rete getState() {
@@ -138,5 +141,9 @@ public class RRLObservations {
 
 	public boolean isTerminal() {
 		return terminal_;
+	}
+
+	public double[] getRewards(String player) {
+		return agentRewards_.get(player);
 	}
 }

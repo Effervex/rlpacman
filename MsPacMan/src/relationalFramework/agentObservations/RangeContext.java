@@ -190,7 +190,7 @@ public class RangeContext implements Serializable, Comparable<RangeContext> {
 				// Action term
 				buffer.append(" "
 						+ RelationalArgument
-								.getVariableTermArg(predicateArgStructure_[i]));
+								.createVariableTermArg(predicateArgStructure_[i]));
 			} else {
 				buffer.append(" ?");
 			}
@@ -219,7 +219,7 @@ public class RangeContext implements Serializable, Comparable<RangeContext> {
 				// Action term
 				buffer.append(" "
 						+ RelationalArgument
-								.getVariableTermArg(predicateArgStructure_[i]));
+								.createVariableTermArg(predicateArgStructure_[i]));
 			} else {
 				buffer.append(" ?");
 			}

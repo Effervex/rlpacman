@@ -30,102 +30,92 @@ public class PacManUnificationTest {
 	public void testNumericalUnifyStates() {
 		// No change unification
 		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
-		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distance b 1)"));
 		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
-		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distance b 1)"));
 		BidiMap replacementMap = new DualHashBidiMap();
 		int result = sut_.unifyStates(oldState, newState, replacementMap);
-		assertEquals(0, result);
+		assertEquals(Unification.NO_CHANGE, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(StateSpec
-				.toRelationalPredicate("(distanceDot a b 1)")));
-		assertEquals(replacementMap.size(), 2);
-		assertEquals(replacementMap.get(new RelationalArgument("a")),
-				new RelationalArgument("a"));
+				.toRelationalPredicate("(distance b 1)")));
+		assertEquals(replacementMap.size(), 1);
 		assertEquals(replacementMap.get(new RelationalArgument("b")),
 				new RelationalArgument("b"));
 
 		// Range addition
 		oldState.clear();
-		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distance b 1)"));
 		newState.clear();
-		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distance b 2)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
-		assertEquals(1, result);
+		assertEquals(Unification.UNIFIED_CHANGE, result);
 		assertEquals(1, oldState.size());
 		int index = 0;
 		assertTrue(oldState.contains(StateSpec
-				.toRelationalPredicate("(distanceDot a b "
+				.toRelationalPredicate("(distance b "
 						+ new RelationalArgument(
 								RelationalArgument.RANGE_VARIABLE_PREFIX
 										+ index, 1, 2) + ")")));
-		assertEquals(replacementMap.size(), 2);
-		assertEquals(replacementMap.get(new RelationalArgument("a")),
-				new RelationalArgument("a"));
+		assertEquals(replacementMap.size(), 1);
 		assertEquals(replacementMap.get(new RelationalArgument("b")),
 				new RelationalArgument("b"));
 
 		// Range addition (reversed)
 		oldState.clear();
-		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distance b 2)"));
 		newState.clear();
-		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		newState.add(StateSpec.toRelationalPredicate("(distance b 1)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
-		assertEquals(1, result);
+		assertEquals(Unification.UNIFIED_CHANGE, result);
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toRelationalPredicate("(distanceDot a b "
+				.toRelationalPredicate("(distance b "
 						+ new RelationalArgument(
 								RelationalArgument.RANGE_VARIABLE_PREFIX
 										+ index, 1, 2) + ")")));
-		assertEquals(replacementMap.size(), 2);
-		assertEquals(replacementMap.get(new RelationalArgument("a")),
-				new RelationalArgument("a"));
+		assertEquals(replacementMap.size(), 1);
 		assertEquals(replacementMap.get(new RelationalArgument("b")),
 				new RelationalArgument("b"));
 
 		// Negative range addition
 		oldState.clear();
-		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b -1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distance b -1)"));
 		newState.clear();
-		newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
+		newState.add(StateSpec.toRelationalPredicate("(distance b 2)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
-		assertEquals(1, result);
+		assertEquals(Unification.UNIFIED_CHANGE, result);
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toRelationalPredicate("(distanceDot a b "
+				.toRelationalPredicate("(distance b "
 						+ new RelationalArgument(
 								RelationalArgument.RANGE_VARIABLE_PREFIX
 										+ index, -1, 2) + ")")));
-		assertEquals(replacementMap.size(), 2);
-		assertEquals(replacementMap.get(new RelationalArgument("a")),
-				new RelationalArgument("a"));
+		assertEquals(replacementMap.size(), 1);
 		assertEquals(replacementMap.get(new RelationalArgument("b")),
 				new RelationalArgument("b"));
 
 		// Tiny value range addition
 		oldState.clear();
-		oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b -1)"));
+		oldState.add(StateSpec.toRelationalPredicate("(distance b -1)"));
 		newState.clear();
 		newState.add(StateSpec
-				.toRelationalPredicate("(distanceDot a b 2.567483E-64)"));
+				.toRelationalPredicate("(distance b 2.567483E-64)"));
 		replacementMap.clear();
 		result = sut_.unifyStates(oldState, newState, replacementMap);
-		assertEquals(1, result);
+		assertEquals(Unification.UNIFIED_CHANGE, result);
 		assertEquals(1, oldState.size());
 		index++;
 		assertTrue(oldState.contains(StateSpec
-				.toRelationalPredicate("(distanceDot a b "
+				.toRelationalPredicate("(distance b "
 						+ new RelationalArgument(
 								RelationalArgument.RANGE_VARIABLE_PREFIX
 										+ index, -1, 2.567483E-64) + ")")));
-		assertEquals(replacementMap.get(new RelationalArgument("a")),
-				new RelationalArgument("a"));
 		assertEquals(replacementMap.get(new RelationalArgument("b")),
 				new RelationalArgument("b"));
 
@@ -133,7 +123,7 @@ public class PacManUnificationTest {
 		// oldState.clear();
 		// oldState.add(StateSpec.toRelationalPredicate("(distanceDot x y -1)"));
 		// newState.clear();
-		// newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
+		// newState.add(StateSpec.toRelationalPredicate("(distance b 2)"));
 		// replacementMap.clear();
 		// result = sut_.unifyStates(oldState, newState, replacementMap);
 		// assertEquals(1, result);
@@ -151,12 +141,12 @@ public class PacManUnificationTest {
 		//
 		// // Unification under an existing range term
 		// oldState.clear();
-		// oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b "
+		// oldState.add(StateSpec.toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0, 1, 3)
 		// + ")"));
 		// newState.clear();
-		// newState.add(StateSpec.toRelationalPredicate("(distanceDot a b 2)"));
+		// newState.add(StateSpec.toRelationalPredicate("(distance b 2)"));
 		// oldTerms = new String[2];
 		// oldTerms[0] = "a";
 		// oldTerms[1] = "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0";
@@ -167,7 +157,7 @@ public class PacManUnificationTest {
 		// assertEquals(0, result);
 		// assertEquals(1, oldState.size());
 		// assertTrue(oldState.contains(StateSpec
-		// .toRelationalPredicate("(distanceDot a b "
+		// .toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0,
 		// 1, 3) + ")")));
@@ -177,12 +167,12 @@ public class PacManUnificationTest {
 		//
 		// // Unification under an existing range term (extension)
 		// oldState.clear();
-		// oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b "
+		// oldState.add(StateSpec.toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0, 1, 3)
 		// + ")"));
 		// newState.clear();
-		// newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
+		// newState.add(StateSpec.toRelationalPredicate("(distance b -2)"));
 		// oldTerms = new String[2];
 		// oldTerms[0] = "a";
 		// oldTerms[1] = "?" + RelationalArgument.RANGE_VARIABLE_PREFIX + "0";
@@ -193,7 +183,7 @@ public class PacManUnificationTest {
 		// assertEquals(1, result);
 		// assertEquals(1, oldState.size());
 		// assertTrue(oldState.contains(StateSpec
-		// .toRelationalPredicate("(distanceDot a b "
+		// .toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0,
 		// -2, 3) + ")")));
@@ -203,10 +193,10 @@ public class PacManUnificationTest {
 		//
 		// // Multiple numerical terms
 		// oldState.clear();
-		// oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b 1)"));
+		// oldState.add(StateSpec.toRelationalPredicate("(distance b 1)"));
 		// oldState.add(StateSpec.toRelationalPredicate("(level a 1)"));
 		// newState.clear();
-		// newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
+		// newState.add(StateSpec.toRelationalPredicate("(distance b -2)"));
 		// newState.add(StateSpec.toRelationalPredicate("(level a 3)"));
 		// oldTerms = new String[2];
 		// oldTerms[0] = "a";
@@ -219,7 +209,7 @@ public class PacManUnificationTest {
 		// assertEquals(2, oldState.size());
 		// index++;
 		// assertTrue(oldState.contains(StateSpec
-		// .toRelationalPredicate("(distanceDot a b "
+		// .toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX
 		// + index, -2, 1) + ")")));
@@ -235,13 +225,13 @@ public class PacManUnificationTest {
 		//
 		// // Multiple numerical terms with existing range term
 		// oldState.clear();
-		// oldState.add(StateSpec.toRelationalPredicate("(distanceDot a b "
+		// oldState.add(StateSpec.toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0, 1, 3)
 		// + ")"));
 		// oldState.add(StateSpec.toRelationalPredicate("(level a 1)"));
 		// newState.clear();
-		// newState.add(StateSpec.toRelationalPredicate("(distanceDot a b -2)"));
+		// newState.add(StateSpec.toRelationalPredicate("(distance b -2)"));
 		// newState.add(StateSpec.toRelationalPredicate("(level a 3)"));
 		// oldTerms = new String[2];
 		// oldTerms[0] = "a";
@@ -253,7 +243,7 @@ public class PacManUnificationTest {
 		// assertEquals(1, result);
 		// assertEquals(2, oldState.size());
 		// assertTrue(oldState.contains(StateSpec
-		// .toRelationalPredicate("(distanceDot a b "
+		// .toRelationalPredicate("(distance b "
 		// + new RelationalArgument("?"
 		// + RelationalArgument.RANGE_VARIABLE_PREFIX + 0,
 		// -2, 3) + ")")));

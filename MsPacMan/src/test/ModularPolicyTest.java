@@ -21,6 +21,7 @@ import cerrla.modular.ModularSubGoal;
 import cerrla.modular.PolicyItem;
 import cerrla.modular.SpecificGoalCondition;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -35,18 +36,15 @@ public class ModularPolicyTest {
 
 	@Test
 	public void testEquals() {
+		// Testing uniquely IDed policies
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
 				GoalCondition.parseGoalCondition("on$A$B"));
 		ModularPolicy modPolA = new ModularPolicy(lced);
-		modPolA.addRule(new RelationalRule("(clear ?A) => (move ?A ?A)"));
+		modPolA.addRule(new RelationalRule("(clear ?X) => (move ?X ?X)"));
 
 		ModularPolicy modPolB = new ModularPolicy(lced);
-		modPolB.addRule(new RelationalRule("(clear ?A) => (move ?A ?A)"));
-		assertEquals(modPolA, modPolB);
-
-		Map<String, String> modularParams = new HashMap<String, String>();
-		modularParams.put("?G_0", "?G_1");
-		modPolB.setModularParameters(modularParams);
+		modPolB.addRule(new RelationalRule("(clear ?X) => (move ?X ?X)"));
+		assertEquals(modPolA.getRules(), modPolB.getRules());
 		assertFalse(modPolA.equals(modPolB));
 	}
 
@@ -58,39 +56,41 @@ public class ModularPolicyTest {
 		RelationalPolicy relPolA = new RelationalPolicy();
 		RelationalRule rule = new RelationalRule(
 				"(highest ?G_1) => (move ?G_0 ?G_0)");
-		List<String> queryParams = new ArrayList<String>();
-		queryParams.add("?G_0");
-		queryParams.add("?G_1");
+		List<RelationalArgument> queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
+		queryParams.add(new RelationalArgument("?G_1"));
 		rule.setQueryParams(queryParams);
 		relPolA.addRule(rule);
 		ModularPolicy modPolA = new ModularPolicy(relPolA, lced);
 		SpecificGoalCondition highGoal = new SpecificGoalCondition("highest$A");
-		assertEquals(modPolA.getRules().get(1), new ModularSubGoal(highGoal, rule));
+		assertEquals(modPolA.getRules().get(1), new ModularSubGoal(highGoal,
+				rule));
 
 		// Highest module
-		Map<String, String> paramReplacementMap = new HashMap<String, String>();
-		paramReplacementMap.put("?G_0", "?G_1");
+		Map<RelationalArgument, RelationalArgument> paramReplacementMap = new HashMap<RelationalArgument, RelationalArgument>();
+		paramReplacementMap.put(new RelationalArgument("?G_0"), new RelationalArgument("?G_1"));
 		lced = new LocalCrossEntropyDistribution(highGoal);
 		RelationalPolicy relPolB = new RelationalPolicy();
 		rule = new RelationalRule("(clear ?G_0) => (move ?G_0 ?G_0)");
-		queryParams = new ArrayList<String>();
-		queryParams.add("?G_0");
+		queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
 		rule.setQueryParams(queryParams);
 		relPolB.addRule(rule);
 		ModularPolicy highest = new ModularPolicy(relPolB, lced);
 		highest.setModularParameters(paramReplacementMap);
 		SpecificGoalCondition clearGoal = new SpecificGoalCondition("clear$A");
-		assertEquals(highest.getRules().get(1), new ModularSubGoal(clearGoal, rule));
+		assertEquals(highest.getRules().get(1), new ModularSubGoal(clearGoal,
+				rule));
 		((ModularSubGoal) modPolA.getRules().get(1)).setModularPolicy(highest);
 
 		// Clear module
-		paramReplacementMap = new HashMap<String, String>();
-		paramReplacementMap.put("?G_0", "?G_1");
+		paramReplacementMap = new HashMap<RelationalArgument, RelationalArgument>();
+		paramReplacementMap.put(new RelationalArgument("?G_0"), new RelationalArgument("?G_1"));
 		lced = new LocalCrossEntropyDistribution(clearGoal);
 		RelationalPolicy relPolC = new RelationalPolicy();
 		rule = new RelationalRule("(above ?X ?G_0) => (move ?X ?G_0)");
-		queryParams = new ArrayList<String>();
-		queryParams.add("?G_0");
+		queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
 		rule.setQueryParams(queryParams);
 		relPolC.addRule(rule);
 		ModularPolicy clear = new ModularPolicy(relPolC, lced);
@@ -106,9 +106,9 @@ public class ModularPolicyTest {
 		RelationalPolicy relPol = new RelationalPolicy();
 		RelationalRule rule = new RelationalRule(
 				"(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
-		List<String> queryParams = new ArrayList<String>();
-		queryParams.add("?G_0");
-		queryParams.add("?G_1");
+		List<RelationalArgument> queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
+		queryParams.add(new RelationalArgument("?G_1"));
 		rule.setQueryParams(queryParams);
 		relPol.addRule(rule);
 
@@ -137,9 +137,9 @@ public class ModularPolicyTest {
 		RelationalPolicy relPol = new RelationalPolicy();
 		RelationalRule rule = new RelationalRule(
 				"(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)");
-		List<String> queryParams = new ArrayList<String>();
-		queryParams.add("?G_0");
-		queryParams.add("?G_1");
+		List<RelationalArgument> queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
+		queryParams.add(new RelationalArgument("?G_1"));
 		rule.setQueryParams(queryParams);
 		relPol.addRule(rule);
 
@@ -147,10 +147,10 @@ public class ModularPolicyTest {
 				GoalCondition.parseGoalCondition("on$A$B"));
 		ModularPolicy modPol = new ModularPolicy(relPol, lced);
 		assertFalse(modPol.shouldRegenerate());
-		modPol.noteStepReward(-1);
+		modPol.noteStepReward(new double[] { -1, -1 });
 		modPol.endEpisode();
 		assertFalse(modPol.shouldRegenerate());
-		modPol.noteStepReward(-2);
+		modPol.noteStepReward(new double[] { -2, -2 });
 		modPol.endEpisode();
 		assertFalse(modPol.shouldRegenerate());
 

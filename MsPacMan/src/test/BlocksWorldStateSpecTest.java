@@ -239,16 +239,20 @@ public class BlocksWorldStateSpecTest {
 		assertTrue(generalConds[1].isEmpty());
 
 		// Test anonymous variable
-		rule = new RelationalRule("(clear ?X) (on ?X ?) => (moveFloor ?X)");
+		rule = new RelationalRule("(clear ?X) (on ?X ?Y) => (moveFloor ?X)");
 		// 5 assertions in the body: clear, on, two blocks, and an
 		// inequals
-		assertEquals(rule.getConditions(false).size(), 3);
+		assertEquals(rule.getConditions(false).size(), 5);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?X ?)")));
+				StateSpec.toRelationalPredicate("(on ?X ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(test (<> ?Y ?X))")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertEquals(rule.getAction(),
@@ -268,23 +272,31 @@ public class BlocksWorldStateSpecTest {
 
 		// Test anonymous variables
 		rule = new RelationalRule(
-				"(clear ?X) (on ?X ?) (on ?Y ?) => (moveFloor ?X)");
+				"(clear ?X) (on ?X ?Z) (on ?Y ?A) => (moveFloor ?X)");
 		// 10 assertions in the body: clear, 2 ons, 4 blocks, and 3
 		// inequals
 		// Note no inequals between ?1 and ?2
-		assertEquals(rule.getConditions(false).size(), 6);
+		assertEquals(rule.getConditions(false).size(), 10);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?X)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?X ?)")));
+				StateSpec.toRelationalPredicate("(on ?X ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?Y ?)")));
+				StateSpec.toRelationalPredicate("(on ?Z ?A)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(test (<> ?Y ?X))")));
+				StateSpec.toRelationalPredicate("(block ?Z)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?A)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(test (<> ?Z ?A ?X ?Y))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(test (<> ?Y ?A ?X))")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(test (<> ?X ?A))")));
 		assertTrue(rule.getStringConditions().indexOf("clear") < rule
 				.getStringConditions().indexOf("block"));
 		assertTrue(rule.getStringConditions().indexOf("block") < rule
@@ -423,16 +435,20 @@ public class BlocksWorldStateSpecTest {
 
 		// Testing module constants
 		rule = new RelationalRule(
-				"(clear ?G_0) (on ?G_0 ?) => (moveFloor ?G_0)");
+				"(clear ?G_0) (on ?G_0 ?Y) => (moveFloor ?G_0)");
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(block ?G_0)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?G_0 ?)")));
+				StateSpec.toRelationalPredicate("(on ?G_0 ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?G_0)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(block ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(test (<> ?Y ?G_0))")));
 		assertEquals(rule.getAction(),
 				StateSpec.toRelationalPredicate("(moveFloor ?G_0)"));
-		assertEquals(rule.getConditions(false).size(), 3);
+		assertEquals(rule.getConditions(false).size(), 5);
 		constants = rule.getSpecificSubGoals();
 		generalConds = rule.getGeneralisedConditions();
 		strFact = StateSpec.getInstance().getPredicates().get("clear");

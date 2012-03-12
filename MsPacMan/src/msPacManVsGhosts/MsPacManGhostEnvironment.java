@@ -255,14 +255,14 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 	 * @return The difference in score.
 	 */
 	@Override
-	protected double calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(boolean isTerminal) {
 		double scoreDiff = game_.getScore() - prevScore_;
 		prevScore_ = game_.getScore();
 		if (StateSpec.getInstance().getGoalName().equals("survive")
 				&& game_.getLivesRemaining() < prevLives_)
 			scoreDiff -= (prevLives_ - game_.getLivesRemaining()) * 10000;
 		prevLives_ = game_.getLivesRemaining();
-		return scoreDiff;
+		return new double[] { scoreDiff, scoreDiff };
 	}
 
 	@Override
@@ -355,7 +355,8 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 
 	@Override
 	protected void stepState(Object action) {
-		game_.advanceGame((Integer) action, ghosts_.getActions(game_, Game.DELAY));
+		game_.advanceGame((Integer) action,
+				ghosts_.getActions(game_, Game.DELAY));
 		if (!experimentMode_) {
 			gv_.repaint();
 		}
@@ -371,7 +372,8 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 		game_ = new _G_();
 
 		for (String arg : extraArgs) {
-			if (arg.equals("-e") || ProgramArgument.EXPERIMENT_MODE.booleanValue()) {
+			if (arg.equals("-e")
+					|| ProgramArgument.EXPERIMENT_MODE.booleanValue()) {
 				// Run the program in experiment mode (No GUI).
 				experimentMode_ = true;
 			}

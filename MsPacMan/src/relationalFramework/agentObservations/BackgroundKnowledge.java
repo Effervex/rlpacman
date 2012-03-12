@@ -1,5 +1,6 @@
 package relationalFramework.agentObservations;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -79,7 +80,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param rightRelation
 	 *            The right side relation.
 	 */
-	public BackgroundKnowledge(SortedSet<RelationalPredicate> leftRelations,
+	public BackgroundKnowledge(Collection<RelationalPredicate> leftRelations,
 			boolean isEquivalenceRule, RelationalPredicate rightRelation) {
 		initialise(leftRelations, isEquivalenceRule, rightRelation);
 	}
@@ -94,7 +95,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param rightRelation
 	 *            The right side relation.
 	 */
-	private void initialise(SortedSet<RelationalPredicate> leftRelations,
+	private void initialise(Collection<RelationalPredicate> leftRelations,
 			boolean isEquivalenceRule, RelationalPredicate rightRelation) {
 		equivalentRule_ = isEquivalenceRule;
 		precendence_ = LEFT_SIDE;
@@ -130,8 +131,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			equivalentRule_ = false;
 		}
 
-		initialise(RelationalRule.splitConditions(split[0], false),
-				equivalentRule_, StateSpec.toRelationalPredicate(split[1]));
+		initialise(RelationalRule.splitConditions(split[0]), equivalentRule_,
+				StateSpec.toRelationalPredicate(split[1]));
 	}
 
 	/**
@@ -140,7 +141,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * any further variables not seen in the right side.
 	 */
 	private void normaliseRuleArgs() {
-		Map<String, String> replacementMap = null;
+		Map<RelationalArgument, RelationalArgument> replacementMap = null;
 		if (precendence_ == LEFT_SIDE)
 			replacementMap = postCondition_.createVariableTermReplacementMap(
 					false, true);
@@ -195,6 +196,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 * @param replacementTerms
 	 *            The replacement terms to swap the terms with.
 	 */
+	@SuppressWarnings("unchecked")
 	private RelationalPredicate getPostCond(BidiMap replacementTerms) {
 		RelationalPredicate replacedFact = new RelationalPredicate(
 				postCondition_);
@@ -227,7 +229,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 *            The rule conditions to simplify.
 	 * @return True if the conditions were simplified.
 	 */
-	public boolean simplify(SortedSet<RelationalPredicate> ruleConds) {
+	@SuppressWarnings("unchecked")
+	public boolean simplify(Collection<RelationalPredicate> ruleConds) {
 		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
 		Collection<RelationalPredicate> bckConditions = getAllConditions();
@@ -235,7 +238,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				ruleConds, replacementTerms);
 		// If all conditions within a background rule are present, remove
 		// the inferred condition
-		if (result == 0) {
+		if (result == Unification.NO_CHANGE) {
 			RelationalPredicate cond = getPostCond(replacementTerms);
 			if (ruleConds.remove(cond))
 				changed = true;
@@ -258,48 +261,18 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				resultantFacts = temp;
 			}
 
-			result = Unification.getInstance().unifyStates(backgroundConds,
-					ruleConds, replacementTerms);
-			if (result == 0) {
-				// Remove any replacements which specialise anonymous terms
+			result = Unification.getInstance().unifyStatesWithUnunified(
+					backgroundConds, ruleConds, replacementTerms, true);
+			if (result == Unification.NO_CHANGE) {
+				changed = true;
+				// If the equivalence rule unified perfectly, add the equivalent
+				// conditions.
 				replacementTerms = replacementTerms.inverseBidiMap();
 
-				// Replace the arguments
-				for (RelationalPredicate removed : backgroundConds) {
-					// If there is a unification, attempt to remove the right
-					// side
-					removed.replaceArguments(replacementTerms, true, false);
-				}
-
-				// Check that all unified conditions exist
-				boolean abortAnonymous = false;
-				SortedSet<RelationalPredicate> backupConds = new TreeSet<RelationalPredicate>(
-						ruleConds);
-				if (ruleConds.containsAll(backgroundConds)) {
-					changed = true;
-					ruleConds.removeAll(backgroundConds);
-					for (RelationalPredicate resultFact : resultantFacts) {
-						// Check for attempting to create anonymous terms with
-						// an anonymous replacement
-						if (replacementTerms.containsKey("?")
-								&& !replacementTerms.get("?").equals("?")
-								&& !resultFact.isFullyNotAnonymous()) {
-							abortAnonymous = true;
-							break;
-						}
-						resultFact.replaceArguments(replacementTerms, false,
-								false);
-						if (!ruleConds.contains(resultFact))
-							ruleConds.add(resultFact);
-					}
-				}
-
-				// If the unification has anonymous unity problems, revert to
-				// normal
-				if (abortAnonymous) {
-					ruleConds.clear();
-					ruleConds.addAll(backupConds);
-					changed = false;
+				for (RelationalPredicate resultFact : resultantFacts) {
+					resultFact.replaceArguments(replacementTerms, false, false);
+					if (!ruleConds.contains(resultFact))
+						ruleConds.add(resultFact);
 				}
 			}
 		}
@@ -310,11 +283,13 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	/**
 	 * Checks if a rule is illegal in regards to this background knowledge.
 	 * 
-	 * @param ruleConds The rule conditions to evaluate.
-	 * @param fixRule If the rule should be modified to become legal.
+	 * @param ruleConds
+	 *            The rule conditions to evaluate.
+	 * @param fixRule
+	 *            If the rule should be modified to become legal.
 	 * @return True if the conditions are illegal.
 	 */
-	public boolean checkIllegalRule(SortedSet<RelationalPredicate> ruleConds,
+	public boolean checkIllegalRule(Collection<RelationalPredicate> ruleConds,
 			boolean fixRule) {
 		// Check for illegal rules
 		BidiMap replacementTerms = new DualHashBidiMap();
@@ -322,7 +297,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 				getConjugatedConditions(), ruleConds, replacementTerms);
 		// If the rule is found to be illegal using the conjugated
 		// conditions, remove the illegal condition
-		if (result == 0) {
+		if (result == Unification.NO_CHANGE) {
 			RelationalPredicate cond = getPostCond(replacementTerms);
 			cond.swapNegated();
 			if (ruleConds.contains(cond)) {

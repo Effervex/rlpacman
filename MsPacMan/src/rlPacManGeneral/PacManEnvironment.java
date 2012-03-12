@@ -319,7 +319,7 @@ public class PacManEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(boolean isTerminal) {
 		int scoreDiff = model_.m_player.m_score - prevScore_;
 		prevScore_ += scoreDiff;
 		// Including -10000 if survival environment
@@ -327,7 +327,7 @@ public class PacManEnvironment extends RRLEnvironment {
 				&& model_.m_nLives < prevLives_)
 			scoreDiff -= (prevLives_ - model_.m_nLives) * 10000;
 		prevLives_ = model_.m_nLives;
-		return scoreDiff;
+		return new double[] { scoreDiff, scoreDiff };
 	}
 
 	@Override

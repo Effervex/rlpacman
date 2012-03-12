@@ -63,7 +63,7 @@ public class CERRLA implements RRLAgent {
 	 */
 	private void addModuleToPolicy(ModularSubGoal subGoal,
 			Collection<GoalCondition> priorPolicies,
-			Map<String, String> moduleReplacementMap,
+			Map<RelationalArgument, RelationalArgument> moduleReplacementMap,
 			ModularPolicy modularPolicy,
 			Collection<ModularPolicy> subGoalPolicies) {
 		GoalCondition subGoalCondition = subGoal.getGoalCondition();
@@ -86,12 +86,13 @@ public class CERRLA implements RRLAgent {
 
 			if (subGoalCondition instanceof SpecificGoalCondition) {
 				// Apply the replacement map
-				Map<String, String> newModuleReplacementMap = new HashMap<String, String>();
-				ArrayList<String> args = ((SpecificGoalCondition) subGoalCondition)
+				Map<RelationalArgument, RelationalArgument> newModuleReplacementMap = new HashMap<RelationalArgument, RelationalArgument>();
+				ArrayList<RelationalArgument> args = ((SpecificGoalCondition) subGoalCondition)
 						.getConstantArgs();
 				for (int i = 0; i < args.size(); i++) {
-					String goalTerm = RelationalArgument.createGoalTerm(i);
-					String argTerm = args.get(i);
+					RelationalArgument goalTerm = RelationalArgument
+							.createGoalTerm(i);
+					RelationalArgument argTerm = args.get(i);
 					if (moduleReplacementMap == null
 							|| moduleReplacementMap.isEmpty())
 						newModuleReplacementMap.put(goalTerm, argTerm);
@@ -190,7 +191,7 @@ public class CERRLA implements RRLAgent {
 	private ModularPolicy regeneratePolicy(
 			LocalCrossEntropyDistribution policyGenerator,
 			Collection<GoalCondition> priorPolicies,
-			Map<String, String> moduleReplacementMap,
+			Map<RelationalArgument, RelationalArgument> moduleReplacementMap,
 			Collection<ModularPolicy> subGoalPolicies) {
 		// Initialise null collections
 		if (priorPolicies == null)
@@ -241,10 +242,11 @@ public class CERRLA implements RRLAgent {
 		// End the episode for ALL players
 		for (String player : agentPolicy_.keySet()) {
 			ModularPolicy currentPolicy = agentPolicy_.get(player);
-			currentPolicy.noteStepReward(observations.getReward(player));
+			currentPolicy.noteStepReward(observations.getRewards(player));
 			boolean regeneratePolicy = currentPolicy.endEpisode();
 			if (regeneratePolicy)
-				agentPolicy_.put(player, recreateCurrentPolicy(agentPolicy_.values()));
+				agentPolicy_.put(player,
+						recreateCurrentPolicy(agentPolicy_.values()));
 		}
 		startedAgents_.clear();
 	}
@@ -332,7 +334,7 @@ public class CERRLA implements RRLAgent {
 
 		// Note the reward for the relevant distributions
 		agentPolicy_.get(playerID).noteStepReward(
-				observations.getReward(playerID));
+				observations.getRewards(playerID));
 
 		// Evaluate the policy.
 		return evaluatePolicy(observations);

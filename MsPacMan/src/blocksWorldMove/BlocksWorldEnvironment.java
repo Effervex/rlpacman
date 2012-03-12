@@ -133,15 +133,17 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(boolean isTerminal) {
+		double[] reward = new double[2];
 		if (isTerminal || steps_ == maxSteps_) {
 			if (optimalSteps_ >= maxSteps_)
-				return 0;
+				reward[0] = 0;
 			else
-				return MINIMAL_REWARD * (steps_ - optimalSteps_)
+				reward[0] = MINIMAL_REWARD * (steps_ - optimalSteps_)
 						/ (maxSteps_ - optimalSteps_);
 		}
-		return 0;
+		reward[1] = reward[0];
+		return reward;
 	}
 
 	@Override

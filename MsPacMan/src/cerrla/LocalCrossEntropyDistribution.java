@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,6 +30,7 @@ import jess.QueryResult;
 import jess.Rete;
 import jess.ValueVector;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
@@ -220,7 +222,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			if (goalRule_ == null) {
 				SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>();
 				conditions.add(goalCondition_.getFact());
-				goalRule_ = new RelationalRule(conditions, null, null, null);
+				goalRule_ = new RelationalRule(conditions, null, null);
 				goalRule_.expandConditions();
 			}
 		} else
@@ -232,8 +234,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			// System.out.println(StateSpec.extractFacts(state));
 			ValueVector vv = new ValueVector();
 			goalRule_.setParameters(goalReplacements);
-			for (String param : goalRule_.getParameters())
-				vv.add(param);
+			for (RelationalArgument param : goalRule_.getParameters())
+				vv.add(param.toString());
 
 			// Run the query
 			String query = StateSpec.getInstance().getRuleQuery(goalRule_);
@@ -501,15 +503,19 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/**
 	 * Records a given sample with a given reward.
 	 * 
-	 * @param value
-	 *            The value of the sample.
+	 * @param sample
+	 *            The sample being recorded.
+	 * @param policyRewards
+	 *            The internal and environmental rewards the policy has
+	 *            received.
 	 */
-	public void recordSample(ModularPolicy sample, Double[] values) {
+	public void recordSample(ModularPolicy sample,
+			ArrayList<double[]> policyRewards) {
 		// Performance
 		if (!frozen_)
-			currentEpisode_ += values.length;
-		double average = performance_
-				.noteSampleRewards(values, currentEpisode_);
+			currentEpisode_ += policyRewards.size();
+		double average = performance_.noteSampleRewards(policyRewards,
+				currentEpisode_);
 
 		// Calculate the population and number of elites
 		population_ = policyGenerator_.determinePopulation();

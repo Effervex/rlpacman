@@ -23,13 +23,13 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		Serializable {
 	private static final long serialVersionUID = 6131063892766663639L;
 	/** The actual arguments of the fact. */
-	private RelationalArgument[] arguments_;
+	protected RelationalArgument[] arguments_;
 	/** The fact name. */
-	private String factName_;
+	protected String factName_;
 	/** The types of the fact arguments. */
-	private String[] factTypes_;
+	protected String[] factTypes_;
 	/** If this fact is negated (prefixed by not) */
-	private boolean negated_ = false;
+	protected boolean negated_ = false;
 	/** A collection of contexts which define ranges. */
 	private SortedSet<RangeContext> rangeContexts_;
 
@@ -179,10 +179,6 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (result != 0)
 			return result;
 
-		result = factName_.compareTo(sf.factName_);
-		if (result != 0)
-			return result;
-
 		// Fact Types should be the same if both names are the same
 		// Check arguments
 		for (int i = 0; i < arguments_.length; i++) {
@@ -190,6 +186,10 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			if (result != 0)
 				return result;
 		}
+
+		result = factName_.compareTo(sf.factName_);
+		if (result != 0)
+			return result;
 		return 0;
 	}
 
@@ -221,7 +221,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 				if ((p & (int) Math.pow(2, i)) != 0) {
 					if (generateArgs)
 						genArguments[i] = RelationalArgument
-								.getVariableTermArg(i);
+								.createVariableTermArg(i);
 					else
 						genArguments[i] = arguments_[i];
 				} else
@@ -246,22 +246,20 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @return A replacement map which converts this string fact's non-numerical
 	 *         terms into ordered variable terms.
 	 */
-	public Map<String, String> createVariableTermReplacementMap(
+	public Map<RelationalArgument, RelationalArgument> createVariableTermReplacementMap(
 			boolean formNumericalReplacement, boolean ignoreAnonymous) {
-		Map<String, String> replacementMap = new HashMap<String, String>();
+		Map<RelationalArgument, RelationalArgument> replacementMap = new HashMap<RelationalArgument, RelationalArgument>();
 		for (int i = 0; i < arguments_.length; i++) {
 			if (!StateSpec.isNumberType(factTypes_[i])
 					|| formNumericalReplacement) {
 				if (!arguments_[i].equals(RelationalArgument.ANONYMOUS)
 						|| !ignoreAnonymous) {
-					if (!replacementMap.containsKey(arguments_[i].toString()))
-						replacementMap.put(arguments_[i].toString(),
-								RelationalArgument.getVariableTermArg(i)
-										.toString());
+					if (!replacementMap.containsKey(arguments_[i]))
+						replacementMap.put(arguments_[i],
+								RelationalArgument.createVariableTermArg(i));
 				}
-			} else if (!replacementMap.containsKey(arguments_[i].toString()))
-				replacementMap.put(arguments_[i].toString(),
-						arguments_[i].toString());
+			} else if (!replacementMap.containsKey(arguments_[i]))
+				replacementMap.put(arguments_[i], arguments_[i]);
 		}
 		return replacementMap;
 	}
@@ -378,7 +376,24 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	/**
-	 * Replaces all occurrences of an argument with another value.
+	 * Applies a replacement map to this predicate, while flexibly creating
+	 * unbound terms for non replacement terms.
+	 * 
+	 * @param replacementMap
+	 *            The replacement map to apply, and modify.
+	 * @param unboundStart
+	 *            The start index for the unbound variables.
+	 */
+	public void flexibleReplaceArguments(
+			Map<RelationalArgument, RelationalArgument> replacementMap,
+			int unboundStart) {
+		replaceArguments(replacementMap, false, true, true, unboundStart);
+	}
+
+	/**
+	 * Internal replacement method.
+	 * 
+	 * @param <T>
 	 * 
 	 * @param replacementMap
 	 *            The replacement map for the arguments. Can be of type String
@@ -389,12 +404,17 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param retainNumbers
 	 *            If not retaining other arguments, if numbers should be an
 	 *            exception.
+	 * @param flexibleReplace
+	 *            If the replacement map should be appended to.
 	 * @return True if the fact is still valid (not anonymous)
 	 */
-	public boolean replaceArguments(Map<?, ?> replacementMap,
-			boolean retainOtherArgs, boolean retainNumbers) {
+	@SuppressWarnings("unchecked")
+	private <T> boolean replaceArguments(Map<T, T> replacementMap,
+			boolean retainOtherArgs, boolean retainNumbers,
+			boolean flexibleReplace, int unboundStart) {
 		RelationalArgument[] newArguments = new RelationalArgument[arguments_.length];
 		boolean notAnonymous = false;
+		int unboundIndex = 0;
 		for (int i = 0; i < arguments_.length; i++) {
 			newArguments[i] = arguments_[i].clone();
 			boolean hasReplacement = false;
@@ -417,16 +437,44 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 
 			// Retaining args
 			if (!retainOtherArgs && !hasReplacement) {
-				if (!retainNumbers || !arguments_[i].isNumber())
-					newArguments[i] = RelationalArgument.ANONYMOUS;
+				if (!retainNumbers || !arguments_[i].isNumber()) {
+					if (flexibleReplace) {
+						newArguments[i] = RelationalArgument
+								.createUnboundVariable(unboundIndex,
+										unboundStart);
+						replacementMap.put((T) arguments_[i],
+								(T) newArguments[i]);
+					} else
+						newArguments[i] = RelationalArgument.ANONYMOUS;
+				}
 			}
 
 			// Anonymous checks.
-			if (!newArguments[i].equals(RelationalArgument.ANONYMOUS))
+			if (!newArguments[i].isUnboundVariable())
 				notAnonymous = true;
 		}
 		arguments_ = newArguments;
 		return notAnonymous;
+	}
+
+	/**
+	 * Replaces all occurrences of an argument with another value.
+	 * 
+	 * @param replacementMap
+	 *            The replacement map for the arguments. Can be of type String
+	 *            or RelationalArgument.
+	 * @param retainOtherArgs
+	 *            If arguments that have no replacement should be retained (or
+	 *            turned anonymous).
+	 * @param retainNumbers
+	 *            If not retaining other arguments, if numbers should be an
+	 *            exception.
+	 * @return True if the fact is still valid (not anonymous)
+	 */
+	public <T> boolean replaceArguments(Map<T, T> replacementMap,
+			boolean retainOtherArgs, boolean retainNumbers) {
+		return replaceArguments(replacementMap, retainOtherArgs, retainNumbers,
+				false, 0);
 	}
 
 	/**
@@ -467,9 +515,13 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		// Run through the arguments, replacing variable args with the
 		// replacements.
 		for (int i = 0; i < arguments_.length; i++) {
-			int termIndex = arguments_[i].getVariableTermIndex();
-			if (termIndex != -1)
-				arguments_[i] = new RelationalArgument(replacements[termIndex]);
+			// Only replace action variables!
+			if (!arguments_[i].isUnboundVariable()) {
+				int termIndex = arguments_[i].getVariableTermIndex();
+				if (termIndex != -1)
+					arguments_[i] = new RelationalArgument(
+							replacements[termIndex]);
+			}
 		}
 	}
 
@@ -480,9 +532,9 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param retainedArgs
 	 *            The arguments to retain.
 	 */
-	public void retainArguments(Collection<String> retainedArgs) {
+	public void retainArguments(Collection<RelationalArgument> retainedArgs) {
 		for (int i = 0; i < arguments_.length; i++) {
-			if (!retainedArgs.contains(arguments_[i].toString()))
+			if (!retainedArgs.contains(arguments_[i]))
 				arguments_[i] = RelationalArgument.ANONYMOUS;
 		}
 	}
@@ -494,8 +546,9 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * 
 	 * @param replacementMap
 	 */
-	public void safeReplaceArgs(Map<String, String> replacementMap) {
-		Map<String, String> tempRepl = new HashMap<String, String>(
+	public void safeReplaceArgs(
+			Map<RelationalArgument, RelationalArgument> replacementMap) {
+		Map<RelationalArgument, RelationalArgument> tempRepl = new HashMap<RelationalArgument, RelationalArgument>(
 				arguments_.length);
 		int tempCounter = 0;
 		// Run through each argument, swapping existing args with unbound temp
@@ -503,19 +556,18 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		for (int i = 0; i < arguments_.length; i++) {
 			// Increment tempCounter to an unbound variable
 			while (replacementMap.containsValue(RelationalArgument
-					.getVariableTermArg(tempCounter).toString()))
+					.createVariableTermArg(tempCounter)))
 				tempCounter++;
 
-			String arg = arguments_[i].toString();
+			RelationalArgument arg = arguments_[i];
 			if (replacementMap.containsKey(arg))
-				arguments_[i] = new RelationalArgument(replacementMap.get(arg));
+				arguments_[i] = replacementMap.get(arg).clone();
 			else if (tempRepl.containsKey(arg))
-				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
-			else if (!arg.equals("?")) {
+				arguments_[i] = tempRepl.get(arg).clone();
+			else if (!arg.isAnonymous()) {
 				tempRepl.put(arg,
-						RelationalArgument.getVariableTermArg(tempCounter++)
-								.toString());
-				arguments_[i] = new RelationalArgument(tempRepl.get(arg));
+						RelationalArgument.createVariableTermArg(tempCounter++));
+				arguments_[i] = tempRepl.get(arg).clone();
 			}
 		}
 	}
@@ -540,17 +592,18 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * 
 	 * @return The StringFact as a nice string (including goal args).
 	 */
-	public String toNiceString(Map<String, String> replacements) {
+	public String toNiceString(
+			Map<RelationalArgument, RelationalArgument> replacements) {
 		StringBuffer buffer = new StringBuffer();
 		if (negated_)
 			buffer.append("(not ");
 		buffer.append("(" + factName_);
 		for (int i = 0; i < arguments_.length; i++) {
-			String arg = arguments_[i].toNiceString();
+			RelationalArgument arg = arguments_[i];
 			if (replacements != null && replacements.containsKey(arg))
 				arg = replacements.get(arg);
 
-			buffer.append(" " + arg);
+			buffer.append(" " + arg.toNiceString());
 		}
 		buffer.append(")");
 		if (negated_)
@@ -570,5 +623,15 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (negated_)
 			buffer.append(")");
 		return buffer.toString();
+	}
+
+	/**
+	 * Replaces all unbound variables with anonymous variables.
+	 */
+	public void replaceUnboundWithAnonymous() {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isUnboundVariable())
+				arguments_[i] = RelationalArgument.ANONYMOUS;
+		}
 	}
 }

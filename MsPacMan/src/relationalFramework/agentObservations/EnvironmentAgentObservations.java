@@ -70,7 +70,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	private transient Collection<Fact> lastScannedState_;
 
 	/** A transient group of facts indexed by terms used within. */
-	private transient MultiMap<String, RelationalPredicate> termMappedFacts_;
+	private transient MultiMap<RelationalArgument, RelationalPredicate> termMappedFacts_;
 
 	/**
 	 * The constructor for the agent observations.
@@ -160,8 +160,64 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 *         conditions in the invariants, and not containing any conditions
 	 *         not in either invariants or variants.
 	 */
+	// protected Collection<RelationalPredicate> createSpecialisations(
+	// Collection<RelationalPredicate> variants, boolean checkNegated,
+	// String action, Collection<RelationalPredicate> localInvariants,
+	// Collection<RelationalPredicate> localVariants) {
+	// SortedSet<RelationalPredicate> specialisations = new
+	// TreeSet<RelationalPredicate>(
+	// ConditionComparator.getInstance());
+	// if (variants == null)
+	// return specialisations;
+	//
+	// for (RelationalPredicate condition : variants) {
+	// // Check the non-negated version
+	// condition = simplifyCondition(condition, action, localInvariants,
+	// localVariants);
+	// if (condition != null && specialisations.add(condition)) {
+	// // Check the negated version (only for non-types)
+	// if (checkNegated
+	// && !StateSpec.getInstance().isTypePredicate(
+	// condition.getFactName())) {
+	// RelationalArgument[] negArgs = new RelationalArgument[condition
+	// .getArgTypes().length];
+	// // Special case for numerical values - negated
+	// // numericals are made anonymous
+	// for (int i = 0; i < condition.getArgTypes().length; i++) {
+	// if (StateSpec.isNumberType(condition.getArgTypes()[i]))
+	// negArgs[i] = RelationalArgument.ANONYMOUS;
+	// else
+	// negArgs[i] = condition.getRelationalArguments()[i]
+	// .clone();
+	// }
+	//
+	// RelationalPredicate negCondition = new RelationalPredicate(
+	// condition, negArgs);
+	// negCondition.swapNegated();
+	// negCondition = simplifyCondition(negCondition, action,
+	// localInvariants, localVariants);
+	// if (negCondition != null)
+	// specialisations.add(negCondition);
+	// }
+	// }
+	// }
+	//
+	// return specialisations;
+	// }
+
+	/**
+	 * Creates the specialisation conditions from the variants by simply using
+	 * negated and non-negated conditions.
+	 * 
+	 * @param variants
+	 *            The variants the specialisations are composed of.
+	 * @param addNegated
+	 *            If negated versions of the specialisations should also be
+	 *            added.
+	 * @return The specialisation conditions.
+	 */
 	protected Collection<RelationalPredicate> createSpecialisations(
-			Collection<RelationalPredicate> variants, boolean checkNegated,
+			Collection<RelationalPredicate> variants, boolean addNegated,
 			String action, Collection<RelationalPredicate> localInvariants,
 			Collection<RelationalPredicate> localVariants) {
 		SortedSet<RelationalPredicate> specialisations = new TreeSet<RelationalPredicate>(
@@ -170,22 +226,24 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			return specialisations;
 
 		for (RelationalPredicate condition : variants) {
-			// Check the non-negated version
+			// Add variant to specialisations
 			condition = simplifyCondition(condition, action, localInvariants,
 					localVariants);
 			if (condition != null && specialisations.add(condition)) {
 				// Check the negated version (only for non-types)
-				if (checkNegated
+				if (addNegated
 						&& !StateSpec.getInstance().isTypePredicate(
 								condition.getFactName())) {
-					String[] negArgs = new String[condition.getArgTypes().length];
+					RelationalArgument[] negArgs = new RelationalArgument[condition
+							.getArgTypes().length];
 					// Special case for numerical values - negated
 					// numericals are made anonymous
 					for (int i = 0; i < condition.getArgTypes().length; i++) {
 						if (StateSpec.isNumberType(condition.getArgTypes()[i]))
-							negArgs[i] = "?";
+							negArgs[i] = RelationalArgument.ANONYMOUS;
 						else
-							negArgs[i] = condition.getArguments()[i];
+							negArgs[i] = condition.getRelationalArguments()[i]
+									.clone();
 					}
 
 					RelationalPredicate negCondition = new RelationalPredicate(
@@ -233,17 +291,19 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 */
 	public Collection<RelationalPredicate> gatherActionFacts(
 			Collection<Fact> stateFacts, RelationalPredicate action,
-			Map<String, String> goalReplacements) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		// If the state has been scanned, then the actions do not need to be
 		// rescanned.
 		boolean needToScan = (lastScannedState_ == null || !lastScannedState_
 				.equals(stateFacts));
 
 		// Note down action conditions if still unsettled.
-		Map<String, String> replacementMap = action
+		Map<RelationalArgument, RelationalArgument> replacementMap = action
 				.createVariableTermReplacementMap(false, false);
+		int replBefore = replacementMap.size();
 		if (goalReplacements != null) {
-			goalReplacements = new HashMap<String, String>(goalReplacements);
+			goalReplacements = new HashMap<RelationalArgument, RelationalArgument>(
+					goalReplacements);
 			goalReplacements.putAll(replacementMap);
 		}
 
@@ -254,7 +314,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		for (RelationalArgument argument : action.getRelationalArguments()) {
 			if (!argument.isNumber()) {
 				Collection<RelationalPredicate> termFacts = termMappedFacts_
-						.get(argument.toString());
+						.get(argument);
 				// Modify the term facts, retaining constants, replacing terms
 				for (RelationalPredicate termFact : termFacts) {
 					// If the action needs to be scanned.
@@ -267,7 +327,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					// Note the action condition
 					RelationalPredicate actionCond = new RelationalPredicate(
 							termFact);
-					actionCond.replaceArguments(replacementMap, false, true);
+					int unboundOffset = replacementMap.size() - replBefore;
+					actionCond.flexibleReplaceArguments(replacementMap,
+							action.getArgTypes().length + unboundOffset);
 					actionConds.add(actionCond);
 
 
@@ -275,7 +337,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					if (goalReplacements != null) {
 						RelationalPredicate goalCond = new RelationalPredicate(
 								termFact);
-						goalCond.replaceArguments(goalReplacements, false, true);
+						goalCond.flexibleReplaceArguments(goalReplacements,
+								action.getArgTypes().length + unboundOffset);
 						if (!actionConds.contains(goalCond))
 							goalActionConds.add(goalCond);
 					}
@@ -380,10 +443,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 */
 	public Collection<RelationalPredicate> getRLGGConditions(
 			RelationalPredicate action) {
-		SortedSet<RelationalPredicate> rlggConds = actionBasedObservations_
+		List<RelationalPredicate> rlggConds = actionBasedObservations_
 				.get(action.getFactName()).getRLGGRule().getConditions(true);
-		Collection<RelationalPredicate> termSwappedConds = new TreeSet<RelationalPredicate>(
-				rlggConds.comparator());
+		Collection<RelationalPredicate> termSwappedConds = new ArrayList<RelationalPredicate>(
+				rlggConds.size());
 		String[] actionTerms = action.getArguments();
 		for (RelationalPredicate rlggCond : rlggConds) {
 			rlggCond = new RelationalPredicate(rlggCond);
@@ -524,13 +587,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 * @return All facts which contain a goal term.
 	 */
 	public Collection<RelationalPredicate> scanState(Collection<Fact> state,
-			Map<String, String> goalReplacements) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		Collection<RelationalPredicate> goalFacts = new HashSet<RelationalPredicate>();
 
 
 		// If the state was already scanned, no need to scan again.
 		if (lastScannedState_ != null && lastScannedState_.equals(state)) {
-			for (String term : goalReplacements.keySet()) {
+			for (RelationalArgument term : goalReplacements.keySet()) {
 				Collection<RelationalPredicate> goalTermFacts = termMappedFacts_
 						.get(term);
 				for (RelationalPredicate goalTermFact : goalTermFacts) {
@@ -566,11 +629,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 								.getRelationalArguments()) {
 							// Ignore numerical terms
 							if (!arg.isNumber())
-								termMappedFacts_.putContains(arg.toString(),
-										strFact);
+								termMappedFacts_.putContains(arg, strFact);
 
 							// Note goal facts
-							if (goalReplacements.containsKey(arg.toString())) {
+							if (goalReplacements.containsKey(arg)) {
 								RelationalPredicate replFact = new RelationalPredicate(
 										strFact);
 								replFact.replaceArguments(goalReplacements,
@@ -608,7 +670,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 * @return 1 if the condition was simplified, 0 if no change, -1 if illegal
 	 *         rule (and exiting with illegal rules).
 	 */
-	public int simplifyRule(SortedSet<RelationalPredicate> simplified,
+	public int simplifyRule(Collection<RelationalPredicate> simplified,
 			boolean exitIfIllegalRule, boolean onlyEquivalencies,
 			Collection<RelationalPredicate> localConditionInvariants) {
 		// Simplify using background knowledge
@@ -796,7 +858,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * @return True if the set of action conditions changed because of the
 		 *         addition.
 		 */
-		public boolean addActionConditions(
+		private boolean addActionConditions(
 				Collection<RelationalPredicate> actionConds,
 				RelationalPredicate action) {
 			boolean changed = false;
@@ -807,7 +869,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				invariantActionConditions_ = new HashSet<RelationalPredicate>(
 						actionConds);
 				variantActionConditions_ = new HashSet<RelationalPredicate>();
-				specialisationConditions_ = new HashSet<RelationalPredicate>();
 				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
 				actionRanges_ = new HashMap<RangeContext, double[]>();
@@ -822,9 +883,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					variantActionConditions_, actionRanges_);
 
 			if (changed) {
-				specialisationConditions_ = createSpecialisations(
-						variantActionConditions_, true, action_.getFactName(),
-						null, null);
+				specialisationConditions_ = null;
 				recreateRLGG_ = true;
 				return true;
 			}
@@ -892,7 +951,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Simplify the rule conditions
 				simplifyRule(ruleConds, false, false, null);
-				rlggRule_ = new RelationalRule(ruleConds, action_, null, null);
+				rlggRule_ = new RelationalRule(ruleConds, action_, null);
 
 				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
@@ -1081,8 +1140,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * @return True if the condition beliefs changed at all.
 		 */
 		private boolean recordConditionAssociations(
-				Collection<RelationalPredicate> stateFacts,
-				Map<String, String> goalReplacements) {
+				Collection<RelationalPredicate> stateFacts) {
 			boolean changed = false;
 			for (RelationalPredicate baseFact : stateFacts) {
 				// Getting the ConditionBeliefs object
@@ -1095,13 +1153,14 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Create a replacement map here (excluding numerical
 				// values)
-				Map<String, String> replacementMap = baseFact
+				Map<RelationalArgument, RelationalArgument> replacementMap = baseFact
 						.createVariableTermReplacementMap(true, false);
 
 				// Replace facts for all relevant facts and store as
 				// condition beliefs.
 				Collection<RelationalPredicate> relativeFacts = new HashSet<RelationalPredicate>();
-				for (String term : baseFact.getArguments()) {
+				for (RelationalArgument term : baseFact
+						.getRelationalArguments()) {
 					Collection<RelationalPredicate> termFacts = termMappedFacts_
 							.get(term);
 					if (termFacts != null) {
@@ -1201,16 +1260,17 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 				// Create a separate condition beliefs object for each
 				// non-anonymous argument position
-				String[] untrueFactArgs = untrueFact.getArguments();
+				RelationalArgument[] untrueFactArgs = untrueFact
+						.getRelationalArguments();
 				// Form the replacement map, modifying the args if necessary
 				// (such that ?X is first arg, ?Y second, etc).
-				Map<String, String> replacementMap = new HashMap<String, String>();
+				Map<RelationalArgument, RelationalArgument> replacementMap = new HashMap<RelationalArgument, RelationalArgument>();
 				for (int i = 0; i < untrueFactArgs.length; i++) {
 					if (!untrueFactArgs[i].equals("?")) {
 						if (!replacementMap.containsKey(untrueFactArgs[i]))
-							replacementMap.put(untrueFactArgs[i],
-									RelationalArgument.getVariableTermArg(i)
-											.toString());
+							replacementMap
+									.put(untrueFactArgs[i], RelationalArgument
+											.createVariableTermArg(i));
 						untrueFactArgs[i] = replacementMap
 								.get(untrueFactArgs[i]);
 					}
@@ -1252,7 +1312,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * @return If invariants were removed.
 		 */
 		private boolean removeInvariants(
-				SortedSet<RelationalPredicate> conditions,
+				Collection<RelationalPredicate> conditions,
 				Collection<RelationalPredicate> localConditionInvariants) {
 			boolean changed = false;
 			for (RelationalPredicate invariant : invariants_
@@ -1379,7 +1439,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		public boolean noteObservations(
 				Collection<RelationalPredicate> stateFacts,
 				Collection<String> generalStateFacts,
-				Map<String, String> goalReplacements) {
+				Map<RelationalArgument, RelationalArgument> goalReplacements) {
 			boolean changed = false;
 			// Note the invariants
 			changed |= invariants_.noteAllInvariants(stateFacts,
@@ -1387,7 +1447,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 			// Use the term mapped facts to generate collections of true
 			// facts.
-			changed |= recordConditionAssociations(stateFacts, goalReplacements);
+			changed |= recordConditionAssociations(stateFacts);
 			return changed;
 		}
 
@@ -1406,14 +1466,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * @return 1 if the rule is simplified/altered, 0 if no change, -1 if
 		 *         rule conditions are illegal.
 		 */
-		public int simplifyRule(SortedSet<RelationalPredicate> simplified,
+		public int simplifyRule(Collection<RelationalPredicate> simplified,
 				boolean exitIfIllegal, boolean onlyEquivalencies,
 				Collection<RelationalPredicate> localConditionInvariants) {
 			boolean changedOverall = false;
 			// Note which facts have already been tested, so changes don't
 			// restart the process.
-			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>(
-					simplified.comparator());
+			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>();
 			boolean changedThisIter = true;
 
 			// Simplify using the invariants first

@@ -24,13 +24,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeSet;
 
 import jess.Fact;
 import jess.Rete;
 import cerrla.ProgramArgument;
-import cerrla.SpecialisationOperator;
 import cerrla.Unification;
 import cerrla.UnifiedFact;
 import cerrla.modular.GeneralGoalCondition;
@@ -128,7 +126,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @return False if the condition conflicts, true otherwise.
 	 */
 	private boolean checkConditionTypes(
-			SortedSet<RelationalPredicate> ruleConds,
+			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition) {
 		// Run through the rule conditions.
 		for (RelationalPredicate ruleCond : ruleConds) {
@@ -280,7 +278,8 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @return True if the action observations have changed from this operation.
 	 */
 	public boolean gatherActionFacts(RelationalPredicate action,
-			Map<String, String> goalReplacements, Collection<Fact> stateFacts) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements,
+			Collection<Fact> stateFacts) {
 		// Gather the facts
 		Collection<RelationalPredicate> goalActionConds = EnvironmentAgentObservations
 				.getInstance().gatherActionFacts(stateFacts, action,
@@ -335,7 +334,8 @@ public class LocalAgentObservations extends SettlingScan implements
 			// Get the RLGG from the invariant conditions from the action
 			// conditions.
 			int numGoalArgs = localGoal_.getNumArgs();
-			List<String> queryTerms = new ArrayList<String>(numGoalArgs);
+			List<RelationalArgument> queryTerms = new ArrayList<RelationalArgument>(
+					numGoalArgs);
 			for (int i = 0; i < numGoalArgs; i++)
 				queryTerms.add(RelationalArgument.createGoalTerm(i));
 			for (RelationalRule envRLGG : EnvironmentAgentObservations
@@ -361,7 +361,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				// still valid.
 				if (localGoal_ instanceof GeneralGoalCondition) {
 					// First check that the RLGG doesn't contain the goal
-					SortedSet<RelationalPredicate> rlggConds = localisedRLGG
+					List<RelationalPredicate> rlggConds = localisedRLGG
 							.getConditions(false);
 					boolean validRLGG = true;
 					for (RelationalPredicate rlggCond : rlggConds) {
@@ -519,7 +519,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	@SuppressWarnings("unchecked")
 	public boolean observeState(RRLObservations observations,
 			MultiMap<String, String[]> activatedActions,
-			Map<String, String> goalReplacements) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		// First check if the agent needs to observe the state
 		MultiMap<String, String[]> validActions = observations
 				.getValidActions();
@@ -671,7 +671,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @return True if the scan modified the agent observations at all.
 	 */
 	public boolean scanState(Collection<Fact> stateFacts,
-			Map<String, String> goalReplacements) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		// Scan the environment's state
 		Collection<RelationalPredicate> goalFacts = EnvironmentAgentObservations
 				.getInstance().scanState(stateFacts, goalReplacements);
@@ -722,11 +722,11 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
-	public SortedSet<RelationalPredicate> simplifyRule(
-			SortedSet<RelationalPredicate> ruleConds,
+	public List<RelationalPredicate> simplifyRule(
+			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition, RelationalPredicate ruleAction,
 			boolean exitIfIllegalRule) {
-		SortedSet<RelationalPredicate> simplified = new TreeSet<RelationalPredicate>(
+		List<RelationalPredicate> simplified = new ArrayList<RelationalPredicate>(
 				ruleConds);
 		// Add the RLGG conditions to assist in simplification (don't add
 		// numerical predicates)
@@ -743,7 +743,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		if (condition != null) {
 			condition.swapNegated();
 			Collection<UnifiedFact> negUnification = Unification.getInstance()
-					.unifyFact(condition, ruleConds, null, null, false, false);
+					.unifyFactToState(condition, ruleConds, null, null, false);
 			condition.swapNegated();
 			if (!negUnification.isEmpty())
 				return null;
@@ -907,14 +907,13 @@ public class LocalAgentObservations extends SettlingScan implements
 			mutantArgs[condArgIndex] = subRangeArg;
 			RelationalPredicate mutantFact = new RelationalPredicate(condition,
 					mutantArgs);
-			SortedSet<RelationalPredicate> cloneConds = baseRule
+			List<RelationalPredicate> cloneConds = baseRule
 					.getConditions(false);
-			cloneConds.remove(condition);
-			cloneConds.add(mutantFact);
+			int index = cloneConds.indexOf(condition);
+			cloneConds.set(index, mutantFact);
 
 			RelationalRule mutant = new RelationalRule(cloneConds,
-					baseRule.getAction(), baseRule, new SpecialisationOperator(
-							subRangeArg));
+					baseRule.getAction(), baseRule);
 			mutant.setQueryParams(baseRule.getQueryParameters());
 			return mutant;
 		}
@@ -1097,10 +1096,9 @@ public class LocalAgentObservations extends SettlingScan implements
 				String[] oldTerms, int i, String goalTerm) {
 			String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
 			newTerms[i] = goalTerm;
-			SortedSet<RelationalPredicate> ruleConditions = rule
-					.getConditions(true);
-			SortedSet<RelationalPredicate> specConditions = new TreeSet<RelationalPredicate>(
-					ruleConditions.comparator());
+			List<RelationalPredicate> ruleConditions = rule.getConditions(true);
+			List<RelationalPredicate> specConditions = new ArrayList<RelationalPredicate>(
+					ruleConditions.size());
 			// Form the replacement map
 			Map<String, String> replacementMap = new HashMap<String, String>();
 			replacementMap.put(oldTerms[i], newTerms[i]);
@@ -1126,16 +1124,16 @@ public class LocalAgentObservations extends SettlingScan implements
 				}
 			}
 
-			EnvironmentAgentObservations.getInstance().simplifyRule(
-					specConditions, false, false,
-					localInvariants_.getSpecificInvariants());
-
 			if (validRule) {
+				// Simplify conditions
+				EnvironmentAgentObservations.getInstance().simplifyRule(
+						specConditions, false, false,
+						localInvariants_.getSpecificInvariants());
+
 				// Create the mutant
 				RelationalRule mutant = new RelationalRule(specConditions,
 						new RelationalPredicate(rule.getAction(), newTerms),
-						rule, new SpecialisationOperator(oldTerms[i],
-								newTerms[i]));
+						rule);
 				mutant.setQueryParams(rule.getQueryParameters());
 				mutant.expandConditions();
 				return mutant;
@@ -1236,43 +1234,175 @@ public class LocalAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> actionConditions = getSpecialisationConditions(actionPred);
 			if (actionConditions == null)
 				return specialisations;
-			SortedSet<RelationalPredicate> conditions = rule
+			Collection<RelationalPredicate> conditions = rule
 					.getConditions(false);
 			RelationalPredicate action = rule.getAction();
 			String[] actionTerms = action.getArguments();
 
 			// Add conditions, one-by-one, using both negation and regular
 			for (RelationalPredicate condition : actionConditions) {
-				// Modify the condition arguments to match the action arguments.
-				condition = new RelationalPredicate(condition);
-				condition.replaceArguments(actionTerms);
+				specialisations.addAll(groundAnonymousTerms(condition,
+						conditions, action, actionTerms, rule));
+			}
 
-				// Check for the regular condition
-				SortedSet<RelationalPredicate> specConditions = simplifyRule(
-						conditions, condition, action, true);
-				if (specConditions != null && !specConditions.equals(conditions)) {
-					RelationalRule specialisation = new RelationalRule(
-							specConditions, action, rule,
-							new SpecialisationOperator(condition));
-					specialisation.setQueryParams(rule.getQueryParameters());
-					specialisation.expandConditions();
-					if (!specialisations.contains(specialisation)
-							&& !specialisation.equals(rule)) {
-						// Only add specialisations if they contain goal
-						// conditions (if there are goal conditions).
-						if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
-								|| localGoal_.getNumArgs() == 0
-								|| specConditions
-										.toString()
-										.contains(
-												RelationalArgument.GOAL_VARIABLE_PREFIX)) {
-							specialisations.add(specialisation);
+			return specialisations;
+		}
+
+		/**
+		 * Creates a specialisation from the given conditions by grounding the
+		 * rule (replacing anonymous terms with unbound variables) in all
+		 * possible combinations based on existing unbound variables.
+		 * 
+		 * @param specConditions
+		 *            The specialised conditions of the rule.
+		 * @param action
+		 *            The action of the rule.
+		 * @param rule
+		 *            The rule that the specialised rules came from.
+		 * @param condition
+		 *            The condition that is to be added.
+		 * @return A collection of all possible specialisations (usually just
+		 *         one).
+		 */
+		private Set<RelationalRule> groundAnonymousTerms(
+				RelationalPredicate condition,
+				Collection<RelationalPredicate> conditions,
+				RelationalPredicate action, String[] actionTerms,
+				RelationalRule rule) {
+			Set<RelationalRule> specialisations = new HashSet<RelationalRule>();
+
+			// Modify the condition arguments to match the action arguments.
+			condition = new RelationalPredicate(condition);
+			condition.replaceArguments(actionTerms);
+
+			// Check for the regular condition
+			Collection<RelationalPredicate> specConditions = simplifyRule(
+					conditions, condition, action, true);
+			if (specConditions != null && !specConditions.equals(conditions)) {
+				// Determine an anonymous variable (if any)
+				RelationalPredicate anonVariable = null;
+				for (RelationalPredicate cond : specConditions)
+					if (!cond.isFullyNotAnonymous())
+						anonVariable = cond;
+
+				// If there is an anon variable, match it up
+				if (anonVariable == null)
+					// If no anon variable, create normally
+					createSpecialisation(specConditions, action, rule,
+							specialisations);
+				else {
+					// Match the anon argument to the unbound types, wherever
+					// possible.
+					MultiMap<RelationalArgument, String> unboundTypes = rule
+							.getUnboundTypeConditions();
+
+					// Determine the anon type
+					Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();
+					RelationalArgument[] args = anonVariable
+							.getRelationalArguments();
+					recursivelyGroundAnons(args, 0, unboundTypes, anonVariable,
+							resultPreds);
+
+					// Swap the grounded result preds in
+					if (!resultPreds.isEmpty())
+						specConditions.remove(anonVariable);
+					for (RelationalPredicate result : resultPreds) {
+						if (specConditions.add(result)) {
+							createSpecialisation(specConditions, action, rule,
+									specialisations);
+							specConditions.remove(result);
 						}
 					}
 				}
 			}
-
 			return specialisations;
+		}
+
+		/**
+		 * Recursively grounds anonymous variables into rules by testing
+		 * existing unbound variables on them.
+		 * 
+		 * @param args
+		 *            The state of the arguments for the predicate.
+		 * @param i
+		 *            The current index in the args.
+		 * @param unboundTypes
+		 *            The unbound type map for the rule.
+		 * @param anonVariable
+		 *            The original anonymous variable to replace.
+		 * @param resultPreds
+		 *            A to-be-filled collection of grounded relational
+		 *            predicates.
+		 */
+		private void recursivelyGroundAnons(RelationalArgument[] args, int i,
+				MultiMap<RelationalArgument, String> unboundTypes,
+				RelationalPredicate anonVariable,
+				Collection<RelationalPredicate> resultPreds) {
+			// Base case, final index reached
+			if (i == args.length) {
+				RelationalPredicate swappedPred = new RelationalPredicate(
+						anonVariable, args);
+				if (anonVariable.isNegated())
+					swappedPred.swapNegated();
+				resultPreds.add(swappedPred);
+				return;
+			}
+
+			// Can always recurse with existing variable (creates new unbound if
+			// anonymous).
+			recursivelyGroundAnons(args, i + 1, unboundTypes, anonVariable,
+					resultPreds);
+			if (args[i].isAnonymous()) {
+				// Get this index's type lineage
+				Collection<String> lineage = new HashSet<String>();
+				StateSpec.getInstance().getTypeLineage(
+						anonVariable.getArgTypes()[i], lineage);
+				// For every unbound argument, check that the types are in the
+				// lineage.
+				for (RelationalArgument unboundArg : unboundTypes.keySet()) {
+					if (lineage.containsAll(unboundTypes.get(unboundArg))) {
+						args[i] = unboundArg;
+						recursivelyGroundAnons(args, i + 1, unboundTypes,
+								anonVariable, resultPreds);
+						args[i] = RelationalArgument.ANONYMOUS;
+					}
+				}
+			}
+		}
+
+		/**
+		 * Creates a specialised rule.
+		 * 
+		 * @param specConditions
+		 *            The conditions of the specialised rule.
+		 * @param action
+		 *            The action of the rule.
+		 * @param rule
+		 *            The parent rule.
+		 * @param specialisations
+		 *            The specialisations set to add to.
+		 */
+		private void createSpecialisation(
+				Collection<RelationalPredicate> specConditions,
+				RelationalPredicate action, RelationalRule rule,
+				Set<RelationalRule> specialisations) {
+			// Create the specialisation
+			RelationalRule specialisation = new RelationalRule(specConditions,
+					action, rule);
+			specialisation.setQueryParams(rule.getQueryParameters());
+			specialisation.expandConditions();
+
+			if (!specialisations.contains(specialisation)
+					&& !specialisation.equals(rule)) {
+				// Only add specialisations if they contain goal
+				// conditions (if there are goal conditions).
+				if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
+						|| localGoal_.getNumArgs() == 0
+						|| specConditions.toString().contains(
+								RelationalArgument.GOAL_VARIABLE_PREFIX)) {
+					specialisations.add(specialisation);
+				}
+			}
 		}
 
 		/**

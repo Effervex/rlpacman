@@ -16,13 +16,13 @@ public class SpecificGoalCondition extends GoalCondition {
 			.compile("^(\\w+)((?:\\$[A-Z])+)$");
 
 	/** The number of arguments the goal condition has. */
-	private ArrayList<String> goalArgs_;
+	private ArrayList<RelationalArgument> goalArgs_;
 
 	public SpecificGoalCondition(RelationalPredicate fact) {
 		super(fact);
 
-		goalArgs_ = new ArrayList<String>();
-		for (String arg : fact.getArguments()) {
+		goalArgs_ = new ArrayList<RelationalArgument>();
+		for (RelationalArgument arg : fact.getRelationalArguments()) {
 			if (!goalArgs_.contains(arg))
 				goalArgs_.add(arg);
 		}
@@ -30,7 +30,10 @@ public class SpecificGoalCondition extends GoalCondition {
 
 	public SpecificGoalCondition(SpecificGoalCondition goalCondition) {
 		super(goalCondition);
-		goalArgs_ = new ArrayList<String>(goalCondition.goalArgs_);
+		goalArgs_ = new ArrayList<RelationalArgument>(
+				goalCondition.goalArgs_.size());
+		for (RelationalArgument relArg : goalCondition.goalArgs_)
+			goalArgs_.add(relArg.clone());
 	}
 
 	public SpecificGoalCondition(String strFact) {
@@ -45,8 +48,8 @@ public class SpecificGoalCondition extends GoalCondition {
 	@Override
 	protected RelationalPredicate extractFact(String predName, String suffix) {
 		// Determine the arguments
-		goalArgs_ = new ArrayList<String>();
-		String[] arguments = new String[suffix.length() / 2];
+		goalArgs_ = new ArrayList<RelationalArgument>();
+		RelationalArgument[] arguments = new RelationalArgument[suffix.length() / 2];
 		for (int a = 0; a < arguments.length; a++) {
 			int argIndex = suffix.charAt(a * 2 + 1) - 'A';
 			arguments[a] = RelationalArgument.createGoalTerm(argIndex);
@@ -84,7 +87,7 @@ public class SpecificGoalCondition extends GoalCondition {
 	 * 
 	 * @return The args used in these goal conditions.
 	 */
-	public ArrayList<String> getConstantArgs() {
+	public ArrayList<RelationalArgument> getConstantArgs() {
 		return goalArgs_;
 	}
 
@@ -102,11 +105,12 @@ public class SpecificGoalCondition extends GoalCondition {
 			return;
 
 		goalArgs_.clear();
-		Map<String, String> replacements = new HashMap<String, String>();
+		Map<RelationalArgument, RelationalArgument> replacements = new HashMap<RelationalArgument, RelationalArgument>();
 		int i = 0;
-		for (String arg : fact_.getArguments()) {
+		for (RelationalArgument arg : fact_.getRelationalArguments()) {
 			if (!replacements.containsKey(arg)) {
-				String goalTerm = RelationalArgument.createGoalTerm(i++);
+				RelationalArgument goalTerm = RelationalArgument
+						.createGoalTerm(i++);
 				goalArgs_.add(goalTerm);
 				replacements.put(arg, goalTerm);
 			}

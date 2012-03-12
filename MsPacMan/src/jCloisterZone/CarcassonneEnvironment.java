@@ -2,8 +2,10 @@ package jCloisterZone;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -38,35 +40,97 @@ import com.jcloisterzone.rmi.ServerIF;
 import com.jcloisterzone.rmi.mina.ClientStub;
 
 public class CarcassonneEnvironment extends RRLEnvironment {
-	private static final String CERRLA_NAME = "CERRLA";
 	private static final String AI_NAME = "AI";
+	private static final String CERRLA_NAME = "CERRLA";
 	private static final int NO_ACTION_PENALTY = -1000;
 	/** The Carcassonne client. */
 	private RRLJCloisterClient client_;
+	/** The user interface for the client. */
+	private UserInterface clientInterface_;
+	/** The current player. */
+	private Player currentPlayer_;
 	/** If the game should exit early. */
 	private boolean earlyExit_;
 	/** The current environment. */
 	private Game environment_;
 	/** If viewing experiment in GUI. */
 	private boolean guiMode_ = true;
+	/** If there are multiple learning agents at once. */
+	private boolean multiLearners_ = false;
 	/** The player delay when viewing GUI version. */
 	private int playerDelay = 0;
+	/** The AI players. */
+	private String[] players_;
 	/** The previous score. */
 	private Map<Player, Integer> prevScores_ = new HashMap<Player, Integer>();
+	/** The players that did not place a tile during the game. */
+	private Collection<Player> earlyExitPlayers_ = new HashSet<Player>();
 	/** The relational wrapper for (de)relationalising the game. */
 	private CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
 	/** The Carcassonne server. */
 	private ServerIF server_;
-	/** The AI players. */
-	private String[] players_;
-	/** If there are multiple learning agents at once. */
-	private boolean multiLearners_ = false;
 	/** The current players of the game. */
 	private ArrayList<PlayerSlot> slots_;
-	/** The user interface for the client. */
-	private UserInterface clientInterface_;
-	/** The current player. */
-	private Player currentPlayer_;
+
+	/**
+	 * Calculates a player's reward between steps.
+	 * 
+	 * @param player
+	 *            The player to calculate reward for.
+	 * @return The reward received in one step.
+	 */
+	private double[] calculateReward(Player player) {
+		int prevScore = getPlayerPrevScore(player);
+
+		int currentScore = player.getPoints();
+		int diff = currentScore - prevScore;
+		prevScores_.put(player, currentScore);
+		
+		double[] reward = new double[2];
+		reward[RRLObservations.ENVIRONMENTAL_INDEX] = diff;
+		reward[RRLObservations.INTERNAL_INDEX] = (earlyExitPlayers_
+				.contains(player)) ? NO_ACTION_PENALTY : diff;
+		return reward;
+	}
+
+	/**
+	 * Checks if the game should be initialised with multiple players.
+	 * 
+	 * @param arg
+	 *            The arg to check.
+	 */
+	private void checkMultiplayer(String arg) {
+		// Setting up multiple agents
+		if (arg.startsWith("multi [")) {
+			// Using a defined list of players
+			String playerList = arg.substring(7, arg.indexOf("]"));
+			String[] split = playerList.split(",");
+			players_ = new String[split.length];
+			for (int i = 0; i < split.length; i++) {
+				players_[i] = split[i].trim();
+			}
+			multiLearners_ = true;
+		} else if (arg.startsWith("multi")) {
+			// 1 agent + X other players.
+			String[] split = arg.split(" ");
+			players_ = new String[Integer.parseInt(split[2])];
+			// At least one learner
+			players_[0] = CERRLA_NAME;
+			// The rest of the learners
+			for (int i = 1; i < players_.length; i++) {
+				players_[i] = split[1];
+				if (players_[i].equals(CERRLA_NAME))
+					multiLearners_ = true;
+			}
+		}
+	}
+
+	private int getPlayerPrevScore(Player player) {
+		if (!prevScores_.containsKey(player))
+			prevScores_.put(player, 0);
+		int prevScore = prevScores_.get(player);
+		return prevScore;
+	}
 
 	/**
 	 * Cycles through the phases whenever necessary. Also replaces the
@@ -110,7 +174,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(boolean isTerminal) {
 		return calculateReward(currentPlayer_);
 	}
 
@@ -130,34 +194,11 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		for (Player p : environment_.getAllPlayers()) {
 			String playerName = p.getNick();
 			if (playerName.startsWith(CERRLA_NAME)) {
-				double playerReward = calculateReward(p);
+				double[] playerReward = calculateReward(p);
 				rrlObs.addPlayerObservations(playerName, playerReward);
 			}
 		}
 		return rrlObs;
-	}
-
-	/**
-	 * Calculates a player's reward between steps.
-	 * 
-	 * @param player
-	 *            The player to calculate reward for.
-	 * @return The reward received in one step.
-	 */
-	private double calculateReward(Player player) {
-		int prevScore = getPlayerPrevScore(player);
-
-		int currentScore = player.getPoints();
-		int diff = currentScore - prevScore;
-		prevScores_.put(player, currentScore);
-		return diff;
-	}
-
-	private int getPlayerPrevScore(Player player) {
-		if (!prevScores_.containsKey(player))
-			prevScores_.put(player, 0);
-		int prevScore = prevScores_.get(player);
-		return prevScore;
 	}
 
 	@Override
@@ -167,14 +208,18 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
+	protected String getPlayerID() {
+		return environment_.getTurnPlayer().getNick();
+	}
+
+	@Override
 	protected Object groundActions(PolicyActions actions) {
 		Object action = relationalWrapper_.groundActions(actions, environment_,
 				multiLearners_);
 		// Check for no tile placement
 		if (relationalWrapper_.wasNoTilePlaced()) {
 			Player p = environment_.getTurnPlayer();
-			int prevScore = getPlayerPrevScore(p);
-			prevScores_.put(p, prevScore - NO_ACTION_PENALTY);
+			earlyExitPlayers_.add(p);
 		}
 		return action;
 	}
@@ -328,11 +373,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected String getPlayerID() {
-		return environment_.getTurnPlayer().getNick();
-	}
-
-	@Override
 	public void cleanup() {
 		// TODO Auto-generated method stub
 
@@ -369,38 +409,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 				}
 			} else
 				client_ = new LocalCarcassonneClient("config.ini");
-		}
-	}
-
-	/**
-	 * Checks if the game should be initialised with multiple players.
-	 * 
-	 * @param arg
-	 *            The arg to check.
-	 */
-	private void checkMultiplayer(String arg) {
-		// Setting up multiple agents
-		if (arg.startsWith("multi [")) {
-			// Using a defined list of players
-			String playerList = arg.substring(7, arg.indexOf("]"));
-			String[] split = playerList.split(",");
-			players_ = new String[split.length];
-			for (int i = 0; i < split.length; i++) {
-				players_[i] = split[i].trim();
-			}
-			multiLearners_ = true;
-		} else if (arg.startsWith("multi")) {
-			// 1 agent + X other players.
-			String[] split = arg.split(" ");
-			players_ = new String[Integer.parseInt(split[2])];
-			// At least one learner
-			players_[0] = CERRLA_NAME;
-			// The rest of the learners
-			for (int i = 1; i < players_.length; i++) {
-				players_[i] = split[1];
-				if (players_[i].equals(CERRLA_NAME))
-					multiLearners_ = true;
-			}
 		}
 	}
 }

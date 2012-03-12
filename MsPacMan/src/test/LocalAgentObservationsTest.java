@@ -2,11 +2,11 @@ package test;
 
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.List;
 
 import jess.JessException;
 import jess.Rete;
@@ -21,7 +21,6 @@ import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.agentObservations.LocalAgentObservations;
-import util.ConditionComparator;
 
 public class LocalAgentObservationsTest {
 	private LocalAgentObservations sut_;
@@ -45,7 +44,7 @@ public class LocalAgentObservationsTest {
 		Rete state = StateSpec.getInstance().getRete();
 		state.assertString("(clear a)");
 		sut_.scanState(StateSpec.extractFacts(state),
-				new HashMap<String, String>());
+				new HashMap<RelationalArgument, RelationalArgument>());
 		int newHash = sut_.hashCode();
 		assertFalse(prevHash == newHash);
 		prevHash = newHash;
@@ -55,7 +54,7 @@ public class LocalAgentObservationsTest {
 		state.reset();
 		state.assertString("(on a b)");
 		sut_.scanState(StateSpec.extractFacts(state),
-				new HashMap<String, String>());
+				new HashMap<RelationalArgument, RelationalArgument>());
 		newHash = sut_.hashCode();
 		assertFalse(prevHash == newHash);
 
@@ -72,7 +71,7 @@ public class LocalAgentObservationsTest {
 		Collection<RelationalRule> rlggRules = sut_
 				.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
-			SortedSet<RelationalPredicate> conds = rr.getConditions(true);
+			Collection<RelationalPredicate> conds = rr.getConditions(true);
 			if (rr.getActionPredicate().equals("move")) {
 				// Clear ?X and Clear ?Y
 				RelationalArgument[] args = { new RelationalArgument("?X") };
@@ -124,10 +123,9 @@ public class LocalAgentObservationsTest {
 	@Test
 	public void testSimplifyRule() {
 		// Simple no-effect test
-		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
+		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
-		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+		Collection<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
 				null, null, false);
 		assertNull(results);
 
@@ -205,7 +203,7 @@ public class LocalAgentObservationsTest {
 						StateSpec.toRelationalPredicate("(not (on ?X ?))"),
 						null, false);
 		assertNull(results);
-		
+
 		// Illegal rule
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Y)"));
@@ -372,12 +370,11 @@ public class LocalAgentObservationsTest {
 				sut_);
 
 		// Strange issue:
-		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
+		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Y ?)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?Y)"));
-		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+		Collection<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
 				null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
@@ -495,9 +492,9 @@ public class LocalAgentObservationsTest {
 		assertNotNull("No loaded agent observations. Cannot run test.", sut_);
 
 		// Basic rule
-		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
+		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(edible ?X)"));
-		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+		List<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
 				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(blinking ?X)")));
@@ -509,7 +506,7 @@ public class LocalAgentObservationsTest {
 		results = sut_.simplifyRule(ruleConds,
 				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
 		assertNull(results);
-		
+
 		// Negated anon rule (illegal rule)
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
@@ -521,7 +518,8 @@ public class LocalAgentObservationsTest {
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(not (edible ?X))"));
 		results = sut_.simplifyRule(ruleConds,
-				StateSpec.toRelationalPredicate("(not (blinking ?X))"), null, true);
+				StateSpec.toRelationalPredicate("(not (blinking ?X))"), null,
+				true);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(not (edible ?X))")));
 		assertEquals(results.size(), 1);
@@ -530,12 +528,11 @@ public class LocalAgentObservationsTest {
 	@Test
 	public void testEquivalenceRules() {
 		// Basic implication test
-		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
+		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?X)"));
-		SortedSet<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
-				null, null, false);
+		List<RelationalPredicate> results = sut_.simplifyRule(ruleConds, null,
+				null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?X)")));

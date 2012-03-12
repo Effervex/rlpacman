@@ -132,7 +132,7 @@ public abstract class RRLEnvironment {
 	 *            If at the terminal state.
 	 * @return The reward received at this given interval.
 	 */
-	protected abstract double calculateReward(boolean isTerminal);
+	protected abstract double[] calculateReward(boolean isTerminal);
 
 	/**
 	 * Get the goal argument list (if any).

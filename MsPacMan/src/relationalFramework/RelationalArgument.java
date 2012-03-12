@@ -32,14 +32,16 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	private static final long serialVersionUID = -7883241266827157231L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'X';
-	/** The representing arg for anonymous args. */
-	public static final RelationalArgument ANONYMOUS = new RelationalArgument(
-			"?");
 
 	/** The goal variable prefix. */
 	public static final String GOAL_VARIABLE_PREFIX = "?G_";
 	/** The prefix for range variables. */
 	public static final String RANGE_VARIABLE_PREFIX = "?#_";
+	/** Anonymous term for situations where variables don't matter. */
+	public static final RelationalArgument ANONYMOUS = new RelationalArgument(
+			"?");
+	/** Variable extension for unbound variables. Test purposes. */
+	private static final String UNBOUND_EXTENSION = "_Unb";
 
 	/** Defines the arg type. */
 	private ArgType argType_;
@@ -57,6 +59,9 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 	/** The argument represented by this arg. */
 	private String stringArg_;
+
+	/** If this variable argument is unbound (anonymous equivalent). */
+	private boolean unboundVariable_ = false;
 
 	/**
 	 * The constructor. This deconstructs ranges into their components.
@@ -110,12 +115,19 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 		// Determine arg type
 		if (stringArg_.charAt(0) == '?') {
-			if (stringArg_.length() == 1)
+			if (stringArg_.length() == 1) {
 				argType_ = ArgType.ANON;
-			else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
+				unboundVariable_ = true;
+			} else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
 				argType_ = ArgType.CONST;
-			else
+			else {
 				argType_ = ArgType.VAR;
+				if (stringArg_.endsWith(UNBOUND_EXTENSION)) {
+					unboundVariable_ = true;
+					stringArg_ = stringArg_.substring(0,
+							stringArg_.indexOf(UNBOUND_EXTENSION));
+				}
+			}
 		} else {
 			argType_ = ArgType.CONST;
 		}
@@ -188,6 +200,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				rangeBounds_[0], rangeFrac_[0], rangeBounds_[1], rangeFrac_[1],
 				rangeContext_);
 		relArg.argType_ = argType_;
+		relArg.unboundVariable_ = unboundVariable_;
 		return relArg;
 	}
 
@@ -339,6 +352,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			}
 			return toString();
 		}
+		if (unboundVariable_ && argType_ != ArgType.ANON)
+			return stringArg_ + UNBOUND_EXTENSION;
 		return stringArg_;
 	}
 
@@ -354,7 +369,33 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 					+ rangeBounds_[0] + " " + rangeFrac_[0] + " " + stringArg_
 					+ " " + rangeBounds_[1] + " " + rangeFrac_[1] + ")";
 		}
+
+		if (unboundVariable_ && argType_ != ArgType.ANON)
+			return stringArg_ + UNBOUND_EXTENSION;
 		return stringArg_;
+	}
+
+	/**
+	 * Sets this relational argument as an unbound variable.
+	 */
+	public void setAsUnboundVariable() {
+		if (argType_ != ArgType.VAR)
+			throw new IllegalAccessError(this
+					+ " is not a variable. Cannot be set as unbound!");
+		unboundVariable_ = true;
+	}
+
+	/**
+	 * If this argument is an unbound variable.
+	 * 
+	 * @return True if this argument is an unbound variable.
+	 */
+	public boolean isUnboundVariable() {
+		return unboundVariable_;
+	}
+
+	public boolean isGoalCondition() {
+		return isGoalCondition(stringArg_);
 	}
 
 	/**
@@ -364,8 +405,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 *            The index of the goal condition.
 	 * @return The variable goal condition.
 	 */
-	public static String createGoalTerm(int i) {
-		return GOAL_VARIABLE_PREFIX + i;
+	public static RelationalArgument createGoalTerm(int i) {
+		return new RelationalArgument(GOAL_VARIABLE_PREFIX + i);
 	}
 
 	/**
@@ -376,7 +417,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return A string in variable format, with the name of the variable in the
 	 *         middle.
 	 */
-	public static RelationalArgument getVariableTermArg(int i) {
+	public static RelationalArgument createVariableTermArg(int i) {
 		char variable = (char) (FIRST_CHAR + (STARTING_CHAR - FIRST_CHAR + i)
 				% MODULO_LETTERS);
 		return new RelationalArgument("?" + variable);
@@ -384,6 +425,34 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 	public static boolean isGoalCondition(String arg) {
 		return arg.startsWith(GOAL_VARIABLE_PREFIX);
+	}
+
+	/**
+	 * Creates an unbound variable (equivalent to an anon variable).
+	 * 
+	 * @param i
+	 *            The number of existing unbound variables already.
+	 * @param unboundStart
+	 *            A provided index for the unbound variables.
+	 * @return An unbound variable (locally to this predicate, anyway).
+	 */
+	public static RelationalArgument createUnboundVariable(int i,
+			int unboundStart) {
+		RelationalArgument unbound = RelationalArgument.createVariableTermArg(i
+				+ unboundStart);
+		unbound.setAsUnboundVariable();
+		return unbound;
+	}
+
+	/**
+	 * Creates an unbound variable (equivalent to an anon variable).
+	 * 
+	 * @param i
+	 *            The number of existing unbound variables already.
+	 * @return An unbound variable (locally to this predicate, anyway).
+	 */
+	public static RelationalArgument createUnboundVariable(int i) {
+		return createUnboundVariable(i, 0);
 	}
 
 	/**
@@ -395,6 +464,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	}
 
 	public boolean isAnonymous() {
-		return this == ANONYMOUS || this.equals(ANONYMOUS);
+		return argType_ == ArgType.ANON;
 	}
 }

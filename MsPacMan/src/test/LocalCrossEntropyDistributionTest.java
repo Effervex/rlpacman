@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -71,13 +72,13 @@ public class LocalCrossEntropyDistributionTest {
 		goalReplacements.put("z", "?G_0");
 		goalReplacements.put("x", "?G_1");
 		List<RelationalRule> rlggRules = sut_.coverState(null,
-				new RRLObservations(state, validActions, 0d, goalReplacements,
-						false), activatedActions, null);
+				new RRLObservations(state, validActions, new double[] { 0, 0 },
+						goalReplacements, false), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (height ?X ?#_0) (clear ?X) => (moveFloor ?X)");
-		List<String> queryParameters = new ArrayList<String>();
-		queryParameters.add("?G_0");
-		queryParameters.add("?G_1");
+		List<RelationalArgument> queryParameters = new ArrayList<RelationalArgument>();
+		queryParameters.add(new RelationalArgument("?G_0"));
+		queryParameters.add(new RelationalArgument("?G_1"));
 		rlggRule.setQueryParams(queryParameters);
 		assertTrue(rlggRules.contains(rlggRule));
 		rlggRule = new RelationalRule("(clear ?X) (clear ?Y) => (move ?X ?Y)");
@@ -112,8 +113,8 @@ public class LocalCrossEntropyDistributionTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, goalReplacements, false), activatedActions,
-				null);
+				validActions, new double[] { 0, 0 }, goalReplacements, false),
+				activatedActions, null);
 		assertTrue(rlggRules.isEmpty());
 
 		// Test the state of the slot generator
@@ -131,8 +132,8 @@ public class LocalCrossEntropyDistributionTest {
 	public void testPacManTriggerRLGGCovering() throws Exception {
 		// Init PacMan
 		StateSpec.initInstance("rlPacMan.PacMan");
-		sut_ = new LocalCrossEntropyDistribution(GoalCondition.parseGoalCondition("levelmax"),
-				0);
+		sut_ = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("levelmax"), 0);
 
 		Rete state = StateSpec.getInstance().getRete();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -149,7 +150,7 @@ public class LocalCrossEntropyDistributionTest {
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
 
 		List<RelationalRule> rlggRules = sut_.coverState(null,
-				new RRLObservations(state, validActions, 0d,
+				new RRLObservations(state, validActions, new double[] { 0, 0 },
 						new DualHashBidiMap(), false), activatedActions, null);
 
 		state.reset();
@@ -166,8 +167,8 @@ public class LocalCrossEntropyDistributionTest {
 		activatedActions.clear();
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, new DualHashBidiMap(), false),
-				activatedActions, null);
+				validActions, new double[] { 0, 0 }, new DualHashBidiMap(),
+				false), activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -182,8 +183,8 @@ public class LocalCrossEntropyDistributionTest {
 		activatedActions.clear();
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, 0d, new DualHashBidiMap(), false),
-				activatedActions, null);
+				validActions, new double[] { 0, 0 }, new DualHashBidiMap(),
+				false), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");
