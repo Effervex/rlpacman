@@ -22,6 +22,8 @@ import java.util.TreeSet;
 public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		Serializable {
 	private static final long serialVersionUID = 6131063892766663639L;
+	/** A collection of contexts which define ranges. */
+	private SortedSet<RangeContext> rangeContexts_;
 	/** The actual arguments of the fact. */
 	protected RelationalArgument[] arguments_;
 	/** The fact name. */
@@ -30,8 +32,6 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	protected String[] factTypes_;
 	/** If this fact is negated (prefixed by not) */
 	protected boolean negated_ = false;
-	/** A collection of contexts which define ranges. */
-	private SortedSet<RangeContext> rangeContexts_;
 
 	/**
 	 * Constructor for a clone StringFact.
@@ -144,6 +144,71 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 				rangeContexts_.add(rc);
 		}
 		return newArgs;
+	}
+
+	/**
+	 * Internal replacement method.
+	 * 
+	 * @param <T>
+	 * 
+	 * @param replacementMap
+	 *            The replacement map for the arguments. Can be of type String
+	 *            or RelationalArgument.
+	 * @param retainOtherArgs
+	 *            If arguments that have no replacement should be retained (or
+	 *            turned anonymous).
+	 * @param retainNumbers
+	 *            If not retaining other arguments, if numbers should be an
+	 *            exception.
+	 * @param flexibleReplace
+	 *            If the replacement map should be appended to.
+	 * @return True if the fact is still valid (not anonymous)
+	 */
+	@SuppressWarnings("unchecked")
+	private <T> boolean replaceArguments(Map<T, T> replacementMap,
+			boolean retainOtherArgs, boolean retainNumbers,
+			boolean flexibleReplace, int unboundStart) {
+		RelationalArgument[] newArguments = new RelationalArgument[arguments_.length];
+		boolean notAnonymous = false;
+		for (int i = 0; i < arguments_.length; i++) {
+			newArguments[i] = arguments_[i].clone();
+			boolean hasReplacement = false;
+
+			// Determine what type of map is being used for replacements
+			RelationalArgument replacement = (RelationalArgument) replacementMap
+					.get(arguments_[i]);
+			if (replacement == null) {
+				String strReplacement = (String) replacementMap
+						.get(arguments_[i].toString());
+				if (strReplacement != null)
+					replacement = new RelationalArgument(strReplacement);
+			}
+
+			// Apply the replacement (if not null)
+			if (replacement != null) {
+				newArguments[i] = replacement;
+				hasReplacement = true;
+			}
+
+			// Retaining args
+			if (!retainOtherArgs && !hasReplacement) {
+				if (!retainNumbers || !arguments_[i].isNumber()) {
+					if (flexibleReplace) {
+						newArguments[i] = RelationalArgument
+								.createUnboundVariable(unboundStart);
+						replacementMap.put((T) arguments_[i],
+								(T) newArguments[i]);
+					} else
+						newArguments[i] = RelationalArgument.ANONYMOUS;
+				}
+			}
+
+			// Anonymous checks.
+			if (!newArguments[i].isAnonymous())
+				notAnonymous = true;
+		}
+		arguments_ = newArguments;
+		return notAnonymous;
 	}
 
 	/**
@@ -286,6 +351,21 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	}
 
 	/**
+	 * Applies a replacement map to this predicate, while flexibly creating
+	 * unbound terms for non replacement terms.
+	 * 
+	 * @param replacementMap
+	 *            The replacement map to apply, and modify.
+	 * @param unboundStart
+	 *            The start index for the unbound variables.
+	 */
+	public void flexibleReplaceArguments(
+			Map<RelationalArgument, RelationalArgument> replacementMap,
+			int unboundStart) {
+		replaceArguments(replacementMap, false, true, true, unboundStart);
+	}
+
+	/**
 	 * Gets the argument types for the fact.
 	 * 
 	 * @return The argument types.
@@ -368,93 +448,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @return True if the predicate contains numerical args
 	 */
 	public boolean isNumerical() {
-		for (String type : factTypes_) {
-			if (StateSpec.isNumberType(type))
-				return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Applies a replacement map to this predicate, while flexibly creating
-	 * unbound terms for non replacement terms.
-	 * 
-	 * @param replacementMap
-	 *            The replacement map to apply, and modify.
-	 * @param unboundStart
-	 *            The start index for the unbound variables.
-	 */
-	public void flexibleReplaceArguments(
-			Map<RelationalArgument, RelationalArgument> replacementMap,
-			int unboundStart) {
-		replaceArguments(replacementMap, false, true, true, unboundStart);
-	}
-
-	/**
-	 * Internal replacement method.
-	 * 
-	 * @param <T>
-	 * 
-	 * @param replacementMap
-	 *            The replacement map for the arguments. Can be of type String
-	 *            or RelationalArgument.
-	 * @param retainOtherArgs
-	 *            If arguments that have no replacement should be retained (or
-	 *            turned anonymous).
-	 * @param retainNumbers
-	 *            If not retaining other arguments, if numbers should be an
-	 *            exception.
-	 * @param flexibleReplace
-	 *            If the replacement map should be appended to.
-	 * @return True if the fact is still valid (not anonymous)
-	 */
-	@SuppressWarnings("unchecked")
-	private <T> boolean replaceArguments(Map<T, T> replacementMap,
-			boolean retainOtherArgs, boolean retainNumbers,
-			boolean flexibleReplace, int unboundStart) {
-		RelationalArgument[] newArguments = new RelationalArgument[arguments_.length];
-		boolean notAnonymous = false;
-		int unboundIndex = 0;
-		for (int i = 0; i < arguments_.length; i++) {
-			newArguments[i] = arguments_[i].clone();
-			boolean hasReplacement = false;
-
-			// Determine what type of map is being used for replacements
-			RelationalArgument replacement = (RelationalArgument) replacementMap
-					.get(arguments_[i]);
-			if (replacement == null) {
-				String strReplacement = (String) replacementMap
-						.get(arguments_[i].toString());
-				if (strReplacement != null)
-					replacement = new RelationalArgument(strReplacement);
-			}
-
-			// Apply the replacement (if not null)
-			if (replacement != null) {
-				newArguments[i] = replacement;
-				hasReplacement = true;
-			}
-
-			// Retaining args
-			if (!retainOtherArgs && !hasReplacement) {
-				if (!retainNumbers || !arguments_[i].isNumber()) {
-					if (flexibleReplace) {
-						newArguments[i] = RelationalArgument
-								.createUnboundVariable(unboundIndex,
-										unboundStart);
-						replacementMap.put((T) arguments_[i],
-								(T) newArguments[i]);
-					} else
-						newArguments[i] = RelationalArgument.ANONYMOUS;
-				}
-			}
-
-			// Anonymous checks.
-			if (!newArguments[i].isUnboundVariable())
-				notAnonymous = true;
-		}
-		arguments_ = newArguments;
-		return notAnonymous;
+		return StateSpec.isNumerical(this.factName_);
 	}
 
 	/**
@@ -477,23 +471,12 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 				false, 0);
 	}
 
-	/**
-	 * Replaces a single argument by another.
-	 * 
-	 * @param replacedTerm
-	 *            The term to be replaced.
-	 * @param replacementTerm
-	 *            the term to replace the old term.
-	 * @param retainOtherArgs
-	 *            If retaining the other arguments.
-	 * @return True if the fact is still valid (not anonymous)
-	 */
-	public boolean replaceArguments(String replacedTerm,
-			String replacementTerm, boolean retainOtherArgs) {
+	public boolean replaceArguments(RelationalArgument replacedTerm,
+			RelationalArgument replacementTerm, boolean retainOtherArgs) {
 		boolean notAnonymous = false;
 		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].toString().equals(replacedTerm)) {
-				arguments_[i] = new RelationalArgument(replacementTerm);
+			if (arguments_[i].equals(replacedTerm)) {
+				arguments_[i] = replacementTerm.clone();
 				notAnonymous = true;
 			} else if (!retainOtherArgs)
 				arguments_[i] = RelationalArgument.ANONYMOUS;
@@ -516,12 +499,22 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		// replacements.
 		for (int i = 0; i < arguments_.length; i++) {
 			// Only replace action variables!
-			if (!arguments_[i].isUnboundVariable()) {
+			if (!arguments_[i].isFreeVariable()) {
 				int termIndex = arguments_[i].getVariableTermIndex();
 				if (termIndex != -1)
 					arguments_[i] = new RelationalArgument(
 							replacements[termIndex]);
 			}
+		}
+	}
+
+	/**
+	 * Replaces all unbound variables with anonymous variables.
+	 */
+	public void replaceUnboundWithAnonymous() {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isUnboundVariable())
+				arguments_[i] = RelationalArgument.ANONYMOUS;
 		}
 	}
 
@@ -623,15 +616,5 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (negated_)
 			buffer.append(")");
 		return buffer.toString();
-	}
-
-	/**
-	 * Replaces all unbound variables with anonymous variables.
-	 */
-	public void replaceUnboundWithAnonymous() {
-		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].isUnboundVariable())
-				arguments_[i] = RelationalArgument.ANONYMOUS;
-		}
 	}
 }

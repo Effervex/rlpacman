@@ -18,6 +18,7 @@ import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
 import cerrla.Unification;
+import cerrla.UnifiedFact;
 
 /**
  * A class representing background knowledge assertions
@@ -162,19 +163,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	}
 
 	/**
-	 * Gets all conditions used in this background knowledge. That's both the
-	 * conditions and the asserted information together.
-	 * 
-	 * @return A collection of all conditions shown in the background rule.
-	 */
-	private Collection<RelationalPredicate> getAllConditions() {
-		Collection<RelationalPredicate> backgroundConditions = new ArrayList<RelationalPredicate>(
-				preConds_);
-		backgroundConditions.add(postCondition_);
-		return backgroundConditions;
-	}
-
-	/**
 	 * Gets the rule in conjugate form, such that the postcondition is negated.
 	 * 
 	 * @return A collection of all conditions with the postcondition negated.
@@ -187,23 +175,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		backgroundConditions.add(negated);
 
 		return backgroundConditions;
-	}
-
-	/**
-	 * Gets the post condition of the background knowledge with the terms of the
-	 * condition swapped for the replacement terms.
-	 * 
-	 * @param replacementTerms
-	 *            The replacement terms to swap the terms with.
-	 */
-	@SuppressWarnings("unchecked")
-	private RelationalPredicate getPostCond(BidiMap replacementTerms) {
-		RelationalPredicate replacedFact = new RelationalPredicate(
-				postCondition_);
-		if (replacementTerms != null)
-			replacedFact.replaceArguments(replacementTerms.inverseBidiMap(),
-					true, false);
-		return replacedFact;
 	}
 
 	/**
@@ -231,53 +202,57 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 */
 	@SuppressWarnings("unchecked")
 	public boolean simplify(Collection<RelationalPredicate> ruleConds) {
-		boolean changed = false;
 		BidiMap replacementTerms = new DualHashBidiMap();
-		Collection<RelationalPredicate> bckConditions = getAllConditions();
-		int result = Unification.getInstance().unifyStates(bckConditions,
-				ruleConds, replacementTerms);
-		// If all conditions within a background rule are present, remove
-		// the inferred condition
-		if (result == Unification.NO_CHANGE) {
-			RelationalPredicate cond = getPostCond(replacementTerms);
-			if (ruleConds.remove(cond))
-				changed = true;
+
+		// Unify with the preConds to check if they're there
+		Collection<RelationalPredicate> allFacts = getAllFacts();
+		Collection<UnifiedFact> unified = Unification.getInstance()
+				.unifyStates(allFacts, ruleConds, replacementTerms);
+		if (unified.size() == allFacts.size()) {
+			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
+			for (UnifiedFact unifact : unified) {
+				if (nonPreferred.contains(unifact.getBaseFact()))
+					ruleConds.remove(unifact.getUnityFact());
+			}
+			return true;
 		}
 
-		// Simplify to the left for equivalent background knowledge
+		// Equivalent rule simplification
 		if (equivalentRule_) {
+			// Unify with post conds and if a result, insert the replacement
+			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
 			replacementTerms.clear();
-
-			Collection<RelationalPredicate> backgroundConds = new ArrayList<RelationalPredicate>();
-			backgroundConds.add(new RelationalPredicate(postCondition_));
-			Collection<RelationalPredicate> resultantFacts = new ArrayList<RelationalPredicate>();
-			for (RelationalPredicate rp : preConds_)
-				resultantFacts.add(new RelationalPredicate(rp));
-
-			// If precendence is on the other side, swap facts.
-			if (precendence_ == RIGHT_SIDE) {
-				Collection<RelationalPredicate> temp = backgroundConds;
-				backgroundConds = resultantFacts;
-				resultantFacts = temp;
-			}
-
-			result = Unification.getInstance().unifyStatesWithUnunified(
-					backgroundConds, ruleConds, replacementTerms, true);
-			if (result == Unification.NO_CHANGE) {
-				changed = true;
-				// If the equivalence rule unified perfectly, add the equivalent
-				// conditions.
-				replacementTerms = replacementTerms.inverseBidiMap();
-
-				for (RelationalPredicate resultFact : resultantFacts) {
-					resultFact.replaceArguments(replacementTerms, false, false);
-					if (!ruleConds.contains(resultFact))
-						ruleConds.add(resultFact);
+			unified = Unification.getInstance().unifyStates(nonPreferred,
+					ruleConds, replacementTerms);
+			// If the post cond fully unified
+			if (unified.size() == nonPreferred.size()) {
+				// Remove the post conds.
+				for (UnifiedFact unifact : unified) {
+					ruleConds.remove(unifact.getUnityFact());
+					replacementTerms = unifact.getResultReplacements();
 				}
+
+				// Add the preconds (with replacements)
+				replacementTerms = replacementTerms.inverseBidiMap();
+				for (RelationalPredicate resultFact : getPreferredFacts()) {
+					RelationalPredicate cloneFact = new RelationalPredicate(
+							resultFact);
+					cloneFact.replaceArguments(replacementTerms, false, false);
+					if (!ruleConds.contains(cloneFact))
+						ruleConds.add(cloneFact);
+				}
+				return true;
 			}
 		}
 
-		return changed;
+		return false;
+	}
+
+	private Collection<RelationalPredicate> getAllFacts() {
+		ArrayList<RelationalPredicate> allFacts = new ArrayList<RelationalPredicate>(
+				preConds_);
+		allFacts.add(postCondition_);
+		return allFacts;
 	}
 
 	/**
@@ -293,18 +268,24 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			boolean fixRule) {
 		// Check for illegal rules
 		BidiMap replacementTerms = new DualHashBidiMap();
-		int result = Unification.getInstance().unifyStates(
-				getConjugatedConditions(), ruleConds, replacementTerms);
+		Collection<RelationalPredicate> conjugated = getConjugatedConditions();
+		Collection<UnifiedFact> unified = Unification.getInstance()
+				.unifyStates(conjugated, ruleConds, replacementTerms);
 		// If the rule is found to be illegal using the conjugated
 		// conditions, remove the illegal condition
-		if (result == Unification.NO_CHANGE) {
-			RelationalPredicate cond = getPostCond(replacementTerms);
-			cond.swapNegated();
-			if (ruleConds.contains(cond)) {
-				if (fixRule)
-					ruleConds.remove(cond);
-				return true;
+		if (unified.size() == conjugated.size()) {
+			if (fixRule) {
+				// Fix up the rule (remove illegals)
+				Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
+				for (UnifiedFact unifact : unified) {
+					RelationalPredicate negUniFact = new RelationalPredicate(
+							unifact.getBaseFact());
+					negUniFact.swapNegated();
+					if (nonPreferred.contains(negUniFact))
+						ruleConds.remove(unifact.getUnityFact());
+				}
 			}
+			return true;
 		}
 		return false;
 	}
@@ -435,7 +416,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			nonPreferred.add(postCondition_);
 			return nonPreferred;
 		} else {
-			return preConds_;
+			return new ArrayList<RelationalPredicate>(preConds_);
 		}
 	}
 
@@ -447,7 +428,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	 */
 	public Collection<RelationalPredicate> getPreferredFacts() {
 		if (precendence_ == LEFT_SIDE) {
-			return preConds_;
+			return new ArrayList<RelationalPredicate>(preConds_);
 		} else {
 			Collection<RelationalPredicate> nonPreferred = new ArrayList<RelationalPredicate>();
 			nonPreferred.add(postCondition_);

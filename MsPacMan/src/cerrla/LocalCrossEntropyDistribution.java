@@ -56,9 +56,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** The relative directory in which modules are stored. */
 	public static final String MODULE_DIR = "modules";
 
-	/** TODO The suffix for module files. */
-	public static final String MODULE_SUFFIX = ".mod";
-
 	/** The suffix for module files. */
 	public static final String SERIALISED_SUFFIX = ".ser";
 
@@ -151,6 +148,14 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		localAgentObservations_ = LocalAgentObservations
 				.loadAgentObservations(goal);
 		policyIDCounter_ = 0;
+
+		// Load in RLGG rules and mutate them if possible
+		Collection<RelationalRule> covered = localAgentObservations_
+				.getRLGGRules(new HashSet<RelationalRule>());
+		if (!covered.isEmpty()) {
+			policyGenerator_.addRLGGRules(covered);
+			policyGenerator_.mutateRLGGRules();
+		}
 	}
 
 	/**
@@ -174,13 +179,15 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// than N steps
 
 		// Only remove stuff if the elites are a representative solution
-		int iteration = policyGenerator_.getPoliciesEvaluated();
-		for (Iterator<PolicyValue> iter = elites.iterator(); iter.hasNext();) {
-			PolicyValue pv = iter.next();
-			if (iteration - pv.getIteration() >= staleValue) {
-				if (ProgramArgument.RETEST_STALE_POLICIES.booleanValue())
-					policyGenerator_.retestPolicy(pv.getPolicy());
-				iter.remove();
+		if (!ProgramArgument.GLOBAL_ELITES.booleanValue()) {
+			int iteration = policyGenerator_.getPoliciesEvaluated();
+			for (Iterator<PolicyValue> iter = elites.iterator(); iter.hasNext();) {
+				PolicyValue pv = iter.next();
+				if (iteration - pv.getIteration() >= staleValue) {
+					if (ProgramArgument.RETEST_STALE_POLICIES.booleanValue())
+						policyGenerator_.retestPolicy(pv.getPolicy());
+					iter.remove();
+				}
 			}
 		}
 
@@ -389,7 +396,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		for (Iterator<ModularPolicy> iter = undertestedPolicies_.iterator(); iter
 				.hasNext();) {
 			ModularPolicy undertested = iter.next();
-			if (undertested.shouldRegenerate())
+			if (undertested.shouldRegenerate() || !isValidSample(undertested))
 				// If the element is fully tested, remove it.
 				iter.remove();
 			else if (!existingSubGoals.contains(undertested)) {
@@ -487,20 +494,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	/**
-	 * Notes the reward for a _single_ episode.
-	 * 
-	 * @param episodeReward
-	 *            The total reward received this episode.
-	 */
-	public void noteEpisodeReward(double episodeReward) {
-		// Only note the sample if it was actually used
-		if (goalCondition_.isMainGoal() || episodeReward != 0) {
-			if (!frozen_)
-				currentEpisode_++;
-		}
-	}
-
-	/**
 	 * Records a given sample with a given reward.
 	 * 
 	 * @param sample
@@ -516,6 +509,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			currentEpisode_ += policyRewards.size();
 		double average = performance_.noteSampleRewards(policyRewards,
 				currentEpisode_);
+
+		// Mutate new rules, if necessary.
+		policyGenerator_.mutateRLGGRules();
 
 		// Calculate the population and number of elites
 		population_ = policyGenerator_.determinePopulation();
@@ -542,8 +538,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 							subPol.getLocalCEDistribution(), currentEpisode_);
 			}
 		}
-
-
 
 		// Estimate experiment convergence
 		double convergence = policyGenerator_.getConvergenceValue();
@@ -751,6 +745,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 				// Load Local Agent Observations
 				lced.localAgentObservations_ = LocalAgentObservations
 						.loadAgentObservations(lced.goalCondition_);
+				lced.policyGenerator_.rebuildCurrentData();
 
 				return lced;
 			}

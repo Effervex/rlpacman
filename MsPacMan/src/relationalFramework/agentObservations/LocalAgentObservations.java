@@ -291,10 +291,11 @@ public class LocalAgentObservations extends SettlingScan implements
 
 		// Revise the invariant/variants (return true if the method return not
 		// null)
-		changed = InvariantObservations.intersectActionConditions(null, null,
-				goalActionConds,
+		changed = InvariantObservations.intersectActionConditions(action,
+				action, goalActionConds,
 				invariantGoalActionConditions_.get(action.getFactName()),
-				variantGoalActionConditions_.get(action.getFactName()), null);
+				variantGoalActionConditions_.get(action.getFactName()), null,
+				goalReplacements);
 
 		// If it changed, recreate the specialisations
 		if (changed) {
@@ -345,8 +346,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				if (rlggRules_.containsKey(actionPred)) {
 					// Modify the local RLGG rule
 					localisedRLGG = rlggRules_.get(actionPred);
-					localisedRLGG.setConditions(envRLGG.getConditions(false),
-							false);
+					localisedRLGG.setConditions(envRLGG.getConditions(false));
 					localisedRLGG.setActionTerms(envRLGG.getActionTerms());
 					localisedRLGG.setQueryParams(queryTerms);
 				} else {
@@ -361,7 +361,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				// still valid.
 				if (localGoal_ instanceof GeneralGoalCondition) {
 					// First check that the RLGG doesn't contain the goal
-					List<RelationalPredicate> rlggConds = localisedRLGG
+					Collection<RelationalPredicate> rlggConds = localisedRLGG
 							.getConditions(false);
 					boolean validRLGG = true;
 					for (RelationalPredicate rlggCond : rlggConds) {
@@ -393,7 +393,7 @@ public class LocalAgentObservations extends SettlingScan implements
 							if (rlggConds == null)
 								rlggRules_.remove(actionPred);
 							else {
-								localisedRLGG.setConditions(rlggConds, false);
+								localisedRLGG.setConditions(rlggConds);
 								localisedRLGG.expandConditions();
 							}
 						}
@@ -722,11 +722,11 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * @return A modified version of the input rule conditions, or null if no
 	 *         change made.
 	 */
-	public List<RelationalPredicate> simplifyRule(
+	public Collection<RelationalPredicate> simplifyRule(
 			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition, RelationalPredicate ruleAction,
 			boolean exitIfIllegalRule) {
-		List<RelationalPredicate> simplified = new ArrayList<RelationalPredicate>(
+		Collection<RelationalPredicate> simplified = new HashSet<RelationalPredicate>(
 				ruleConds);
 		// Add the RLGG conditions to assist in simplification (don't add
 		// numerical predicates)
@@ -1234,8 +1234,8 @@ public class LocalAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> actionConditions = getSpecialisationConditions(actionPred);
 			if (actionConditions == null)
 				return specialisations;
-			Collection<RelationalPredicate> conditions = rule
-					.getConditions(false);
+			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
+					rule.getConditions(true));
 			RelationalPredicate action = rule.getAction();
 			String[] actionTerms = action.getArguments();
 
@@ -1243,6 +1243,15 @@ public class LocalAgentObservations extends SettlingScan implements
 			for (RelationalPredicate condition : actionConditions) {
 				specialisations.addAll(groundAnonymousTerms(condition,
 						conditions, action, actionTerms, rule));
+			}
+
+			// Also add the wider specialisations
+			if (ProgramArgument.WIDER_SPECIALISATION.booleanValue()) {
+				for (RelationalPredicate generalVariant : EnvironmentAgentObservations
+						.getInstance().getGeneralSpecialisationConditions()) {
+					specialisations.addAll(groundAnonymousTerms(generalVariant,
+							conditions, action, actionTerms, rule));
+				}
 			}
 
 			return specialisations;
@@ -1274,45 +1283,25 @@ public class LocalAgentObservations extends SettlingScan implements
 			// Modify the condition arguments to match the action arguments.
 			condition = new RelationalPredicate(condition);
 			condition.replaceArguments(actionTerms);
+			if (condition.isFullyNotAnonymous()) {
+				createSpecialisation(condition, conditions, action, rule,
+						specialisations);
+			} else {
+				// Match the anon argument to the unbound types, wherever
+				// possible.
+				MultiMap<RelationalArgument, String> unboundTypes = rule
+						.getUnboundTypeConditions();
 
-			// Check for the regular condition
-			Collection<RelationalPredicate> specConditions = simplifyRule(
-					conditions, condition, action, true);
-			if (specConditions != null && !specConditions.equals(conditions)) {
-				// Determine an anonymous variable (if any)
-				RelationalPredicate anonVariable = null;
-				for (RelationalPredicate cond : specConditions)
-					if (!cond.isFullyNotAnonymous())
-						anonVariable = cond;
+				// Determine the anon type
+				Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();
+				RelationalArgument[] args = condition.getRelationalArguments();
+				recursivelyGroundAnons(args, 0, unboundTypes, condition,
+						resultPreds);
 
-				// If there is an anon variable, match it up
-				if (anonVariable == null)
-					// If no anon variable, create normally
-					createSpecialisation(specConditions, action, rule,
+				// Swap the grounded result preds in
+				for (RelationalPredicate result : resultPreds) {
+					createSpecialisation(result, conditions, action, rule,
 							specialisations);
-				else {
-					// Match the anon argument to the unbound types, wherever
-					// possible.
-					MultiMap<RelationalArgument, String> unboundTypes = rule
-							.getUnboundTypeConditions();
-
-					// Determine the anon type
-					Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();
-					RelationalArgument[] args = anonVariable
-							.getRelationalArguments();
-					recursivelyGroundAnons(args, 0, unboundTypes, anonVariable,
-							resultPreds);
-
-					// Swap the grounded result preds in
-					if (!resultPreds.isEmpty())
-						specConditions.remove(anonVariable);
-					for (RelationalPredicate result : resultPreds) {
-						if (specConditions.add(result)) {
-							createSpecialisation(specConditions, action, rule,
-									specialisations);
-							specConditions.remove(result);
-						}
-					}
 				}
 			}
 			return specialisations;
@@ -1342,9 +1331,11 @@ public class LocalAgentObservations extends SettlingScan implements
 			if (i == args.length) {
 				RelationalPredicate swappedPred = new RelationalPredicate(
 						anonVariable, args);
-				if (anonVariable.isNegated())
-					swappedPred.swapNegated();
-				resultPreds.add(swappedPred);
+				if (!swappedPred.isFullyAnonymous()) {
+					if (anonVariable.isNegated())
+						swappedPred.swapNegated();
+					resultPreds.add(swappedPred);
+				}
 				return;
 			}
 
@@ -1373,7 +1364,9 @@ public class LocalAgentObservations extends SettlingScan implements
 		/**
 		 * Creates a specialised rule.
 		 * 
-		 * @param specConditions
+		 * @param condition
+		 * 
+		 * @param conditions
 		 *            The conditions of the specialised rule.
 		 * @param action
 		 *            The action of the rule.
@@ -1382,25 +1375,31 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * @param specialisations
 		 *            The specialisations set to add to.
 		 */
-		private void createSpecialisation(
-				Collection<RelationalPredicate> specConditions,
+		private void createSpecialisation(RelationalPredicate condition,
+				Collection<RelationalPredicate> conditions,
 				RelationalPredicate action, RelationalRule rule,
 				Set<RelationalRule> specialisations) {
-			// Create the specialisation
-			RelationalRule specialisation = new RelationalRule(specConditions,
-					action, rule);
-			specialisation.setQueryParams(rule.getQueryParameters());
-			specialisation.expandConditions();
+			// Simplify the conds first
+			Collection<RelationalPredicate> specConditions = simplifyRule(
+					conditions, condition, action, true);
 
-			if (!specialisations.contains(specialisation)
-					&& !specialisation.equals(rule)) {
-				// Only add specialisations if they contain goal
-				// conditions (if there are goal conditions).
-				if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
-						|| localGoal_.getNumArgs() == 0
-						|| specConditions.toString().contains(
-								RelationalArgument.GOAL_VARIABLE_PREFIX)) {
-					specialisations.add(specialisation);
+			if (specConditions != null && !specConditions.equals(conditions)) {
+				// Create the specialisation
+				RelationalRule specialisation = new RelationalRule(
+						specConditions, action, rule);
+				specialisation.setQueryParams(rule.getQueryParameters());
+				specialisation.expandConditions();
+
+				if (!specialisations.contains(specialisation)
+						&& !specialisation.equals(rule)) {
+					// Only add specialisations if they contain goal
+					// conditions (if there are goal conditions).
+					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
+							|| localGoal_.getNumArgs() == 0
+							|| conditions.toString().contains(
+									RelationalArgument.GOAL_VARIABLE_PREFIX)) {
+						specialisations.add(specialisation);
+					}
 				}
 			}
 		}

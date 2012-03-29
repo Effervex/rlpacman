@@ -27,9 +27,13 @@ public class UnifiedFact {
 	/** The generalisation of this unification. */
 	private int generalisation_;
 
-	public UnifiedFact(RelationalPredicate resultFact, RelationalArgument[] factTerms,
-			RelationalPredicate unityFact, BidiMap replacements,
-			int generalisation) {
+	/** The fact that was unified. */
+	private RelationalPredicate baseFact_;
+
+	public UnifiedFact(RelationalPredicate baseFact,
+			RelationalPredicate unityFact, RelationalArgument[] factTerms,
+			BidiMap replacements, RelationalPredicate resultFact, int generalisation) {
+		baseFact_ = baseFact;
 		resultFact_ = resultFact;
 		factTerms_ = factTerms;
 		unityFact_ = unityFact;
@@ -39,6 +43,10 @@ public class UnifiedFact {
 
 	public RelationalPredicate getResultFact() {
 		return resultFact_;
+	}
+
+	public RelationalPredicate getBaseFact() {
+		return baseFact_;
 	}
 
 	public RelationalArgument[] getFactTerms() {
@@ -92,7 +100,7 @@ public class UnifiedFact {
 			return false;
 		return true;
 	}
-	
+
 	@Override
 	public String toString() {
 		return resultFact_.toString();

@@ -241,21 +241,29 @@ public class InvariantObservations implements Serializable {
 	 *            Variant action conditions. Can only get bigger.
 	 * @param actionRanges
 	 *            The observed ranges for various conditions.
+	 * @param goalReplacements
+	 *            The (possibly null) replacements for the goal variables.
 	 * @return True if the action conditions changed, false otherwise.
 	 */
-	@SuppressWarnings("unchecked")
 	public static boolean intersectActionConditions(
 			RelationalPredicate newAction, RelationalPredicate oldAction,
 			Collection<RelationalPredicate> actionConds,
 			Collection<RelationalPredicate> invariants,
 			Collection<RelationalPredicate> variants,
-			Map<RangeContext, double[]> actionRanges) {
+			Map<RangeContext, double[]> actionRanges,
+			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		boolean changed = false;
 
 		// Generalise the action if necessary
 		RelationalArgument[] actionArgs = (oldAction != null) ? oldAction
 				.getRelationalArguments() : new RelationalArgument[0];
 		BidiMap replacementMap = new DualHashBidiMap();
+		// Add the goal replacements
+		if (goalReplacements != null) {
+			for (RelationalArgument goalArg : goalReplacements.values())
+				replacementMap.put(goalArg, goalArg);
+		}
+
 		for (int i = 0; i < actionArgs.length; i++) {
 			RelationalArgument argument = actionArgs[i];
 			RelationalArgument variableArg = RelationalArgument
@@ -275,48 +283,50 @@ public class InvariantObservations implements Serializable {
 		// Run through each invariant fact
 		Collection<RelationalPredicate> variantActionConds = new HashSet<RelationalPredicate>(
 				actionConds);
-		int result = Unification.getInstance().unifyStatesWithUnunified(
-				invariants, variantActionConds, replacementMap, false);
+		int result = Unification.getInstance().rlggUnification(invariants,
+				variantActionConds, replacementMap, actionArgs);
 		if (result == Unification.UNIFIED_CHANGE)
 			changed = true;
+		else if (result == Unification.CANNOT_UNIFY) {
+			// No invariants can be unified, they are all variants
+			variantActionConds.addAll(invariants);
+			invariants.clear();
+		}
 
 		// Note ranges
 		for (RelationalPredicate invFact : invariants) {
-			if (invFact.isNumerical())
-				noteRange(oldAction.getFactName(), invFact, actionRanges);
+			if (invFact.isNumerical()) {
+				noteRanges(oldAction.getFactName(), invFact, actionRanges);
+			}
 		}
 
 		// Add any remaining action conds to the variants, merging any
 		// numerical ranges together
-		Collection<RelationalPredicate> newVariantConditions = new HashSet<RelationalPredicate>();
-		for (RelationalPredicate variant : variants) {
-			Collection<UnifiedFact> mergedFacts = Unification.getInstance()
-					.unifyFactToState(variant, variantActionConds,
-							replacementMap.inverseBidiMap(), actionArgs, false);
-			if (mergedFacts != null && !mergedFacts.isEmpty()) {
-				for (UnifiedFact uf : mergedFacts) {
-					RelationalPredicate unifiedFact = uf.getResultFact();
-					unifiedFact.replaceUnboundWithAnonymous();
-					changed |= !variant.equals(unifiedFact);
-					variantActionConds.remove(uf.getUnityFact());
-					if (newVariantConditions.add(unifiedFact)) {
-						if (oldAction != null)
-							noteRange(oldAction.getFactName(), unifiedFact,
-									actionRanges);
+		for (RelationalPredicate varFact : variantActionConds) {
+			// Anonymise the fact and add it
+			varFact.replaceUnboundWithAnonymous();
+			if (varFact.isNumerical()) {
+				// If numerical, attempt to unify
+				Collection<UnifiedFact> mergedFacts = Unification.getInstance()
+						.unifyFactToState(varFact, variants,
+								new DualHashBidiMap(),
+								new RelationalArgument[0], false);
+				// Should only merge with one fact (if at all)
+				if (!mergedFacts.isEmpty()) {
+					UnifiedFact unifiedFact = mergedFacts.iterator().next();
+					varFact = unifiedFact.getResultFact();
+					if (oldAction != null) {
+						noteRanges(oldAction.getFactName(), varFact,
+								actionRanges);
+					}
+					// If the range changed, update the variant value
+					if (!varFact.equals(unifiedFact.getUnityFact())) {
+						changed = true;
+						variants.remove(unifiedFact.getUnityFact());
 					}
 				}
-			} else
-				newVariantConditions.add(variant);
-		}
-		variants.clear();
-		variants.addAll(newVariantConditions);
-		BidiMap inverseReplMap = replacementMap.inverseBidiMap();
-		// Add the action conds (with inverse replacements so they don't match
-		// invariants).
-		for (RelationalPredicate variantActionCond : variantActionConds) {
-			variantActionCond.replaceArguments(inverseReplMap, true, true);
-			variantActionCond.replaceUnboundWithAnonymous();
-			changed |= variants.add(variantActionCond);
+			}
+			changed |= variants.add(varFact);
 		}
 
 		if (changed && oldAction != null)
@@ -327,32 +337,47 @@ public class InvariantObservations implements Serializable {
 	/**
 	 * Notes the range from a given fact.
 	 * 
+	 * @param actionName
+	 *            The name of the action being noted.
 	 * @param numberFact
 	 *            The range fact.
 	 * @param actionRanges
 	 *            The map of facts, mapped by factName-range variable.
+	 * @return The range context for the fact if the range beinbg noted is >=
+	 *         the existing noted range. Else, null.
 	 */
-	private static void noteRange(String actionName,
+	private static Collection<RangeContext> noteRanges(String actionName,
 			RelationalPredicate numberFact,
 			Map<RangeContext, double[]> actionRanges) {
+		Collection<RangeContext> result = new HashSet<RangeContext>();
 		if (actionRanges == null || !numberFact.isNumerical())
-			return;
+			return null;
 		RelationalArgument[] factArgs = numberFact.getRelationalArguments();
 		for (int i = 0; i < factArgs.length; i++) {
 			// Only note ranges
 			if (factArgs[i].isRange()) {
-				RangeContext key = new RangeContext(i, numberFact, actionName);
-				double[] range = actionRanges.get(key);
+				RangeContext context = new RangeContext(i, numberFact,
+						actionName);
+				double[] range = actionRanges.get(result);
+				double[] explicitRange = factArgs[i].getExplicitRange();
 				if (range == null) {
 					range = new double[2];
-					actionRanges.put(key, range);
+					System.arraycopy(explicitRange, 0, range, 0, 2);
+					actionRanges.put(context, range);
 				}
-				System.arraycopy(factArgs[i].getExplicitRange(), 0, range, 0, 2);
+				// Check that the range is bigger - only return if same or
+				// bigger
+				if (explicitRange[0] <= range[0]
+						&& explicitRange[1] >= range[1]) {
+					System.arraycopy(explicitRange, 0, range, 0, 2);
+					result.add(context);
+				}
 			}
 		}
+		return result;
 	}
 
-	public Collection<String> getVariants() {
+	public Collection<String> getGeneralVariants() {
 		return generalVariants_;
 	}
 }

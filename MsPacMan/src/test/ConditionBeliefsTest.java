@@ -163,14 +163,14 @@ public class ConditionBeliefsTest {
 		assertTrue(cb.getOccasionallyTrue(null).isEmpty());
 		assertFalse(cb.getNeverTrue(null).isEmpty());
 		assertTrue(cb.getNeverTrue(null).contains(
-				StateSpec.toRelationalPredicate("(distanceGhost ? ?X ?)")));
+				StateSpec.toRelationalPredicate("(distance ?X ?)")));
 		assertTrue(cb.getNeverTrue(null).contains(
 				StateSpec.toRelationalPredicate("(blinking ?X)")));
 		assertTrue(cb.getNeverTrue(null).contains(
 				StateSpec.toRelationalPredicate("(ghost ?X)")));
 		assertEquals(cb.getNeverTrue(null).size(), 3);
 		assertTrue(untrueFacts.contains(StateSpec
-				.toRelationalPredicate("(distanceGhost ? ?X ?)")));
+				.toRelationalPredicate("(distance ?X ?)")));
 		assertTrue(untrueFacts
 				.contains(StateSpec.toRelationalPredicate("(blinking ?X)")));
 		assertTrue(untrueFacts.contains(StateSpec.toRelationalPredicate("(ghost ?X)")));

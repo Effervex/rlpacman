@@ -321,8 +321,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 			totalPoliciesEvaluated = numUpdates_;
 
 		// If the slot has not seen enough samples to update, return 0.
-		// TODO Maybe should change this to x * |S|.
-//		int evaluationThreshold = 2 * numElites;
 		int evaluationThreshold = (int) (size() * PolicyGenerator.CONFIDENCE_INTERVAL);
 		if (totalPoliciesEvaluated < evaluationThreshold)
 			return 0;

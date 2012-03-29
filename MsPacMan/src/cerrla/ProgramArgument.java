@@ -40,6 +40,8 @@ public enum ProgramArgument implements Serializable {
 			"The size of the ensemble"),
 	EXPERIMENT_MODE(false, "experimentMode", "-e", ParameterType.EVALUATION,
 			"If GUI elements are to be hidden."),
+	GLOBAL_ELITES(false, "globalElites", null, ParameterType.SAMPLING,
+			"If elites remain in the set forever"),
 	INHERIT_PARENT_SLOT_VALS(true, "inheritParent", null,
 			ParameterType.SPECIALISATION,
 			"If newly created slots inherit mu(S) and o(S) of the parent slot."),
@@ -81,7 +83,8 @@ public enum ProgramArgument implements Serializable {
 	RETEST_STALE_POLICIES(true, "retestStale", null, ParameterType.SAMPLING,
 			"If stale policies should be immediately retested."),
 	RHO(0.05, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
-	SAVE_EXPERIMENT_FILES(false, "saveExperimentFiles", "-m", ParameterType.EVALUATION,
+	SAVE_EXPERIMENT_FILES(false, "saveExperimentFiles", "-m",
+			ParameterType.EVALUATION,
 			"If module files should be saved into sub-directories "
 					+ "so they aren't loaded in successive runs."),
 	SEED_MODULE_RULES(false, "seedModuleRules", null, ParameterType.SAMPLING,
@@ -96,19 +99,22 @@ public enum ProgramArgument implements Serializable {
 			"Number of iterations to test the final testing for"),
 	TESTING(false, "test", "-t", ParameterType.EVALUATION,
 			"If just running tests"),
-	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
-			"If using/learning modules"),
 	USE_GENERAL_MODULES(true, "useGeneralModules", null,
 			ParameterType.SAMPLING, "If using/learning general modules"),
+	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
+			"If using/learning modules"),
 	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
-			"If using weighted updates");
+			"If using weighted updates"),
+	WIDER_SPECIALISATION(true, "widerSpecialisation", null,
+			ParameterType.SPECIALISATION,
+			"If including non-action specialisation conditions");
 
 	public static final File ARG_FILE = new File("cerrlaArgs.txt");
 	public static final int ELITES_SIZE_AV_RULES = 0;
-	public static final int ELITES_SIZE_SUM_SLOTS = 1;
-	public static final int ELITES_SIZE_SUM_RULES = 2;
-	public static final int ELITES_SIZE_MAX_RULES = 3;
 	public static final int ELITES_SIZE_MAX_RULE_NUM_SLOTS = 4;
+	public static final int ELITES_SIZE_MAX_RULES = 3;
+	public static final int ELITES_SIZE_SUM_RULES = 2;
+	public static final int ELITES_SIZE_SUM_SLOTS = 1;
 	private Boolean booleanValue_;
 	private String comment_;
 	private Object defaultValue_;

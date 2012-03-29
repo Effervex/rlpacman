@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedSet;
@@ -364,5 +365,21 @@ public class TestTest {
 		
 		assertFalse(serSC.getFoo() == 23);
 		assertEquals(serSC.getFoo(), 0);
+	}
+	
+	@Test
+	public void testPriorityQueue() {
+		PriorityQueue<Integer> pq = new PriorityQueue<Integer>();
+		pq.add(4);
+		pq.add(10);
+		pq.add(1);
+		pq.add(6);
+		pq.add(3);
+		System.out.println(pq);
+		assertTrue(pq.poll() == 1);
+		assertTrue(pq.poll() == 3);
+		assertTrue(pq.poll() == 4);
+		assertTrue(pq.poll() == 6);
+		assertTrue(pq.poll() == 10);
 	}
 }

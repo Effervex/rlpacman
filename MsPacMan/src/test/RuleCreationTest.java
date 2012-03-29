@@ -69,9 +69,11 @@ public class RuleCreationTest {
 		mutant = new RelationalRule(
 				"(clear ?X) (above ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (on ?X ?G_0) => (moveFloor ?X)");
+		mutant = new RelationalRule(
+				"(clear ?X) (above ?X ?Y) (on ?X ?G_0) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear ?X) (above ?X ?Y) (on ?X ?G_1) => (moveFloor ?X)");
+		mutant = new RelationalRule(
+				"(clear ?X) (above ?X ?Y) (on ?X ?G_1) => (moveFloor ?X)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
@@ -88,9 +90,11 @@ public class RuleCreationTest {
 		assertTrue(results.contains(mutant));
 		mutant = new RelationalRule("(clear a) (above a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (above a ?Y) (on a ?G_0) => (moveFloor a)");
+		mutant = new RelationalRule(
+				"(clear a) (above a ?Y) (on a ?G_0) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
-		mutant = new RelationalRule("(clear a) (above a ?Y) (on a ?G_1) => (moveFloor a)");
+		mutant = new RelationalRule(
+				"(clear a) (above a ?Y) (on a ?G_1) => (moveFloor a)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 6);
 
@@ -260,6 +264,14 @@ public class RuleCreationTest {
 		mutant = new RelationalRule(
 				"(clear ?X) (floor ?Y) (above ?G_0 ?Y) (block ?X) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
+		
+		// Illegal specialisation
+		rule = new RelationalRule(
+				"(clear ?X) (floor ?Y) (block ?X) => (move ?X ?Y)");
+		results = sut_.specialiseRule(rule);
+		mutant = new RelationalRule(
+				"(clear ?X) (floor ?Y) (highest ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
 	}
 
 	@Test
@@ -350,7 +362,7 @@ public class RuleCreationTest {
 						+ "(floor ?Y) => (move ?X ?Y)");
 		assertTrue(results.contains(mutant));
 		assertEquals(results.size(), 5);
-		
+
 		// Test NOT splitting a CONSTANT numerical condition
 		rule = new RelationalRule(
 				"(clear ?X) (height ?X 1) (floor ?Y) => (move ?X ?Y)");
@@ -390,5 +402,33 @@ public class RuleCreationTest {
 		Set<RelationalRule> specialisedRules = sut_.specialiseRuleMinor(rule);
 
 		assertEquals(specialisedRules.size(), 6);
+	}
+
+	@Test
+	public void testSpecialiseRuleCarcassonne() {
+		StateSpec.initInstance("jCloisterZone.Carcassonne");
+		LocalAgentObservations lao = LocalAgentObservations
+				.loadAgentObservations(GoalCondition.parseGoalCondition("cool"));
+		sut_ = lao.getRuleMutation();
+
+		RelationalRule rule = new RelationalRule(
+				"(currentPlayer ?X) (currentTile ?Y) (test (<> ?Y ?X)) "
+						+ "(score ?X ?#_0) (meeplesLeft ?X ?#_1) (numSurroundingTiles ?Z ?#_2) "
+						+ "(test (<> ?Z ?Y ?X)) (validLoc ?Z ?A) (test (<> ?A ?Z ?Y ?X)) "
+						+ "(tileEdge ?Y ?Unb_4 ?Unb_5) (test (<> ?Unb_5 ?A ?Z ?Y ?X)) "
+						+ "(test (<> ?Unb_4 ?A ?Z ?Y ?X)) (locationXY ?Z ?#_3 ?#_4) "
+						+ "(nextTo ?Z ?Unb_6 ?Unb_7) (test (<> ?Unb_7 ?A ?Z ?Y ?X)) "
+						+ "(test (<> ?Unb_6 ?A ?Z ?Y ?X)) (orientation ?A) (edge ?Unb_4) "
+						+ "(terrain ?Unb_5) (edge ?Unb_6) (terrain ?Unb_7) (player ?X) "
+						+ "(tile ?Y) (location ?Z) => (placeTile ?X ?Y ?Z ?A)");
+		// TODO Check here.,
+		Set<RelationalRule> specialisedRules = sut_.specialiseRule(rule);
+		
+		assertEquals(specialisedRules.size(), 19);
+	}
+	
+	@Test
+	public void testSpecialiseBindingVariable() {
+		
 	}
 }
