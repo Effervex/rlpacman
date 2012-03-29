@@ -235,7 +235,7 @@ public class ConditionBeliefs implements Serializable {
 			leftConds.add(extraCond);
 		// Create an equivalence relation if possible.
 		if (!otherCond.getFactName().equals(condition_)) {
-			// Form the anti
+			// Form the anti-replacement map
 			BidiMap replacementMap = new DualHashBidiMap();
 			RelationalArgument[] otherArgs = otherCond.getRelationalArguments();
 			for (int i = 0; i < otherArgs.length; i++) {
@@ -245,6 +245,7 @@ public class ConditionBeliefs implements Serializable {
 			}
 
 			// If the sets are equal, the relations are equivalent!
+			// TODO Need to investigate why exactly I changed to set comparison
 			if (isEquivalentConditions(extraCond, otherCond, negationType,
 					conditionBeliefs, negatedConditionBeliefs, replacementMap)) {
 				// Swap the facts if the otherCond is simpler
@@ -446,7 +447,6 @@ public class ConditionBeliefs implements Serializable {
 
 		// Shape the sets if variables don't match (but cannot purge negated
 		// predicates)
-		// Other conds always true set has to be shaped
 		thatAlwaysTrue = shapeFacts(thatAlwaysTrue,
 				replacementMap.inverseBidiMap(), negationType, true);
 		thatSometimesTrue = shapeFacts(thatSometimesTrue,
@@ -484,10 +484,6 @@ public class ConditionBeliefs implements Serializable {
 		// If the predicate is a never-seen invariant, return false
 		if (EnvironmentAgentObservations.getInstance().getNeverSeenInvariants()
 				.contains(relativeFact.getFactName()))
-			return false;
-
-		// If the fact is negated and has never been true, return false
-		if (!isAlwaysTrue && !typedCondBeliefs_.containsKey(relativeFact))
 			return false;
 
 		// If there are no type beliefs
@@ -599,9 +595,8 @@ public class ConditionBeliefs implements Serializable {
 
 				// Assert the true facts
 				for (RelationalPredicate alwaysTrue : beliefs.alwaysTrue_) {
-					// Only create the relation if it unique to the type, isn't
-					// already realised by the type itself and is
-					// useful (not an obvious type relation)
+					// Only create the relation if it unique to the type and
+					// isn't already realised by the type itself
 					if (isUsefulRelation(alwaysTrue, true, typeBeliefs,
 							typeVarReplacements)
 							&& shouldCreateRelation(cbFact_, alwaysTrue))
@@ -611,10 +606,9 @@ public class ConditionBeliefs implements Serializable {
 				}
 
 				if (args_ == null) {
-
 					// Assert the false facts
 					for (RelationalPredicate neverTrue : beliefs.neverTrue_) {
-						// Only create the relation is it is unique to the type
+						// Only create the relation if it is unique to the type
 						// and isn't already realised by the type itself.
 						if (isUsefulRelation(neverTrue, false, typeBeliefs,
 								typeVarReplacements))
@@ -797,20 +791,8 @@ public class ConditionBeliefs implements Serializable {
 		// If the fact is a type predicate, go for it.
 		if (StateSpec.getInstance().isTypePredicate(thisFact.getFactName()))
 			return true;
-		else {
-			// If the rule is a normal predicate, don't make obvious type
-			// rules.
-			if (StateSpec.getInstance().isTypePredicate(
-					relatedFact.getFactName())) {
-				int index = relatedFact.getRelationalArguments()[0]
-						.getVariableTermIndex();
-				if (thisFact.getArgTypes()[index].equals(relatedFact
-						.getFactName()))
-					return false;
-			}
 
-			return true;
-		}
+		return true;
 	}
 
 	/**

@@ -220,6 +220,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		if (relationalWrapper_.wasNoTilePlaced()) {
 			Player p = environment_.getTurnPlayer();
 			earlyExitPlayers_.add(p);
+			if (earlyExitPlayers_.size() == players_.length)
+				earlyExit_ = true;
 		}
 		return action;
 	}

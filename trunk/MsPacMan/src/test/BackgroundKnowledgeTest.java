@@ -28,8 +28,18 @@ public class BackgroundKnowledgeTest {
 				"(clear ?X) (above ? ?X) <=> (floor ?X)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
-		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Z_Unb ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Unb_0 ?X)"));
 		boolean result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.contains(StateSpec
+				.toRelationalPredicate("(floor ?X)")));
+
+		// Implication test
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ? ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(floor ?X)"));
+		result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
 				.toRelationalPredicate("(floor ?X)")));
@@ -54,7 +64,7 @@ public class BackgroundKnowledgeTest {
 		BackgroundKnowledge bk = new BackgroundKnowledge(
 				"(above ?X ?) <=> (on ?X ?)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
-		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Z_Unb)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Unb_0)"));
 		boolean result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
@@ -65,10 +75,16 @@ public class BackgroundKnowledgeTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Z)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
+		
+		// Bound variable case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Bnd_0)"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
 
 		// Other way around
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Z_Unb)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Unb_0)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
 	}
@@ -87,8 +103,65 @@ public class BackgroundKnowledgeTest {
 
 		// Negative case
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Z_Unb)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Unb_0)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
+	}
+
+	@Test
+	public void testSimplifyCarcassonne() {
+		StateSpec.initInstance("jCloisterZone.Carcassonne");
+		LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition("cool"));
+
+		BackgroundKnowledge bk = new BackgroundKnowledge(
+				"(controls ?X ?Z) => (tileEdge ? ? ?Z)");
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?X ?)"));
+		ruleConds.add(StateSpec
+				.toRelationalPredicate("(tileEdge ?Y ?Unb_4 ?Unb_5)"));
+		boolean result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
+
+		// True case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ? ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(tileEdge ? ? ?X)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.size() == 1);
+
+		// True case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?Y ?X)"));
+		ruleConds.add(StateSpec
+				.toRelationalPredicate("(tileEdge ?Unb_3 ?Unb_4 ?X)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.size() == 1);
+
+		// True case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ? ?X)"));
+		ruleConds.add(StateSpec
+				.toRelationalPredicate("(tileEdge ?Unb_3 ?Unb_4 ?X)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.size() == 1);
+
+		// Self test
+		bk = new BackgroundKnowledge("(controls ?X ?Y) => (controls ?X ?)");
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?X ?)"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
+
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?X ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?X ?)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.size() == 1);
+		assertTrue(ruleConds.toString().contains("(controls ?X ?Y)"));
 	}
 }

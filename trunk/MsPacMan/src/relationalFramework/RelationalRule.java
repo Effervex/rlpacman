@@ -12,7 +12,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -145,6 +144,7 @@ public class RelationalRule implements Serializable,
 		if (parent != null)
 			setMutant(parent);
 		slot_ = null;
+		expandConditions();
 		findConstantsAndRanges();
 		ruleHash_ = hashCode();
 	}
@@ -178,6 +178,75 @@ public class RelationalRule implements Serializable,
 			List<RelationalArgument> queryParams) {
 		this(ruleString);
 		queryParams_ = queryParams;
+	}
+
+	/**
+	 * Creates the inequals tests from the terms given. Note anonymous terms are
+	 * special in that they aren't inequal to one-another.
+	 * 
+	 * @param ruleConditions
+	 *            The current conditions for the rule.
+	 * @param variableTerms
+	 *            The variable terms in the rule.
+	 * @param constantTerms
+	 *            The constant terms in the rule.
+	 */
+	private void addInequalityTests(List<RelationalPredicate> ruleConditions,
+			Collection<RelationalArgument> constantTerms) {
+		List<RelationalArgument> variableTerms = new ArrayList<RelationalArgument>();
+		int lastVars = 0;
+		int ruleConditionIndex = 0;
+		for (Object condObj : ruleConditions.toArray()) {
+			RelationalPredicate cond = (RelationalPredicate) condObj;
+			RelationalArgument[] condArgs = cond.getRelationalArguments();
+			String[] argTypes = cond.getArgTypes();
+			for (int i = 0; i < condArgs.length; i++) {
+				// Is an unseen variable (but not a numerical variable)
+				if (condArgs[i].isVariable()
+						&& !StateSpec.isNumberType(argTypes[i])
+						&& !variableTerms.contains(condArgs[i]))
+					variableTerms.add(condArgs[i]);
+			}
+
+			int numTerms = variableTerms.size();
+			for (int i = numTerms; i > lastVars
+					&& numTerms + constantTerms.size() >= 2; i--) {
+				StringBuffer buffer = new StringBuffer("(<>");
+				// (Potentially) Create an inequality test
+				RelationalArgument varTermA = null;
+				boolean isValid = false;
+				for (ListIterator<RelationalArgument> varIter = variableTerms
+						.listIterator(i); varIter.hasPrevious();) {
+					RelationalArgument varTerm = varIter.previous();
+					if (varTermA == null) {
+						// First term
+						varTermA = varTerm;
+						buffer.append(" " + varTermA);
+					} else if (!varTermA.isFreeVariable()
+							|| !varTerm.isFreeVariable()) {
+						isValid = true;
+						buffer.append(" " + varTerm);
+					}
+				}
+
+				// Adding constant terms
+				for (RelationalArgument constant : constantTerms) {
+					isValid = true;
+					buffer.append(" " + constant);
+				}
+
+				if (isValid) {
+					buffer.append(")");
+					RelationalPredicate inequality = new RelationalPredicate(
+							StateSpec.TEST_DEFINITION,
+							new String[] { buffer.toString() });
+					ruleConditionIndex++;
+					ruleConditions.add(ruleConditionIndex, inequality);
+				}
+			}
+			lastVars = numTerms;
+			ruleConditionIndex++;
+		}
 	}
 
 	/**
@@ -233,33 +302,45 @@ public class RelationalRule implements Serializable,
 	}
 
 	/**
-	 * Removes unnecessary conditions from the set of conditions by removing any
-	 * not containing action terms.
+	 * Initialises the variable normalisation map with the action terms, so the
+	 * fundamental structure of the rule doesn't change.
 	 * 
-	 * @param conditions
-	 *            The conditions to scan through and remove.
+	 * @return The normalisation map, containing any variable action terms.
 	 */
-	private void removeUnnecessaryFacts(List<RelationalPredicate> conditions) {
-		// Run through the conditions, ensuring each one has at least one unique
-		// term seen in the action.
-		for (Iterator<RelationalPredicate> iter = conditions.iterator(); iter
-				.hasNext();) {
-			RelationalPredicate condition = iter.next();
+	private Map<RelationalArgument, RelationalArgument> initialiseNormalisationMap() {
+		if (ruleAction_ == null)
+			return null;
 
-			// Check if any of the terms are in the condition
-			boolean containsAny = false;
-			for (String term : ruleAction_.getArguments()) {
-				if (StateSpec.arrayContains(condition.getArguments(), term)) {
-					containsAny = true;
-					break;
-				}
-			}
-
-			// Removing unnecessary terms
-			if (!containsAny) {
-				iter.remove();
+		Map<RelationalArgument, RelationalArgument> normalisationMap = new HashMap<RelationalArgument, RelationalArgument>();
+		RelationalArgument[] actionArgs = ruleAction_.getRelationalArguments();
+		for (int i = 0; i < actionArgs.length; i++) {
+			if (actionArgs[i].isVariable()) {
+				if (actionArgs[i].isGoalCondition()
+						|| actionArgs[i].isRangeVariable())
+					normalisationMap.put(actionArgs[i], actionArgs[i]);
+				else if (!normalisationMap.containsKey(actionArgs[i]))
+					normalisationMap.put(actionArgs[i],
+							RelationalArgument.createVariableTermArg(i));
 			}
 		}
+		return normalisationMap;
+	}
+
+	/**
+	 * Sets this rule as a mutant and adds the parent rule.
+	 * 
+	 * @param parent
+	 *            The parent rule to add.
+	 */
+	private void setMutant(RelationalRule parent) {
+		if (mutantParents_ == null) {
+			mutantParents_ = new ArrayList<RelationalRule>();
+			ancestryCount_ = parent.ancestryCount_ + 1;
+		}
+		mutant_ = true;
+		mutantParents_.add(parent);
+		if (parent.ancestryCount_ < ancestryCount_ - 1)
+			ancestryCount_ = parent.ancestryCount_ + 1;
 	}
 
 	/**
@@ -344,7 +425,7 @@ public class RelationalRule implements Serializable,
 	 */
 	public void expandConditions() {
 		unboundTypeMap_ = null;
-		Set<RelationalPredicate> addedConditions = new TreeSet<RelationalPredicate>();
+		List<RelationalPredicate> addedConditions = new ArrayList<RelationalPredicate>();
 
 		Set<RelationalArgument> constantTerms = new TreeSet<RelationalArgument>();
 
@@ -352,10 +433,18 @@ public class RelationalRule implements Serializable,
 				.getPredicates();
 
 		Map<RelationalArgument, RelationalArgument> normalisationMap = initialiseNormalisationMap();
-		int normalisedIndex = (ruleAction_ != null) ? ruleAction_.getArgTypes().length
+		int normalisedIndex[] = new int[3]; // [Unbound, bound, action]
+		normalisedIndex[2] = (ruleAction_ != null) ? ruleAction_.factTypes_.length
 				: 0;
 
+		// Unbound collections
+		MultiMap<RelationalArgument, Integer> indexedUnbounds = MultiMap
+				.createListMultiMap();
+		Map<RelationalArgument, String> unboundNegated = new HashMap<RelationalArgument, String>();
+		Collection<RelationalArgument> boundNegated = new HashSet<RelationalArgument>();
+
 		// Scan each condition
+		int index = 0;
 		for (RelationalPredicate condition : ruleConditions_) {
 			if (StateSpec.getInstance().isNotInternalPredicate(
 					condition.getFactName())) {
@@ -377,45 +466,76 @@ public class RelationalRule implements Serializable,
 									normalisationMap.put(arguments[i],
 											arguments[i]);
 								else if (arguments[i].isUnboundVariable()) {
-									// Swap unbound for unbound
+									// Note the unbound variable
 									normalisationMap
 											.put(arguments[i],
 													RelationalArgument
-															.createUnboundVariable(normalisedIndex++));
-								} else
-									// Swap regular for
+															.createUnboundVariable(normalisedIndex[0]++));
+								} else if (arguments[i].isBoundVariable()) {
+									// Normalise bound variables.
 									normalisationMap
 											.put(arguments[i],
 													RelationalArgument
-															.createVariableTermArg(normalisedIndex++));
-
+															.createBoundVariable(normalisedIndex[1]++));
+								} else {
+									normalisationMap
+											.put(arguments[i],
+													RelationalArgument
+															.createVariableTermArg(normalisedIndex[2]++));
+								}
 							}
 							arguments[i] = normalisationMap.get(arguments[i]);
 						} else if (arguments[i].isAnonymous()) {
 							// If the argument is anonymous, convert it to an
 							// unbound variable.
 							arguments[i] = RelationalArgument
-									.createUnboundVariable(normalisedIndex++);
+									.createUnboundVariable(normalisedIndex[0]++);
 						} else if (arguments[i].isConstant())
 							// Adding constant terms
 							constantTerms.add(arguments[i]);
+
+						// Indexing unbounds
+						if (arguments[i].isFreeVariable()) {
+							indexedUnbounds.put(arguments[i], index);
+
+							if (condition.isNegated())
+								unboundNegated.put(arguments[i],
+										condition.getArgTypes()[i]);
+							else
+								boundNegated.add(arguments[i]);
+						}
 					}
 				}
 				condition = new RelationalPredicate(condition, arguments,
 						condition.isNegated());
 				addedConditions.add(condition);
-
-				// Adding the type arguments
-				addedConditions.addAll(StateSpec.getInstance().createTypeConds(
-						condition));
 			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED))
 				addedConditions.add(condition);
+
+			index++;
+		}
+
+		// Run through and rename bound unbound variables
+		for (RelationalArgument arg : indexedUnbounds.keySet()) {
+			if (unboundNegated.containsKey(arg) && !boundNegated.contains(arg)) {
+				addedConditions.add(StateSpec.getInstance().createTypeCond(
+						unboundNegated.get(arg), arg));
+				indexedUnbounds.put(arg, index++);
+				boundNegated.add(arg);
+			}
+			if (indexedUnbounds.get(arg).size() > 1 && arg.isUnboundVariable()) {
+				RelationalArgument boundVariable = RelationalArgument
+						.createBoundVariable(normalisedIndex[1]++);
+				// Swap the unbound args for bound args
+				for (Integer condIndex : indexedUnbounds.get(arg)) {
+					addedConditions.get(condIndex).replaceArguments(arg,
+							boundVariable, true);
+				}
+			}
 		}
 
 		if (ruleAction_ != null) {
 			ruleAction_.replaceArguments(normalisationMap, true, true);
-			addedConditions.addAll(StateSpec.getInstance().createTypeConds(
-					ruleAction_));
 		}
 
 		ruleConditions_.clear();
@@ -429,98 +549,6 @@ public class RelationalRule implements Serializable,
 		Integer newHash = hashCode();
 		if (!newHash.equals(oldHash))
 			statesSeen_ = 0;
-	}
-
-	/**
-	 * Creates the inequals tests from the terms given. Note anonymous terms are
-	 * special in that they aren't inequal to one-another.
-	 * 
-	 * @param ruleConditions
-	 *            The current conditions for the rule.
-	 * @param variableTerms
-	 *            The variable terms in the rule.
-	 * @param constantTerms
-	 *            The constant terms in the rule.
-	 */
-	private void addInequalityTests(List<RelationalPredicate> ruleConditions,
-			Collection<RelationalArgument> constantTerms) {
-		List<RelationalArgument> variableTerms = new ArrayList<RelationalArgument>();
-		int lastVars = 0;
-		int ruleConditionIndex = 0;
-		for (Object condObj : ruleConditions.toArray()) {
-			RelationalPredicate cond = (RelationalPredicate) condObj;
-			RelationalArgument[] condArgs = cond.getRelationalArguments();
-			String[] argTypes = cond.getArgTypes();
-			for (int i = 0; i < condArgs.length; i++) {
-				// Is an unseen variable (but not a numerical variable)
-				if (condArgs[i].isVariable()
-						&& !StateSpec.isNumberType(argTypes[i])
-						&& !variableTerms.contains(condArgs[i]))
-					variableTerms.add(condArgs[i]);
-			}
-
-			int numTerms = variableTerms.size();
-			if (numTerms > lastVars && numTerms + constantTerms.size() >= 2) {
-				StringBuffer buffer = new StringBuffer("(<>");
-				// (Potentially) Create an inequality test
-				RelationalArgument varTermA = null;
-				boolean isValid = false;
-				for (ListIterator<RelationalArgument> varIter = variableTerms
-						.listIterator(numTerms); varIter.hasPrevious();) {
-					RelationalArgument varTerm = varIter.previous();
-					if (varTermA == null) {
-						// First term
-						varTermA = varTerm;
-						buffer.append(" " + varTermA);
-					} else if (!varTermA.isUnboundVariable()
-							|| !varTerm.isUnboundVariable()) {
-						isValid = true;
-						buffer.append(" " + varTerm);
-					}
-				}
-
-				// Adding constant terms
-				for (RelationalArgument constant : constantTerms) {
-					isValid = true;
-					buffer.append(" " + constant);
-				}
-
-				if (isValid) {
-					buffer.append(")");
-					RelationalPredicate inequality = new RelationalPredicate(
-							StateSpec.TEST_DEFINITION,
-							new String[] { buffer.toString() });
-					ruleConditionIndex++;
-					ruleConditions.add(ruleConditionIndex, inequality);
-				}
-			}
-			lastVars = numTerms;
-			ruleConditionIndex++;
-		}
-	}
-
-	/**
-	 * Initialises the variable normalisation map with the action terms, so the
-	 * fundamental structure of the rule doesn't change.
-	 * 
-	 * @return The normalisation map, containing any variable action terms.
-	 */
-	private Map<RelationalArgument, RelationalArgument> initialiseNormalisationMap() {
-		if (ruleAction_ == null)
-			return null;
-
-		Map<RelationalArgument, RelationalArgument> normalisationMap = new HashMap<RelationalArgument, RelationalArgument>();
-		RelationalArgument[] actionArgs = ruleAction_.getRelationalArguments();
-		for (int i = 0; i < actionArgs.length; i++) {
-			if (actionArgs[i].isVariable()) {
-				if (actionArgs[i].isGoalCondition())
-					normalisationMap.put(actionArgs[i], actionArgs[i]);
-				else if (!normalisationMap.containsKey(actionArgs[i]))
-					normalisationMap.put(actionArgs[i],
-							RelationalArgument.createVariableTermArg(i));
-			}
-		}
-		return normalisationMap;
 	}
 
 	public RelationalPredicate getAction() {
@@ -567,10 +595,6 @@ public class RelationalRule implements Serializable,
 			return conds;
 		}
 		return new ArrayList<RelationalPredicate>(ruleConditions_);
-	}
-
-	public Collection<SpecificGoalCondition> getSpecificSubGoals() {
-		return constantCondition_;
 	}
 
 	public Collection<GeneralGoalCondition>[] getGeneralisedConditions() {
@@ -632,8 +656,37 @@ public class RelationalRule implements Serializable,
 		return slot_;
 	}
 
+	public Collection<SpecificGoalCondition> getSpecificSubGoals() {
+		return constantCondition_;
+	}
+
 	public String getStringConditions() {
 		return StateSpec.conditionsToString(ruleConditions_);
+	}
+
+	/**
+	 * Gets the unbound type conditions present in the rule. These allow
+	 * guidance towards anonymous variable specialisation.
+	 * 
+	 * @return A map of unbound variables to type predicate names.
+	 */
+	public MultiMap<RelationalArgument, String> getUnboundTypeConditions() {
+		if (unboundTypeMap_ != null)
+			return unboundTypeMap_;
+
+		// Initialise the type map.
+		unboundTypeMap_ = MultiMap.createSortedSetMultiMap();
+		for (RelationalPredicate condition : ruleConditions_) {
+			// Only note types
+			if (StateSpec.getInstance()
+					.isTypePredicate(condition.getFactName())) {
+				// Only types of unbound variables
+				RelationalArgument arg = condition.getRelationalArguments()[0];
+				if (arg.isFreeVariable())
+					unboundTypeMap_.put(arg, condition.getFactName());
+			}
+		}
+		return unboundTypeMap_;
 	}
 
 	public int getUses() {
@@ -801,46 +854,22 @@ public class RelationalRule implements Serializable,
 	 * 
 	 * @param conditions
 	 *            The conditions for the guided rule.
-	 * @param removeUnnecessaryFacts
-	 *            If, during the setting process, facts not containing any of
-	 *            the action terms should be removed.
 	 * @return True if the newly set conditions are different from the old.
 	 */
-	public boolean setConditions(List<RelationalPredicate> conditions,
-			boolean removeUnnecessaryFacts) {
+	public boolean setConditions(Collection<RelationalPredicate> conditions) {
 		// If the conditions are the same, return true.
 		if (conditions.equals(ruleConditions_)) {
 			return false;
 		}
 
-		// Instead, introduce method (remove unnecessary conditions).
-		if (removeUnnecessaryFacts)
-			removeUnnecessaryFacts(conditions);
-
 		// Reset the states seen, as the rule has changed.
 		hasSpawned_ = null;
-		ruleConditions_ = conditions;
+		ruleConditions_ = (conditions instanceof List) ? (List<RelationalPredicate>) conditions
+				: new ArrayList<RelationalPredicate>(conditions);
 		ruleUses_ = 0;
 		statesSeen_ = 0;
 		findConstantsAndRanges();
 		return true;
-	}
-
-	/**
-	 * Sets this rule as a mutant and adds the parent rule.
-	 * 
-	 * @param parent
-	 *            The parent rule to add.
-	 */
-	private void setMutant(RelationalRule parent) {
-		if (mutantParents_ == null) {
-			mutantParents_ = new ArrayList<RelationalRule>();
-			ancestryCount_ = parent.ancestryCount_ + 1;
-		}
-		mutant_ = true;
-		mutantParents_.add(parent);
-		if (parent.ancestryCount_ < ancestryCount_ - 1)
-			ancestryCount_ = parent.ancestryCount_ + 1;
 	}
 
 	/**
@@ -852,7 +881,7 @@ public class RelationalRule implements Serializable,
 	 */
 	@Override
 	public void setParameters(BidiMap parameterMap) {
-		if (parameterMap == null) {
+		if (parameterMap == null || parameterMap.isEmpty()) {
 			parameters_ = null;
 			return;
 		}
@@ -916,6 +945,28 @@ public class RelationalRule implements Serializable,
 		hasSpawned_ = preGoalHash;
 	}
 
+	@Override
+	public boolean shouldRegenerate() {
+		// Never regenerate.
+		return false;
+	}
+
+	@Override
+	public int size() {
+		return 1;
+	}
+
+	/**
+	 * Outputs the rule in a simplified, but essentially equivalent (assuming
+	 * inequality and type definitions) format.
+	 * 
+	 * @return A nice, shortened version of the rule.
+	 */
+	@Override
+	public String toNiceString() {
+		return toNiceString(null);
+	}
+
 	/**
 	 * Outputs the rule in a simplified, but essentially equivalent (assuming
 	 * inequality and type definitions) format. Includes a replacement map to
@@ -967,17 +1018,6 @@ public class RelationalRule implements Serializable,
 		return niceString.toString();
 	}
 
-	/**
-	 * Outputs the rule in a simplified, but essentially equivalent (assuming
-	 * inequality and type definitions) format.
-	 * 
-	 * @return A nice, shortened version of the rule.
-	 */
-	@Override
-	public String toNiceString() {
-		return toNiceString(null);
-	}
-
 	@Override
 	public String toString() {
 		return getStringConditions() + " => " + ruleAction_;
@@ -1025,41 +1065,5 @@ public class RelationalRule implements Serializable,
 			conds.add(cond);
 		}
 		return conds;
-	}
-
-	@Override
-	public boolean shouldRegenerate() {
-		// Never regenerate.
-		return false;
-	}
-
-	@Override
-	public int size() {
-		return 1;
-	}
-
-	/**
-	 * Gets the unbound type conditions present in the rule. These allow
-	 * guidance towards anonymous variable specialisation.
-	 * 
-	 * @return A map of unbound variables to type predicate names.
-	 */
-	public MultiMap<RelationalArgument, String> getUnboundTypeConditions() {
-		if (unboundTypeMap_ != null)
-			return unboundTypeMap_;
-
-		// Initialise the type map.
-		unboundTypeMap_ = MultiMap.createSortedSetMultiMap();
-		for (RelationalPredicate condition : ruleConditions_) {
-			// Only note types
-			if (StateSpec.getInstance()
-					.isTypePredicate(condition.getFactName())) {
-				// Only types of unbound variables
-				RelationalArgument arg = condition.getRelationalArguments()[0];
-				if (arg.isUnboundVariable())
-					unboundTypeMap_.put(arg, condition.getFactName());
-			}
-		}
-		return unboundTypeMap_;
 	}
 }

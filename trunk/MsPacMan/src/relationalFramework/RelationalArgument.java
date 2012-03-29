@@ -41,8 +41,9 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public static final RelationalArgument ANONYMOUS = new RelationalArgument(
 			"?");
 	/** Variable extension for unbound variables. Test purposes. */
-	private static final String UNBOUND_EXTENSION = "_Unb";
-
+	private static final String UNBOUND_PREFIX = "?Unb_";
+	/** Variable extension for bound variables. Test purposes. */
+	private static final String BOUND_PREFIX = "?Bnd_";
 	/** Defines the arg type. */
 	private ArgType argType_;
 
@@ -60,7 +61,9 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	/** The argument represented by this arg. */
 	private String stringArg_;
 
-	/** If this variable argument is unbound (anonymous equivalent). */
+	/** If this variable argument is a free variable (non-action). */
+	private boolean freeVariable_ = false;
+	/** If this variable is unbound (anonymous equivalent). */
 	private boolean unboundVariable_ = false;
 
 	/**
@@ -117,16 +120,17 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		if (stringArg_.charAt(0) == '?') {
 			if (stringArg_.length() == 1) {
 				argType_ = ArgType.ANON;
+				freeVariable_ = true;
 				unboundVariable_ = true;
 			} else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
 				argType_ = ArgType.CONST;
 			else {
 				argType_ = ArgType.VAR;
-				if (stringArg_.endsWith(UNBOUND_EXTENSION)) {
+				if (stringArg_.startsWith(UNBOUND_PREFIX)) {
+					freeVariable_ = true;
 					unboundVariable_ = true;
-					stringArg_ = stringArg_.substring(0,
-							stringArg_.indexOf(UNBOUND_EXTENSION));
-				}
+				} else if (stringArg_.startsWith(BOUND_PREFIX))
+					freeVariable_ = true;
 			}
 		} else {
 			argType_ = ArgType.CONST;
@@ -152,10 +156,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		rangeBounds_[1] = new RangeBound(maxBound);
 		rangeFrac_[0] = 0;
 		rangeFrac_[1] = 1;
-		if (minBound == maxBound)
-			argType_ = ArgType.NUMBER_CONST;
-		else
-			argType_ = ArgType.NUMBER_RANGE;
+		argType_ = ArgType.NUMBER_RANGE;
 	}
 
 	/**
@@ -183,10 +184,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		rangeBounds_[1] = maxBound;
 		rangeFrac_[0] = Math.max(0, minFrac);
 		rangeFrac_[1] = Math.min(1, maxFrac);
-		if (minFrac == maxFrac && minBound == maxBound)
-			argType_ = ArgType.NUMBER_CONST;
-		else
-			argType_ = ArgType.NUMBER_RANGE;
+		argType_ = ArgType.NUMBER_RANGE;
 	}
 
 	/**
@@ -200,6 +198,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				rangeBounds_[0], rangeFrac_[0], rangeBounds_[1], rangeFrac_[1],
 				rangeContext_);
 		relArg.argType_ = argType_;
+		relArg.freeVariable_ = freeVariable_;
 		relArg.unboundVariable_ = unboundVariable_;
 		return relArg;
 	}
@@ -352,8 +351,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			}
 			return toString();
 		}
-		if (unboundVariable_ && argType_ != ArgType.ANON)
-			return stringArg_ + UNBOUND_EXTENSION;
 		return stringArg_;
 	}
 
@@ -370,8 +367,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 					+ " " + rangeBounds_[1] + " " + rangeFrac_[1] + ")";
 		}
 
-		if (unboundVariable_ && argType_ != ArgType.ANON)
-			return stringArg_ + UNBOUND_EXTENSION;
 		return stringArg_;
 	}
 
@@ -381,8 +376,29 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public void setAsUnboundVariable() {
 		if (argType_ != ArgType.VAR)
 			throw new IllegalAccessError(this
-					+ " is not a variable. Cannot be set as unbound!");
+					+ " is not a variable. Cannot be set as bound!");
+		freeVariable_ = true;
 		unboundVariable_ = true;
+	}
+
+	/**
+	 * Sets this relational argument as a bound variable.
+	 */
+	public void setAsBoundVariable() {
+		if (argType_ != ArgType.VAR)
+			throw new IllegalAccessError(this
+					+ " is not a variable. Cannot be set as unbound!");
+		freeVariable_ = true;
+		unboundVariable_ = false;
+	}
+
+	/**
+	 * If this argument is a free variable.
+	 * 
+	 * @return True if this argument is a free variable.
+	 */
+	public boolean isFreeVariable() {
+		return unboundVariable_ || freeVariable_;
 	}
 
 	/**
@@ -394,8 +410,21 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return unboundVariable_;
 	}
 
+	/**
+	 * If this argument is a bound free variable.
+	 * 
+	 * @return True if this argument is a bound free variable.
+	 */
+	public boolean isBoundVariable() {
+		return !unboundVariable_ && freeVariable_;
+	}
+
 	public boolean isGoalCondition() {
 		return isGoalCondition(stringArg_);
+	}
+
+	public boolean isRangeVariable() {
+		return isRangeVariable(stringArg_);
 	}
 
 	/**
@@ -427,6 +456,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return arg.startsWith(GOAL_VARIABLE_PREFIX);
 	}
 
+	public static boolean isRangeVariable(String arg) {
+		return arg.startsWith(RANGE_VARIABLE_PREFIX);
+	}
+
 	/**
 	 * Creates an unbound variable (equivalent to an anon variable).
 	 * 
@@ -436,10 +469,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 *            A provided index for the unbound variables.
 	 * @return An unbound variable (locally to this predicate, anyway).
 	 */
-	public static RelationalArgument createUnboundVariable(int i,
-			int unboundStart) {
-		RelationalArgument unbound = RelationalArgument.createVariableTermArg(i
-				+ unboundStart);
+	public static RelationalArgument createUnboundVariable(int i) {
+		RelationalArgument unbound = new RelationalArgument(UNBOUND_PREFIX + i);
 		unbound.setAsUnboundVariable();
 		return unbound;
 	}
@@ -449,10 +480,14 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * 
 	 * @param i
 	 *            The number of existing unbound variables already.
+	 * @param unboundStart
+	 *            A provided index for the unbound variables.
 	 * @return An unbound variable (locally to this predicate, anyway).
 	 */
-	public static RelationalArgument createUnboundVariable(int i) {
-		return createUnboundVariable(i, 0);
+	public static RelationalArgument createBoundVariable(int i) {
+		RelationalArgument bound = new RelationalArgument(BOUND_PREFIX + i);
+		bound.setAsBoundVariable();
+		return bound;
 	}
 
 	/**

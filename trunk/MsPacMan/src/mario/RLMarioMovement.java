@@ -1261,6 +1261,7 @@ public class RLMarioMovement {
 		}
 
 		// If the selected action isn't null, reset the previous bool action.
+		Arrays.fill(prevBoolAction_, false);
 		if (!selectedActions.isEmpty())
 			prevBoolAction_ = selectedActions.get(RRLExperiment.random_
 					.nextInt(selectedActions.size()));

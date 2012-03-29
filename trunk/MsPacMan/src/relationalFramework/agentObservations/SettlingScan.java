@@ -47,7 +47,7 @@ public abstract class SettlingScan {
 			return true;
 		}
 
-		lastCover_++; // TODO This will be called multiple times.
+		lastCover_++;
 		return false;
 	}
 

@@ -2,12 +2,14 @@ package cerrla;
 
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
+import util.MultiMap;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.PriorityQueue;
-
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
@@ -46,25 +48,33 @@ public class Unification {
 	 * @param replacementMap
 	 *            The replacement map for the new state.
 	 * @param recordUnunified
-	 *            If the ununified facts should also be recorded.
-	 * @param noChangeOnly
+	 *            If the un-unified facts should also be recorded.
+	 * @param fullUnifyOnly
+	 *            Only change the new state if the old state didn't change.
 	 * @return 1 if the state unified and changed, 0 if unified without change,
 	 *         -1 if couldn't unify.
 	 */
-	@SuppressWarnings("unchecked")
-	private int aStarUnify(Collection<RelationalPredicate> oldState,
+	private List<UnifiedFact> bestFirstUnify(
+			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState,
 			RelationalArgument[] oldTerms, BidiMap replacementMap,
-			boolean recordUnunified, boolean noChangeOnly) {
-		if (newState.isEmpty())
-			return NO_CHANGE;
+			boolean recordUnunified, boolean fullUnifyOnly) {
+		// Pre-unify and sort the state for more efficient unification
+		List<UnifiedFact> unified = new ArrayList<UnifiedFact>();
+		Collection<RelationalPredicate> dropped = new HashSet<RelationalPredicate>();
+		List<RelationalPredicate> sortedOldState = preUnifyAndSort(oldState,
+				newState, oldTerms, replacementMap, unified, dropped);
+		boolean changed = false;
+		if (sortedOldState.size() != oldState.size())
+			changed = true;
 
 		int id = 0;
+
 		// Define the initial case.
-		UnificationCase initialCase = new UnificationCase(oldState, newState,
-				new RelationalArgument[0], replacementMap, 0, id++);
-		PriorityQueue<UnificationCase> pendingUnifications = new PriorityQueue<UnificationCase>(
-				newState.size() * 2);
+		UnificationCase initialCase = new UnificationCase(sortedOldState,
+				newState, unified, dropped, oldTerms, replacementMap, 0,
+				changed, rangeIndex_, id++);
+		PriorityQueue<UnificationCase> pendingUnifications = new PriorityQueue<UnificationCase>();
 		pendingUnifications.add(initialCase);
 
 		// Continue to unify until a state (the best unified state) is fully
@@ -72,11 +82,11 @@ public class Unification {
 		while (!pendingUnifications.isEmpty()) {
 			// Get the current information
 			UnificationCase currentUnification = pendingUnifications.poll();
-			Collection<RelationalPredicate> currentOldState = currentUnification
+			List<RelationalPredicate> currentOldState = currentUnification
 					.getOldState();
 			Collection<RelationalPredicate> currentNewState = currentUnification
 					.getNewState();
-			Collection<RelationalPredicate> unifiedOldState = currentUnification
+			List<UnifiedFact> unifiedOldState = currentUnification
 					.getUnifiedOldState();
 			Collection<RelationalPredicate> droppedOldFacts = currentUnification
 					.getDroppedOldFacts();
@@ -86,62 +96,30 @@ public class Unification {
 					.getActionArgs();
 			int currentGeneralisation = currentUnification
 					.getGeneralisationValue();
-			boolean changed = currentUnification.isChanged();
+			changed = currentUnification.isChanged();
+			rangeIndex_ = currentUnification.getRangeIndex();
+
 
 			// Breaking condition - no facts left
 			if (currentOldState.isEmpty()) {
-				// If the best unification couldn't unify, return false
-				if (unifiedOldState.isEmpty())
-					return CANNOT_UNIFY;
-
-				// Change the parameter values.
-				oldState.clear();
-				oldState.addAll(unifiedOldState);
-
-				// Change the new state only if flags are enabled.
-				if (recordUnunified && (!changed || !noChangeOnly)) {
-					newState.clear();
-					newState.addAll(currentNewState);
-					newState.addAll(droppedOldFacts);
-				}
-
-				if (!Arrays.equals(currentActionTerms, oldTerms))
-					System.arraycopy(currentActionTerms, 0, oldTerms, 0,
-							currentActionTerms.length);
-				replacementMap.putAll(currentReplacementMap);
-				if (changed)
-					return UNIFIED_CHANGE;
-				else
-					return NO_CHANGE;
+				return unifiedOldState;
 			}
 
-			// Grab the first fact from the old state
+			// Grab the first fact from the old state, or a pending fact
 			RelationalPredicate oldStateFact = currentOldState.iterator()
 					.next();
 			Collection<UnifiedFact> modFacts = unifyFactToState(oldStateFact,
 					currentNewState, currentReplacementMap, currentActionTerms,
 					true);
 
-			// Simplest case: don't unify the fact
-			Collection<RelationalPredicate> reducedOldState = new HashSet<RelationalPredicate>(
-					currentOldState);
-			reducedOldState.remove(oldStateFact);
-			Collection<RelationalPredicate> largerDroppedOldFacts = new HashSet<RelationalPredicate>(
-					droppedOldFacts);
-			largerDroppedOldFacts.add(oldStateFact);
-
-			// Create an ununified case
-			UnificationCase noUnifyCase = new UnificationCase(reducedOldState,
-					currentNewState, unifiedOldState, largerDroppedOldFacts,
-					currentActionTerms, currentReplacementMap,
-					currentGeneralisation + NO_FACT_UNIFY, true, id++);
-			pendingUnifications.add(noUnifyCase);
-
 			// If there was a unification(s) explore them
-			if (!modFacts.isEmpty()) {
+			boolean createNonUnification = false;
+			if (modFacts.isEmpty())
+				createNonUnification = true;
+			else {
 				// Recursively step into each fact unification path
 				for (UnifiedFact modFact : modFacts) {
-					reducedOldState = new HashSet<RelationalPredicate>(
+					List<RelationalPredicate> reducedOldState = new ArrayList<RelationalPredicate>(
 							currentOldState);
 					reducedOldState.remove(oldStateFact);
 					Collection<RelationalPredicate> reducedNewState = new HashSet<RelationalPredicate>(
@@ -152,10 +130,12 @@ public class Unification {
 							.getFactTerms();
 					BidiMap recursiveReplacements = modFact
 							.getResultReplacements();
+					createNonUnification |= !recursiveReplacements
+							.equals(currentReplacementMap);
 
-					Collection<RelationalPredicate> largerUnifiedOldState = new HashSet<RelationalPredicate>(
+					List<UnifiedFact> largerUnifiedOldState = new ArrayList<UnifiedFact>(
 							unifiedOldState);
-					largerUnifiedOldState.add(modFact.getResultFact());
+					largerUnifiedOldState.add(modFact);
 
 					// Create a unified case.
 					UnificationCase unifiedCase = new UnificationCase(
@@ -168,12 +148,30 @@ public class Unification {
 							currentGeneralisation + modFact.getGeneralisation(),
 							changed
 									|| !modFact.getResultFact().equals(
-											oldStateFact), id++);
+											oldStateFact), rangeIndex_, id++);
 					pendingUnifications.add(unifiedCase);
 				}
 			}
+
+			// The non-unification case
+			if (createNonUnification) {
+				List<RelationalPredicate> reducedOldState = new ArrayList<RelationalPredicate>(
+						currentOldState);
+				reducedOldState.remove(oldStateFact);
+				Collection<RelationalPredicate> largerDroppedOldFacts = new HashSet<RelationalPredicate>(
+						droppedOldFacts);
+				largerDroppedOldFacts.add(oldStateFact);
+
+				// Create an ununified case
+				UnificationCase noUnifyCase = new UnificationCase(
+						reducedOldState, currentNewState, unifiedOldState,
+						largerDroppedOldFacts, currentActionTerms,
+						currentReplacementMap, currentGeneralisation
+								+ NO_FACT_UNIFY, true, rangeIndex_, id++);
+				pendingUnifications.add(noUnifyCase);
+			}
 		}
-		return CANNOT_UNIFY;
+		return null;
 	}
 
 	/**
@@ -236,6 +234,81 @@ public class Unification {
 	}
 
 	/**
+	 * Pre-unifies the old state, finds out the approximate amount of splitting
+	 * each fact has, then returns a sorted list such that proper unification is
+	 * more efficient.
+	 * 
+	 * @param oldState
+	 *            The old state.
+	 * @param newState
+	 *            The new state.
+	 * @param oldTerms
+	 *            The action terms.
+	 * @param replacementMap
+	 *            The original replacement map.
+	 * @param unified
+	 *            The set of unified facts to fill.
+	 * @param dropped
+	 *            The facts that have been dropped.
+	 * @return A sorted list of the old state.
+	 */
+	private List<RelationalPredicate> preUnifyAndSort(
+			Collection<RelationalPredicate> oldState,
+			Collection<RelationalPredicate> newState,
+			RelationalArgument[] oldTerms, BidiMap replacementMap,
+			List<UnifiedFact> unified, Collection<RelationalPredicate> dropped) {
+		MultiMap<Integer, RelationalPredicate> complexityMap = MultiMap
+				.createListMultiMap();
+
+		// Perform basic unification
+		int maxComplexity = 0;
+		for (RelationalPredicate oldStateFact : oldState) {
+			int beforeRangeIndex = rangeIndex_;
+			Collection<UnifiedFact> unifiedFacts = unifyFactToState(
+					oldStateFact, newState, replacementMap, oldTerms, true);
+
+			// If only one fact can unify.
+			int numUnifiedFacts = unifiedFacts.size();
+			if (numUnifiedFacts == 0) {
+				dropped.add(oldStateFact);
+			} else if (numUnifiedFacts == 1) {
+				// If it required replacements, store as complexity 1.
+				if (!unifiedFacts.iterator().next().getResultReplacements()
+						.equals(replacementMap)) {
+					complexityMap.put(1, oldStateFact);
+					maxComplexity = Math.max(maxComplexity, 1);
+				} else {
+					// Unify the fact here and now.
+					UnifiedFact unifact = unifiedFacts.iterator().next();
+					unified.add(unifact);
+					newState.remove(unifact);
+					if (oldStateFact.isNumerical())
+						beforeRangeIndex = rangeIndex_;
+				}
+			} else if (numUnifiedFacts > 1) {
+				// If there are N > 1 unified facts, return complexity N
+				complexityMap.put(numUnifiedFacts, oldStateFact);
+				maxComplexity = Math.max(maxComplexity, numUnifiedFacts);
+			}
+			rangeIndex_ = beforeRangeIndex;
+		}
+
+		// Place preds back into a single collection in 'sorted' order
+		List<RelationalPredicate> sortedOldState = new ArrayList<RelationalPredicate>(
+				oldState.size());
+		int complexity = 0;
+		while (complexity <= maxComplexity) {
+			Collection<RelationalPredicate> facts = complexityMap
+					.get(complexity);
+			if (facts != null)
+				sortedOldState.addAll(facts);
+			complexity++;
+		}
+
+		return sortedOldState;
+	}
+
+	/**
 	 * Checks if a fact unifies with another fact.
 	 * 
 	 * @param fact
@@ -295,23 +368,23 @@ public class Unification {
 					return null;
 				}
 
-				// If the fact and unity term are the same, great! So far,
-				// so good
-				if (factTerm.equals(unityTerm)) {
-					unification[i] = factTerm;
-					validFact = true;
-				} else if (factArguments[i].isNumber()
-						&& unityArguments[i].isNumber()) {
+				// First case: check numerical
+				if (factArguments[i].isNumber() && unityArguments[i].isNumber()) {
 					// We have two numerical terms: unify them into a range
 					// if necessary.
 					unification[i] = unifyRange(factArguments[i],
 							unityArguments[i], newActionTerms);
-				} else if (factTerm.isUnboundVariable()
-						&& unityTerm.isUnboundVariable()) {
+				} else if (factTerm.equals(unityTerm)) {
+					// If the fact and unity term are the same, great! So far,
+					// so good
+					unification[i] = factTerm;
+					validFact = true;
+				} else if (unityTerm.isUnboundVariable() && !fact.isNegated()) {
 					// If the fact term and unity term are unbound variables
 					// (and one of them is anonymous)
 					unification[i] = RelationalArgument.ANONYMOUS;
-					thisGeneralness++;
+					if (!factArguments[i].equals(RelationalArgument.ANONYMOUS))
+						thisGeneralness++;
 				} else {
 					// Break if the terms differ and cannot be unified
 					// through replacement.
@@ -328,11 +401,9 @@ public class Unification {
 						unification, fact.isNegated());
 				if (unityReplacementMap != null) {
 					tempUnityReplacementMap.putAll(unityReplacementMap);
-					// thisGeneralness +=
-					// tempUnityReplacementMap.size();
 				}
-				UnifiedFact unifiedFact = new UnifiedFact(unifact,
-						newActionTerms, unityFact, tempUnityReplacementMap,
+				UnifiedFact unifiedFact = new UnifiedFact(fact, unityFact,
+						newActionTerms, tempUnityReplacementMap, unifact,
 						thisGeneralness);
 				return unifiedFact;
 			}
@@ -342,6 +413,67 @@ public class Unification {
 
 	public void resetRangeIndex() {
 		rangeIndex_ = 0;
+	}
+
+	/**
+	 * Unifies two states together, with the resultant unification in oldState
+	 * and any un-unified terms in newState. The oldTerms are also modified.
+	 * 
+	 * @param oldState
+	 *            The old state to unify with and return unified.
+	 * @param newState
+	 *            The new state to unify together and also represent the
+	 *            ununified terms.
+	 * @param replacementMap
+	 *            The replacement map to fill with {@link RelationalArgument}s.
+	 * @param oldTerms
+	 *            The old terms to change.
+	 * @return -1 if the states cannot unify, 0 if there is no change to
+	 *         oldState, 1 if they unified but the old state was changed. In the
+	 *         two latter cases, the replacement map will contain replacement
+	 *         terms.
+	 */
+	@SuppressWarnings("unchecked")
+	public int rlggUnification(Collection<RelationalPredicate> oldState,
+			Collection<RelationalPredicate> newState, BidiMap replacementMap,
+			RelationalArgument[] oldTerms) {
+		if (oldState.isEmpty() || newState.isEmpty())
+			return NO_CHANGE;
+
+		// Unify the states
+		List<UnifiedFact> unified = bestFirstUnify(oldState, newState,
+				oldTerms, replacementMap, true, false);
+
+		if (unified.isEmpty())
+			return CANNOT_UNIFY;
+
+		// Change the parameter values.
+		boolean changed = false;
+		int oldStateSize = oldState.size();
+		oldState.clear();
+		newState.addAll(oldState);
+		UnifiedFact lastFact = null;
+		for (UnifiedFact unifact : unified) {
+			RelationalPredicate oldFact = unifact.getBaseFact();
+			RelationalPredicate resultFact = unifact.getResultFact();
+			changed |= !oldFact.equals(resultFact);
+
+			// Modify the states
+			oldState.add(resultFact);
+			newState.remove(unifact.getBaseFact());
+			newState.remove(unifact.getUnityFact());
+			lastFact = unifact;
+		}
+		changed |= oldStateSize != oldState.size();
+
+		RelationalArgument[] unifiedTerms = lastFact.getFactTerms();
+		if (!Arrays.equals(unifiedTerms, oldTerms))
+			System.arraycopy(unifiedTerms, 0, oldTerms, 0, unifiedTerms.length);
+		replacementMap.putAll(lastFact.getResultReplacements());
+		if (changed)
+			return UNIFIED_CHANGE;
+		else
+			return NO_CHANGE;
 	}
 
 	/**
@@ -413,19 +545,22 @@ public class Unification {
 		double[] unityBounds = unifiedValue.getExplicitRange();
 		double min = Math.min(baseBounds[0], unityBounds[0]);
 		double max = Math.max(baseBounds[1], unityBounds[0]);
-		if (min == max || min == baseBounds[0] && max == baseBounds[1]) {
-			return baseValue;
-		}
 
 		String variable = baseValue.getStringArg();
 		// If the fact isn't a variable yet, change the action terms.
-		if (!baseValue.isVariable()) {
-			variable = RelationalArgument.RANGE_VARIABLE_PREFIX + rangeIndex_++;
-			// Changing the action terms
-			if (actionTerms != null) {
-				for (int i = 0; i < actionTerms.length; i++)
-					if (actionTerms[i].equals(baseValue))
-						actionTerms[i] = new RelationalArgument(variable);
+		if (!baseValue.isRange()) {
+			// If the unity value is a range, use that.
+			if (unifiedValue.isRange())
+				variable = unifiedValue.getStringArg();
+			else {
+				variable = RelationalArgument.RANGE_VARIABLE_PREFIX
+						+ rangeIndex_++;
+				// Changing the action terms
+				if (actionTerms != null) {
+					for (int i = 0; i < actionTerms.length; i++)
+						if (actionTerms[i].equals(baseValue))
+							actionTerms[i] = new RelationalArgument(variable);
+				}
 			}
 		}
 
@@ -451,37 +586,11 @@ public class Unification {
 	 *         two latter cases, the replacement map will contain replacement
 	 *         terms.
 	 */
-	public int unifyStates(Collection<RelationalPredicate> oldState,
-			Collection<RelationalPredicate> newState, BidiMap replacementMap) {
-		return aStarUnify(oldState, newState, new RelationalArgument[0],
-				replacementMap, false, false);
-	}
-
-	/**
-	 * Unifies two states together, with the resultant unification in oldState
-	 * and any un-unified terms in newState.
-	 * 
-	 * @param oldState
-	 *            The old state to unify with and return unified.
-	 * @param newState
-	 *            The new state to unify together and also represent the
-	 *            ununified terms.
-	 * @param replacementMap
-	 *            The replacement map to fill with {@link RelationalArgument}s.
-	 * @param noChangeOnly
-	 *            Only change the new state if the old state unified without
-	 *            change.
-	 * @return -1 if the states cannot unify, 0 if there is no change to
-	 *         oldState, 1 if they unified but the old state was changed. In the
-	 *         two latter cases, the replacement map will contain replacement
-	 *         terms.
-	 */
-	public int unifyStatesWithUnunified(
+	public List<UnifiedFact> unifyStates(
 			Collection<RelationalPredicate> oldState,
-			Collection<RelationalPredicate> newState, BidiMap replacementMap,
-			boolean noChangeOnly) {
-		return aStarUnify(oldState, newState, new RelationalArgument[0],
-				replacementMap, true, noChangeOnly);
+			Collection<RelationalPredicate> newState, BidiMap replacementMap) {
+		return bestFirstUnify(oldState, newState, new RelationalArgument[0],
+				replacementMap, false, false);
 	}
 
 	public static Unification getInstance() {
@@ -510,12 +619,14 @@ public class Unification {
 		private int generalisationValue_;
 		/** A unique ID per unification case. */
 		private int id_;
+		/** The local unification range index. */
+		private int localUnificationIndex_;
 		/** The new state yet to unify. */
 		private Collection<RelationalPredicate> newState_;
 		/** The old state yet to unify. */
-		private Collection<RelationalPredicate> oldState_;
+		private List<RelationalPredicate> oldState_;
 		/** The old state that has been unified. */
-		private Collection<RelationalPredicate> unifiedOldState_;
+		private List<UnifiedFact> unifiedOldState_;
 
 		/**
 		 * A more advanced case where there is some unification.
@@ -528,6 +639,8 @@ public class Unification {
 		 *            The old state that has been unified.
 		 * @param droppedOldFacts
 		 *            Any facts dropped (not unified) from the old state so far.
+		 * @param untestedMap
+		 *            The untested predicates map.
 		 * @param actionArguments
 		 *            The action arguments (if any).
 		 * @param replacementMap
@@ -535,15 +648,19 @@ public class Unification {
 		 * @param generalisation
 		 *            The level of generalisation that has occured through
 		 *            unifications so far. 0 is the minimum.
+		 * @param changed
+		 *            If there is a change in the unified state.
+		 * @param rangeIndex
+		 *            The current index of the range index.
 		 * @param id
 		 *            The unique ID assigned to this unification case.
 		 */
-		public UnificationCase(Collection<RelationalPredicate> oldState,
+		public UnificationCase(List<RelationalPredicate> oldState,
 				Collection<RelationalPredicate> newState,
-				Collection<RelationalPredicate> unifiedOldState,
+				List<UnifiedFact> unifiedOldState,
 				Collection<RelationalPredicate> droppedOldFacts,
 				RelationalArgument[] actionArguments, BidiMap replacementMap,
-				int generalisation, boolean changed, int id) {
+				int generalisation, boolean changed, int rangeIndex, int id) {
 			oldState_ = oldState;
 			newState_ = newState;
 			unifiedOldState_ = unifiedOldState;
@@ -551,48 +668,34 @@ public class Unification {
 			actionArgs_ = actionArguments;
 			argReplacementMap_ = replacementMap;
 			generalisationValue_ = generalisation;
+			localUnificationIndex_ = rangeIndex;
 			id_ = id;
 			changed_ = changed;
 		}
 
-		/**
-		 * Basic constructor.
-		 * 
-		 * @param oldState
-		 *            The state to modify.
-		 * @param newState
-		 *            The state to unify with.
-		 * @param actionArguments
-		 *            The action arguments (if any).
-		 * @param replacementMap
-		 *            The current argument replacement map.
-		 * @param generalisation
-		 *            The level of generalisation that has occured through
-		 *            unifications so far. 0 is the minimum.
-		 * @param id
-		 *            The unique ID assigned to this unification case.
-		 */
-		public UnificationCase(Collection<RelationalPredicate> oldState,
-				Collection<RelationalPredicate> newState,
-				RelationalArgument[] actionArguments, BidiMap replacementMap,
-				int generalisation, int id) {
-			oldState_ = oldState;
-			newState_ = newState;
-			unifiedOldState_ = new HashSet<RelationalPredicate>();
-			droppedOldFacts_ = new HashSet<RelationalPredicate>();
-			actionArgs_ = actionArguments;
-			argReplacementMap_ = replacementMap;
-			generalisationValue_ = generalisation;
-			id_ = id;
-			changed_ = false;
-		}
-
 		@Override
 		public int compareTo(UnificationCase uc) {
-			if (generalisationValue_ < uc.generalisationValue_)
-				return -1;
-			if (generalisationValue_ > uc.generalisationValue_)
-				return 1;
+			int result = Double.compare(generalisationValue_,
+					uc.generalisationValue_);
+			if (result != 0)
+				return result;
+			// Emphasize more unified cases over lesser unified
+			result = Double.compare(unifiedOldState_.size(),
+					uc.unifiedOldState_.size());
+			// Swap comparison, as bigger is better.
+			if (result != 0)
+				return -result;
+
+			// Emphasize less unification remaining
+			result = Double.compare(oldState_.size(), uc.oldState_.size());
+			if (result != 0)
+				return result;
+
+			result = Double.compare(newState_.size(), uc.newState_.size());
+			if (result != 0)
+				return result;
+
+			// Otherwise, resort to comparing ID (always returns !0)
 			return Double.compare(id_, uc.id_);
 		}
 
@@ -630,11 +733,15 @@ public class Unification {
 			return newState_;
 		}
 
-		public Collection<RelationalPredicate> getOldState() {
+		public List<RelationalPredicate> getOldState() {
 			return oldState_;
 		}
 
-		public Collection<RelationalPredicate> getUnifiedOldState() {
+		public int getRangeIndex() {
+			return localUnificationIndex_;
+		}
+
+		public List<UnifiedFact> getUnifiedOldState() {
 			return unifiedOldState_;
 		}
 
@@ -653,8 +760,8 @@ public class Unification {
 		@Override
 		public String toString() {
 			return "Unification Case (g=" + generalisationValue_
-					+ "): oldState: " + oldState_.size() + ", newState: "
-					+ newState_.size();
+					+ "): unified: " + unifiedOldState_.size() + ", oldState: "
+					+ oldState_.size() + ", newState: " + newState_.size();
 		}
 	}
 }

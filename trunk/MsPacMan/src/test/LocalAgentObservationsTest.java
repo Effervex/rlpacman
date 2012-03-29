@@ -494,7 +494,7 @@ public class LocalAgentObservationsTest {
 		// Basic rule
 		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(edible ?X)"));
-		List<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+		Collection<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
 				StateSpec.toRelationalPredicate("(blinking ?X)"), null, true);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(blinking ?X)")));
@@ -531,8 +531,8 @@ public class LocalAgentObservationsTest {
 		List<RelationalPredicate> ruleConds = new ArrayList<RelationalPredicate>();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(highest ?X)"));
-		List<RelationalPredicate> results = sut_.simplifyRule(ruleConds, null,
-				null, false);
+		Collection<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
+				null, null, false);
 		assertNotNull(results);
 		assertTrue(results.contains(StateSpec
 				.toRelationalPredicate("(highest ?X)")));

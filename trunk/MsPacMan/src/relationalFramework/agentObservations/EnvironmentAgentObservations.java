@@ -226,14 +226,18 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			return specialisations;
 
 		for (RelationalPredicate condition : variants) {
+			// Simplify defined numerical ranges into variables.
+			if (condition.isNumerical()) {
+				condition = new RelationalPredicate(condition);
+				condition.clearRanges();
+			}
+
 			// Add variant to specialisations
 			condition = simplifyCondition(condition, action, localInvariants,
 					localVariants);
 			if (condition != null && specialisations.add(condition)) {
-				// Check the negated version (only for non-types)
-				if (addNegated
-						&& !StateSpec.getInstance().isTypePredicate(
-								condition.getFactName())) {
+				// Check the negated version
+				if (addNegated) {
 					RelationalArgument[] negArgs = new RelationalArgument[condition
 							.getArgTypes().length];
 					// Special case for numerical values - negated
@@ -329,7 +333,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 							termFact);
 					int unboundOffset = replacementMap.size() - replBefore;
 					actionCond.flexibleReplaceArguments(replacementMap,
-							action.getArgTypes().length + unboundOffset);
+							unboundOffset);
 					actionConds.add(actionCond);
 
 
@@ -338,7 +342,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 						RelationalPredicate goalCond = new RelationalPredicate(
 								termFact);
 						goalCond.flexibleReplaceArguments(goalReplacements,
-								action.getArgTypes().length + unboundOffset);
+								unboundOffset);
 						if (!actionConds.contains(goalCond))
 							goalActionConds.add(goalCond);
 					}
@@ -364,6 +368,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 	public Collection<String> getGeneralInvariants() {
 		return conditionObservations_.invariants_.getGeneralInvariants();
+	}
+
+	public Collection<RelationalPredicate> getGeneralSpecialisationConditions() {
+		return conditionObservations_.getGeneralSpecialisationConditions();
 	}
 
 	/**
@@ -526,7 +534,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
 			abo.recreateRLGG_ = true;
 		}
-		conditionObservations_.generalGoalConds_ = null;
 	}
 
 	/**
@@ -699,11 +706,11 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 * @return An IntegerArray representing the structure of the fact.
 	 */
 	protected static IntegerArray determineArgState(RelationalPredicate fact) {
-		String[] args = fact.getArguments();
+		RelationalArgument[] args = fact.getRelationalArguments();
 		int[] structure = new int[args.length];
-		Map<String, Integer> seenArgs = new HashMap<String, Integer>();
+		Map<RelationalArgument, Integer> seenArgs = new HashMap<RelationalArgument, Integer>();
 		for (int i = 0; i < args.length; i++) {
-			if (!args[i].equals("?")) {
+			if (!args[i].isAnonymous()) {
 				if (!seenArgs.containsKey(args[i]))
 					seenArgs.put(args[i], seenArgs.size() + 1);
 				structure[i] = seenArgs.get(args[i]);
@@ -866,9 +873,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// If this is the first action condition, then all the actions are
 			// considered invariant.
 			if (invariantActionConditions_ == null) {
-				invariantActionConditions_ = new HashSet<RelationalPredicate>(
+				invariantActionConditions_ = new TreeSet<RelationalPredicate>(
 						actionConds);
-				variantActionConditions_ = new HashSet<RelationalPredicate>();
+				variantActionConditions_ = new TreeSet<RelationalPredicate>();
 				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
 				actionRanges_ = new HashMap<RangeContext, double[]>();
@@ -880,7 +887,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// for numerical conditions.
 			changed = InvariantObservations.intersectActionConditions(action,
 					action_, actionConds, invariantActionConditions_,
-					variantActionConditions_, actionRanges_);
+					variantActionConditions_, actionRanges_, null);
 
 			if (changed) {
 				specialisationConditions_ = null;
@@ -1023,6 +1030,11 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		/** The collection of unseen predicates. */
 		private Collection<RelationalPredicate> unseenPreds_;
 
+		/**
+		 * A collection of specialisation conditions using only anon conditions.
+		 */
+		private Collection<RelationalPredicate> generalSpecialisationConditions_;
+
 		public ConditionObservations() {
 			conditionBeliefs_ = new TreeMap<String, ConditionBeliefs>();
 			negatedConditionBeliefs_ = new TreeMap<String, Map<IntegerArray, ConditionBeliefs>>();
@@ -1038,6 +1050,31 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		/**
+		 * Gets the general specialisation conditions.
+		 * 
+		 * @return A set of anonymous conditions representing the general
+		 *         specialisations.
+		 */
+		public Collection<RelationalPredicate> getGeneralSpecialisationConditions() {
+			if (generalSpecialisationConditions_ == null) {
+				generalSpecialisationConditions_ = new HashSet<RelationalPredicate>();
+				for (String variant : invariants_.getGeneralVariants()) {
+					// Create both negated and non-negated versions
+					RelationalPredicate predicate = StateSpec.getInstance()
+							.getPredicateByName(variant);
+					generalSpecialisationConditions_
+							.add(new RelationalPredicate(predicate));
+
+					RelationalPredicate negPred = new RelationalPredicate(
+							predicate);
+					negPred.swapNegated();
+					generalSpecialisationConditions_.add(negPred);
+				}
+			}
+			return generalSpecialisationConditions_;
+		}
+
+		/**
 		 * Gets a collection of general goal conditions noted by the
 		 * observations which represent general sub-goals to achieve. Note that
 		 * these goal conditions can be negated.
@@ -1047,17 +1084,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		private Collection<GeneralGoalCondition> getGeneralGoalConditions() {
 			if (generalGoalConds_ == null) {
 				generalGoalConds_ = new HashSet<GeneralGoalCondition>();
-				for (String variant : invariants_.getVariants()) {
-					// Create both negated and non-negated versions
-					RelationalPredicate predicate = StateSpec.getInstance()
-							.getPredicateByName(variant);
-					generalGoalConds_.add(new GeneralGoalCondition(predicate));
-
-					RelationalPredicate negPred = new RelationalPredicate(
-							predicate);
-					negPred.swapNegated();
-					generalGoalConds_.add(new GeneralGoalCondition(negPred));
-				}
+				for (RelationalPredicate genPredicate : generalSpecialisationConditions_)
+					generalGoalConds_
+							.add(new GeneralGoalCondition(genPredicate));
 			}
 			return generalGoalConds_;
 		}
@@ -1131,8 +1160,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * Records all conditions associations from the current state using the
 		 * term mapped facts to form the relations.
 		 * 
-		 * TODO This is a slow method. Find ways to speed it up.
-		 * 
 		 * @param stateFacts
 		 *            The facts of the state in StringFact form.
 		 * @param goalReplacements2
@@ -1190,13 +1217,11 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				}
 
 				// Form the condition beliefs for the not relative facts,
-				// using the relative facts as always true values (only for
-				// non-types predicates)
+				// using the relative facts as always true values
 				changed |= recordUntrueConditionAssociations(relativeFacts,
 						notRelativeFacts);
 
 				// Note the ranges of the condition if the fact is numerical
-
 				if (baseFact.isNumerical()) {
 					RelationalArgument[] baseArgs = baseFact
 							.getRelationalArguments();
@@ -1264,9 +1289,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 						.getRelationalArguments();
 				// Form the replacement map, modifying the args if necessary
 				// (such that ?X is first arg, ?Y second, etc).
+
 				Map<RelationalArgument, RelationalArgument> replacementMap = new HashMap<RelationalArgument, RelationalArgument>();
 				for (int i = 0; i < untrueFactArgs.length; i++) {
-					if (!untrueFactArgs[i].equals("?")) {
+					if (!untrueFactArgs[i].isAnonymous()) {
 						if (!replacementMap.containsKey(untrueFactArgs[i]))
 							replacementMap
 									.put(untrueFactArgs[i], RelationalArgument
@@ -1444,6 +1470,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// Note the invariants
 			changed |= invariants_.noteAllInvariants(stateFacts,
 					generalStateFacts);
+			if (changed) {
+				conditionObservations_.generalGoalConds_ = null;
+				conditionObservations_.generalSpecialisationConditions_ = null;
+			}
 
 			// Use the term mapped facts to generate collections of true
 			// facts.

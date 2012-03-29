@@ -24,11 +24,12 @@ public class CarcassonneStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// A tile may be placed if all edges fit nicely
 		preconds.put("placeTile",
-				"(currentTile ?X) (validLoc ?Y ?Z) (location ?Y) (orientation ?Z)");
+				"(currentPlayer ?X) (currentTile ?Y) (validLoc ?Y ?Z ?A) "
+						+ "(location ?Z) (orientation ?A)");
 
 		// A meeple can be played when it is meeple playing stage on the placed
 		// tile
-		preconds.put("placeMeeple", "(player ?X) (meepleLoc ?Y ?Z)");
+		preconds.put("placeMeeple", "(currentPlayer ?X) (meepleLoc ?Y ?Z)");
 
 		return preconds;
 	}
@@ -43,10 +44,11 @@ public class CarcassonneStateSpec extends StateSpec {
 		Collection<RelationalPredicate> actions = new ArrayList<RelationalPredicate>();
 
 		// Jump onto something
-		String[] structure = new String[3];
-		structure[0] = "tile";
-		structure[1] = "location";
-		structure[2] = "orientation";
+		String[] structure = new String[4];
+		structure[0] = "player";
+		structure[1] = "tile";
+		structure[2] = "location";
+		structure[3] = "orientation";
 		actions.add(new RelationalPredicate("placeTile", structure));
 
 		// Jump over something
@@ -81,13 +83,14 @@ public class CarcassonneStateSpec extends StateSpec {
 				"(edge west) => (assert (edgeDirection west -1 0))", false));
 
 		// Next to rule
+		// TODO This nextTo rule isn't working...
 		bckKnowledge
 				.put("nextToRule",
 						new BackgroundKnowledge(
 								"(locationXY ?L1 ?X ?Y) (not (tileLocation ?T1 ?L1)) "
-										+ "(edgeDirection ?E ?Ex ?Ey) (locationXY ?L2 ?X2&:(= ?X2 (+ ?X2 ?Ex)) ?Y2&:(= ?Y2 (+ ?Y2 ?Ey))) "
+										+ "(edgeDirection ?E ?Ex ?Ey) (locationXY ?L2 ?X2&:(= ?X2 (+ ?X ?Ex)) ?Y2&:(= ?Y2 (+ ?Y ?Ey))) "
 										+ "(tileLocation ?T2 ?L2) (oppEdge ?E ?Eopp) "
-										+ "(tileEdge ?T2 ?Eopp ?Ter) => (nextTo ?L1 ?E ?Ter)",
+										+ "(tileEdge ?T2 ?Eopp ?Ter) => (assert (nextTo ?L1 ?E ?Ter))",
 								false));
 
 		return bckKnowledge;
@@ -174,9 +177,10 @@ public class CarcassonneStateSpec extends StateSpec {
 		predicates.add(new RelationalPredicate("edgeDirection", structure));
 
 		// A valid location to place the current tile.
-		structure = new String[2];
-		structure[0] = "location";
-		structure[1] = "orientation";
+		structure = new String[3];
+		structure[0] = "tile";
+		structure[1] = "location";
+		structure[2] = "orientation";
 		predicates.add(new RelationalPredicate("validLoc", structure));
 
 		// A valid location to place a meeple.

@@ -17,6 +17,8 @@ import util.Pair;
 import jess.JessException;
 import jess.Rete;
 
+import cerrla.ProgramArgument;
+
 import com.jcloisterzone.Expansion;
 import com.jcloisterzone.Player;
 import com.jcloisterzone.UserInterface;
@@ -39,6 +41,7 @@ import com.jcloisterzone.feature.Road;
 import com.jcloisterzone.feature.visitor.FindMaster;
 import com.jcloisterzone.feature.visitor.score.AbstractScoreContext;
 import com.jcloisterzone.feature.visitor.score.CityScoreContext;
+import com.jcloisterzone.feature.visitor.score.CloisterScoreContext;
 import com.jcloisterzone.feature.visitor.score.CompletableScoreContext;
 import com.jcloisterzone.feature.visitor.score.FarmScoreContext;
 import com.jcloisterzone.feature.visitor.score.PositionCollectingScoreContext;
@@ -62,6 +65,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	private List<PlayerAction> actions_;
 	/** Features that have already been asserted this iteration. */
 	private Collection<Feature> assertedFeatures_ = new HashSet<Feature>();
+	/** The positions that have already been asserted this iteration. */
+	private Collection<Position> assertedPositions_ = new HashSet<Position>();
 	/** Cache of cities for farm evaluation. */
 	private Map<City, CityScoreContext> cityCache_ = new HashMap<City, CityScoreContext>();
 	/** The current game environment. */
@@ -114,17 +119,25 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			throws JessException {
 		String cloisterName = formatFeature(cloister);
 		rete.assertString("(cloister " + cloisterName + ")");
+
 		// Don't assert other information about unplaced cloisters.
-		if (cloister.getNeighbouring() != null) {
-			if (cloister.getScoreContext().isCompleted())
+		Position cloisterLoc = cloister.getTile().getPosition();
+		if (cloisterLoc != null) {
+			String cloisterLocStr = assertPosition(rete, cloisterLoc);
+			CloisterScoreContext context = (CloisterScoreContext) cloister
+					.getScoreContext();
+			context.visit(cloister);
+			if (context.isCompleted())
 				rete.assertString("(completed " + cloisterName + ")");
 			else {
 				rete.assertString("(worth " + cloisterName + " "
-						+ cloister.getScoreContext().getPoints() + ")");
+						+ context.getPoints() + ")");
 			}
 
+			rete.assertString("(cloisterZone " + cloisterLocStr + " "
+					+ cloisterName + ")");
+
 			// Assert surrounding zone locations
-			Position cloisterLoc = cloister.getTile().getPosition();
 			for (Position adjDiag : Position.ADJACENT_AND_DIAGONAL.values()) {
 				Position p = cloisterLoc.add(adjDiag);
 				String loc = assertPosition(rete, p);
@@ -220,7 +233,9 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 		Location tileLocation = terrain.getLocation();
 		for (Location side : Location.sides()) {
 			// Check the side location.
-			if (side.isPartOf(tileLocation)) {
+			if (side.isPartOf(tileLocation)
+					|| (tileLocation.isFarmLocation() && ((side.hashCode() >> 8) & tileLocation
+							.hashCode()) != 0)) {
 				// Name the edge.
 				String edge = null;
 				if (side.equals(Location.N))
@@ -266,7 +281,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 				String loc = assertPosition(rete, pos);
 				Set<Rotation> rotations = tilePositions_.get(pos);
 				for (Rotation rot : rotations) {
-					rete.assertString("(validLoc " + loc + " " + rot + ")");
+					rete.assertString("(validLoc " + tileStr + " " + loc + " "
+							+ rot + ")");
 				}
 
 				locationMap_.put(loc, pos);
@@ -283,8 +299,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 						Feature terrain = currentTile.getFeature(loc);
 						FindMaster master = new FindMaster();
 						terrain.walk(master);
-						String masterStr = formatFeature(master
-								.getMasterFeature());
+						String masterStr = formatFeature(master.getResult());
 
 						// Assert the meeple loc.
 						rete.assertString("(meepleLoc " + tileStr + " "
@@ -309,15 +324,17 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	private String assertPosition(Rete rete, Position position)
 			throws JessException {
 		String loc = "loc_" + position.x + "_" + position.y;
-		rete.assertString("(location " + loc + ")");
-		rete.assertString("(locationXY " + loc + " " + position.x + " "
-				+ position.y + ")");
+		if (!assertedPositions_.contains(position)) {
+			rete.assertString("(location " + loc + ")");
+			rete.assertString("(locationXY " + loc + " " + position.x + " "
+					+ position.y + ")");
 
-		// Assert the number of surrounding tiles
-		int numAdjacentAndDiagonal = environment_.getBoard()
-				.getAdjacentTilesMap(position).size();
-		rete.assertString("(numSurroundingTiles " + loc + " "
-				+ numAdjacentAndDiagonal + ")");
+			// Assert the number of surrounding tiles
+			int numAdjacentAndDiagonal = environment_.getBoard()
+					.getAdjacentAndDiagonalTiles(position).size();
+			rete.assertString("(numSurroundingTiles " + loc + " "
+					+ numAdjacentAndDiagonal + ")");
+		}
 
 		return loc;
 	}
@@ -388,7 +405,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	 * @param context
 	 *            The context of the feature.
 	 * @throws JessException
-	 *             Should something fo awry...
+	 *             Should something go awry...
 	 */
 	private void assertWorthAndMeeples(Rete rete, String featureName,
 			AbstractScoreContext context) throws JessException {
@@ -474,7 +491,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	private boolean sleepUntilReady(Game game) {
 		// Wait for the game.
 		try {
-			readyToExecute_.await();
+			if (!ProgramArgument.EXPERIMENT_MODE.booleanValue())
+				readyToExecute_.await();
 		} catch (Exception e) {
 		}
 
@@ -483,7 +501,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			return true;
 
 		// Restart the counter.
-		readyToExecute_ = new CountDownLatch(1);
+		if (!ProgramArgument.EXPERIMENT_MODE.booleanValue())
+			readyToExecute_ = new CountDownLatch(1);
 		return false;
 	}
 
@@ -504,6 +523,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 
 		// Other initialisations
 		assertedFeatures_.clear();
+		assertedPositions_.clear();
 		tileCount_ = 0;
 		environment_ = game;
 		featureMap_.clear();
@@ -612,8 +632,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 
 			// Get position and rotation
 			String[] args = action.getArguments();
-			Position pos = locationMap_.get(args[1]);
-			Rotation rot = Rotation.valueOf(args[2]);
+			Position pos = locationMap_.get(args[2]);
+			Rotation rot = Rotation.valueOf(args[3]);
 
 			if (RRLExperiment.debugMode_) {
 				System.out.println("Tile phase: " + action.toString());

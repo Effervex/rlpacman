@@ -90,6 +90,9 @@ public abstract class StateSpec {
 	/** The state the agent must reach to successfully end the episode. */
 	private String goalState_;
 
+	/** All predicates of the state containing numerical terms. */
+	private Collection<String> numberPreds_;
+
 	/**
 	 * The goal StringFact definition (goalArgs on a b...). Is simply a
 	 * StringFact definition created with arguments equalling the number of goal
@@ -188,6 +191,8 @@ public abstract class StateSpec {
 
 			environment_ = this.getClass().getPackage().getName();
 
+			numberPreds_ = new HashSet<String>();
+
 			// Initialise any deffunctions
 			initialiseFunctions();
 
@@ -238,6 +243,9 @@ public abstract class StateSpec {
 		actions_ = new HashMap<String, RelationalPredicate>();
 		for (RelationalPredicate action : initialiseActionTemplates()) {
 			actions_.put(action.getFactName(), action);
+			for (String type : action.getArgTypes())
+				if (isNumberType(type))
+					numberPreds_.add(action.getFactName());
 			defineTemplate(action.getFactName(), rete_);
 		}
 		actionNum_ = initialiseActionsPerStep();
@@ -308,6 +316,9 @@ public abstract class StateSpec {
 		predicates_ = new HashMap<String, RelationalPredicate>();
 		for (RelationalPredicate pred : initialisePredicateTemplates()) {
 			predicates_.put(pred.getFactName(), pred);
+			for (String type : pred.getArgTypes())
+				if (isNumberType(type))
+					numberPreds_.add(pred.getFactName());
 			defineTemplate(pred.getFactName(), rete_);
 		}
 	}
@@ -574,17 +585,33 @@ public abstract class StateSpec {
 		}
 
 		String[] types = fact.getArgTypes();
+		RelationalArgument[] args = fact.getRelationalArguments();
 		for (int i = 0; i < types.length; i++) {
 			if (!fact.getRelationalArguments()[i]
 					.equals(RelationalArgument.ANONYMOUS)) {
-				RelationalPredicate typeFact = typePredicates_.get(types[i]);
-				if (typeFact != null) {
-					typeConds.add(new RelationalPredicate(typeFact,
-							new String[] { fact.getArguments()[i] }));
-				}
+				typeConds.add(createTypeCond(types[i], args[i]));
 			}
 		}
 		return typeConds;
+	}
+
+	/**
+	 * Creates a single type condition for a given type and argument.
+	 * 
+	 * @param typePred
+	 *            The type predicate.
+	 * @param arg
+	 *            The current argument of the pred.
+	 * @return A newly created type predicate for the arg.
+	 */
+	public RelationalPredicate createTypeCond(String typePred,
+			RelationalArgument arg) {
+		RelationalPredicate typeFact = typePredicates_.get(typePred);
+		if (typeFact != null) {
+			return new RelationalPredicate(typeFact,
+					new RelationalArgument[] { arg });
+		}
+		return null;
 	}
 
 	/**
@@ -959,6 +986,10 @@ public abstract class StateSpec {
 		} catch (IllegalArgumentException iae) {
 		}
 		return false;
+	}
+
+	public static boolean isNumerical(String factName) {
+		return getInstance().numberPreds_.contains(factName);
 	}
 
 	public static void reinitInstance() {

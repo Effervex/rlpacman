@@ -200,7 +200,6 @@ public class ModularPolicy extends RelationalPolicy {
 					.getGoalReplacements()));
 		}
 
-
 		// If the goal has been achieved, don't evaluate this policy
 		if (goalAchievedCurrently_)
 			return;
@@ -361,6 +360,7 @@ public class ModularPolicy extends RelationalPolicy {
 		if (ceDistribution_.getGoalCondition().isMainGoal()
 				|| episodeReward_[0] != 0) {
 			policyRewards_.add(episodeReward_);
+			episodeReward_ = null;
 		}
 
 		// End episode for all children.
@@ -525,6 +525,9 @@ public class ModularPolicy extends RelationalPolicy {
 	 */
 	@Recursive
 	public boolean noteStepReward(double[] reward) {
+		if (episodeReward_ == null)
+			episodeReward_ = new double[2];
+		
 		// Note reward if a rule in this policy fired (or it's the main policy).
 		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
 				|| !firedLastStep_.isEmpty();
@@ -614,7 +617,7 @@ public class ModularPolicy extends RelationalPolicy {
 	 */
 	@Recursive
 	public void startEpisode() {
-		episodeReward_ = new double[2];
+		episodeReward_ = null;
 		if (ceDistribution_.getGoalCondition().isMainGoal())
 			episodeStarted_ = true;
 		else

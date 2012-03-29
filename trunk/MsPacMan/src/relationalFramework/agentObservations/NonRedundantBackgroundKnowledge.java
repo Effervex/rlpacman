@@ -2,6 +2,7 @@ package relationalFramework.agentObservations;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -19,6 +20,9 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	/** The background knowledge rules ordered by what they simplify. */
 	private MultiMap<SortedSet<RelationalPredicate>, BackgroundKnowledge> currentKnowledge_;
 
+	/** The equivalence post conditions. */
+	private Collection<SortedSet<RelationalPredicate>> equivalencePostConds_;
+
 	/** The rules mapped by the left side predicates (or either if equivalent). */
 	private MultiMap<String, BackgroundKnowledge> predicateMap_;
 
@@ -27,6 +31,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 
 	public NonRedundantBackgroundKnowledge() {
 		currentKnowledge_ = MultiMap.createSortedSetMultiMap();
+		equivalencePostConds_ = new HashSet<SortedSet<RelationalPredicate>>();
 		predicateMap_ = MultiMap.createSortedSetMultiMap();
 		reversePredicateMap_ = MultiMap.createSortedSetMultiMap();
 	}
@@ -46,35 +51,36 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 					bckKnow.getNonPreferredFacts());
 			SortedSet<RelationalPredicate> preferredFacts = new TreeSet<RelationalPredicate>(
 					bckKnow.getPreferredFacts());
-			if (bckKnow.isEquivalence()
-					&& currentKnowledge_.containsKey(preferredFacts)) {
-				// If the background knowledge rule is an equivalence rule, it
-				// may be redundant
-				SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
-						.getSortedSet(preferredFacts);
-				// If the existing rules are only an equivalence rule, this
-				// rule is redundant
-				if (existingRules.size() == 1
-						&& existingRules.first().isEquivalence()) {
-					return false;
+			// If an implication rule
+			if (!bckKnow.isEquivalence()) {
+				for (SortedSet<RelationalPredicate> equivPostCond : equivalencePostConds_) {
+					// If any equivalent post conditions are in this implication
+					// rule, return false
+					if (nonPreferredFacts.containsAll(equivPostCond)
+							|| preferredFacts.containsAll(equivPostCond))
+						return false;
 				}
-			} else if (currentKnowledge_.containsKey(nonPreferredFacts)) {
 
-				// Fact already exists in another rule - it may be redundant
-				SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
-						.getSortedSet(nonPreferredFacts);
-				if (!bckKnow.isEquivalence()) {
-					// Inference rule
-					if (existingRules.size() > 1
-							|| !existingRules.first().isEquivalence()) {
-						// Only add inference rules if there aren't any
-						// equivalence rules with the same non-preferred facts
-						// (so possibly more than one rule).
-						addRule(bckKnow, preferredFacts, nonPreferredFacts);
-						return true;
+				// Rule isn't present, can add freely
+				addRule(bckKnow, preferredFacts, nonPreferredFacts);
+				return true;
+			} else {
+				// Equivalence rule
+				if (currentKnowledge_.containsKey(preferredFacts)) {
+					// If the background knowledge rule is an equivalence rule,
+					// it may be redundant
+					SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
+							.getSortedSet(preferredFacts);
+					// If the existing rules are only an equivalence rule, this
+					// rule is redundant
+					if (existingRules.size() == 1
+							&& existingRules.first().isEquivalence()) {
+						return false;
 					}
-				} else {
-
+				} else if (currentKnowledge_.containsKey(nonPreferredFacts)) {
+					// Fact already exists in another rule - it may be redundant
+					SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
+							.getSortedSet(nonPreferredFacts);
 					if (existingRules.size() > 1
 							|| !existingRules.first().isEquivalence()) {
 						// If the existing rules are inference rules, this rule
@@ -91,14 +97,14 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 							return true;
 						}
 					}
+
+					return false;
+				} else {
+					// Rule isn't present, can add freely
+					addRule(bckKnow, preferredFacts, nonPreferredFacts);
+					return true;
 				}
-
-				return false;
 			}
-
-			// Rule isn't present, can add freely
-			addRule(bckKnow, preferredFacts, nonPreferredFacts);
-			return true;
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -140,6 +146,8 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 			SortedSet<RelationalPredicate> preferredFacts,
 			SortedSet<RelationalPredicate> nonPreferredFacts) {
 		currentKnowledge_.put(nonPreferredFacts, bckKnow);
+		if (bckKnow.isEquivalence())
+			equivalencePostConds_.add(nonPreferredFacts);
 		for (RelationalPredicate fact : preferredFacts) {
 			predicateMap_.putContains(fact.getFactName(), bckKnow);
 			if (bckKnow.isEquivalence())
