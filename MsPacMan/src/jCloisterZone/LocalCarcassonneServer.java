@@ -73,6 +73,11 @@ public class LocalCarcassonneServer extends GameSettings implements ServerIF,
 		proxylessDrawPhase.setDefaultNext(drawPhase.getDefaultNext());
 		game.getPhases().put(ProxylessDrawPhase.class, proxylessDrawPhase);
 	}
+	
+	@Override
+	public void stopGame() {
+		// No action.
+	}
 
 	@Override
 	public void placeNoFigure() {

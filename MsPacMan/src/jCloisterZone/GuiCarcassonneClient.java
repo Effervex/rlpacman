@@ -12,12 +12,14 @@ public class GuiCarcassonneClient extends Client implements RRLJCloisterClient {
 	
 	@Override
 	public void createGame() {
-		running_ = true;
 		super.createGame();
+		running_ = true;
 	}
 	
 	@Override
 	public boolean closeGame(boolean force) {
+		if (!running_)
+			return true;
 		running_ = false;
 		return super.closeGame(force);
 	}

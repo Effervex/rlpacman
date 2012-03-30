@@ -257,6 +257,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		}
 		client_.createGame();
 		earlyExit_ = false;
+		earlyExitPlayers_.clear();
 		prevScores_.clear();
 
 		if (environment_ == null) {
@@ -307,6 +308,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			clientInterface_ = environment_.getUserInterface();
 		} else if (players_.length > 1) {
 			// Reset the UIs
+			server_.stopGame();
 			environment_.clearUserInterface();
 			environment_.addUserInterface(clientInterface_);
 
@@ -347,8 +349,9 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	@Override
 	protected void stepState(Object action) {
 		// If null, exit the episode
-		if (action == null) {
+		if (action == null || earlyExit_) {
 			earlyExit_ = true;
+			relationalWrapper_.gameOver();
 			client_.closeGame(true);
 			return;
 		}
