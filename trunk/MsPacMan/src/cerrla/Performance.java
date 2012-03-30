@@ -429,10 +429,17 @@ public class Performance implements Serializable {
 			String elapsed = "Elapsed: "
 					+ RRLExperiment.toTimeFormat(elapsedTime);
 			if (hasUpdated && !episodeMeans_.isEmpty()) {
+				PolicyGenerator policyGenerator = distribution
+						.getPolicyGenerator();
+				DecimalFormat formatter = new DecimalFormat("#0.0000");
+				String percentStr = "~"
+						+ formatter.format(100 * policyGenerator
+								.getConvergenceValue()) + "% " + "converged ("
+						+ policyGenerator.getGenerator().size() + " slots).";
 				System.out.println("Run " + runIndex_ + ", learning: "
 						+ currentEpisode + ": "
 						+ episodeMeans_.get(episodeMeans_.lastKey()) + ", "
-						+ elapsed);
+						+ elapsed + ", " + percentStr);
 				System.out.println("Learning...");
 			} else
 				System.out.println("Learning...");

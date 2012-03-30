@@ -548,5 +548,64 @@ public class UnificationTest {
 								+ "1&:(<= 5.0 "
 								+ RelationalArgument.RANGE_VARIABLE_PREFIX
 								+ "1 10.0))"));
+
+		// Unify a numeral to a range (as opposed to range to a numeral)
+		RelationalPredicate numeralFact = StateSpec
+				.toRelationalPredicate("(distance blinky 5");
+		newState.clear();
+		newState.add(StateSpec
+				.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))"));
+		Collection<UnifiedFact> unified = Unification.getInstance()
+				.unifyFactToState(numeralFact, newState, new DualHashBidiMap(),
+						new RelationalArgument[0], false);
+		assertEquals(unified.size(), 1);
+		UnifiedFact unifact = unified.iterator().next();
+		assertTrue(unifact
+				.getResultFact()
+				.equals(StateSpec
+						.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))")));
+		assertTrue(unifact
+				.getUnityFact()
+				.equals(StateSpec
+						.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))")));
+		assertTrue(unifact.getBaseFact().equals(
+				StateSpec.toRelationalPredicate("(distance blinky 5)")));
+
+
+		numeralFact = StateSpec.toRelationalPredicate("(distance blinky 10");
+		newState.clear();
+		newState.add(StateSpec
+				.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))"));
+		unified = Unification.getInstance().unifyFactToState(numeralFact,
+				newState, new DualHashBidiMap(), new RelationalArgument[0],
+				false);
+		assertEquals(unified.size(), 1);
+		unifact = unified.iterator().next();
+		assertTrue(unifact.getResultFact().equals(StateSpec
+				.toRelationalPredicate(
+				"(distance blinky ?#_4&:(<= 0.0 ?#_4 10.0))")));
+		assertTrue(unifact.getUnityFact().equals(StateSpec
+				.toRelationalPredicate(
+				"(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))")));
+		assertTrue(unifact.getBaseFact().equals(StateSpec
+				.toRelationalPredicate("(distance blinky 10)")));
+		
+		numeralFact = StateSpec.toRelationalPredicate("(distance blinky 1");
+		newState.clear();
+		newState.add(StateSpec
+				.toRelationalPredicate("(distance blinky ?#_4&:(<= 1.0 ?#_4 5.0))"));
+		unified = Unification.getInstance().unifyFactToState(numeralFact,
+				newState, new DualHashBidiMap(), new RelationalArgument[0],
+				false);
+		assertEquals(unified.size(), 1);
+		unifact = unified.iterator().next();
+		assertTrue(unifact.getResultFact().equals(StateSpec
+				.toRelationalPredicate(
+				"(distance blinky ?#_4&:(<= 1.0 ?#_4 5.0))")));
+		assertTrue(unifact.getUnityFact().equals(StateSpec
+				.toRelationalPredicate(
+				"(distance blinky ?#_4&:(<= 1.0 ?#_4 5.0))")));
+		assertTrue(unifact.getBaseFact().equals(StateSpec
+				.toRelationalPredicate("(distance blinky 1)")));
 	}
 }

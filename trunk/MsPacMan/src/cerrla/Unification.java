@@ -544,7 +544,7 @@ public class Unification {
 		double[] baseBounds = baseValue.getExplicitRange();
 		double[] unityBounds = unifiedValue.getExplicitRange();
 		double min = Math.min(baseBounds[0], unityBounds[0]);
-		double max = Math.max(baseBounds[1], unityBounds[0]);
+		double max = Math.max(baseBounds[1], unityBounds[1]);
 
 		String variable = baseValue.getStringArg();
 		// If the fact isn't a variable yet, change the action terms.
