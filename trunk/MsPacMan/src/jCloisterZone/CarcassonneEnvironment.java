@@ -85,7 +85,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		int currentScore = player.getPoints();
 		int diff = currentScore - prevScore;
 		prevScores_.put(player, currentScore);
-		
+
 		double[] reward = new double[2];
 		reward[RRLObservations.ENVIRONMENTAL_INDEX] = diff;
 		reward[RRLObservations.INTERNAL_INDEX] = (earlyExitPlayers_
@@ -148,6 +148,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		Phase phase = environment_.getPhase();
 
 		// Cycle through (probably only once) to keep the game moving.
+		int counter = 0;
 		while (phase != null && !phase.isEntered()) {
 			// Modifying phases to proxyless versions
 			if (!guiMode_) {
@@ -162,6 +163,9 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			phase.setEntered(true);
 			phase.enter();
 			phase = environment_.getPhase();
+			counter++;
+			if (counter > 20)
+				System.out.println("Phase looping");
 		}
 	}
 
@@ -249,7 +253,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	protected void startState() {
 		relationalWrapper_.startState();
 
-		while (client_.isRunning()) {
+		while (!ProgramArgument.EXPERIMENT_MODE.booleanValue()
+				&& client_.isRunning()) {
 			try {
 				Thread.yield();
 			} catch (Exception e) {
@@ -262,8 +267,9 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 		if (environment_ == null) {
 			// Sleep only as long as it needs to to get the clientID.
-			long clientID = -1;
-			while (clientID == -1) {
+			long clientID = client_.getClientId();
+			while (!ProgramArgument.EXPERIMENT_MODE.booleanValue()
+					&& clientID == -1) {
 				try {
 					Thread.yield();
 					clientID = client_.getClientId();
@@ -296,7 +302,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 			// Start the game.
 			environment_ = client_.getGame();
-			while (environment_ == null) {
+			while (!ProgramArgument.EXPERIMENT_MODE.booleanValue()
+					&& environment_ == null) {
 				try {
 					Thread.yield();
 				} catch (Exception e) {
@@ -331,8 +338,9 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 		server_.startGame();
 		// Sleep until game has started
-		while (environment_ == null || environment_.getBoard() == null
-				|| environment_.getTilePack() == null) {
+		while (!ProgramArgument.EXPERIMENT_MODE.booleanValue()
+				&& (environment_ == null || environment_.getBoard() == null || environment_
+						.getTilePack() == null)) {
 			environment_ = ((ClientStub) Proxy.getInvocationHandler(server_))
 					.getGame();
 			try {
