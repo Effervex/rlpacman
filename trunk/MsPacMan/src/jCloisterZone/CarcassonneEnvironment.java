@@ -148,7 +148,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 		Phase phase = environment_.getPhase();
 
 		// Cycle through (probably only once) to keep the game moving.
-		int counter = 0;
 		while (phase != null && !phase.isEntered()) {
 			// Modifying phases to proxyless versions
 			if (!guiMode_) {
@@ -163,9 +162,6 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			phase.setEntered(true);
 			phase.enter();
 			phase = environment_.getPhase();
-			counter++;
-			if (counter > 20)
-				System.out.println("Phase looping");
 		}
 	}
 
@@ -267,7 +263,8 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 		if (environment_ == null) {
 			// Sleep only as long as it needs to to get the clientID.
-			long clientID = client_.getClientId();
+			long clientID = (ProgramArgument.EXPERIMENT_MODE.booleanValue()) ? client_
+					.getClientId() : -1;
 			while (!ProgramArgument.EXPERIMENT_MODE.booleanValue()
 					&& clientID == -1) {
 				try {
