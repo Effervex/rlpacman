@@ -226,7 +226,7 @@ public class PacManStateSpec extends StateSpec {
 		// Distance Metric
 		structure = new String[2];
 		structure[0] = "thing";
-		structure[1] = NumberEnum.Double.toString();
+		structure[1] = NumberEnum.Integer.toString();
 		predicates.add(new RelationalPredicate("distance", structure));
 
 		structure = new String[2];
