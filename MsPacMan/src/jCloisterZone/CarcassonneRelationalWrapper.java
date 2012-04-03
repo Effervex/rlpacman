@@ -127,12 +127,10 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			CloisterScoreContext context = (CloisterScoreContext) cloister
 					.getScoreContext();
 			context.visit(cloister);
+			rete.assertString("(worth " + cloisterName + " "
+					+ context.getPoints() + ")");
 			if (context.isCompleted())
 				rete.assertString("(completed " + cloisterName + ")");
-			else {
-				rete.assertString("(worth " + cloisterName + " "
-						+ context.getPoints() + ")");
-			}
 
 			rete.assertString("(cloisterZone " + cloisterLocStr + " "
 					+ cloisterName + ")");
@@ -168,9 +166,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			// Assert open edges
 			rete.assertString("(open " + featureName + " "
 					+ context.getOpenEdges() + ")");
-
-			assertWorthAndMeeples(rete, featureName, context);
 		}
+		assertWorthAndMeeples(rete, featureName, context);
 	}
 
 	/**

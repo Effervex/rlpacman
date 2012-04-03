@@ -120,22 +120,20 @@ public class RelationalRuleTest {
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(on ?X ?Unb_1)")));
 
-		// Binding negated preds
-		rule = new RelationalRule("(clear ?A) (clear ?D) "
-				+ "(not (on ?A ?Unb_2)) => (move ?A ?D)");
-		assertEquals(rule.getConditions(false).size(), 6);
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?Y)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
-
 		// Binding negated anonymous
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(not (on ?A ?)) => (move ?A ?D)");
+		assertEquals(rule.getConditions(false).size(), 4);
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(not (on ?X ?))")));
+		
+		// Binding negated unbound (the only way to bind unbound negated variables)
+		rule = new RelationalRule("(clear ?A) (clear ?D) "
+				+ "(thing ?Unb_0) (not (on ?D ?Unb_0)) => (move ?A ?D)");
 		assertEquals(rule.getConditions(false).size(), 6);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
@@ -143,48 +141,19 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(clear ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
-		
-		// Binding double negated anonymous
-		rule = new RelationalRule("(clear ?A) (clear ?D) "
-				+ "(not (on ?A ?Bnd_0)) (not (on ?D ?Bnd_0)) => (move ?A ?D)");
-		assertEquals(rule.getConditions(false).size(), 7);
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?Y)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?Y ?Bnd_0))")));
 		
 		// Unbinding lonely variables
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(not (on ?A ?Bnd_0)) => (move ?A ?D)");
-		assertEquals(rule.getConditions(false).size(), 6);
+		assertEquals(rule.getConditions(false).size(), 4);
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?X)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(clear ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
-
-		rule = new RelationalRule("(clear ?A) (clear ?D) "
-				+ "(not (on ?A ?Bnd_4)) => (move ?A ?D)");
-		assertEquals(rule.getConditions(false).size(), 6);
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?X)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?Y)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
-		assertTrue(rule.getConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
+				StateSpec.toRelationalPredicate("(not (on ?X ?))")));
 		
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(thing ?Bnd_4) (not (on ?A ?Bnd_4)) => (move ?A ?D)");
@@ -197,6 +166,19 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
+		
+		// Negated numerical condition
+		rule = new RelationalRule("(clear ?A) (clear ?D) "
+				+ "(thing ?Bnd_4) (not (height ?A ?)) => (move ?A ?D)");
+		assertEquals(rule.getConditions(false).size(), 6);
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(clear ?X)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(clear ?Y)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(thing ?Unb_0)")));
+		assertTrue(rule.getConditions(false).contains(
+				StateSpec.toRelationalPredicate("(not (height ?X ?))")));
 	}
 
 	@Test

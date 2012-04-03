@@ -75,9 +75,13 @@ public class SpecificGoalCondition extends GoalCondition {
 		int i = 0;
 		buffer.append(fact.getFactName());
 		for (String arg : fact.getArguments()) {
-			if (!argMapping.containsKey(arg))
-				argMapping.put(arg, (char) ('A' + i++));
-			buffer.append("$" + argMapping.get(arg));
+			if (arg.equals(RelationalArgument.ANONYMOUS.toString()))
+				buffer.append("?");
+			else {
+				if (!argMapping.containsKey(arg))
+					argMapping.put(arg, (char) ('A' + i++));
+				buffer.append("$" + argMapping.get(arg));
+			}
 		}
 		return buffer.toString();
 	}

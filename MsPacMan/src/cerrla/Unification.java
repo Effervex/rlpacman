@@ -47,18 +47,13 @@ public class Unification {
 	 *            The terms the old state uses. This is modified in the process.
 	 * @param replacementMap
 	 *            The replacement map for the new state.
-	 * @param recordUnunified
-	 *            If the un-unified facts should also be recorded.
-	 * @param fullUnifyOnly
-	 *            Only change the new state if the old state didn't change.
 	 * @return 1 if the state unified and changed, 0 if unified without change,
 	 *         -1 if couldn't unify.
 	 */
 	private List<UnifiedFact> bestFirstUnify(
 			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState,
-			RelationalArgument[] oldTerms, BidiMap replacementMap,
-			boolean recordUnunified, boolean fullUnifyOnly) {
+			RelationalArgument[] oldTerms, BidiMap replacementMap) {
 		// Pre-unify and sort the state for more efficient unification
 		List<UnifiedFact> unified = new ArrayList<UnifiedFact>();
 		Collection<RelationalPredicate> dropped = new HashSet<RelationalPredicate>();
@@ -281,7 +276,7 @@ public class Unification {
 					// Unify the fact here and now.
 					UnifiedFact unifact = unifiedFacts.iterator().next();
 					unified.add(unifact);
-					newState.remove(unifact);
+					newState.remove(unifact.getUnityFact());
 					if (oldStateFact.isNumerical())
 						beforeRangeIndex = rangeIndex_;
 				}
@@ -379,7 +374,8 @@ public class Unification {
 					// so good
 					unification[i] = factTerm;
 					validFact = true;
-				} else if (unityTerm.isUnboundVariable() && !fact.isNegated()) {
+				} else if (!fact.isNegated() && unityTerm.isUnboundVariable()
+						&& factTerm.isUnboundVariable()) {
 					// If the fact term and unity term are unbound variables
 					// (and one of them is anonymous)
 					unification[i] = RelationalArgument.ANONYMOUS;
@@ -442,7 +438,7 @@ public class Unification {
 
 		// Unify the states
 		List<UnifiedFact> unified = bestFirstUnify(oldState, newState,
-				oldTerms, replacementMap, true, false);
+				oldTerms, replacementMap);
 
 		if (unified.isEmpty())
 			return CANNOT_UNIFY;
@@ -590,7 +586,7 @@ public class Unification {
 			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState, BidiMap replacementMap) {
 		return bestFirstUnify(oldState, newState, new RelationalArgument[0],
-				replacementMap, false, false);
+				replacementMap);
 	}
 
 	public static Unification getInstance() {

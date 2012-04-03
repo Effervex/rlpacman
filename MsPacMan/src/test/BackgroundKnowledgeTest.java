@@ -56,6 +56,16 @@ public class BackgroundKnowledgeTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(floor ?X)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
+
+		// Not matching
+		bk = new BackgroundKnowledge(
+				"(clear ?X) (above ?Y ?X) <=> (floor ?X)");
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
 	}
 
 	@Test
@@ -75,7 +85,7 @@ public class BackgroundKnowledgeTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Z)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
-		
+
 		// Bound variable case
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(on ?X ?Bnd_0)"));
@@ -93,17 +103,25 @@ public class BackgroundKnowledgeTest {
 	public void testSimplifyC() {
 		// Positive case
 		BackgroundKnowledge bk = new BackgroundKnowledge(
-				"(above ?X ?) <=> (block ?X)");
+				"(block ?X) <=> (above ?X ?)");
 		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
-		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		boolean result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
-				.toRelationalPredicate("(above ?X ?)")));
+				.toRelationalPredicate("(block ?X)")));
 
-		// Negative case
+		// Unbound case
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?Unb_0)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.contains(StateSpec
+				.toRelationalPredicate("(block ?X)")));
+		
+		// Negative case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
 	}
@@ -125,7 +143,7 @@ public class BackgroundKnowledgeTest {
 
 		// True case
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(controls ? ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?Y ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(tileEdge ? ? ?X)"));
 		result = bk.simplify(ruleConds);
 		assertTrue(ruleConds.toString(), result);
@@ -142,7 +160,7 @@ public class BackgroundKnowledgeTest {
 
 		// True case
 		ruleConds.clear();
-		ruleConds.add(StateSpec.toRelationalPredicate("(controls ? ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(controls ?Y ?X)"));
 		ruleConds.add(StateSpec
 				.toRelationalPredicate("(tileEdge ?Unb_3 ?Unb_4 ?X)"));
 		result = bk.simplify(ruleConds);
