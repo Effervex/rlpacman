@@ -440,8 +440,6 @@ public class RelationalRule implements Serializable,
 		// Unbound collections
 		MultiMap<RelationalArgument, Integer> indexedUnbounds = MultiMap
 				.createListMultiMap();
-		Map<RelationalArgument, String> unboundNegated = new HashMap<RelationalArgument, String>();
-		Collection<RelationalArgument> boundNegated = new HashSet<RelationalArgument>();
 
 		// Scan each condition
 		int index = 0;
@@ -451,6 +449,7 @@ public class RelationalRule implements Serializable,
 				// Adding the terms
 				RelationalArgument[] arguments = condition
 						.getRelationalArguments();
+				boolean negated = condition.isNegated();
 				for (int i = 0; i < arguments.length; i++) {
 					// Ignore numerical terms
 					if ((predicates.get(condition.getFactName()) == null)
@@ -485,7 +484,12 @@ public class RelationalRule implements Serializable,
 								}
 							}
 							arguments[i] = normalisationMap.get(arguments[i]);
-						} else if (arguments[i].isAnonymous()) {
+
+							// Note the free variables.
+							if (arguments[i].isFreeVariable()
+									&& !arguments[i].isAnonymous())
+								indexedUnbounds.put(arguments[i], index);
+						} else if (arguments[i].isAnonymous() && !negated) {
 							// If the argument is anonymous, convert it to an
 							// unbound variable.
 							arguments[i] = RelationalArgument
@@ -493,44 +497,41 @@ public class RelationalRule implements Serializable,
 						} else if (arguments[i].isConstant())
 							// Adding constant terms
 							constantTerms.add(arguments[i]);
-
-						// Indexing unbounds
-						if (arguments[i].isFreeVariable()) {
-							indexedUnbounds.put(arguments[i], index);
-
-							if (condition.isNegated())
-								unboundNegated.put(arguments[i],
-										condition.getArgTypes()[i]);
-							else
-								boundNegated.add(arguments[i]);
-						}
 					}
 				}
 				condition = new RelationalPredicate(condition, arguments,
 						condition.isNegated());
-				addedConditions.add(condition);
-			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED))
-				addedConditions.add(condition);
 
-			index++;
+				addedConditions.add(condition);
+				index++;
+			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED)) {
+				addedConditions.add(condition);
+				index++;
+			}
 		}
 
 		// Run through and rename bound unbound variables
 		for (RelationalArgument arg : indexedUnbounds.keySet()) {
-			if (unboundNegated.containsKey(arg) && !boundNegated.contains(arg)) {
-				addedConditions.add(StateSpec.getInstance().createTypeCond(
-						unboundNegated.get(arg), arg));
-				indexedUnbounds.put(arg, index++);
-				boundNegated.add(arg);
+			if (indexedUnbounds.get(arg).size() == 1) {
+				RelationalPredicate singleCond = addedConditions
+						.get(indexedUnbounds.get(arg).iterator().next());
+				// If the condition is negated, swap the unbound variable
+				// for an
+				// anonymous variable
+				if (singleCond.isNegated())
+					singleCond.replaceArguments(arg,
+							RelationalArgument.ANONYMOUS, true);
+				else if (arg.isBoundVariable())
+					singleCond.replaceArguments(arg, RelationalArgument
+							.createUnboundVariable(normalisedIndex[0]++), true);
 			}
 			if (indexedUnbounds.get(arg).size() > 1 && arg.isUnboundVariable()) {
 				RelationalArgument boundVariable = RelationalArgument
 						.createBoundVariable(normalisedIndex[1]++);
 				// Swap the unbound args for bound args
-				for (Integer condIndex : indexedUnbounds.get(arg)) {
+				for (Integer condIndex : indexedUnbounds.get(arg))
 					addedConditions.get(condIndex).replaceArguments(arg,
 							boundVariable, true);
-				}
 			}
 		}
 

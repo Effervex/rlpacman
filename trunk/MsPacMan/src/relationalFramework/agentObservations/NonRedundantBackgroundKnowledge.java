@@ -2,10 +2,13 @@ package relationalFramework.agentObservations;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import util.MultiMap;
 
@@ -17,11 +20,14 @@ import util.MultiMap;
 public class NonRedundantBackgroundKnowledge implements Serializable {
 	private static final long serialVersionUID = -7845690550224825015L;
 
-	/** The background knowledge rules ordered by what they simplify. */
-	private MultiMap<SortedSet<RelationalPredicate>, BackgroundKnowledge> currentKnowledge_;
+	/**
+	 * The background knowledge rules ordered by what they simplify (in String
+	 * ID).
+	 */
+	private MultiMap<String, BackgroundKnowledge> currentKnowledge_;
 
 	/** The equivalence post conditions. */
-	private Collection<SortedSet<RelationalPredicate>> equivalencePostConds_;
+	private Collection<String> equivalencePostConds_;
 
 	/** The rules mapped by the left side predicates (or either if equivalent). */
 	private MultiMap<String, BackgroundKnowledge> predicateMap_;
@@ -31,7 +37,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 
 	public NonRedundantBackgroundKnowledge() {
 		currentKnowledge_ = MultiMap.createSortedSetMultiMap();
-		equivalencePostConds_ = new HashSet<SortedSet<RelationalPredicate>>();
+		equivalencePostConds_ = new HashSet<String>();
 		predicateMap_ = MultiMap.createSortedSetMultiMap();
 		reversePredicateMap_ = MultiMap.createSortedSetMultiMap();
 	}
@@ -51,59 +57,65 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 					bckKnow.getNonPreferredFacts());
 			SortedSet<RelationalPredicate> preferredFacts = new TreeSet<RelationalPredicate>(
 					bckKnow.getPreferredFacts());
+			String[] factStrings = formFactsKeys(preferredFacts,
+					nonPreferredFacts);
 			// If an implication rule
 			if (!bckKnow.isEquivalence()) {
-				for (SortedSet<RelationalPredicate> equivPostCond : equivalencePostConds_) {
+				for (String equivPostString : equivalencePostConds_) {
 					// If any equivalent post conditions are in this implication
 					// rule, return false
-					if (nonPreferredFacts.containsAll(equivPostCond)
-							|| preferredFacts.containsAll(equivPostCond))
+					if (factStrings[0].contains(equivPostString)
+							|| factStrings[0].contains(equivPostString))
 						return false;
 				}
 
 				// Rule isn't present, can add freely
-				addRule(bckKnow, preferredFacts, nonPreferredFacts);
+				addRule(bckKnow, preferredFacts, nonPreferredFacts,
+						factStrings[1]);
 				return true;
 			} else {
 				// Equivalence rule
-				if (currentKnowledge_.containsKey(preferredFacts)) {
+				if (currentKnowledge_.containsKey(factStrings[0])) {
 					// If the background knowledge rule is an equivalence rule,
 					// it may be redundant
 					SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
-							.getSortedSet(preferredFacts);
+							.getSortedSet(factStrings[0]);
 					// If the existing rules are only an equivalence rule, this
 					// rule is redundant
 					if (existingRules.size() == 1
 							&& existingRules.first().isEquivalence()) {
 						return false;
 					}
-				} else if (currentKnowledge_.containsKey(nonPreferredFacts)) {
+				}
+				if (currentKnowledge_.containsKey(factStrings[1])) {
 					// Fact already exists in another rule - it may be redundant
 					SortedSet<BackgroundKnowledge> existingRules = currentKnowledge_
-							.getSortedSet(nonPreferredFacts);
+							.getSortedSet(factStrings[1]);
 					if (existingRules.size() > 1
 							|| !existingRules.first().isEquivalence()) {
 						// If the existing rules are inference rules, this rule
 						// trumps them all
-						removeRules(nonPreferredFacts);
-						addRule(bckKnow, preferredFacts, nonPreferredFacts);
+						removeRules(factStrings[1]);
+						addRule(bckKnow, preferredFacts, nonPreferredFacts,
+								factStrings[1]);
 						return true;
 					} else {
 						// Check if this rule's preconditions are more general
 						// than the existing equivalence rule's
 						if (bckKnow.compareTo(existingRules.first()) == -1) {
-							removeRules(nonPreferredFacts);
-							addRule(bckKnow, preferredFacts, nonPreferredFacts);
+							removeRules(factStrings[1]);
+							addRule(bckKnow, preferredFacts, nonPreferredFacts,
+									factStrings[1]);
 							return true;
 						}
 					}
 
 					return false;
-				} else {
-					// Rule isn't present, can add freely
-					addRule(bckKnow, preferredFacts, nonPreferredFacts);
-					return true;
 				}
+				// Rule isn't present, can add freely
+				addRule(bckKnow, preferredFacts, nonPreferredFacts,
+						factStrings[1]);
+				return true;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -112,12 +124,62 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	}
 
 	/**
+	 * Forms the key for a group of facts.
+	 * 
+	 * @param facts
+	 *            The facts to form the string key for.
+	 * @return A string representing the facts in generalised format (variables
+	 *         are fully variable).
+	 */
+	private String[] formFactsKeys(
+			SortedSet<RelationalPredicate> preferredFacts,
+			SortedSet<RelationalPredicate> nonPreferredFacts) {
+		String[] factsKeys = new String[2];
+		StringBuffer buffer = new StringBuffer();
+		Map<RelationalArgument, Character> replMap = new HashMap<RelationalArgument, Character>();
+		replMap.put(RelationalArgument.ANONYMOUS, '?');
+
+		// Replace non-preferred facts first
+		int charIndex = 0;
+		for (RelationalPredicate fact : nonPreferredFacts) {
+			buffer.append("(");
+			if (fact.isNegated())
+				buffer.append("!");
+			buffer.append(fact.getFactName());
+			for (RelationalArgument arg : fact.getRelationalArguments()) {
+				if (!replMap.containsKey(arg))
+					replMap.put(arg, (char) ('A' + charIndex++));
+				buffer.append(replMap.get(arg));
+			}
+			buffer.append(")");
+		}
+		factsKeys[1] = buffer.toString();
+
+		// Replace preferred facts, using same replacement map
+		buffer = new StringBuffer();
+		for (RelationalPredicate fact : preferredFacts) {
+			buffer.append("(");
+			if (fact.isNegated())
+				buffer.append("!");
+			buffer.append(fact.getFactName());
+			for (RelationalArgument arg : fact.getRelationalArguments()) {
+				if (!replMap.containsKey(arg))
+					replMap.put(arg, (char) ('A' + charIndex++));
+				buffer.append(replMap.get(arg));
+			}
+			buffer.append(")");
+		}
+		factsKeys[0] = buffer.toString();
+		return factsKeys;
+	}
+
+	/**
 	 * Removes all rules from the given set from the member variables.
 	 * 
 	 * @param removeKey
 	 *            The key of the rules to remove.
 	 */
-	private void removeRules(SortedSet<RelationalPredicate> removeKey) {
+	private void removeRules(String removeKey) {
 		Collection<BackgroundKnowledge> removedRules = currentKnowledge_
 				.remove(removeKey);
 		for (BackgroundKnowledge removed : removedRules) {
@@ -144,10 +206,10 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	 */
 	private void addRule(BackgroundKnowledge bckKnow,
 			SortedSet<RelationalPredicate> preferredFacts,
-			SortedSet<RelationalPredicate> nonPreferredFacts) {
-		currentKnowledge_.put(nonPreferredFacts, bckKnow);
+			SortedSet<RelationalPredicate> nonPreferredFacts, String factString) {
+		currentKnowledge_.put(factString, bckKnow);
 		if (bckKnow.isEquivalence())
-			equivalencePostConds_.add(nonPreferredFacts);
+			equivalencePostConds_.add(factString);
 		for (RelationalPredicate fact : preferredFacts) {
 			predicateMap_.putContains(fact.getFactName(), bckKnow);
 			if (bckKnow.isEquivalence())

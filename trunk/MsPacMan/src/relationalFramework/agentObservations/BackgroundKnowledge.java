@@ -115,6 +115,11 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		}
 
 		normaliseRuleArgs();
+
+		if (equivalentRule_ && preConds_.size() == 1
+				&& preConds_.iterator().next().compareTo(postCondition_) > 0)
+			// Otherwise check which side is simpler
+			precendence_ = RIGHT_SIDE;
 	}
 
 	/**

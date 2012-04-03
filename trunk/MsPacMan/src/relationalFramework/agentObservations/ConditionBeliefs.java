@@ -434,6 +434,13 @@ public class ConditionBeliefs implements Serializable {
 			Map<String, ConditionBeliefs> conditionBeliefs,
 			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs,
 			BidiMap replacementMap) {
+		// First check the potential equivalence doesn't involve obvious type
+		// relations
+		if (extraCond == null
+				&& (obviousTypeEquivalence(cbFact_, otherCond) || obviousTypeEquivalence(
+						otherCond, cbFact_)))
+			return false;
+
 		// Get the conditions for this cond.
 		Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
 		Set<RelationalPredicate> thisSometimesTrue = getOccasionallyTrue(extraCond);
@@ -460,6 +467,34 @@ public class ConditionBeliefs implements Serializable {
 
 		return thisAlwaysTrue.equals(thatAlwaysTrue)
 				&& thisSometimesTrue.equals(thatSometimesTrue);
+	}
+
+	/**
+	 * Checks if the typeFact is an obvious type fact of baseFact.
+	 * 
+	 * @param baseFact
+	 *            The base fact to check.
+	 * @param typeFact
+	 *            The type fact to check.
+	 * @return True if typeFact is an obvious (defined) type of baseFact.
+	 */
+	private boolean obviousTypeEquivalence(RelationalPredicate baseFact,
+			RelationalPredicate typeFact) {
+		if (!StateSpec.getInstance().isTypePredicate(typeFact.getFactName()))
+			return false;
+
+		RelationalArgument typeArg = typeFact.getRelationalArguments()[0];
+		RelationalArgument[] baseArgs = baseFact.getRelationalArguments();
+		String[] argTypes = baseFact.getArgTypes();
+		for (int i = 0; i < baseArgs.length; i++) {
+			// Arg found
+			if (baseArgs[i].equals(typeArg)) {
+				// Is obvious type?
+				if (argTypes[i].equals(typeFact.getFactName()))
+					return true;
+			}
+		}
+		return false;
 	}
 
 	/**
