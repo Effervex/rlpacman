@@ -246,7 +246,7 @@ public abstract class StateSpec {
 			for (String type : action.getArgTypes())
 				if (isNumberType(type))
 					numberPreds_.add(action.getFactName());
-			defineTemplate(action.getFactName(), rete_);
+			defineTemplate(action, rete_);
 		}
 		actionNum_ = initialiseActionsPerStep();
 		// Action rules
@@ -319,7 +319,7 @@ public abstract class StateSpec {
 			for (String type : pred.getArgTypes())
 				if (isNumberType(type))
 					numberPreds_.add(pred.getFactName());
-			defineTemplate(pred.getFactName(), rete_);
+			defineTemplate(pred, rete_);
 		}
 	}
 
@@ -329,9 +329,10 @@ public abstract class StateSpec {
 		Map<String, String> typeParents = initialiseTypePredicateTemplates();
 		typeHierarchy_ = new HashMap<String, ParentChildren>();
 		for (String type : typeParents.keySet()) {
-			typePredicates_.put(type, new RelationalPredicate(type,
-					new String[] { type }));
-			defineTemplate(type, rete_);
+			RelationalPredicate typePred = new RelationalPredicate(type,
+					new String[] { type });
+			typePredicates_.put(type, typePred);
+			defineTemplate(typePred, rete_);
 
 			// Define background knowledge rule
 			if (typeParents.get(type) != null) {
@@ -624,13 +625,14 @@ public abstract class StateSpec {
 	 *            The rete object being asserted to.
 	 * @return The name of the fact template.
 	 */
-	public String defineTemplate(String factName, Rete rete) {
+	public String defineTemplate(RelationalPredicate fact, Rete rete) {
 		try {
-			rete.eval("(deftemplate " + factName + " (declare (ordered TRUE)))");
+			rete.eval("(deftemplate " + fact.getFactName()
+					+ " (declare (ordered TRUE)))");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		return factName;
+		return fact.getFactName();
 	}
 
 	/**

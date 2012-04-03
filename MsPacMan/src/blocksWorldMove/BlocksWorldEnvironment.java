@@ -111,9 +111,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			return;
 		}
 
-		// Assert the floor
-		rete.assertString("(floor floor)");
-
 		Integer[] intState = state_.getState();
 
 		// Scanning through, making predicates (On)
