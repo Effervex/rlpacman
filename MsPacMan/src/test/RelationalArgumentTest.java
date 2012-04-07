@@ -24,32 +24,32 @@ public class RelationalArgumentTest {
 		assertTrue(ra.equals(RelationalArgument.ANONYMOUS));
 		assertFalse(ra.isVariable());
 		assertFalse(ra.isConstant());
-		assertFalse(ra.isRange());
+		assertFalse(ra.isRange(false));
 		assertFalse(ra.isNumber());
 
 		ra = new RelationalArgument("?X");
 		assertTrue(ra.isVariable());
 		assertFalse(ra.isConstant());
-		assertFalse(ra.isRange());
+		assertFalse(ra.isRange(false));
 		assertFalse(ra.isNumber());
 
 		ra = new RelationalArgument("X");
 		assertFalse(ra.isVariable());
 		assertTrue(ra.isConstant());
-		assertFalse(ra.isRange());
+		assertFalse(ra.isRange(false));
 		assertFalse(ra.isNumber());
 
 		ra = new RelationalArgument("14.4");
 		assertFalse(ra.isVariable());
 		assertFalse(ra.isConstant());
-		assertFalse(ra.isRange());
+		assertFalse(ra.isRange(false));
 		assertTrue(ra.isNumber());
 
 		ra = new RelationalArgument(RelationalArgument.GOAL_VARIABLE_PREFIX
 				+ "0");
 		assertFalse(ra.isVariable());
 		assertTrue(ra.isConstant());
-		assertFalse(ra.isRange());
+		assertFalse(ra.isRange(false));
 		assertFalse(ra.isNumber());
 
 		ra = new RelationalArgument(RelationalArgument.RANGE_VARIABLE_PREFIX
@@ -57,7 +57,7 @@ public class RelationalArgumentTest {
 				+ "0 10)");
 		assertTrue(ra.isVariable());
 		assertFalse(ra.isConstant());
-		assertTrue(ra.isRange());
+		assertTrue(ra.isRange(false));
 		assertTrue(ra.isNumber());
 	}
 

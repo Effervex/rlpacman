@@ -28,12 +28,14 @@ public class RLMarioStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
-		preconds.put("move", "(canJumpOn ?X) (thing ?X) "
+		preconds.put("moveTo", "(canJumpOn ?X) (thing ?X) "
 				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
+		// Moving away from a given object
+//		preconds.put("moveFrom", "(canJumpOn ?X) (thing ?X) "
+//				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
-		preconds.put(
-				"search",
+		preconds.put("search",
 				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(<= -32 ?D 32)) "
 						+ "(heightDiff ?X ?Y&:(<= 16 ?Y 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
@@ -87,7 +89,13 @@ public class RLMarioStateSpec extends StateSpec {
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("move", structure));
+		actions.add(new RelationalPredicate("moveTo", structure));
+
+		// Move away from something
+//		structure = new String[2];
+//		structure[0] = "thing";
+//		structure[1] = NumberEnum.Integer.toString();
+//		actions.add(new RelationalPredicate("moveFrom", structure));
 
 		// Search a brick
 		structure = new String[2];
@@ -170,7 +178,7 @@ public class RLMarioStateSpec extends StateSpec {
 		// Search bricks
 		rules.add("(brick ?X) (heightDiff ?X ?Y) => (search ?X ?Y)");
 		// To the goal
-		rules.add("(flag ?X) (distance ?X ?Y) => (move ?X ?Y)");
+		rules.add("(flag ?X) (distance ?X ?Y) => (moveTo ?X ?Y)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new RelationalRule(rule));

@@ -216,16 +216,30 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 */
 	public void clearRanges() {
 		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].isRange())
+			if (arguments_[i].isRange(false)) {
 				arguments_[i] = new RelationalArgument(
 						arguments_[i].getStringArg());
+			}
 		}
 	}
 
 	@Override
-	public int compareTo(RelationalPredicate sf) {
+	public int compareTo(RelationalPredicate arg1) {
+		return compareTo(arg1, true);
+	}
+
+	/**
+	 * Compares this predicate against another predicate.
+	 * 
+	 * @param arg1
+	 *            The predicate to compare to.
+	 * @param ascending
+	 *            If # arguments is ascending.
+	 * @return -1 if this predicate is before the other, 1 if after, 0 if equal.
+	 */
+	public int compareTo(RelationalPredicate arg1, boolean ascending) {
 		// Compare by negation
-		if (negated_ != sf.negated_) {
+		if (negated_ != arg1.negated_) {
 			if (!negated_)
 				return -1;
 			else
@@ -234,25 +248,24 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 
 		// Type predicates trump non-type predicates
 		if (StateSpec.getInstance().isTypePredicate(factName_)) {
-			if (!StateSpec.getInstance().isTypePredicate(sf.factName_))
+			if (!StateSpec.getInstance().isTypePredicate(arg1.factName_))
 				return -1;
-		} else if (StateSpec.getInstance().isTypePredicate(sf.factName_))
+		} else if (StateSpec.getInstance().isTypePredicate(arg1.factName_))
 			return 1;
 
 		// Compare by number of arguments (complexity)
-		int result = Double.compare(arguments_.length, sf.arguments_.length);
+		int result = Double.compare(arguments_.length, arg1.arguments_.length);
 		if (result != 0)
-			return result;
+			return (ascending) ? result : -result;
 
-		// Fact Types should be the same if both names are the same
 		// Check arguments
 		for (int i = 0; i < arguments_.length; i++) {
-			result = arguments_[i].compareTo(sf.arguments_[i]);
+			result = arguments_[i].compareTo(arg1.arguments_[i]);
 			if (result != 0)
 				return result;
 		}
 
-		result = factName_.compareTo(sf.factName_);
+		result = factName_.compareTo(arg1.factName_);
 		if (result != 0)
 			return result;
 		return 0;

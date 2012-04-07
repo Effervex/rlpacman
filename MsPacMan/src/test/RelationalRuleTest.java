@@ -2,6 +2,11 @@ package test;
 
 import static org.junit.Assert.*;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+
+import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 
@@ -130,8 +135,9 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(clear ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?X ?))")));
-		
-		// Binding negated unbound (the only way to bind unbound negated variables)
+
+		// Binding negated unbound (the only way to bind unbound negated
+		// variables)
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(thing ?Unb_0) (not (on ?D ?Unb_0)) => (move ?A ?D)");
 		assertEquals(rule.getConditions(false).size(), 6);
@@ -143,7 +149,7 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?Y ?Bnd_0))")));
-		
+
 		// Unbinding lonely variables
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(not (on ?A ?Bnd_0)) => (move ?A ?D)");
@@ -154,7 +160,7 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(clear ?Y)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?X ?))")));
-		
+
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(thing ?Bnd_4) (not (on ?A ?Bnd_4)) => (move ?A ?D)");
 		assertEquals(rule.getConditions(false).size(), 6);
@@ -166,7 +172,7 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(thing ?Bnd_0)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (on ?X ?Bnd_0))")));
-		
+
 		// Negated numerical condition
 		rule = new RelationalRule("(clear ?A) (clear ?D) "
 				+ "(thing ?Bnd_4) (not (height ?A ?)) => (move ?A ?D)");
@@ -179,6 +185,24 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(thing ?Unb_0)")));
 		assertTrue(rule.getConditions(false).contains(
 				StateSpec.toRelationalPredicate("(not (height ?X ?))")));
+	}
+
+	@Test
+	public void testConditionOrdering() {
+		Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>();
+		conditions.add(StateSpec.toRelationalPredicate("(above ?X ?G_0)"));
+		conditions.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		conditions.add(StateSpec.toRelationalPredicate("(clear ?G_1)"));
+		conditions.add(StateSpec.toRelationalPredicate("(above ?G_1 ?Unb_0)"));
+		conditions.add(StateSpec.toRelationalPredicate("(on ?X ?Unb_1)"));
+		RelationalPredicate action = StateSpec
+				.toRelationalPredicate("(move ?X ?G_1)");
+		RelationalRule rule = new RelationalRule(conditions, action, null);
+		List<RelationalPredicate> ruleConditions = rule.getConditions(false);
+		// No more automatically added type conds
+		assertEquals(ruleConditions.get(0).toString(), "(clear ?G_1)");
+		assertEquals(ruleConditions.get(1).toString(), "(above ?X ?G_0)");
+		assertEquals(ruleConditions.get(1).toString(), "(above ?X ?G_0)");
 	}
 
 	@Test

@@ -39,14 +39,14 @@ public class Slot implements Serializable, Comparable<Slot> {
 	/** The ordering of the slot (0..1) */
 	private double ordering_;
 
+	/** The distribution containing this slot. */
+	private PolicyGenerator parentDistribution_;
+
 	/** The rule generator within the slot. */
 	private ProbabilityDistribution<RelationalRule> ruleGenerator_;
 
 	/** The seed (first) rule for the slot. */
 	private RelationalRule seedRule_;
-
-	/** The chance of this slot being selected. */
-	private double slotMean_;
 
 	/** The hashcode for the slot. */
 	private int slotHash_;
@@ -54,11 +54,13 @@ public class Slot implements Serializable, Comparable<Slot> {
 	/** The slot level (number of splits frm RLGG slot). */
 	private int slotLevel_;
 
+	/** The chance of this slot being selected. */
+	private double slotMean_;
+
 	/** The amount of updating this slot is receiving. */
 	private double updateDelta_ = Integer.MAX_VALUE;
 
-	/** The distribution containing this slot. */
-	private PolicyGenerator parentDistribution_;
+	private int convergedCount_;
 
 	/**
 	 * A constructor for a new slot. The slot may be fixed (only one rule
@@ -88,6 +90,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 			ruleGenerator_.add(seedRule);
 			slotLevel_ = level;
 		}
+		convergedCount_ = 0;
 		ordering_ = 0.5;
 		parentDistribution_ = parentDistribution;
 		calculateHash();
@@ -132,28 +135,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 		guidedRule.setSlot(this);
 	}
 
-	/**
-	 * Checks if this slot is converged. Also applies slot fixing if that option
-	 * is enabled.
-	 * 
-	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
-	 */
-	public boolean isConverged() {
-		// If KL size is 1, then the slot can be fixed.
-		if (ProgramArgument.SLOT_FIXING.booleanValue()) {
-			if (!fixed_ && klSize() == 1
-					&& slotMean_ >= 1 - ProgramArgument.BETA.doubleValue()) {
-				fixed_ = true;
-				fixedRule_ = ruleGenerator_.getBestElement();
-			}
-		}
-		// If mean is close to 0 or 1, return true
-		if (fixed_ || slotMean_ <= ProgramArgument.BETA.doubleValue()
-				|| updateDelta_ < ProgramArgument.BETA.doubleValue())
-			return true;
-		return false;
-	}
-
 	@Override
 	public int compareTo(Slot other) {
 		int result = action_.compareTo(other.action_);
@@ -192,6 +173,49 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean contains(RelationalRule gr) {
 		return ruleGenerator_.contains(gr);
+	}
+
+	/**
+	 * Gets the local alpha for this slot. If the slot is not ready for updates
+	 * yet, return 0.
+	 * 
+	 * @param alpha
+	 *            The standard alpha value.
+	 * @param population
+	 *            The size of the population.
+	 * @param numElites
+	 *            The minimum number of elite samples.
+	 * @param totalPoliciesEvaluated
+	 *            The number of policies updated.
+	 * @return The local alpha value or 0 if the slot is not ready for updates.
+	 */
+	public double determineLocalAlpha(double alpha, int population,
+			int numElites, int totalPoliciesEvaluated) {
+		// If using a local alpha and using dynamic slots, use the number of
+		// updates this slot has been present in.
+		if (ProgramArgument.LOCAL_ALPHA.booleanValue()
+				&& ProgramArgument.DYNAMIC_SLOTS.booleanValue())
+			totalPoliciesEvaluated = numUpdates_;
+
+		// If the slot has not seen enough samples to update, return 0.
+		int evaluationThreshold = determineEvaluationThreshold();
+		if (totalPoliciesEvaluated < evaluationThreshold)
+			return 0;
+
+		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
+				: totalPoliciesEvaluated;
+		return alpha / Math.max(population - policiesEvaluated, numElites);
+	}
+
+	/**
+	 * Determines the number of evaluations this slot must undergo before it is
+	 * allowed to update.
+	 * 
+	 * @return The minimum number of slot evaluations required.
+	 */
+	private int determineEvaluationThreshold() {
+		return (int) (size() * ProgramArgument.CONFIDENCE_INTERVAL
+				.doubleValue());
 	}
 
 	@Override
@@ -298,38 +322,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return slotLevel_;
 	}
 
-	/**
-	 * Gets the local alpha for this slot. If the slot is not ready for updates
-	 * yet, return 0.
-	 * 
-	 * @param alpha
-	 *            The standard alpha value.
-	 * @param population
-	 *            The size of the population.
-	 * @param numElites
-	 *            The minimum number of elite samples.
-	 * @param totalPoliciesEvaluated
-	 *            The number of policies updated.
-	 * @return The local alpha value or 0 if the slot is not ready for updates.
-	 */
-	public double getLocalAlpha(double alpha, int population, int numElites,
-			int totalPoliciesEvaluated) {
-		// If using a local alpha and using dynamic slots, use the number of
-		// updates this slot has been present in.
-		if (ProgramArgument.LOCAL_ALPHA.booleanValue()
-				&& ProgramArgument.DYNAMIC_SLOTS.booleanValue())
-			totalPoliciesEvaluated = numUpdates_;
-
-		// If the slot has not seen enough samples to update, return 0.
-		int evaluationThreshold = (int) (size() * PolicyGenerator.CONFIDENCE_INTERVAL);
-		if (totalPoliciesEvaluated < evaluationThreshold)
-			return 0;
-
-		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
-				: totalPoliciesEvaluated;
-		return alpha / Math.max(population - policiesEvaluated, numElites);
-	}
-
 	public double getOrdering() {
 		return ordering_;
 	}
@@ -368,6 +360,38 @@ public class Slot implements Serializable, Comparable<Slot> {
 	@Override
 	public int hashCode() {
 		return slotHash_;
+	}
+
+	/**
+	 * Checks if this slot is converged. Also applies slot fixing if that option
+	 * is enabled.
+	 * 
+	 * @return True if this slot's mean has converged to 0 or 1, +- epsilon.
+	 */
+	public boolean isConverged() {
+		// If KL size is 1, then the slot can be fixed.
+		if (ProgramArgument.SLOT_FIXING.booleanValue()) {
+			if (!fixed_ && klSize() == 1
+					&& slotMean_ >= 1 - ProgramArgument.BETA.doubleValue()) {
+				fixed_ = true;
+				fixedRule_ = ruleGenerator_.getBestElement();
+			}
+		}
+		// If slot is fixed, return true
+		if (fixed_)
+			return true;
+		// If slot has mean ~0, return true;
+		if (slotMean_ <= ProgramArgument.BETA.doubleValue())
+			return true;
+		// If the update delta is low enough (and stays low), return true.
+		if (updateDelta_ < ProgramArgument.BETA.doubleValue()) {
+			convergedCount_++;
+			if (convergedCount_ >= ProgramArgument.NUM_UPDATES_CONVERGED
+					.intValue())
+				return true;
+		} else
+			convergedCount_ = 0;
+		return false;
 	}
 
 	public boolean isEmpty() {
@@ -409,6 +433,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 		if (fixed_)
 			return 1;
 		return ruleGenerator_.klSize();
+	}
+
+	public void resetPolicyCount() {
+		numUpdates_ = 0;
 	}
 
 	/**
@@ -456,20 +484,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 		return ruleGenerator_.size();
 	}
 
-	@Override
-	public String toString() {
-		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
-		buffer.append(slotSplitToString());
-		buffer.append(" [MU:" + slotMean_ + ";ORD:" + ordering_ + ";KL_SIZE:"
-				+ klSize() + ";SIZE:" + size() + ";LVL:" + slotLevel_
-				+ ";#UPDATES:" + numUpdates_ + "]");
-		if (fixed_)
-			buffer.append(" " + fixedRule_.toString());
-		else
-			buffer.append(" " + ruleGenerator_.toString());
-		return buffer.toString();
-	}
-
 	/**
 	 * Outputs this slot split facts as a string.
 	 * 
@@ -490,6 +504,20 @@ public class Slot implements Serializable, Comparable<Slot> {
 			buffer.append(" -> ");
 		}
 		buffer.append(action_.toString() + ")");
+		return buffer.toString();
+	}
+
+	@Override
+	public String toString() {
+		StringBuffer buffer = new StringBuffer((fixed_) ? "FIXED " : "");
+		buffer.append(slotSplitToString());
+		buffer.append(" [MU:" + slotMean_ + ";ORD:" + ordering_ + ";KL_SIZE:"
+				+ klSize() + ";SIZE:" + size() + ";LVL:" + slotLevel_
+				+ ";#UPDATES:" + numUpdates_ + "]");
+		if (fixed_)
+			buffer.append(" " + fixedRule_.toString());
+		else
+			buffer.append(" " + ruleGenerator_.toString());
 		return buffer.toString();
 	}
 
@@ -522,7 +550,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		if (ed == null || alpha == 0)
 			return null;
 
-		double alphaPrime = getLocalAlpha(alpha, population, numElites,
+		double alphaPrime = determineLocalAlpha(alpha, population, numElites,
 				totalPoliciesEvaluated);
 		if (alphaPrime > 0) {
 			// Update the slot values
@@ -579,9 +607,5 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean useSlot(Random random) {
 		return random.nextDouble() < slotMean_;
-	}
-
-	public void resetPolicyCount() {
-		numUpdates_ = 0;
 	}
 }

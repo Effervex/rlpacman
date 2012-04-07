@@ -39,13 +39,6 @@ public class Performance implements Serializable {
 	/** Unicode symbol for +-. */
 	public static final String SD_SYMBOL = "\u00b1";
 
-	/**
-	 * The number of updates that the performance has remained close to the
-	 * mean.
-	 */
-	private int convergedCount_;
-	/** The convergence value for performance convergence. */
-	private double convergedMean_;
 	/** The episodic reward (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeMeans_;
 	/** The episodic SD (including policy repetitions). */
@@ -122,22 +115,13 @@ public class Performance implements Serializable {
 		episodeMeans_.put(currentEpisode, mean);
 		episodeSDs_.put(currentEpisode, sd.evaluate(vals));
 
-		if (Math.abs(mean - convergedMean_) > meanDeviation) {
-			convergedMean_ = mean;
-			convergedCount_ = -1;
-		}
-		convergedCount_++;
-
 		// Output current means
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue() && !frozen_) {
 			DecimalFormat formatter = new DecimalFormat("#0.00");
-			String converged = formatter.format(100 * convergedCount_
-					/ ProgramArgument.PERFORMANCE_TESTING_SIZE.doubleValue())
-					+ "%";
 			String meanString = formatter.format(mean);
 			String sdString = formatter.format(meanDeviation);
-			System.out.println(converged + " performance converged at value: "
-					+ meanString + " " + SD_SYMBOL + " " + sdString);
+			System.out.println("Average performance: " + meanString + " "
+					+ SD_SYMBOL + " " + sdString);
 		}
 	}
 
@@ -343,17 +327,6 @@ public class Performance implements Serializable {
 
 	public double getMinimumReward() {
 		return minMaxReward_[0];
-	}
-
-	/**
-	 * Checks if the performance appears to be converged (hasn't changed for
-	 * some time).
-	 * 
-	 * @return True if the performance appears to be converged.
-	 */
-	public boolean isConverged() {
-		return convergedCount_ >= ProgramArgument.NUM_PERFORMANCES_CONVERGED
-				.intValue();
 	}
 
 	/**

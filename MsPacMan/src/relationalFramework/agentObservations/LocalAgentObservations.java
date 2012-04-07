@@ -1055,7 +1055,7 @@ public class LocalAgentObservations extends SettlingScan implements
 									condition, baseRule.getAction());
 							// If the arg is a range or represents a range, can
 							// split it
-							if (arg.isRange()) {
+							if (arg.isRange(true)) {
 								subranges.addAll(splitExistingRange(baseRule,
 										condition, i, arg, context));
 							} else {
