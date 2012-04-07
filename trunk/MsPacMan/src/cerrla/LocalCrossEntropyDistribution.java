@@ -360,12 +360,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (!frozen_ && goalCondition_.isMainGoal()) {
 			// Test the learned behaviour
 			System.out.println();
-			if (!ProgramArgument.ENSEMBLE_EVALUATION.booleanValue())
-				System.out.println("Beginning [" + goalCondition_
-						+ "] testing for episode " + currentEpisode_ + ".");
-			else
-				System.out.println("Beginning ensemble testing for episode "
-						+ currentEpisode_ + ".");
+			System.out.println("Beginning [" + goalCondition_
+					+ "] testing for episode " + currentEpisode_ + ".");
+
 			System.out.println();
 			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 				System.out.println("Testing...");
@@ -459,11 +456,6 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					&& !subGoal.isConverged())
 				return false;
 		}
-
-		// Check performance convergence
-		if (ProgramArgument.PERFORMANCE_CONVERGENCE.booleanValue())
-			if (performance_.isConverged())
-				return true;
 
 		// Check elite convergence
 		if (elites_.size() >= population_

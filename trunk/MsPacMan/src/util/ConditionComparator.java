@@ -1,5 +1,7 @@
 package util;
 
+import relationalFramework.ArgumentType;
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
@@ -39,7 +41,40 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 			return -1;
 		}
 
-		// Determine the type of condition
+		// First, compare by negation
+		if (!arg0.isNegated() && arg1.isNegated())
+			return -1;
+		if (arg0.isNegated() && !arg1.isNegated())
+			return 1;
+
+		// Next compare by argument types contained within
+		int[] argCounter0 = new int[ArgumentType.values().length];
+		double numArgs0 = 0;
+		for (RelationalArgument relArg : arg0.getRelationalArguments()) {
+			argCounter0[relArg.getArgumentType().ordinal()]++;
+			numArgs0++;
+		}
+
+		double numArgs1 = 0;
+		int[] argCounter1 = new int[ArgumentType.values().length];
+		for (RelationalArgument relArg : arg1.getRelationalArguments()) {
+			argCounter1[relArg.getArgumentType().ordinal()]++;
+			numArgs1++;
+		}
+
+		// Compare arg counts
+		for (int i = 0; i < argCounter0.length; i++) {
+			int result = Double.compare(argCounter0[i] / numArgs0, argCounter1[i] / numArgs1);
+			if (result != 0)
+				return -result;
+		}
+		
+		// Compare by num arguments
+		int result = Double.compare(numArgs0, numArgs1);
+		if (result != 0)
+			return -result;
+		
+		// Compare by cond type
 		int condType0 = BASE;
 		int condType1 = BASE;
 
@@ -67,7 +102,7 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 			return -1;
 		if (condType0 > condType1)
 			return 1;
-		return arg0.compareTo(arg1);
+		return arg0.compareTo(arg1, false);
 	}
 
 	public static Comparator<RelationalPredicate> getInstance() {

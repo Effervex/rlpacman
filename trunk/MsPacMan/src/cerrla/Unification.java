@@ -544,9 +544,9 @@ public class Unification {
 
 		String variable = baseValue.getStringArg();
 		// If the fact isn't a variable yet, change the action terms.
-		if (!baseValue.isRange()) {
+		if (!baseValue.isRange(false)) {
 			// If the unity value is a range, use that.
-			if (unifiedValue.isRange())
+			if (unifiedValue.isRange(false))
 				variable = unifiedValue.getStringArg();
 			else {
 				variable = RelationalArgument.RANGE_VARIABLE_PREFIX

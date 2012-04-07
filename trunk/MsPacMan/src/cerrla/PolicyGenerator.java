@@ -58,12 +58,6 @@ public final class PolicyGenerator implements Serializable {
 
 	private static final long serialVersionUID = 3157117448981353095L;
 
-	/**
-	 * The multiplier to test 95% of the rules at least once in the largest
-	 * slot.
-	 */
-	public static final double CONFIDENCE_INTERVAL = 6.0;
-
 	/** The element delimiter between elements in the generator files. */
 	public static final String ELEMENT_DELIMITER = ",";
 
@@ -171,24 +165,11 @@ public final class PolicyGenerator implements Serializable {
 				.headSet(new PolicyValue(null, minValue, Integer.MAX_VALUE))
 				: elites;
 
-		// WEIGHTED UPDATES CODE
-		double gradient = 0;
-		double offset = 1;
-		if (ProgramArgument.WEIGHTED_UPDATES.booleanValue()) {
-			double diffValues = (subElites.first().getValue() - subElites
-					.last().getValue());
-			if (diffValues != 0)
-				gradient = (1 - ProgramArgument.MIN_WEIGHTED_UPDATE
-						.doubleValue()) / diffValues;
-			offset = 1 - gradient * subElites.first().getValue();
-		}
-		// /////////////////////
-
 
 		// Only selecting the top elite samples
 		Map<Slot, Double> slotMean = new HashMap<Slot, Double>();
 		for (PolicyValue pv : subElites) {
-			double weight = pv.getValue() * gradient + offset;
+			double weight = pv.getValue();
 			ModularPolicy eliteSolution = pv.getPolicy();
 
 			// Count the occurrences of rules and slots in the policy
@@ -746,8 +727,8 @@ public final class PolicyGenerator implements Serializable {
 		case ProgramArgument.ELITES_SIZE_MAX_RULE_NUM_SLOTS:
 			// Population is equal to the maximum (weighted) slot size * the
 			// number of slots * 3
-			population = CONFIDENCE_INTERVAL * maxWeightedRuleCount
-					* sumSlotMean;
+			population = ProgramArgument.CONFIDENCE_INTERVAL.doubleValue()
+					* maxWeightedRuleCount * sumSlotMean;
 			break;
 		case ProgramArgument.ELITES_SIZE_AV_RULES:
 		default:
@@ -831,7 +812,7 @@ public final class PolicyGenerator implements Serializable {
 			double slotOrdering = slot.getOrdering();
 			double slotOrderSD = slot.getOrderingSD();
 
-			// Insert the slot as many times as required.
+			// Only add slot if it isn't empty
 			if (!slot.isEmpty()) {
 				noRules = false;
 				if (slot.useSlot(RRLExperiment.random_)) {
@@ -1397,8 +1378,8 @@ public final class PolicyGenerator implements Serializable {
 				Slot slot = gr.getSlot();
 				if (slot != null) {
 					double negAlpha = negModifier
-							* slot.getLocalAlpha(alpha, population, numElites,
-									policiesEvaluated_) / numElites;
+							* slot.determineLocalAlpha(alpha, population,
+									numElites, policiesEvaluated_) / numElites;
 
 					// If the slot is ready for updates.
 					if (negAlpha != 0) {

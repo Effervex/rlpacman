@@ -744,7 +744,7 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to move to the object
 	 */
-	private boolean[] move(float startX, float startY, float marioX,
+	private boolean[] moveTo(float startX, float startY, float marioX,
 			float marioY, float endX, float endY, boolean bigMario) {
 		boolean[] actionArray = new boolean[Environment.numberOfKeys];
 
@@ -789,6 +789,72 @@ public class RLMarioMovement {
 
 		return actionArray;
 	}
+	
+	/**
+	 * Returns the actions necessary to take if Mario wants to move to a
+	 * particular point. Mario may jump to get there.
+	 * 
+	 * @param startX
+	 *            The x point from which the move was made.
+	 * @param startY
+	 *            The y point from which the move was made.
+	 * @param currentX
+	 *            Mario's current x point.
+	 * @param currentY
+	 *            Mario's current y point.
+	 * @param endX
+	 *            The x location to move to.
+	 * @param endY
+	 *            The y location to move to.
+	 * @param bigMario
+	 *            If Mario is currently big.
+	 * @return A boolean array of action required to move to the object
+	 */
+	private boolean[] moveFrom(float startX, float startY, float marioX,
+			float marioY, float endX, float endY, boolean bigMario) {
+		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+
+		actionArray[direction_] = true;
+		actionArray[Environment.MARIO_KEY_SPEED] = true;
+
+		// Jumping if thing is in same column
+		if (startEndDiffs_[0] < CELL_SIZE && startEndDiffs_[1] > 0)
+			actionArray[Environment.MARIO_KEY_JUMP] = true;
+
+		// Check if obstacles are in the way
+		int midY = basicLevelObs_.length / 2;
+		int midX = basicLevelObs_[midY].length / 2;
+		int jumpPoint = (int) Math.ceil(Math.min(currentEndDiffs_[0]
+				/ CELL_SIZE, MAX_JUMP_DIST / CELL_SIZE));
+		for (int x = jumpPoint; x >= 1; x--) {
+			// If there is an obstacle
+			// Big Mario check.
+			boolean obstacle = !ObservationConstants
+					.isEmptyCell(basicLevelObs_[midY][midX - (x * negModifier_)]);
+			int yOffset = 0;
+			if (bigMario
+					&& !ObservationConstants
+							.isEmptyCell(basicLevelObs_[midY - 1][midX
+									+ (x * negModifier_)])) {
+				yOffset = 1;
+				obstacle = true;
+			}
+
+			if (obstacle) {
+				// Find the highest point of the obstacle
+				while (yOffset < midY
+						&& !ObservationConstants
+								.isEmptyCell(basicLevelObs_[midY - yOffset - 1][midX
+										+ (x * negModifier_)]))
+					yOffset++;
+
+				return jumpOnto(startX, startY, marioX, marioY, startX
+						- directedCellSize_ * x, startY - CELL_SIZE * yOffset);
+			}
+		}
+
+		return actionArray;
+	}
 
 	/**
 	 * Pickup a shell (and continue to hold it until shot or used as a shield).
@@ -820,7 +886,7 @@ public class RLMarioMovement {
 			actionArray[direction_] = true;
 			return actionArray;
 		} else
-			return move(startX, startY, currentX, currentY, shellX, shellY,
+			return moveTo(startX, startY, currentX, currentY, shellX, shellY,
 					bigMario);
 	}
 
@@ -849,7 +915,7 @@ public class RLMarioMovement {
 		if (canJump(currentEndDiffs_, 0)) {
 			return jumpOnto(startX, startY, currentX, currentY, endX, endY);
 		} else
-			return move(startX, startY, currentX, currentY, endX, endY,
+			return moveTo(startX, startY, currentX, currentY, endX, endY,
 					bigMario);
 	}
 
@@ -887,7 +953,7 @@ public class RLMarioMovement {
 					endX, endY);
 			return jumpOnto(startX, startY, currentX, currentY, endX, endY);
 		} else
-			return move(startX, startY, currentX, currentY, endX, endY,
+			return moveTo(startX, startY, currentX, currentY, endX, endY,
 					bigMario);
 	}
 
@@ -918,7 +984,7 @@ public class RLMarioMovement {
 		// Get within one cell beneath the object
 		int movement = (int) (Math.max(1, startEndDiffs_[1] / (1 * CELL_SIZE)));
 		if (startEndDiffs_[0] > CELL_SIZE * movement) {
-			return move(startX, startY, currentX, currentY, endX, endY,
+			return moveTo(startX, startY, currentX, currentY, endX, endY,
 					bigMario);
 		}
 
@@ -1117,8 +1183,11 @@ public class RLMarioMovement {
 				marioPos[1], x, y);
 
 		// Determine the actions
-		if (action.getFactName().equals("move"))
-			actionArray = move(startPos[0], startPos[1], marioPos[0],
+		if (action.getFactName().equals("moveTo"))
+			actionArray = moveTo(startPos[0], startPos[1], marioPos[0],
+					marioPos[1], x, y, bigMario);
+		else if (action.getFactName().equals("moveFrom"))
+			actionArray = moveFrom(startPos[0], startPos[1], marioPos[0],
 					marioPos[1], x, y, bigMario);
 		else if (action.getFactName().equals("search"))
 			actionArray = search(startPos[0], startPos[1], marioPos[0],

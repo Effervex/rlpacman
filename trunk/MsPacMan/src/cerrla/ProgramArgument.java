@@ -24,6 +24,9 @@ public enum ProgramArgument implements Serializable {
 			"If the minimum number of elites = |D_S|."),
 	CHI(0.0, "chi", null, ParameterType.SAMPLING,
 			"The resampling percentage of average episode steps"),
+	CONFIDENCE_INTERVAL(6.0, "confidenceInterval", "-C",
+			ParameterType.SAMPLING, "The amount of confidence for sampling "
+					+ "every element at least once."),
 	DYNAMIC_SLOTS(true, "dynamicSlots", null, ParameterType.SPECIALISATION,
 			"If the slots grow dynamically"),
 	EARLY_UPDATING(true, "earlyUpdating", null, ParameterType.UPDATING,
@@ -34,10 +37,6 @@ public enum ProgramArgument implements Serializable {
 					+ "4=Confidence * Max KL weighted rules * num slots * rho"),
 	ELITES_MULTIPLE(1, "elitesMultiple", null, ParameterType.SAMPLING,
 			"The multiplier of the elites size."),
-	ENSEMBLE_EVALUATION(false, "ensembleEvaluation", null,
-			ParameterType.EVALUATION, "If using ensemble evaluation"),
-	ENSEMBLE_SIZE(100, "ensembleSize", null, ParameterType.EVALUATION,
-			"The size of the ensemble"),
 	EXPERIMENT_MODE(false, "experimentMode", "-e", ParameterType.EVALUATION,
 			"If GUI elements are to be hidden."),
 	GLOBAL_ELITES(false, "globalElites", null, ParameterType.SAMPLING,
@@ -51,26 +50,16 @@ public enum ProgramArgument implements Serializable {
 			ParameterType.SAMPLING, "The initial slot mu probabilities."),
 	LOCAL_ALPHA(true, "localAlpha", null, ParameterType.UPDATING,
 			"If updates are performed slot locally"),
-	MIN_WEIGHTED_UPDATE(0.1, "minWeightedUpdate", null, ParameterType.UPDATING,
-			"The minimal update when using weighted updates"),
-	MULTI_MODULES(false, "multiMods", null, ParameterType.SAMPLING,
-			"If multi-condition modules are to be learned/used"),
 	NEGATIVE_UPDATES(false, "negativeUpdates", null, ParameterType.UPDATING,
 			"If performing negative updates"),
 	NUM_NUMERICAL_SPLITS(3, "numNumericalSplits", null,
 			ParameterType.SPECIALISATION, "The number of numerical splits"),
-	NUM_PERFORMANCES_CONVERGED(3, "numPerformancesConverged", null,
-			ParameterType.CONVERGENCE,
-			"If the average performance has remained the same for this many iterations"),
 	NUM_UPDATES_CONVERGED(10, "numUpdatesConverged", null,
 			ParameterType.CONVERGENCE,
 			"If KL sum updates remain below Beta for this many updates"),
 	ONLY_GOAL_RULES(false, "onlyGoalRules", "-goalRules",
 			ParameterType.SPECIALISATION,
 			"If the agent should only create rules with the goal condition in it"),
-	PERFORMANCE_CONVERGENCE(false, "performanceConvergence", null,
-			ParameterType.CONVERGENCE,
-			"If converging when performance has settled"),
 	PERFORMANCE_EPISODE_GAP(100, "performanceEpisodeGap", null,
 			ParameterType.EVALUATION, "The gap between measuring performances"),
 	PERFORMANCE_TESTING_SIZE(100, "policyTestingSize", null,
@@ -103,8 +92,6 @@ public enum ProgramArgument implements Serializable {
 			ParameterType.SAMPLING, "If using/learning general modules"),
 	USE_MODULES(true, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
-	WEIGHTED_UPDATES(false, "weightedUpdates", null, ParameterType.UPDATING,
-			"If using weighted updates"),
 	WIDER_SPECIALISATION(true, "widerSpecialisation", null,
 			ParameterType.SPECIALISATION,
 			"If including non-action specialisation conditions");
@@ -224,12 +211,6 @@ public enum ProgramArgument implements Serializable {
 				INITIAL_SLOT_MEAN.setDoubleValue(Double.parseDouble(args[i]));
 				paramName = "slotProb" + args[i];
 			}
-			argFound = true;
-		} else if (args[i].equals("-ensemble")) {
-			ENSEMBLE_EVALUATION.setBooleanValue(true);
-			i++;
-			ENSEMBLE_SIZE.setDoubleValue(Integer.parseInt(args[i]));
-			paramName = "ensemble";
 			argFound = true;
 		} else if (args[i].equals("-dynamicSlots")) {
 			i++;

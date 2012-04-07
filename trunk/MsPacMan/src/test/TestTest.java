@@ -24,6 +24,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import jess.Fact;
+import jess.JessException;
 import jess.Rete;
 
 import org.apache.commons.math.distribution.PoissonDistribution;
@@ -283,6 +284,52 @@ public class TestTest {
 	}
 
 	@Test
+	public void testUnorderedSpeed() throws JessException {
+		Rete rete = new Rete();
+		rete.eval("(deftemplate on (slot arg0) (slot arg1))");
+		Random rand = new Random(0);
+		long fullStartTime = System.currentTimeMillis();
+		for (int i = 0; i < 10000; i++) {
+			char a = (char) ('a' + rand.nextInt(26));
+			char b = (char) ('a' + rand.nextInt(26));
+			String fact = "(on (arg0 " + a + ") (arg1 " + b + "))";
+			rete.assertString(fact);
+		}
+		rete.eval("(defrule findOnA (on (arg0 a) (arg1 ?X)) (on (arg0 ?X) (arg1 z)) => "
+				+ "(printout t \"It has been found!\" crlf))");
+		rete.eval("(defrule findNoA (on (arg0 ?X) (arg1 a)) (on (arg0 ?X) (arg1 ?Y)) (on (arg0 ?Y) (arg1 z)) => "
+				+ "(printout t \"It has also been found!\" crlf))");
+		long startTime = System.currentTimeMillis();
+		rete.run();
+		long endTime = System.currentTimeMillis();
+		System.out.println("Rule: " + (endTime - startTime));
+		System.out.println("Assert+Rule: " + (endTime - fullStartTime));
+	}
+
+	@Test
+	public void testOrderedSpeed() throws JessException {
+		Rete rete = new Rete();
+		rete.eval("(deftemplate on (declare (ordered TRUE)))");
+		Random rand = new Random(0);
+		long fullStartTime = System.currentTimeMillis();
+		for (int i = 0; i < 10000; i++) {
+			char a = (char) ('a' + rand.nextInt(26));
+			char b = (char) ('a' + rand.nextInt(26));
+			String fact = "(on " + a + " " + b + ")";
+			rete.assertString(fact);
+		}
+		rete.eval("(defrule findOnA (on a ?X) (on ?X z) => "
+				+ "(printout t \"It has been found!\" crlf))");
+		rete.eval("(defrule findNoA (on ?X a) (on ?X ?Y) (on ?Y z) => "
+				+ "(printout t \"It has also been found!\" crlf))");
+		long startTime = System.currentTimeMillis();
+		rete.run();
+		long endTime = System.currentTimeMillis();
+		System.out.println("Rule: " + (endTime - startTime));
+		System.out.println("Assert+Rule: " + (endTime - fullStartTime));
+	}
+
+	@Test
 	public void testClass() {
 		BlocksWorldEnvironment bwe = new BlocksWorldEnvironment();
 		assertEquals("blocksWorldMove.BlocksWorldEnvironment", bwe.getClass()
@@ -332,11 +379,11 @@ public class TestTest {
 			System.out.println("Example single slot, |S|=20: N=" + n + ", N_E="
 					+ Math.ceil(n * 0.05));
 			n = 20 * numPasses * 6;
-			System.out.println("Example multi slots, max|S|=20, |D_S|=6: N=" + n + ", N_E="
-					+ Math.ceil(n * 0.05));
+			System.out.println("Example multi slots, max|S|=20, |D_S|=6: N="
+					+ n + ", N_E=" + Math.ceil(n * 0.05));
 		}
 	}
-	
+
 	@Test
 	public void testSerialisation() throws Exception {
 		SerialisationClass sc = new SerialisationClass();
@@ -344,7 +391,7 @@ public class TestTest {
 		assertEquals(sc.getFoo(), 56);
 		sc.setFoo(23);
 		assertEquals(sc.getFoo(), 23);
-		
+
 		// Serialisation and deserialisation
 		File testFile = new File("testFile.ser");
 		testFile.createNewFile();
@@ -362,11 +409,11 @@ public class TestTest {
 		SerialisationClass serSC = (SerialisationClass) ois.readObject();
 		ois.close();
 		fis.close();
-		
+
 		assertFalse(serSC.getFoo() == 23);
 		assertEquals(serSC.getFoo(), 0);
 	}
-	
+
 	@Test
 	public void testPriorityQueue() {
 		PriorityQueue<Integer> pq = new PriorityQueue<Integer>();

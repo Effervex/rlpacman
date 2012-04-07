@@ -355,7 +355,7 @@ public class InvariantObservations implements Serializable {
 		RelationalArgument[] factArgs = numberFact.getRelationalArguments();
 		for (int i = 0; i < factArgs.length; i++) {
 			// Only note ranges
-			if (factArgs[i].isRange()) {
+			if (factArgs[i].isRange(false)) {
 				RangeContext context = new RangeContext(i, numberFact,
 						actionName);
 				double[] range = actionRanges.get(result);
