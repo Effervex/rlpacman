@@ -46,6 +46,8 @@ public class RangeBound implements Serializable, Comparable<RangeBound> {
 
 	@Override
 	public int compareTo(RangeBound o) {
+		if (o == null)
+			return -1;
 		return boundString_.compareTo(o.boundString_);
 	}
 

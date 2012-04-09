@@ -686,7 +686,7 @@ public class RLMarioMovement {
 			actionArray[Mario.KEY_JUMP] = false;
 
 		// Running or not
-		if (startEndDiffs_[0] >= MAX_JUMP_DIST)
+		if (startEndDiffs_[0] >= CELL_SIZE)
 			actionArray[Mario.KEY_SPEED] = true;
 
 		// HORIZONTAL MOVEMENT
@@ -830,7 +830,7 @@ public class RLMarioMovement {
 			// If there is an obstacle
 			// Big Mario check.
 			boolean obstacle = !ObservationConstants
-					.isEmptyCell(basicLevelObs_[midY][midX - (x * negModifier_)]);
+					.isEmptyCell(basicLevelObs_[midY][midX + (x * negModifier_)]);
 			int yOffset = 0;
 			if (bigMario
 					&& !ObservationConstants
@@ -849,7 +849,7 @@ public class RLMarioMovement {
 					yOffset++;
 
 				return jumpOnto(startX, startY, marioX, marioY, startX
-						- directedCellSize_ * x, startY - CELL_SIZE * yOffset);
+						+ directedCellSize_ * x, startY - CELL_SIZE * yOffset);
 			}
 		}
 

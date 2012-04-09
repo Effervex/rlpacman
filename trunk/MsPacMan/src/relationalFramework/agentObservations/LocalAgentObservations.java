@@ -813,6 +813,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				LocalAgentObservations lao = (LocalAgentObservations) ois
 						.readObject();
 				if (lao != null) {
+					if (localGoal.isMainGoal())
+						lao.localGoal_.setAsMainGoal();
 					return lao;
 				}
 			}
