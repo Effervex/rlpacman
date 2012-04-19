@@ -76,7 +76,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 				ei.timeLeft = 0;
 				reward[0] = ei.computeWeightedFitness();
 			} else
-				reward[1] = environment_.getEvaluationInfo()
+				reward[0] = environment_.getEvaluationInfo()
 						.computeWeightedFitness();
 		}
 		reward[1] = reward[0];
@@ -104,7 +104,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	@Override
 	protected void startState() {
 		cmdLineOptions_.setLevelRandSeed(RRLExperiment.random_.nextInt());
-		cmdLineOptions_.setLevelDifficulty(levelDifficulty_);
+		cmdLineOptions_.setLevelDifficulty(3);
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();

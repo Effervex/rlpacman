@@ -267,9 +267,11 @@ public class Unification {
 			if (numUnifiedFacts == 0) {
 				dropped.add(oldStateFact);
 			} else if (numUnifiedFacts == 1) {
-				// If it required replacements, store as complexity 1.
-				if (!unifiedFacts.iterator().next().getResultReplacements()
-						.equals(replacementMap)) {
+				// If it required replacements or is numerical, store as
+				// complexity 1.
+				UnifiedFact unifiedFact = unifiedFacts.iterator().next();
+				if (!unifiedFact.getResultReplacements().equals(replacementMap)
+						|| unifiedFact.getResultFact().isNumerical()) {
 					complexityMap.put(1, oldStateFact);
 					maxComplexity = Math.max(maxComplexity, 1);
 				} else {

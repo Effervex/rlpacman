@@ -28,12 +28,12 @@ import jess.Rete;
  */
 public class RLMarioMovement {
 	public static final int CELL_SIZE = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
-	public static final float MAX_JUMP_DIST = 79;
-	public static final float MAX_JUMP_DIST_RUNNING = 130;
-	public static final float MAX_JUMP_HEIGHT = 66.4f;
+	public static final int MAX_JUMP_DIST = 79;
+	public static final int MAX_JUMP_DIST_RUNNING = 130;
+	public static final int MAX_JUMP_HEIGHT = 66;
 
 	private byte[][] basicLevelObs_;
-	private float[] currentEndDiffs_ = new float[2];
+	private int[] currentEndDiffs_ = new int[2];
 	private int directedCellSize_;
 	private int direction_;
 	private boolean isMarioInAir_;
@@ -41,14 +41,14 @@ public class RLMarioMovement {
 	private int marioCentreY_;
 	/** Mario's facing direction. */
 	private int marioDirection_ = Environment.MARIO_KEY_RIGHT;
-	private float[] marioGroundPos_ = { 32, 32 };
+	private int[] marioGroundPos_ = { 32, 32 };
 	private int negModifier_;
 	private int oppDirection_;
 	/** Records Mario's previous boolean array action. */
 	private boolean[] prevBoolAction_ = new boolean[Environment.numberOfKeys];
 	/** Needed to check if the shells are passive. */
 	private Collection<String> shellPositions_ = new HashSet<String>();
-	private float[] startEndDiffs_ = new float[2];
+	private int[] startEndDiffs_ = new int[2];
 	private Collection<String> staticObjectFacts_ = new HashSet<String>();
 
 	/**
@@ -204,7 +204,7 @@ public class RLMarioMovement {
 			staticObjectFacts_.addAll(facts);
 
 		// Width assertion
-		fact = "(width " + thing + " " + width + ")";
+		fact = "(width " + thing + " " + (width * LevelScene.cellSize) + ")";
 		rete.assertString(fact);
 		if (isStatic && !isMarioInAir_)
 			staticObjectFacts_.add(fact);
@@ -235,7 +235,7 @@ public class RLMarioMovement {
 	 *            If the thing can be jumped into.
 	 */
 	private Collection<String> assertJumpOnOver(Rete rete,
-			MarioEnvironment environment, String thing, float x, float y,
+			MarioEnvironment environment, String thing, int x, int y,
 			int gridX, int gridY, byte[][] levelObs, boolean jumpInto)
 			throws Exception {
 		// Check Mario isn't blocked by geometry
@@ -400,8 +400,8 @@ public class RLMarioMovement {
 	 * @param y
 	 *            Mario's goal y point.
 	 */
-	private void calculateDirectionVariables(float startX, float startY,
-			float marioX, float marioY, float x, float y) {
+	private void calculateDirectionVariables(int startX, int startY,
+			int marioX, int marioY, int x, int y) {
 		startEndDiffs_[0] = Math.abs(x - startX);
 		startEndDiffs_[1] = startY - y;
 		currentEndDiffs_[0] = Math.abs(x - marioX);
@@ -430,12 +430,12 @@ public class RLMarioMovement {
 	 *            something).
 	 * @return True if Mario can jump onto/over the thing.
 	 */
-	private boolean canJump(float[] diffs, float extraDist) {
+	private boolean canJump(int[] diffs, int extraDist) {
 		// Vertical limit
 		float vertLimit = (extraDist != 0) ? CELL_SIZE * 1.5f : 0;
 		if (diffs[1] <= MAX_JUMP_HEIGHT - vertLimit) {
 			// Horizontal limit
-			float canJumpDist = diffs[0] + diffs[1] + extraDist;
+			int canJumpDist = diffs[0] + diffs[1] + extraDist;
 			if (canJumpDist < MAX_JUMP_DIST_RUNNING)
 				return true;
 		}
@@ -556,7 +556,7 @@ public class RLMarioMovement {
 			isMarioInAir_ = false;
 			prevBoolAction_ = new boolean[Environment.numberOfKeys];
 			marioDirection_ = Environment.MARIO_KEY_RIGHT;
-			marioGroundPos_ = new float[2];
+			marioGroundPos_ = new int[2];
 			return;
 		}
 
@@ -565,7 +565,9 @@ public class RLMarioMovement {
 			isMarioInAir_ = true;
 		else {
 			isMarioInAir_ = false;
-			marioGroundPos_ = Arrays.copyOf(environment.getMarioFloatPos(), 2);
+			marioGroundPos_ = new int[2];
+			marioGroundPos_[0] = (int) environment.getMarioFloatPos()[0];
+			marioGroundPos_[1] = (int) environment.getMarioFloatPos()[1];
 			staticObjectFacts_.clear();
 		}
 	}
@@ -686,7 +688,7 @@ public class RLMarioMovement {
 			actionArray[Mario.KEY_JUMP] = false;
 
 		// Running or not
-		if (startEndDiffs_[0] >= CELL_SIZE)
+		if (startEndDiffs_[0] >= CELL_SIZE * 2)
 			actionArray[Mario.KEY_SPEED] = true;
 
 		// HORIZONTAL MOVEMENT
@@ -789,7 +791,7 @@ public class RLMarioMovement {
 
 		return actionArray;
 	}
-	
+
 	/**
 	 * Returns the actions necessary to take if Mario wants to move to a
 	 * particular point. Mario may jump to get there.
@@ -940,15 +942,15 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to jump to the object
 	 */
-	private boolean[] preJumpOver(float startX, float startY, float currentX,
-			float currentY, float endX, float endY, int width, boolean bigMario) {
+	private boolean[] preJumpOver(int startX, int startY, int currentX,
+			int currentY, int endX, int endY, int width, boolean bigMario) {
 		// If Mario is beyond jumping distance, move closer.
-		float jumpPoint = (width + 1.5f) * CELL_SIZE;
+		int jumpPoint = (int) (width + 1.5f) * CELL_SIZE;
 		if (canJump(currentEndDiffs_, jumpPoint)) {
 			if (negModifier_ > 0)
 				endX = endX + jumpPoint;
 			else
-				endX = endX - 1.5f * CELL_SIZE;
+				endX = (int) (endX - 1.5f * CELL_SIZE);
 			calculateDirectionVariables(startX, startY, currentX, currentY,
 					endX, endY);
 			return jumpOnto(startX, startY, currentX, currentY, endX, endY);
@@ -1130,9 +1132,10 @@ public class RLMarioMovement {
 			}
 		}
 		shellPositions_ = currentShells;
-		
-		rete.assertString("(distance goal " + marioCentreX_
-				* LevelScene.cellSize + ")");
+
+		rete.assertString("(distance goal "
+				+ ((environment.getLevelLength() * LevelScene.cellSize) - (int) environment
+						.getMarioFloatPos()[0]) + ")");
 	}
 
 	/**
@@ -1158,7 +1161,7 @@ public class RLMarioMovement {
 	 *            If Mario is currently carrying a shell.
 	 * @return A boolean array of keystroke actions to take at the time.
 	 */
-	public boolean[] applyAction(RelationalPredicate action, float[] startPos,
+	public boolean[] applyAction(RelationalPredicate action, int[] startPos,
 			float[] marioPos, byte[][] basicLevelObs, boolean[] prevAction,
 			int marioDirection, boolean bigMario, boolean carrying) {
 		basicLevelObs_ = basicLevelObs;
@@ -1168,19 +1171,19 @@ public class RLMarioMovement {
 		}
 
 		// Parse the coords
-		float x, y;
+		int x, y;
 		if (action.getArguments()[0].equals("goal")) {
-			x = marioPos[0] + MAX_JUMP_DIST_RUNNING * 2;
-			y = marioPos[1];
+			x = (int) marioPos[0] + MAX_JUMP_DIST_RUNNING * 2;
+			y = (int) marioPos[1];
 		} else {
 			String[] argSplit = action.getArguments()[0].split("_");
-			x = Float.parseFloat(argSplit[1]);
-			y = Float.parseFloat(argSplit[2]);
+			x = Integer.parseInt(argSplit[1]);
+			y = Integer.parseInt(argSplit[2]);
 		}
 
 		// Direction specific variables
-		calculateDirectionVariables(startPos[0], startPos[1], marioPos[0],
-				marioPos[1], x, y);
+		calculateDirectionVariables(startPos[0], startPos[1],
+				(int) marioPos[0], (int) marioPos[1], x, y);
 
 		// Determine the actions
 		if (action.getFactName().equals("moveTo"))
@@ -1197,8 +1200,8 @@ public class RLMarioMovement {
 					marioPos[1], x, y, bigMario);
 		} else if (action.getFactName().equals("jumpOver")) {
 			int width = Integer.parseInt(action.getArguments()[2]);
-			actionArray = preJumpOver(startPos[0], startPos[1], marioPos[0],
-					marioPos[1], x, y, width, bigMario);
+			actionArray = preJumpOver(startPos[0], startPos[1],
+					(int) marioPos[0], (int) marioPos[1], x, y, width, bigMario);
 		} else if (action.getFactName().equals("shootFireball")) {
 			actionArray = shoot(prevAction, marioDirection);
 		} else if (action.getFactName().equals("shootShell")) {
@@ -1209,6 +1212,8 @@ public class RLMarioMovement {
 		}
 
 		// TODO Mario continues to hold shell as long as possible?
+		if (carrying && !action.getFactName().equals("shootShell"))
+			actionArray[Mario.KEY_SPEED] = true;
 		return actionArray;
 	}
 
@@ -1229,18 +1234,17 @@ public class RLMarioMovement {
 	 * @return A boolean array of size 2: Can Mario: jump on the thing, and jump
 	 *         over the thing.
 	 */
-	public boolean[] canJumpOnOver(float x, float y,
-			MarioEnvironment environment, boolean jumpInto, boolean isMarioInAir) {
+	public boolean[] canJumpOnOver(int x, int y, MarioEnvironment environment,
+			boolean jumpInto, boolean isMarioInAir) {
 		boolean[] canJumpOnOver = new boolean[2];
-		float cellSize = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
+		int cellSize = ch.idsia.benchmark.mario.engine.LevelScene.cellSize;
 		float[] marioPos = environment.getMarioFloatPos();
 
 		// Mario can jump into objects above him to a particular
 		// height (assuming nothing is blocking)
-		float extra = (environment.getMarioMode() > 0) ? cellSize * 2
-				: cellSize;
+		int extra = (environment.getMarioMode() > 0) ? cellSize * 2 : cellSize;
 
-		float[] diffs = { Math.abs(marioPos[0] - x), marioPos[1] - y };
+		int[] diffs = { (int) Math.abs(marioPos[0] - x), (int) marioPos[1] - y };
 		// If the x difference is on the same column
 		if (diffs[0] <= cellSize / 2) {
 			if (jumpInto) {
@@ -1262,7 +1266,7 @@ public class RLMarioMovement {
 
 			// Can only jump over things about a cell and a half lower than MAX
 			// JUMP HEIGHT
-			if (canJump(diffs, cellSize * 1.5f))
+			if (canJump(diffs, (int) (cellSize * 1.5f)))
 				canJumpOnOver[1] = true;
 		}
 
@@ -1303,9 +1307,9 @@ public class RLMarioMovement {
 				boolean[] actionArray = applyAction(action, marioGroundPos_,
 						marioFloatPos, basicLevelObservation, prevBoolAction_,
 						marioDirection_, bigMario, carrying);
-				double distance = Math.abs(Double.parseDouble(action
+				float distance = Math.abs(Float.parseFloat(action
 						.getArguments()[1]));
-				double actionWeight = (1 / distance);
+				float actionWeight = (1 / distance);
 				// If a closer object has been found, act on that.
 				if (actionWeight > bestWeight) {
 					bestWeight = actionWeight;

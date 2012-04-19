@@ -306,7 +306,7 @@ public class PacMan {
 		// Check if player has earned free life
 		if (m_gameModel.m_player.m_score >= m_gameModel.m_nextFreeUp) {
 			m_gameModel.m_nLives += 1;
-			m_gameModel.m_nextFreeUp += 10000;
+			m_gameModel.m_nextFreeUp *= 10;
 			if (redraw)
 				m_bottomCanvas.repaint();
 		}

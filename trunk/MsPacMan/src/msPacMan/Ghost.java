@@ -45,7 +45,7 @@ public class Ghost extends Thing {
 	int m_nTicks2Flee = 0;
 	/** Set to true when Pacman has eaten this ghost */
 	public boolean m_bEaten = false;
-	int m_ghostDeltaMax = 4; // Should never change
+	int m_ghostDeltaMax = 3; // Should never change
 	int m_eatenPoints; // Point worth for eaten Ghost
 	/** Ticks to display eaten points */
 	int m_nTicks2Popup;
