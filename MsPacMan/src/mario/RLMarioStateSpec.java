@@ -36,7 +36,7 @@ public class RLMarioStateSpec extends StateSpec {
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
 		preconds.put("search",
-				"(brick ?X) (not (marioPower small)) (distance ?X ?D&:(<= -32 ?D 32)) "
+				"(brick ?X) (distance ?X ?D&:(<= -32 ?D 32)) "
 						+ "(heightDiff ?X ?Y&:(<= 16 ?Y 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
@@ -132,12 +132,12 @@ public class RLMarioStateSpec extends StateSpec {
 
 		// Squashable enemies
 		bckKnowledge.put("squashableRule", new BackgroundKnowledge(
-				"(enemy ?X) (not (spiky ?X)) " + "(not (pirahnaPlant ?X)) "
+				"(enemy ?X) (not (spiky ?X)) (not (pirahnaPlant ?X)) "
 						+ "=> (assert (squashable ?X))", false));
 
 		// Blastable enemies
 		bckKnowledge.put("blastableRule", new BackgroundKnowledge(
-				"(enemy ?X) (not (spiky ?X)) " + "=> (assert (blastable ?X))",
+				"(enemy ?X) (not (spiky ?X)) => (assert (blastable ?X))",
 				false));
 
 		return bckKnowledge;
@@ -267,7 +267,6 @@ public class RLMarioStateSpec extends StateSpec {
 		types.put("brick", "thing");
 
 		// Mario and his state
-		types.put("mario", null);
 		types.put("marioPower", null);
 
 		// Enemies
@@ -339,7 +338,6 @@ public class RLMarioStateSpec extends StateSpec {
 	@Override
 	protected Collection<String> initialiseConstantFacts() {
 		Collection<String> constants = new ArrayList<String>();
-		constants.add("(mario player)");
 
 		// Ever present goal
 		constants.add("(flag goal)");

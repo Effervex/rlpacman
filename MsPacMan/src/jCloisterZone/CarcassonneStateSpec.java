@@ -72,15 +72,6 @@ public class CarcassonneStateSpec extends StateSpec {
 		bckKnowledge.put("edgeAxiom", new BackgroundKnowledge(
 				"(cEdge ?N ?E) (ccEdge ?N ?W) (oppEdge ?N ?S) => (assert (cEdge ?E ?S) "
 						+ "(ccEdge ?E ?N) (oppEdge ?E ?W))", false));
-		// Edge directions
-		bckKnowledge.put("edgeDirectionN", new BackgroundKnowledge(
-				"(edge north) => (assert (edgeDirection north 0 -1))", false));
-		bckKnowledge.put("edgeDirectionE", new BackgroundKnowledge(
-				"(edge east) => (assert (edgeDirection east 1 0))", false));
-		bckKnowledge.put("edgeDirectionS", new BackgroundKnowledge(
-				"(edge south) => (assert (edgeDirection south 0 1))", false));
-		bckKnowledge.put("edgeDirectionW", new BackgroundKnowledge(
-				"(edge west) => (assert (edgeDirection west -1 0))", false));
 
 		// Next to rule
 		// TODO This nextTo rule isn't working...
@@ -285,6 +276,11 @@ public class CarcassonneStateSpec extends StateSpec {
 		constants.add("(edge east)");
 		constants.add("(edge south)");
 		constants.add("(edge west)");
+		// Edge directions
+		constants.add("(edgeDirection north 0 -1)");
+		constants.add("(edgeDirection east 1 0)");
+		constants.add("(edgeDirection south 0 1)");
+		constants.add("(edgeDirection west -1 0)");
 
 		// Orientations
 		for (Rotation r : Rotation.values())

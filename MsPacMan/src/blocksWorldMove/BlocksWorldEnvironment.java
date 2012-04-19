@@ -10,6 +10,8 @@ import rrlFramework.RRLObservations;
 import util.Pair;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,9 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 	/** The number of steps taken. */
 	protected int steps_;
+
+	/** The block ratios pre-calculated, using [ungrounded][grounded] index. */
+	private float[][] blockRatios_;
 
 	/**
 	 * Calculates the optimal number of steps to solve the problem.
@@ -193,31 +198,70 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	 * @param goalName
 	 *            The goal name.
 	 */
+	@SuppressWarnings("unchecked")
 	protected void initialiseBlocksState(int numBlocks) {
+		// TODO Modify this to a fair distribution of block states
+
+		Pair<Integer, Integer>[] rooted = new Pair[numBlocks];
+		Pair<Integer, Integer>[] floating = new Pair[numBlocks];
 		Integer[] worldState = new Integer[numBlocks];
-		List<Double> contourState = new ArrayList<Double>();
-		contourState.add(0d);
-		List<Integer> blocksLeft = new ArrayList<Integer>();
-		goalArgs_ = null;
-		for (int i = 1; i <= numBlocks; i++) {
-			blocksLeft.add(i);
-		}
 
-		while (!blocksLeft.isEmpty()) {
-			// Get a random block
-			Integer block = blocksLeft.remove(RRLExperiment.random_
-					.nextInt(blocksLeft.size()));
+		for (int x = 0; x < numBlocks; x++) {
+			rooted[x] = new Pair<Integer, Integer>(0, 0);
+			floating[x] = new Pair<Integer, Integer>(x + 1, x + 1);
+			worldState[x] = 0;
+		} /* Initially, each block is a floating tower */
+		int nrt = 0;
+		int nft = numBlocks;
 
-			// Put the block in a random position, influenced by the number of
-			// free blocks.
-			int index = RRLExperiment.random_.nextInt(contourState.size());
-			worldState[block - 1] = contourState.get(index).intValue();
-			if (worldState[block - 1] == 0) {
-				contourState.add(new Double(block));
-			} else {
-				contourState.set(index, new Double(block));
+		while (nft-- != 0) {
+			float r = RRLExperiment.random_.nextFloat();
+			int choice = nft + nrt;
+			float rat = blockRatios_[nft][nrt];
+			float p = rat / (rat + choice);
+			if (r <= p) { /* Put the next block on the table */
+				rooted[nrt].objA_ = floating[nft].objA_;
+				rooted[nrt].objB_ = floating[nft].objB_;
+				nrt++;
+			} else { /* Put the next block on some b */
+				int b = (int) Math.round(Math.floor((r - p)
+						/ ((1.0 - p) / choice)));
+				if (b < nrt) { /* Destination is a rooted tower */
+					worldState[floating[nft].objB_ - 1] = rooted[b].objA_;
+					rooted[b].objA_ = floating[nft].objA_;
+				} else { /* Destination is a floating tower */
+					b -= nrt;
+					worldState[floating[nft].objB_ - 1] = floating[b].objA_;
+					floating[b].objA_ = floating[nft].objA_;
+				}
 			}
 		}
+		//
+		//
+		// Integer[] worldState = new Integer[numBlocks];
+		// List<Double> contourState = new ArrayList<Double>();
+		// contourState.add(0d);
+		// List<Integer> blocksLeft = new ArrayList<Integer>();
+		// goalArgs_ = null;
+		// for (int i = 1; i <= numBlocks; i++) {
+		// blocksLeft.add(i);
+		// }
+		//
+		// while (!blocksLeft.isEmpty()) {
+		// // Get a random block
+		// Integer block = blocksLeft.remove(RRLExperiment.random_
+		// .nextInt(blocksLeft.size()));
+		//
+		// // Put the block in a random position, influenced by the number of
+		// // free blocks.
+		// int index = RRLExperiment.random_.nextInt(contourState.size());
+		// worldState[block - 1] = contourState.get(index).intValue();
+		// if (worldState[block - 1] == 0) {
+		// contourState.add(new Double(block));
+		// } else {
+		// contourState.set(index, new Double(block));
+		// }
+		// }
 
 		// Set the goal
 		int[] params = null;
@@ -255,6 +299,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 		// Check this isn't the goal state
 		state_ = new BlocksState(worldState);
+		System.out.println(state_);
 	}
 
 	@Override
@@ -340,5 +385,29 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		}
 
 		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
+
+		precalculateBlockRatios(numBlocks_);
+	}
+
+	private void precalculateBlockRatios(int numBlocks) {
+		blockRatios_ = new float[numBlocks + 1][numBlocks + 1];
+
+		int n, k;
+		float[] temp = new float[numBlocks + 1];
+		Arrays.fill(temp, 1.0f);
+
+		for (n = 0; n <= numBlocks; n++)
+			for (k = 0; k + n <= numBlocks; k++) {
+				if (n == 0)
+					blockRatios_[n][k] = 1.0f;
+				else {
+//					blockRatios_[n][k] = (blockRatios_[n - 1][k] * (n + k + blockRatios_[n - 1][k + 1]))
+//							/ (n - 1 + k + blockRatios_[n - 1][k]);
+					 temp[k] = (temp[k] * (temp[k + 1] + n + k))
+					 / (temp[k] + n + k - 1.0f);
+					 if (n % 2 == 0)
+					 blockRatios_[n / 2][k] = temp[k];
+				}
+			}
 	}
 }

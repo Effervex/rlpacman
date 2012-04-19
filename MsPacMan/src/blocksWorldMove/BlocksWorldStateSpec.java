@@ -51,7 +51,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
 		actionRules
-				.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z&:(<> ?Z ?Y))"
+				.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z)"
 						+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
@@ -67,14 +67,6 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
-
-		// Floor is always clear
-		bkMap.put("floorTruthA", new BackgroundKnowledge(
-				"(floor ?X) => (assert (clear ?X))", false));
-
-		// Floor is at height 0
-		bkMap.put("floorTruthB", new BackgroundKnowledge(
-				"(floor ?X) => (assert (height ?X 0))", false));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
@@ -229,6 +221,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Collection<String> constants = new ArrayList<String>();
 		// The floor is constant.
 		constants.add("(floor floor)");
+		constants.add("(clear floor)");
+		constants.add("(height floor 0)");
 		return constants;
 	}
 }
