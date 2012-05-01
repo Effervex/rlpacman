@@ -436,10 +436,10 @@ public class ConditionBeliefs implements Serializable {
 			BidiMap replacementMap) {
 		// First check the potential equivalence doesn't involve obvious type
 		// relations
-		if (extraCond == null
-				&& (obviousTypeEquivalence(cbFact_, otherCond) || obviousTypeEquivalence(
-						otherCond, cbFact_)))
-			return false;
+//		if (extraCond == null
+//				&& (obviousTypeEquivalence(cbFact_, otherCond) || obviousTypeEquivalence(
+//						otherCond, cbFact_)))
+//			return false;
 
 		// Get the conditions for this cond.
 		Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);

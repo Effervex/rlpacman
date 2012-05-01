@@ -25,7 +25,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import cerrla.ProgramArgument;
-import cerrla.Unification;
+import cerrla.RLGGMerger;
 import cerrla.modular.GeneralGoalCondition;
 import jess.Fact;
 import jess.QueryResult;
@@ -233,8 +233,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			}
 
 			// Add variant to specialisations
-			condition = simplifyCondition(condition, action, localInvariants,
-					localVariants);
 			if (condition != null && specialisations.add(condition)) {
 				// Check the negated version
 				if (addNegated) {
@@ -635,7 +633,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 						for (RelationalArgument arg : strFact
 								.getRelationalArguments()) {
 							// Ignore numerical terms
-							if (!arg.isNumber())
+							//if (!arg.isNumber())
 								termMappedFacts_.putContains(arg, strFact);
 
 							// Note goal facts
@@ -1192,13 +1190,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 							.get(term);
 					if (termFacts != null) {
 						for (RelationalPredicate termFact : termFacts) {
-							if (!termFact.isNumerical()) {
+							//if (!termFact.isNumerical()) {
 								RelationalPredicate relativeFact = new RelationalPredicate(
 										termFact);
 								relativeFact.replaceArguments(replacementMap,
 										false, false);
 								relativeFacts.add(relativeFact);
-							}
+							//}
 						}
 					}
 				}
@@ -1238,7 +1236,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 								conditionRanges_.put(context, range);
 							} else {
 								// Unify existing range
-								Unification.getInstance().unifyRange(range,
+								RLGGMerger.getInstance().unifyRange(range,
 										baseVal);
 							}
 						}

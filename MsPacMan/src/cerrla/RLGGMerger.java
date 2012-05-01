@@ -13,9 +13,9 @@ import java.util.PriorityQueue;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-public class Unification {
+public class RLGGMerger {
 	/** The singleton instance. */
-	private static Unification instance_;
+	private static RLGGMerger instance_;
 
 	/** The cost of a fact not unifying. */
 	private static final int NO_FACT_UNIFY = 1000;
@@ -32,7 +32,7 @@ public class Unification {
 	/** The incrementing unique index of ranged values. */
 	private int rangeIndex_;
 
-	private Unification() {
+	private RLGGMerger() {
 		resetRangeIndex();
 	}
 
@@ -50,12 +50,12 @@ public class Unification {
 	 * @return 1 if the state unified and changed, 0 if unified without change,
 	 *         -1 if couldn't unify.
 	 */
-	private List<UnifiedFact> bestFirstUnify(
+	private List<MergedFact> bestFirstUnify(
 			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState,
 			RelationalArgument[] oldTerms, BidiMap replacementMap) {
 		// Pre-unify and sort the state for more efficient unification
-		List<UnifiedFact> unified = new ArrayList<UnifiedFact>();
+		List<MergedFact> unified = new ArrayList<MergedFact>();
 		Collection<RelationalPredicate> dropped = new HashSet<RelationalPredicate>();
 		List<RelationalPredicate> sortedOldState = preUnifyAndSort(oldState,
 				newState, oldTerms, replacementMap, unified, dropped);
@@ -81,7 +81,7 @@ public class Unification {
 					.getOldState();
 			Collection<RelationalPredicate> currentNewState = currentUnification
 					.getNewState();
-			List<UnifiedFact> unifiedOldState = currentUnification
+			List<MergedFact> unifiedOldState = currentUnification
 					.getUnifiedOldState();
 			Collection<RelationalPredicate> droppedOldFacts = currentUnification
 					.getDroppedOldFacts();
@@ -103,7 +103,7 @@ public class Unification {
 			// Grab the first fact from the old state, or a pending fact
 			RelationalPredicate oldStateFact = currentOldState.iterator()
 					.next();
-			Collection<UnifiedFact> modFacts = unifyFactToState(oldStateFact,
+			Collection<MergedFact> modFacts = unifyFactToState(oldStateFact,
 					currentNewState, currentReplacementMap, currentActionTerms,
 					true);
 
@@ -113,7 +113,7 @@ public class Unification {
 				createNonUnification = true;
 			else {
 				// Recursively step into each fact unification path
-				for (UnifiedFact modFact : modFacts) {
+				for (MergedFact modFact : modFacts) {
 					List<RelationalPredicate> reducedOldState = new ArrayList<RelationalPredicate>(
 							currentOldState);
 					reducedOldState.remove(oldStateFact);
@@ -128,7 +128,7 @@ public class Unification {
 					createNonUnification |= !recursiveReplacements
 							.equals(currentReplacementMap);
 
-					List<UnifiedFact> largerUnifiedOldState = new ArrayList<UnifiedFact>(
+					List<MergedFact> largerUnifiedOldState = new ArrayList<MergedFact>(
 							unifiedOldState);
 					largerUnifiedOldState.add(modFact);
 
@@ -251,7 +251,7 @@ public class Unification {
 			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState,
 			RelationalArgument[] oldTerms, BidiMap replacementMap,
-			List<UnifiedFact> unified, Collection<RelationalPredicate> dropped) {
+			List<MergedFact> unified, Collection<RelationalPredicate> dropped) {
 		MultiMap<Integer, RelationalPredicate> complexityMap = MultiMap
 				.createListMultiMap();
 
@@ -259,7 +259,7 @@ public class Unification {
 		int maxComplexity = 0;
 		for (RelationalPredicate oldStateFact : oldState) {
 			int beforeRangeIndex = rangeIndex_;
-			Collection<UnifiedFact> unifiedFacts = unifyFactToState(
+			Collection<MergedFact> unifiedFacts = unifyFactToState(
 					oldStateFact, newState, replacementMap, oldTerms, true);
 
 			// If only one fact can unify.
@@ -269,14 +269,14 @@ public class Unification {
 			} else if (numUnifiedFacts == 1) {
 				// If it required replacements or is numerical, store as
 				// complexity 1.
-				UnifiedFact unifiedFact = unifiedFacts.iterator().next();
+				MergedFact unifiedFact = unifiedFacts.iterator().next();
 				if (!unifiedFact.getResultReplacements().equals(replacementMap)
 						|| unifiedFact.getResultFact().isNumerical()) {
 					complexityMap.put(1, oldStateFact);
 					maxComplexity = Math.max(maxComplexity, 1);
 				} else {
 					// Unify the fact here and now.
-					UnifiedFact unifact = unifiedFacts.iterator().next();
+					MergedFact unifact = unifiedFacts.iterator().next();
 					unified.add(unifact);
 					newState.remove(unifact.getUnityFact());
 					if (oldStateFact.isNumerical())
@@ -322,7 +322,7 @@ public class Unification {
 	 * @return A unified fact (if the facts can be unified), or null.
 	 */
 	@SuppressWarnings("unchecked")
-	private UnifiedFact unifyFactToFact(RelationalPredicate fact,
+	private MergedFact unifyFactToFact(RelationalPredicate fact,
 			RelationalPredicate unityFact, BidiMap unityReplacementMap,
 			boolean flexibleReplacement, RelationalArgument[] actionTerms) {
 		// Check it if the same fact
@@ -400,7 +400,7 @@ public class Unification {
 				if (unityReplacementMap != null) {
 					tempUnityReplacementMap.putAll(unityReplacementMap);
 				}
-				UnifiedFact unifiedFact = new UnifiedFact(fact, unityFact,
+				MergedFact unifiedFact = new MergedFact(fact, unityFact,
 						newActionTerms, tempUnityReplacementMap, unifact,
 						thisGeneralness);
 				return unifiedFact;
@@ -439,7 +439,7 @@ public class Unification {
 			return NO_CHANGE;
 
 		// Unify the states
-		List<UnifiedFact> unified = bestFirstUnify(oldState, newState,
+		List<MergedFact> unified = bestFirstUnify(oldState, newState,
 				oldTerms, replacementMap);
 
 		if (unified.isEmpty())
@@ -450,8 +450,8 @@ public class Unification {
 		int oldStateSize = oldState.size();
 		oldState.clear();
 		newState.addAll(oldState);
-		UnifiedFact lastFact = null;
-		for (UnifiedFact unifact : unified) {
+		MergedFact lastFact = null;
+		for (MergedFact unifact : unified) {
 			RelationalPredicate oldFact = unifact.getBaseFact();
 			RelationalPredicate resultFact = unifact.getResultFact();
 			changed |= !oldFact.equals(resultFact);
@@ -495,15 +495,15 @@ public class Unification {
 	 * @return The unified version of the fact (possibly more general than the
 	 *         input fact) or null if no unification.
 	 */
-	public Collection<UnifiedFact> unifyFactToState(RelationalPredicate fact,
+	public Collection<MergedFact> unifyFactToState(RelationalPredicate fact,
 			Collection<RelationalPredicate> unityFacts,
 			BidiMap unityReplacementMap, RelationalArgument[] actionTerms,
 			boolean flexibleReplacement) {
-		Collection<UnifiedFact> unifiedFacts = new HashSet<UnifiedFact>();
+		Collection<MergedFact> unifiedFacts = new HashSet<MergedFact>();
 
 		// Check every fact in the unity facts.
 		for (RelationalPredicate unityFact : unityFacts) {
-			UnifiedFact unifiedFact = unifyFactToFact(fact, unityFact,
+			MergedFact unifiedFact = unifyFactToFact(fact, unityFact,
 					unityReplacementMap, flexibleReplacement, actionTerms);
 			if (unifiedFact != null)
 				unifiedFacts.add(unifiedFact);
@@ -584,16 +584,16 @@ public class Unification {
 	 *         two latter cases, the replacement map will contain replacement
 	 *         terms.
 	 */
-	public List<UnifiedFact> unifyStates(
+	public List<MergedFact> unifyStates(
 			Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState, BidiMap replacementMap) {
 		return bestFirstUnify(oldState, newState, new RelationalArgument[0],
 				replacementMap);
 	}
 
-	public static Unification getInstance() {
+	public static RLGGMerger getInstance() {
 		if (instance_ == null)
-			instance_ = new Unification();
+			instance_ = new RLGGMerger();
 		return instance_;
 	}
 
@@ -624,7 +624,7 @@ public class Unification {
 		/** The old state yet to unify. */
 		private List<RelationalPredicate> oldState_;
 		/** The old state that has been unified. */
-		private List<UnifiedFact> unifiedOldState_;
+		private List<MergedFact> unifiedOldState_;
 
 		/**
 		 * A more advanced case where there is some unification.
@@ -655,7 +655,7 @@ public class Unification {
 		 */
 		public UnificationCase(List<RelationalPredicate> oldState,
 				Collection<RelationalPredicate> newState,
-				List<UnifiedFact> unifiedOldState,
+				List<MergedFact> unifiedOldState,
 				Collection<RelationalPredicate> droppedOldFacts,
 				RelationalArgument[] actionArguments, BidiMap replacementMap,
 				int generalisation, boolean changed, int rangeIndex, int id) {
@@ -739,7 +739,7 @@ public class Unification {
 			return localUnificationIndex_;
 		}
 
-		public List<UnifiedFact> getUnifiedOldState() {
+		public List<MergedFact> getUnifiedOldState() {
 			return unifiedOldState_;
 		}
 

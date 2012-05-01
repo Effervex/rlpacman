@@ -17,8 +17,8 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import cerrla.Unification;
-import cerrla.UnifiedFact;
+import cerrla.RLGGMerger;
+import cerrla.MergedFact;
 
 /**
  * A class representing background knowledge assertions
@@ -211,11 +211,11 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 		// Unify with the preConds to check if they're there
 		Collection<RelationalPredicate> allFacts = getAllFacts();
-		Collection<UnifiedFact> unified = Unification.getInstance()
+		Collection<MergedFact> unified = RLGGMerger.getInstance()
 				.unifyStates(allFacts, ruleConds, replacementTerms);
 		if (unified.size() == allFacts.size()) {
 			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
-			for (UnifiedFact unifact : unified) {
+			for (MergedFact unifact : unified) {
 				if (nonPreferred.contains(unifact.getBaseFact()))
 					ruleConds.remove(unifact.getUnityFact());
 			}
@@ -227,12 +227,12 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			// Unify with post conds and if a result, insert the replacement
 			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
 			replacementTerms.clear();
-			unified = Unification.getInstance().unifyStates(nonPreferred,
+			unified = RLGGMerger.getInstance().unifyStates(nonPreferred,
 					ruleConds, replacementTerms);
 			// If the post cond fully unified
 			if (unified.size() == nonPreferred.size()) {
 				// Remove the post conds.
-				for (UnifiedFact unifact : unified) {
+				for (MergedFact unifact : unified) {
 					ruleConds.remove(unifact.getUnityFact());
 					replacementTerms = unifact.getResultReplacements();
 				}
@@ -274,7 +274,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		// Check for illegal rules
 		BidiMap replacementTerms = new DualHashBidiMap();
 		Collection<RelationalPredicate> conjugated = getConjugatedConditions();
-		Collection<UnifiedFact> unified = Unification.getInstance()
+		Collection<MergedFact> unified = RLGGMerger.getInstance()
 				.unifyStates(conjugated, ruleConds, replacementTerms);
 		// If the rule is found to be illegal using the conjugated
 		// conditions, remove the illegal condition
@@ -282,7 +282,7 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			if (fixRule) {
 				// Fix up the rule (remove illegals)
 				Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
-				for (UnifiedFact unifact : unified) {
+				for (MergedFact unifact : unified) {
 					RelationalPredicate negUniFact = new RelationalPredicate(
 							unifact.getBaseFact());
 					negUniFact.swapNegated();

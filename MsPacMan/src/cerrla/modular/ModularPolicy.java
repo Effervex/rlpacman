@@ -32,7 +32,7 @@ import util.Recursive;
 
 public class ModularPolicy extends RelationalPolicy {
 	/** The minimum 'goal-not-achieved' value. */
-	private static final double MINIMUM_REWARD = -Integer.MIN_VALUE;
+	private static final double MINIMUM_REWARD = -100000;
 
 	private static final long serialVersionUID = 7855536761222318011L;
 

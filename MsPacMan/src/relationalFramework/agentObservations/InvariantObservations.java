@@ -13,8 +13,8 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
-import cerrla.Unification;
-import cerrla.UnifiedFact;
+import cerrla.RLGGMerger;
+import cerrla.MergedFact;
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -283,11 +283,11 @@ public class InvariantObservations implements Serializable {
 		// Run through each invariant fact
 		Collection<RelationalPredicate> variantActionConds = new HashSet<RelationalPredicate>(
 				actionConds);
-		int result = Unification.getInstance().rlggUnification(invariants,
+		int result = RLGGMerger.getInstance().rlggUnification(invariants,
 				variantActionConds, replacementMap, actionArgs);
-		if (result == Unification.UNIFIED_CHANGE)
+		if (result == RLGGMerger.UNIFIED_CHANGE)
 			changed = true;
-		else if (result == Unification.CANNOT_UNIFY) {
+		else if (result == RLGGMerger.CANNOT_UNIFY) {
 			// No invariants can be unified, they are all variants
 			variantActionConds.addAll(invariants);
 			invariants.clear();
@@ -307,13 +307,13 @@ public class InvariantObservations implements Serializable {
 			varFact.replaceUnboundWithAnonymous();
 			if (varFact.isNumerical()) {
 				// If numerical, attempt to unify
-				Collection<UnifiedFact> mergedFacts = Unification.getInstance()
+				Collection<MergedFact> mergedFacts = RLGGMerger.getInstance()
 						.unifyFactToState(varFact, variants,
 								new DualHashBidiMap(),
 								new RelationalArgument[0], false);
 				// Should only merge with one fact (if at all)
 				if (!mergedFacts.isEmpty()) {
-					UnifiedFact unifiedFact = mergedFacts.iterator().next();
+					MergedFact unifiedFact = mergedFacts.iterator().next();
 					varFact = unifiedFact.getResultFact();
 					if (oldAction != null) {
 						noteRanges(oldAction.getFactName(), varFact,
