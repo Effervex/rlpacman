@@ -15,16 +15,16 @@ import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import cerrla.Unification;
-import cerrla.UnifiedFact;
+import cerrla.RLGGMerger;
+import cerrla.MergedFact;
 
 public class UnificationTest {
-	private Unification sut_;
+	private RLGGMerger sut_;
 
 	@Before
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
-		sut_ = Unification.getInstance();
+		sut_ = RLGGMerger.getInstance();
 	}
 
 	@Test
@@ -35,10 +35,10 @@ public class UnificationTest {
 		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
 		newState.add(StateSpec.toRelationalPredicate("(clear x)"));
 		BidiMap replacementMap = new DualHashBidiMap();
-		List<UnifiedFact> result = sut_.unifyStates(oldState, newState,
+		List<MergedFact> result = sut_.unifyStates(oldState, newState,
 				replacementMap);
 		assertEquals(result.size(), 1);
-		UnifiedFact lastFact = result.get(result.size() - 1);
+		MergedFact lastFact = result.get(result.size() - 1);
 		assertEquals(lastFact.getResultReplacements().size(), 1);
 		assertEquals(lastFact.getResultFact(),
 				StateSpec.toRelationalPredicate("(clear ?X)"));
@@ -461,7 +461,7 @@ public class UnificationTest {
 		int newStateHash = newState.hashCode();
 		int result = sut_.rlggUnification(oldState, newState, replacementMap,
 				terms);
-		assertEquals(oldState.toString(), Unification.CANNOT_UNIFY, result);
+		assertEquals(oldState.toString(), RLGGMerger.CANNOT_UNIFY, result);
 		assertEquals(oldStateHash, oldState.hashCode());
 		assertEquals(newStateHash, newState.hashCode());
 
@@ -502,7 +502,7 @@ public class UnificationTest {
 		newStateHash = newState.hashCode();
 		result = sut_
 				.rlggUnification(oldState, newState, replacementMap, terms);
-		assertEquals(Unification.UNIFIED_CHANGE, result);
+		assertEquals(RLGGMerger.UNIFIED_CHANGE, result);
 		assertEquals(1, oldState.size());
 		assertTrue(oldState.contains(predA));
 		assertTrue(newState.contains(predD));
@@ -513,7 +513,7 @@ public class UnificationTest {
 	@Test
 	public void testUnifyNumerical() {
 		StateSpec.initInstance("rlPacManGeneral.PacMan");
-		sut_ = Unification.getInstance();
+		sut_ = RLGGMerger.getInstance();
 
 		// Basic unification
 		List<RelationalPredicate> oldState = new ArrayList<RelationalPredicate>();
@@ -521,10 +521,10 @@ public class UnificationTest {
 		List<RelationalPredicate> newState = new ArrayList<RelationalPredicate>();
 		newState.add(StateSpec.toRelationalPredicate("(distance blinky 5)"));
 		BidiMap replacementMap = new DualHashBidiMap();
-		List<UnifiedFact> result = sut_.unifyStates(oldState, newState,
+		List<MergedFact> result = sut_.unifyStates(oldState, newState,
 				replacementMap);
 		assertEquals(result.size(), 1);
-		UnifiedFact lastFact = result.get(result.size() - 1);
+		MergedFact lastFact = result.get(result.size() - 1);
 		RelationalPredicate expected = StateSpec
 				.toRelationalPredicate("(distance blinky "
 						+ RelationalArgument.RANGE_VARIABLE_PREFIX
@@ -555,11 +555,11 @@ public class UnificationTest {
 		newState.clear();
 		newState.add(StateSpec
 				.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))"));
-		Collection<UnifiedFact> unified = Unification.getInstance()
+		Collection<MergedFact> unified = RLGGMerger.getInstance()
 				.unifyFactToState(numeralFact, newState, new DualHashBidiMap(),
 						new RelationalArgument[0], false);
 		assertEquals(unified.size(), 1);
-		UnifiedFact unifact = unified.iterator().next();
+		MergedFact unifact = unified.iterator().next();
 		assertTrue(unifact
 				.getResultFact()
 				.equals(StateSpec
@@ -576,7 +576,7 @@ public class UnificationTest {
 		newState.clear();
 		newState.add(StateSpec
 				.toRelationalPredicate("(distance blinky ?#_4&:(<= 0.0 ?#_4 5.0))"));
-		unified = Unification.getInstance().unifyFactToState(numeralFact,
+		unified = RLGGMerger.getInstance().unifyFactToState(numeralFact,
 				newState, new DualHashBidiMap(), new RelationalArgument[0],
 				false);
 		assertEquals(unified.size(), 1);
@@ -594,7 +594,7 @@ public class UnificationTest {
 		newState.clear();
 		newState.add(StateSpec
 				.toRelationalPredicate("(distance blinky ?#_4&:(<= 1.0 ?#_4 5.0))"));
-		unified = Unification.getInstance().unifyFactToState(numeralFact,
+		unified = RLGGMerger.getInstance().unifyFactToState(numeralFact,
 				newState, new DualHashBidiMap(), new RelationalArgument[0],
 				false);
 		assertEquals(unified.size(), 1);

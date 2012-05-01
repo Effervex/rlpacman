@@ -23,13 +23,12 @@ public class CarcassonneStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// A tile may be placed if all edges fit nicely
-		preconds.put("placeTile",
-				"(currentPlayer ?X) (currentTile ?Y) (validLoc ?Y ?Z ?A) "
-						+ "(location ?Z) (orientation ?A)");
+		preconds.put("placeTile", "(currentPlayer ?X) (validLoc ?Y ?Z ?A)");
 
 		// A meeple can be played when it is meeple playing stage on the placed
 		// tile
-		preconds.put("placeMeeple", "(currentPlayer ?X) (meepleLoc ?Y ?Z)");
+		preconds.put("placeMeeple",
+				"(currentPlayer ?X) (meepleLoc ?Y ?Z) (meeplesLeft ?X ?#_M&:(> ?#_M 0))");
 
 		return preconds;
 	}

@@ -21,6 +21,17 @@ public class BackgroundKnowledgeTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
 	}
+	
+	@Test
+	public void testNormalisation() {
+		BackgroundKnowledge bk = new BackgroundKnowledge(
+				"(above ?X ?Y) <=> (on ?X ?)");
+		assertEquals(bk.toString(), "(above ?X ?) <=> (on ?X ?)");
+		
+		bk = new BackgroundKnowledge(
+				"(on ?X ?Y) <=> (above ?X ?)");
+		assertEquals(bk.toString(), "(on ?X ?) <=> (above ?X ?)");
+	}
 
 	@Test
 	public void testSimplifyA() {
@@ -57,15 +68,30 @@ public class BackgroundKnowledgeTest {
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
 
+		// Bound conditions
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Bnd_0 ?X)"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
+
 		// Not matching
-		bk = new BackgroundKnowledge(
-				"(clear ?X) (above ?Y ?X) <=> (floor ?X)");
+		bk = new BackgroundKnowledge("(clear ?X) (above ?Y ?X) <=> (floor ?X)");
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?Y)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		result = bk.simplify(ruleConds);
 		assertFalse(ruleConds.toString(), result);
+
+		// Bound conditions
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(clear ?X)"));
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?Bnd_0 ?X)"));
+		result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.contains(StateSpec
+				.toRelationalPredicate("(floor ?X)")));
 	}
 
 	@Test
@@ -118,7 +144,7 @@ public class BackgroundKnowledgeTest {
 		assertTrue(ruleConds.toString(), result);
 		assertTrue(ruleConds.contains(StateSpec
 				.toRelationalPredicate("(block ?X)")));
-		
+
 		// Negative case
 		ruleConds.clear();
 		ruleConds.add(StateSpec.toRelationalPredicate("(block ?X)"));
@@ -126,7 +152,7 @@ public class BackgroundKnowledgeTest {
 		assertFalse(ruleConds.toString(), result);
 	}
 
-	@Test
+	//@Test
 	public void testSimplifyCarcassonne() {
 		StateSpec.initInstance("jCloisterZone.Carcassonne");
 		LocalAgentObservations.loadAgentObservations(GoalCondition

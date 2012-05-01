@@ -11,7 +11,7 @@ import org.apache.commons.collections.BidiMap;
  * 
  * @author Sam Sarjant
  */
-public class UnifiedFact {
+public class MergedFact {
 	/** The resulting unified fact. */
 	private RelationalPredicate resultFact_;
 
@@ -30,7 +30,7 @@ public class UnifiedFact {
 	/** The fact that was unified. */
 	private RelationalPredicate baseFact_;
 
-	public UnifiedFact(RelationalPredicate baseFact,
+	public MergedFact(RelationalPredicate baseFact,
 			RelationalPredicate unityFact, RelationalArgument[] factTerms,
 			BidiMap replacements, RelationalPredicate resultFact, int generalisation) {
 		baseFact_ = baseFact;
@@ -85,7 +85,7 @@ public class UnifiedFact {
 			return false;
 		if (getClass() != obj.getClass())
 			return false;
-		UnifiedFact other = (UnifiedFact) obj;
+		MergedFact other = (MergedFact) obj;
 		if (resultFact_ == null) {
 			if (other.resultFact_ != null)
 				return false;

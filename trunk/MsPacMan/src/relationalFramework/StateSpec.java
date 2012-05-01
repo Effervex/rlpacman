@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
-import cerrla.Unification;
+import cerrla.RLGGMerger;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.RangeContext;
@@ -220,7 +220,7 @@ public abstract class StateSpec {
 			queryNames_ = new HashMap<RuleQuery, String>();
 			queryCount_ = 0;
 
-			Unification.getInstance().resetRangeIndex();
+			RLGGMerger.getInstance().resetRangeIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

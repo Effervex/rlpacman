@@ -29,8 +29,8 @@ import java.util.TreeSet;
 import jess.Fact;
 import jess.Rete;
 import cerrla.ProgramArgument;
-import cerrla.Unification;
-import cerrla.UnifiedFact;
+import cerrla.RLGGMerger;
+import cerrla.MergedFact;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.SpecificGoalCondition;
@@ -742,7 +742,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		// duplicates/negation
 		if (condition != null) {
 			condition.swapNegated();
-			Collection<UnifiedFact> negUnification = Unification.getInstance()
+			Collection<MergedFact> negUnification = RLGGMerger.getInstance()
 					.unifyFactToState(condition, ruleConds, null, null, false);
 			condition.swapNegated();
 			if (!negUnification.isEmpty())
