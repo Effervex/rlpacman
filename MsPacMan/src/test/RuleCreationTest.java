@@ -272,6 +272,23 @@ public class RuleCreationTest {
 		mutant = new RelationalRule(
 				"(clear ?X) (floor ?Y) (highest ?Y) => (move ?X ?Y)");
 		assertFalse(results.contains(mutant));
+		mutant = new RelationalRule(
+				"(clear ?X) (floor ?Y) (not (highest ?Y)) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
+		
+		rule = new RelationalRule(
+				"(clear ?X) (highest ?Y) (block ?X) => (move ?X ?Y)");
+		results = sut_.specialiseRule(rule);
+		mutant = new RelationalRule(
+				"(clear ?X) (floor ?Y) (highest ?Y) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
+		
+		rule = new RelationalRule(
+				"(clear ?X) (clear ?Y) (not (highest ?Y)) (block ?X) => (move ?X ?Y)");
+		results = sut_.specialiseRule(rule);
+		mutant = new RelationalRule(
+				"(clear ?X) (floor ?Y) (not (highest ?Y)) => (move ?X ?Y)");
+		assertFalse(results.contains(mutant));
 	}
 
 	@Test

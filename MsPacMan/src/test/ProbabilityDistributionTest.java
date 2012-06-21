@@ -121,29 +121,33 @@ public class ProbabilityDistributionTest {
 	}
 
 	@Test
-	public void testUpdateDistributionDoubleMapOfTDoubleDouble() {
-		Map<String, Double> counts = new HashMap<String, Double>();
-		counts.put("a", 2d);
-		counts.put("b", 1d);
-		counts.put("c", 3.5);
-		counts.put("d", 3.5);
-		counts.put("e", 0d);
+	public void testUpdateDistribution() {
+		for (String val : sut_)
+			sut_.set(val, 0.2);
+		
+		Map<String, Integer> counts = new HashMap<String, Integer>();
+		counts.put("a", 2);
+		counts.put("b", 1);
+		counts.put("c", 3);
+		counts.put("d", 3);
+		counts.put("e", 1);
 		sut_.updateDistribution(10, counts, 0.6);
-		assertEquals(0.16, sut_.getProb("a"), 0.0001);
+		assertEquals(0.2, sut_.getProb("a"), 0.0001);
 		assertEquals(0.14, sut_.getProb("b"), 0.0001);
-		assertEquals(0.33, sut_.getProb("c"), 0.0001);
-		assertEquals(0.35, sut_.getProb("d"), 0.0001);
-		assertEquals(0.02, sut_.getProb("e"), 0.0001);
+		assertEquals(0.26, sut_.getProb("c"), 0.0001);
+		assertEquals(0.26, sut_.getProb("d"), 0.0001);
+		assertEquals(0.14, sut_.getProb("e"), 0.0001);
 
 		// Normalisation
-		resetSUT();
-		counts.put("c", 7d);
-		sut_.updateDistribution(10, counts, 0.6);
-		assertEquals(0.16 / 1.21, sut_.getProb("a"), 0.0001);
-		assertEquals(0.14 / 1.21, sut_.getProb("b"), 0.0001);
-		assertEquals(0.54 / 1.21, sut_.getProb("c"), 0.0001);
-		assertEquals(0.35 / 1.21, sut_.getProb("d"), 0.0001);
-		assertEquals(0.02 / 1.21, sut_.getProb("e"), 0.0001);
+		for (String val : sut_)
+			sut_.set(val, 0.2);
+		counts.put("c", 7);
+		sut_.updateDistribution(14, counts, 0.6);
+		assertEquals(0.1657, sut_.getProb("a"), 0.0001);
+		assertEquals(0.1229, sut_.getProb("b"), 0.0001);
+		assertEquals(0.38, sut_.getProb("c"), 0.0001);
+		assertEquals(0.2086, sut_.getProb("d"), 0.0001);
+		assertEquals(0.1229, sut_.getProb("e"), 0.0001);
 	}
 
 	@Test
@@ -153,5 +157,29 @@ public class ProbabilityDistributionTest {
 		sut_.set("d", 0.7);
 		sut_.normaliseProbs();
 		assertEquals(sut_.klSize(), 3.95338898, 0.001);
+	}
+	
+	@Test
+	public void testNormalisation() {
+		sut_.normaliseProbs();
+		assertEquals(0.1, sut_.getProb("a"), 0.0001);
+		assertEquals(0.2, sut_.getProb("b"), 0.0001);
+		assertEquals(0.3, sut_.getProb("c"), 0.0001);
+		assertEquals(0.35, sut_.getProb("d"), 0.0001);
+		assertEquals(0.05, sut_.getProb("e"), 0.0001);
+		
+		sut_.add("f", 0.2);
+		sut_.add("g", 0.2);
+		sut_.add("h", 0.2);
+		sut_.normaliseProbs();
+		
+		assertEquals(0.0625, sut_.getProb("a"), 0.0001);
+		assertEquals(0.125, sut_.getProb("b"), 0.0001);
+		assertEquals(0.1875, sut_.getProb("c"), 0.0001);
+		assertEquals(0.21875, sut_.getProb("d"), 0.0001);
+		assertEquals(0.03125, sut_.getProb("e"), 0.0001);
+		assertEquals(0.125, sut_.getProb("f"), 0.0001);
+		assertEquals(0.125, sut_.getProb("g"), 0.0001);
+		assertEquals(0.125, sut_.getProb("h"), 0.0001);
 	}
 }

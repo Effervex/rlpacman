@@ -1,9 +1,15 @@
 package cerrla;
 
 import relationalFramework.RelationalRule;
+import util.MultiMap;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.apache.commons.math.stat.descriptive.moment.Mean;
 
 /**
  * A class for containing all of the data gathered about the elite solutions,
@@ -16,11 +22,15 @@ public class ElitesData {
 	private Map<Slot, SlotData> slotData_;
 
 	/** The number of times each rule was used within the elite policies. */
-	private Map<RelationalRule, Double> ruleCounts_;
+	private Map<RelationalRule, Integer> ruleCounts_;
 
-	public ElitesData() {
+	/** The elite values. */
+	private ArrayList<Double> elitesValues_;
+
+	public ElitesData(int numElites) {
 		slotData_ = new HashMap<Slot, SlotData>();
-		ruleCounts_ = new HashMap<RelationalRule, Double>();
+		ruleCounts_ = new HashMap<RelationalRule, Integer>();
+		elitesValues_ = new ArrayList<Double>(numElites);
 	}
 
 	/**
@@ -46,10 +56,10 @@ public class ElitesData {
 	 * @param weight
 	 *            The weight to add to the rule [0-1].
 	 */
-	public void addRuleCount(RelationalRule rule, double weight) {
-		Double oldWeight = ruleCounts_.get(rule);
+	public void addRuleCount(RelationalRule rule, int weight) {
+		Integer oldWeight = ruleCounts_.get(rule);
 		if (oldWeight == null)
-			oldWeight = 0d;
+			oldWeight = 0;
 		ruleCounts_.put(rule, oldWeight + weight);
 	}
 
@@ -91,7 +101,7 @@ public class ElitesData {
 	 * 
 	 * @return A mapping of rules to their weighted counts.
 	 */
-	public Map<RelationalRule, Double> getRuleCounts() {
+	public Map<RelationalRule, Integer> getRuleCounts() {
 		return ruleCounts_;
 	}
 
@@ -133,6 +143,23 @@ public class ElitesData {
 			slotData_.put(slot, new SlotData());
 		return slotData_.get(slot);
 	}
+	
+	public Double getMaxEliteValue() {
+		if (elitesValues_.isEmpty())
+			return null;
+		return elitesValues_.get(0);
+	}
+	
+	public Double getMeanEliteValue() {
+		if (elitesValues_.isEmpty())
+			return null;
+		double[] values = new double[elitesValues_.size()];
+		int i = 0;
+		for (Double val : elitesValues_)
+			values[i++] = val;
+		Mean m = new Mean();
+		return m.evaluate(values);
+	}
 
 	@Override
 	public String toString() {
@@ -145,13 +172,20 @@ public class ElitesData {
 						+ slotData_.get(slot) + "\n");
 			else
 				buffer.append("\tSlot " + slot.getSlotSplitFacts() + " => "
-						+ slot.getAction() + ":\n" + slotData_.get(slot)
-						+ "\n");
+						+ slot.getAction() + ":\n" + slotData_.get(slot) + "\n");
 		}
 
 		buffer.append("Rule counts: \n");
-		for (RelationalRule gr : ruleCounts_.keySet()) {
-			buffer.append("\t" + gr + ": " + ruleCounts_.get(gr) + "\n");
+		MultiMap<Integer, RelationalRule> orderedMap = MultiMap
+				.createSortedSetMultiMap();
+		SortedSet<Integer> keys = new TreeSet<Integer>();
+		for (RelationalRule rule : ruleCounts_.keySet()) {
+			orderedMap.put(ruleCounts_.get(rule), rule);
+			keys.add(ruleCounts_.get(rule));
+		}
+		for (Integer count : keys) {
+			for (RelationalRule rule : orderedMap.get(count))
+				buffer.append("\t" + rule + ": " + count + "\n");
 		}
 
 		return buffer.toString();
@@ -215,5 +249,9 @@ public class ElitesData {
 			buffer.append("\n\tNumeracy: " + mean_);
 			return buffer.toString();
 		}
+	}
+
+	public void noteSampleValue(double value) {
+		elitesValues_.add(value);
 	}
 }

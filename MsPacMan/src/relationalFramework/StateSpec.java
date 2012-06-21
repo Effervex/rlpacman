@@ -770,8 +770,9 @@ public abstract class StateSpec {
 	 *            lineage, be they parent, grandparent or child, grandchild,
 	 *            etc.
 	 */
-	public void getTypeLineage(String type, Collection<String> lineage) {
+	public Collection<String> getTypeLineage(String type) {
 		// Add itself
+		Collection<String> lineage = new ArrayList<String>();
 		lineage.add(type);
 
 		ParentChildren typePC = typeHierarchy_.get(type);
@@ -782,6 +783,26 @@ public abstract class StateSpec {
 			// Add parents
 			recurseParentTypes(typePC, lineage);
 		}
+		return lineage;
+	}
+
+	/**
+	 * Gets the parents of the given type.
+	 * 
+	 * @param type
+	 *            The current type.
+	 * @return All parent types.
+	 */
+	public Collection<String> getTypeParents(String type) {
+		// Add itself
+		Collection<String> parents = new ArrayList<String>();
+
+		ParentChildren typePC = typeHierarchy_.get(type);
+		if (typePC != null) {
+			// Add parents
+			recurseParentTypes(typePC, parents);
+		}
+		return parents;
 	}
 
 	public Map<String, RelationalPredicate> getTypePredicates() {
@@ -1130,6 +1151,8 @@ public abstract class StateSpec {
 	}
 
 	private class RuleQuery {
+		private static final int MAX_QUERIES = 750;
+
 		/** The list of query parameters this rule takes. */
 		private final List<RelationalArgument> queryParams_;
 
@@ -1209,6 +1232,15 @@ public abstract class StateSpec {
 		 */
 		public String makeQuery() {
 			try {
+				// Wipe the queries if there're too many
+				if (queryCount_ >= MAX_QUERIES) {
+					for (int i = 0; i < queryCount_; i++) {
+						rete_.unDefrule(POLICY_QUERY_PREFIX + i);
+					}
+					queryNames_.clear();
+					queryCount_ = 0;
+				}
+
 				String result = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
 				if ((queryParams_ != null && !queryParams_.isEmpty())

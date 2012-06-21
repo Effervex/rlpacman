@@ -19,6 +19,8 @@ import java.util.TreeSet;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
+import cerrla.RLGGMerger;
+
 import util.MultiMap;
 
 /**
@@ -108,9 +110,8 @@ public class ConditionBeliefs implements Serializable {
 				if (!varName.isAnonymous()) {
 					actionTerms.putContains(argTypes[i], varName);
 					// Also put any parent type of the given type
-					Collection<String> parentTypes = new HashSet<String>();
-					StateSpec.getInstance().getTypeLineage(argTypes[i],
-							parentTypes);
+					Collection<String> parentTypes = StateSpec.getInstance()
+							.getTypeLineage(argTypes[i]);
 					for (String parent : parentTypes)
 						actionTerms.putContains(parent, varName);
 				}
@@ -436,10 +437,11 @@ public class ConditionBeliefs implements Serializable {
 			BidiMap replacementMap) {
 		// First check the potential equivalence doesn't involve obvious type
 		// relations
-//		if (extraCond == null
-//				&& (obviousTypeEquivalence(cbFact_, otherCond) || obviousTypeEquivalence(
-//						otherCond, cbFact_)))
-//			return false;
+		// if (extraCond == null
+		// && (obviousTypeEquivalence(cbFact_, otherCond) ||
+		// obviousTypeEquivalence(
+		// otherCond, cbFact_)))
+		// return false;
 
 		// Get the conditions for this cond.
 		Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
@@ -1020,6 +1022,16 @@ public class ConditionBeliefs implements Serializable {
 				untrueFacts.removeAll(trueFacts);
 				untrueFacts.removeAll(generalities_);
 			}
+
+			// Collection<RelationalPredicate> oldState = new
+			// ArrayList<RelationalPredicate>(
+			// alwaysTrue_);
+			// Collection<RelationalPredicate> newState = new
+			// ArrayList<RelationalPredicate>(
+			// trueFacts);
+			// int result = RLGGMerger.getInstance().rlggUnification(oldState,
+			// newState,
+			// new DualHashBidiMap(), new RelationalArgument[0]);
 
 			// Filter the disallowed facts
 			trueFacts.removeAll(disallowed_);

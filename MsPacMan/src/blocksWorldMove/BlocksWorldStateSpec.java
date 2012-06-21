@@ -22,8 +22,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
 		actionPreconditions.put("move",
-				"(clear ?X) (block ?X) (clear ?Y &:(neq ?X ?Y)) "
-						+ "(not (on ?X ?Y))");
+				"(clear ?A) (block ?A) (clear ?B &:(neq ?A ?B)) "
+						+ "(not (on ?A ?B))");
 
 		return actionPreconditions;
 	}
@@ -51,8 +51,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
 		actionRules
-				.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z)"
-						+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
+				.add("?action <- (move ?A ?B) ?oldOn <- (on ?A ?C)"
+						+ " => (assert (on ?A ?B)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 
@@ -62,25 +62,25 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Block(Y) & !On(?,Y) -> Clear(Y)
 		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
+				"(block ?B) (not (on ? ?B)) => (assert (clear ?B))", true));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
+				"(on ?A ?B) => (assert (above ?A ?B))", true));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
+				"(on ?A ?B) (above ?B ?C) => (assert (above ?A ?C))", true));
 
 		// Height of individual blocks (for highest calcs)
 		bkMap.put("heightRule", new BackgroundKnowledge(
-				"(on ?X ?Y) (height ?Y ?N) => (assert (height ?X (+ ?N 1)))",
+				"(on ?A ?B) (height ?B ?N) => (assert (height ?A (+ ?N 1)))",
 				true));
 
 		// Highest rule
 		bkMap.put("highestRule", new BackgroundKnowledge(
-				"(height ?X ?N) (forall (thing ?Y) (height ?Y ?M&:(<= ?M ?N)))"
-						+ " => (assert (highest ?X))", true));
+				"(height ?A ?N) (forall (thing ?B) (height ?B ?M&:(<= ?M ?N)))"
+						+ " => (assert (highest ?A))", true));
 
 		return bkMap;
 	}
@@ -104,14 +104,14 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(forall (block ?X) (clear ?X))";
+			result[1] = "(forall (block ?A) (clear ?A))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(floor ?Y) (on ?X ?Y) (not (on ?Z ?Y&:(<> ?Z ?X)))";
+			result[1] = "(floor ?B) (on ?A ?B) (not (on ?C&:(<> ?C ?A) ?B))";
 			return result;
 		}
 
@@ -142,25 +142,25 @@ public class BlocksWorldStateSpec extends StateSpec {
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
 			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_1) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?A) (above ?A ?G_1) (floor ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
-			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
+			rules[0] = "(clear ?A) (highest ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
-			rules[0] = "(highest ?X) (floor ?Y) => (move ?X ?Y)";
+			rules[0] = "(highest ?A) (floor ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("highestA") || envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) (floor ?Y) => (move ?X ?Y)";
+					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
+					+ "(clear ?G_0) (highest ?B) => (move ?G_0 ?B)";
 		}
 
 		RelationalPolicy optimal = new RelationalPolicy();

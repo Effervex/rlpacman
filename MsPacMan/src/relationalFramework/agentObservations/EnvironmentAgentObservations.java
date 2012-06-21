@@ -251,8 +251,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					RelationalPredicate negCondition = new RelationalPredicate(
 							condition, negArgs);
 					negCondition.swapNegated();
-					negCondition = simplifyCondition(negCondition, action,
-							localInvariants, localVariants);
+					// negCondition = simplifyCondition(negCondition, action,
+					// localInvariants, localVariants);
 					if (negCondition != null)
 						specialisations.add(negCondition);
 				}
@@ -330,8 +330,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					RelationalPredicate actionCond = new RelationalPredicate(
 							termFact);
 					int unboundOffset = replacementMap.size() - replBefore;
-					actionCond.flexibleReplaceArguments(replacementMap,
-							unboundOffset);
+					actionCond.replaceArguments(replacementMap, false, true);
+//					TODO actionCond.flexibleReplaceArguments(replacementMap,
+//							unboundOffset);
 					actionConds.add(actionCond);
 
 
@@ -633,8 +634,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 						for (RelationalArgument arg : strFact
 								.getRelationalArguments()) {
 							// Ignore numerical terms
-							//if (!arg.isNumber())
-								termMappedFacts_.putContains(arg, strFact);
+							// if (!arg.isNumber())
+							termMappedFacts_.putContains(arg, strFact);
 
 							// Note goal facts
 							if (goalReplacements.containsKey(arg)) {
@@ -742,23 +743,25 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		if (instance_ != null && instance_.environment_.equals(environment))
 			return false;
 
-		try {
-			File globalObsFile = new File(AGENT_OBSERVATIONS_DIR, environment
-					+ File.separatorChar + SERIALISATION_FILE);
-			if (globalObsFile.exists()) {
-				FileInputStream fis = new FileInputStream(globalObsFile);
-				ObjectInputStream ois = new ObjectInputStream(fis);
-				EnvironmentAgentObservations ao = (EnvironmentAgentObservations) ois
-						.readObject();
-				if (ao != null) {
-					instance_ = ao;
-					ao.environment_ = environment;
+		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()) {
+			try {
+				File globalObsFile = new File(AGENT_OBSERVATIONS_DIR,
+						environment + File.separatorChar + SERIALISATION_FILE);
+				if (globalObsFile.exists()) {
+					FileInputStream fis = new FileInputStream(globalObsFile);
+					ObjectInputStream ois = new ObjectInputStream(fis);
+					EnvironmentAgentObservations ao = (EnvironmentAgentObservations) ois
+							.readObject();
+					if (ao != null) {
+						instance_ = ao;
+						ao.environment_ = environment;
 
-					return true;
+						return true;
+					}
 				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 		instance_ = getInstance();
 		return false;
@@ -1190,13 +1193,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 							.get(term);
 					if (termFacts != null) {
 						for (RelationalPredicate termFact : termFacts) {
-							//if (!termFact.isNumerical()) {
-								RelationalPredicate relativeFact = new RelationalPredicate(
-										termFact);
-								relativeFact.replaceArguments(replacementMap,
-										false, false);
-								relativeFacts.add(relativeFact);
-							//}
+							// if (!termFact.isNumerical()) {
+							RelationalPredicate relativeFact = new RelationalPredicate(
+									termFact);
+							relativeFact.replaceArguments(replacementMap,
+									false, false);
+							relativeFacts.add(relativeFact);
+							// }
 						}
 					}
 				}

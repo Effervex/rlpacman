@@ -26,19 +26,19 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("toDot", "(dot ?X) (distance ?X ?Y)");
+		preconds.put("toDot", "(dot ?A) (distance ?A ?B)");
 		preconds.put("toPowerDot",
-				"(powerDot ?X) (distance ?X ?Y)");
+				"(powerDot ?A) (distance ?A ?B)");
 		preconds.put("fromPowerDot",
-				"(powerDot ?X) (distance ?X ?Y)");
-		preconds.put("toFruit", "(fruit ?X) (distance ?X ?Y)");
-		preconds.put("toGhost", "(ghost ?X) (distance ?X ?Y)");
-		preconds.put("fromGhost", "(ghost ?X) (distance ?X ?Y)");
+				"(powerDot ?A) (distance ?A ?B)");
+		preconds.put("toFruit", "(fruit ?A) (distance ?A ?B)");
+		preconds.put("toGhost", "(ghost ?A) (distance ?A ?B)");
+		preconds.put("fromGhost", "(ghost ?A) (distance ?A ?B)");
 		preconds.put("toGhostCentre",
-				"(ghostCentre ?X) (distance ?X ?Y)");
+				"(ghostCentre ?A) (distance ?A ?B)");
 		preconds.put("fromGhostCentre",
-				"(ghostCentre ?X) (distance ?X ?Y)");
-		preconds.put("toJunction", "(junction ?X) (junctionSafety ?X ?Y)");
+				"(ghostCentre ?A) (distance ?A ?B)");
+		preconds.put("toJunction", "(junction ?A) (junctionSafety ?A ?B)");
 
 		return preconds;
 	}

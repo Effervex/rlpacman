@@ -15,6 +15,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import cerrla.LocalCrossEntropyDistribution;
+import cerrla.ProgramArgument;
+import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
 import cerrla.modular.ModularSubGoal;
@@ -26,12 +28,17 @@ import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.LocalAgentObservations;
+import rrlFramework.Config;
 
 public class ModularPolicyTest {
 
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
+		LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+		Config.newInstance(new String[] { "blocksMoveArguments.txt" });
 	}
 
 	@Test
@@ -51,6 +58,8 @@ public class ModularPolicyTest {
 	@Test
 	public void testDeepModules() {
 		// Testing deep modules
+		ProgramArgument.USE_MODULES.setBooleanValue(true);
+		ProgramArgument.USE_GENERAL_MODULES.setBooleanValue(true);
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
 				GoalCondition.parseGoalCondition("on$A$B"));
 		RelationalPolicy relPolA = new RelationalPolicy();
@@ -68,7 +77,8 @@ public class ModularPolicyTest {
 
 		// Highest module
 		Map<RelationalArgument, RelationalArgument> paramReplacementMap = new HashMap<RelationalArgument, RelationalArgument>();
-		paramReplacementMap.put(new RelationalArgument("?G_0"), new RelationalArgument("?G_1"));
+		paramReplacementMap.put(new RelationalArgument("?G_0"),
+				new RelationalArgument("?G_1"));
 		lced = new LocalCrossEntropyDistribution(highGoal);
 		RelationalPolicy relPolB = new RelationalPolicy();
 		rule = new RelationalRule("(clear ?G_0) => (move ?G_0 ?G_0)");
@@ -85,7 +95,8 @@ public class ModularPolicyTest {
 
 		// Clear module
 		paramReplacementMap = new HashMap<RelationalArgument, RelationalArgument>();
-		paramReplacementMap.put(new RelationalArgument("?G_0"), new RelationalArgument("?G_1"));
+		paramReplacementMap.put(new RelationalArgument("?G_0"),
+				new RelationalArgument("?G_1"));
 		lced = new LocalCrossEntropyDistribution(clearGoal);
 		RelationalPolicy relPolC = new RelationalPolicy();
 		rule = new RelationalRule("(above ?X ?G_0) => (move ?X ?G_0)");
@@ -102,6 +113,8 @@ public class ModularPolicyTest {
 
 	@Test
 	public void testDualConditions() {
+		ProgramArgument.USE_MODULES.setBooleanValue(true);
+		ProgramArgument.USE_GENERAL_MODULES.setBooleanValue(true);
 		// Set up the relational policy
 		RelationalPolicy relPol = new RelationalPolicy();
 		RelationalRule rule = new RelationalRule(
@@ -117,8 +130,9 @@ public class ModularPolicyTest {
 		ModularPolicy modPol = new ModularPolicy(relPol, lced);
 
 		List<PolicyItem> polRules = modPol.getRules();
-		// Should be three things in there: the rule, and two modular holes.
-		assertEquals(polRules.size(), 6);
+		// Should be four things in there: the rule, two modular holes and a
+		// general hole.
+		assertEquals(polRules.size(), 4);
 		assertEquals(polRules.get(0), (rule));
 		RelationalPredicate clearFact = new RelationalPredicate(StateSpec
 				.getInstance().getPredicateByName("clear"),
@@ -129,6 +143,41 @@ public class ModularPolicyTest {
 				.getPredicateByName("clear"), new String[] { "?G_1" });
 		assertEquals(polRules.get(2), new ModularSubGoal(
 				new SpecificGoalCondition(clearFact), rule));
+	}
+
+	@Test
+	public void testSameModularCond() {
+		ProgramArgument.USE_MODULES.setBooleanValue(true);
+		ProgramArgument.USE_GENERAL_MODULES.setBooleanValue(true);
+		// Set up the relational policy
+		RelationalPolicy relPol = new RelationalPolicy();
+		RelationalRule ruleA = new RelationalRule(
+				"(clear ?G_0) (clear ?Y) => (move ?G_0 ?Y)");
+		List<RelationalArgument> queryParams = new ArrayList<RelationalArgument>();
+		queryParams.add(new RelationalArgument("?G_0"));
+		queryParams.add(new RelationalArgument("?G_1"));
+		ruleA.setQueryParams(queryParams);
+		relPol.addRule(ruleA);
+		RelationalRule ruleB = new RelationalRule(
+				"(clear ?G_0) (clear ?X) => (move ?X ?G_0)");
+		ruleB.setQueryParams(queryParams);
+		relPol.addRule(ruleB);
+
+		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("on$A$B"));
+		ModularPolicy modPol = new ModularPolicy(relPol, lced);
+
+		List<PolicyItem> polRules = modPol.getRules();
+		// Should be four things in there: two rules, one modular holes and a
+		// general hole.
+		assertEquals(polRules.size(), 4);
+		assertEquals(polRules.get(0), (ruleA));
+		RelationalPredicate clearFact = new RelationalPredicate(StateSpec
+				.getInstance().getPredicateByName("clear"),
+				new String[] { "?G_0" });
+		assertEquals(polRules.get(1), new ModularSubGoal(
+				new SpecificGoalCondition(clearFact), ruleA));
+		assertEquals(polRules.get(3), (ruleB));
 	}
 
 	@Test
@@ -180,5 +229,23 @@ public class ModularPolicyTest {
 		// Also contains the modular holes.
 		assertEquals(serPol.getRules().size(), 6);
 		assertFalse(serPol.shouldRegenerate());
+	}
+	
+	@Test
+	public void testEquivalent() {
+		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("on$A$B"));
+		RelationalPolicy policy = new RelationalPolicy();
+		policy.addRule(new RelationalRule("(clear ?A) (clear ?B) => (move ?A ?B)"));
+		ModularPolicy modPol = new ModularPolicy(policy, lced);
+		assertTrue(modPol.equivalentTo(policy));
+		
+		policy.addRule(new RelationalRule("(highest ?G_0) (clear ?B) => (move ?G_0 ?B)"));
+		assertFalse(modPol.equivalentTo(policy));
+		modPol = new ModularPolicy(policy, lced);
+		assertTrue(modPol.equivalentTo(policy));
+		
+		policy.getRules().remove(1);
+		assertFalse(modPol.equivalentTo(policy));
 	}
 }

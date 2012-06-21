@@ -508,6 +508,23 @@ public class UnificationTest {
 		assertTrue(newState.contains(predD));
 		assertFalse(oldStateHash == oldState.hashCode());
 		assertFalse(newStateHash == newState.hashCode());
+		
+		
+		// Fact dropping test
+		oldState.clear();
+		oldState.add(StateSpec.toRelationalPredicate("(clear a)"));
+		oldState.add(StateSpec.toRelationalPredicate("(on a b)"));
+		newState.clear();
+		newState.add(StateSpec.toRelationalPredicate("(clear a)"));
+		newState.add(StateSpec.toRelationalPredicate("(on b a)"));
+		replacementMap.clear();
+		result = sut_.rlggUnification(oldState, newState, replacementMap, new RelationalArgument[0]);
+		assertTrue(result == 1);
+		assertTrue(oldState.size() == 1);
+		assertTrue(oldState.contains(StateSpec.toRelationalPredicate("(clear a)")));
+		assertTrue(newState.size() == 2);
+		assertTrue(newState.contains(StateSpec.toRelationalPredicate("(on b a)")));
+		assertTrue(newState.contains(StateSpec.toRelationalPredicate("(on a b)")));
 	}
 
 	@Test

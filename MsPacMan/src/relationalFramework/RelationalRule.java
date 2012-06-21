@@ -492,6 +492,7 @@ public class RelationalRule implements Serializable,
 						} else if (arguments[i].isAnonymous() && !negated) {
 							// If the argument is anonymous, convert it to an
 							// unbound variable.
+							// TODO Convert to singleton, but be careful with bindings.
 							arguments[i] = RelationalArgument
 									.createUnboundVariable(normalisedIndex[0]++);
 						} else if (arguments[i].isConstant())
@@ -516,8 +517,7 @@ public class RelationalRule implements Serializable,
 				RelationalPredicate singleCond = addedConditions
 						.get(indexedUnbounds.get(arg).iterator().next());
 				// If the condition is negated, swap the unbound variable
-				// for an
-				// anonymous variable
+				// for an anonymous variable
 				if (singleCond.isNegated())
 					singleCond.replaceArguments(arg,
 							RelationalArgument.ANONYMOUS, true);

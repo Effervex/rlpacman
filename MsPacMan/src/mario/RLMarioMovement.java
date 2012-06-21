@@ -31,6 +31,9 @@ public class RLMarioMovement {
 	public static final int MAX_JUMP_DIST = 79;
 	public static final int MAX_JUMP_DIST_RUNNING = 130;
 	public static final int MAX_JUMP_HEIGHT = 66;
+	private static final int ACTION_OFF = -1;
+	private static final int ACTION_ON = 1;
+	private static final int ACTION_ANY = 0;
 
 	private byte[][] basicLevelObs_;
 	private int[] currentEndDiffs_ = new int[2];
@@ -657,9 +660,9 @@ public class RLMarioMovement {
 	 *            The y location to jump to.
 	 * @return A boolean array of action required to jump to the object
 	 */
-	private boolean[] jumpOnto(float startX, float startY, float currentX,
+	private int[] jumpOnto(float startX, float startY, float currentX,
 			float currentY, float endX, float endY) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
 
 		startX *= negModifier_;
 		currentX *= negModifier_;
@@ -683,43 +686,43 @@ public class RLMarioMovement {
 		if (startEndDiffs_[0] <= CELL_SIZE && startEndDiffs_[1] > 0)
 			releaseJumpPoint = Integer.MAX_VALUE;
 		if (currentEndDiffs_[0] > releaseJumpPoint || currentEndDiffs_[1] > 0)
-			actionArray[Mario.KEY_JUMP] = true;
+			actionArray[Mario.KEY_JUMP] = ACTION_ON;
 		else
-			actionArray[Mario.KEY_JUMP] = false;
+			actionArray[Mario.KEY_JUMP] = ACTION_OFF;
 
 		// Running or not
 		if (startEndDiffs_[0] >= CELL_SIZE * 2)
-			actionArray[Mario.KEY_SPEED] = true;
+			actionArray[Mario.KEY_SPEED] = ACTION_ON;
 
 		// HORIZONTAL MOVEMENT
 		float nearEndX = endX - directedCellSize_ / 2;
-		if (actionArray[Mario.KEY_SPEED])
+		if (actionArray[Mario.KEY_SPEED] == ACTION_ON)
 			nearEndX = endX - directedCellSize_ / 1.5f;
 		float farEndX = endX + directedCellSize_ / 2;
 
 		// Check for special case when Mario is below object and next to
 		if (currentEndDiffs_[1] > 0 && currentEndDiffs_[0] <= CELL_SIZE) {
 			// Move from the object so as not to get caught under it
-			actionArray[direction_] = false;
-			actionArray[oppDirection_] = true;
+			actionArray[direction_] = ACTION_OFF;
+			actionArray[oppDirection_] = ACTION_ON;
 		} else {
 			// Start of jump
 			if (currentX < nearEndX) {
-				actionArray[direction_] = true;
-				actionArray[oppDirection_] = false;
+				actionArray[direction_] = ACTION_ON;
+				actionArray[oppDirection_] = ACTION_OFF;
 			} else if (currentX < endX) {
 				// Between nearEnd and end
-				actionArray[direction_] = false;
-				actionArray[oppDirection_] = false;
+				actionArray[direction_] = ACTION_OFF;
+				actionArray[oppDirection_] = ACTION_OFF;
 			} else if (currentX < farEndX) {
 				// Between end and farEnd
-				actionArray[direction_] = false;
-				actionArray[oppDirection_] = true;
+				actionArray[direction_] = ACTION_OFF;
+				actionArray[oppDirection_] = ACTION_ON;
 			} else {
 				// Past the end point
-				actionArray[Mario.KEY_SPEED] = true;
-				actionArray[direction_] = false;
-				actionArray[oppDirection_] = true;
+				actionArray[Mario.KEY_SPEED] = ACTION_ON;
+				actionArray[direction_] = ACTION_OFF;
+				actionArray[oppDirection_] = ACTION_ON;
 			}
 		}
 
@@ -746,16 +749,17 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to move to the object
 	 */
-	private boolean[] moveTo(float startX, float startY, float marioX,
+	private int[] moveTo(float startX, float startY, float marioX,
 			float marioY, float endX, float endY, boolean bigMario) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
 
-		actionArray[direction_] = true;
-		actionArray[Environment.MARIO_KEY_SPEED] = true;
+		actionArray[direction_] = ACTION_ON;
+		actionArray[oppDirection_] = ACTION_OFF;
+		actionArray[Environment.MARIO_KEY_SPEED] = ACTION_ON;
 
 		// Jumping if thing is in same column
 		if (startEndDiffs_[0] < CELL_SIZE && startEndDiffs_[1] > 0)
-			actionArray[Environment.MARIO_KEY_JUMP] = true;
+			actionArray[Environment.MARIO_KEY_JUMP] = ACTION_ON;
 
 		// Check if obstacles are in the way
 		int midY = basicLevelObs_.length / 2;
@@ -812,16 +816,16 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to move to the object
 	 */
-	private boolean[] moveFrom(float startX, float startY, float marioX,
+	private int[] moveFrom(float startX, float startY, float marioX,
 			float marioY, float endX, float endY, boolean bigMario) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
 
-		actionArray[direction_] = true;
-		actionArray[Environment.MARIO_KEY_SPEED] = true;
+		actionArray[direction_] = ACTION_ON;
+		actionArray[Environment.MARIO_KEY_SPEED] = ACTION_ON;
 
 		// Jumping if thing is in same column
 		if (startEndDiffs_[0] < CELL_SIZE && startEndDiffs_[1] > 0)
-			actionArray[Environment.MARIO_KEY_JUMP] = true;
+			actionArray[Environment.MARIO_KEY_JUMP] = ACTION_ON;
 
 		// Check if obstacles are in the way
 		int midY = basicLevelObs_.length / 2;
@@ -877,15 +881,15 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to move to the object
 	 */
-	private boolean[] pickup(float startX, float startY, float currentX,
+	private int[] pickup(float startX, float startY, float currentX,
 			float currentY, float shellX, float shellY, boolean bigMario) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
 
 		// Pickup behaviour
 		if (currentEndDiffs_[0] < CELL_SIZE
 				&& Math.abs(currentEndDiffs_[1]) < CELL_SIZE) {
-			actionArray[Mario.KEY_SPEED] = true;
-			actionArray[direction_] = true;
+			actionArray[Mario.KEY_SPEED] = ACTION_ON;
+			actionArray[direction_] = ACTION_ON;
 			return actionArray;
 		} else
 			return moveTo(startX, startY, currentX, currentY, shellX, shellY,
@@ -911,7 +915,7 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to jump to the object
 	 */
-	private boolean[] preJumpOnto(float startX, float startY, float currentX,
+	private int[] preJumpOnto(float startX, float startY, float currentX,
 			float currentY, float endX, float endY, boolean bigMario) {
 		// If Mario is beyond jumping distance, move closer.
 		if (canJump(currentEndDiffs_, 0)) {
@@ -942,7 +946,7 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to jump to the object
 	 */
-	private boolean[] preJumpOver(int startX, int startY, int currentX,
+	private int[] preJumpOver(int startX, int startY, int currentX,
 			int currentY, int endX, int endY, int width, boolean bigMario) {
 		// If Mario is beyond jumping distance, move closer.
 		int jumpPoint = (int) (width + 1.5f) * CELL_SIZE;
@@ -979,9 +983,9 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @return A boolean array of action required to search the brick.
 	 */
-	private boolean[] search(float startX, float startY, float currentX,
+	private int[] search(float startX, float startY, float currentX,
 			float currentY, float endX, float endY, boolean bigMario) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
 
 		// Get within one cell beneath the object
 		int movement = (int) (Math.max(1, startEndDiffs_[1] / (1 * CELL_SIZE)));
@@ -991,11 +995,11 @@ public class RLMarioMovement {
 		}
 
 		// Otherwise, Mario is under it enough to jump and centre on it
-		actionArray[Environment.MARIO_KEY_JUMP] = true;
+		actionArray[Environment.MARIO_KEY_JUMP] = ACTION_ON;
 		if (currentX < endX - CELL_SIZE / 2)
-			actionArray[Environment.MARIO_KEY_RIGHT] = true;
+			actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_ON;
 		else if (currentX > endX + CELL_SIZE / 2)
-			actionArray[Environment.MARIO_KEY_LEFT] = true;
+			actionArray[Environment.MARIO_KEY_LEFT] = ACTION_ON;
 
 		return actionArray;
 	}
@@ -1009,16 +1013,17 @@ public class RLMarioMovement {
 	 *            The direction Mario is facing.
 	 * @return A boolean array of action required to shoot.
 	 */
-	private boolean[] shoot(boolean[] prevAction, int marioDirection) {
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+	private int[] shoot(boolean[] prevAction, int marioDirection) {
+		int[] actionArray = new int[Environment.numberOfKeys];
 		if (direction_ != marioDirection) {
 			if (marioDirection == Environment.MARIO_KEY_RIGHT)
-				actionArray[Environment.MARIO_KEY_LEFT] = true;
+				actionArray[Environment.MARIO_KEY_LEFT] = ACTION_ON;
 			else if (marioDirection == Environment.MARIO_KEY_LEFT)
-				actionArray[Environment.MARIO_KEY_RIGHT] = true;
+				actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_ON;
 		} else {
 			// If holding fire, release it and vice-versa
-			actionArray[Environment.MARIO_KEY_SPEED] = !prevAction[Environment.MARIO_KEY_SPEED];
+			actionArray[Environment.MARIO_KEY_SPEED] = (prevAction[Environment.MARIO_KEY_SPEED]) ? -1
+					: 1;
 		}
 		return actionArray;
 	}
@@ -1134,13 +1139,13 @@ public class RLMarioMovement {
 		shellPositions_ = currentShells;
 
 		rete.assertString("(distance goal "
-				+ ((environment.getLevelLength() * LevelScene.cellSize) - (int) environment
-						.getMarioFloatPos()[0]) + ")");
+				+ (environment.getReceptiveFieldWidth() * LevelScene.cellSize)
+				+ ")");
 	}
 
 	/**
-	 * Applies the action chosen by the agent to the environment - returning a
-	 * boolean array of keystroke actions to take.
+	 * Applies the action chosen by the agent to the environment - returning an
+	 * int array of keystroke actions to take.
 	 * 
 	 * @param action
 	 *            The action to take.
@@ -1159,13 +1164,15 @@ public class RLMarioMovement {
 	 *            If Mario is currently big.
 	 * @param carrying
 	 *            If Mario is currently carrying a shell.
-	 * @return A boolean array of keystroke actions to take at the time.
+	 * @return An int array of keystroke actions to take at the time, of button
+	 *         on/off/any.
 	 */
-	public boolean[] applyAction(RelationalPredicate action, int[] startPos,
+	public int[] applyAction(RelationalPredicate action, int[] startPos,
 			float[] marioPos, byte[][] basicLevelObs, boolean[] prevAction,
 			int marioDirection, boolean bigMario, boolean carrying) {
 		basicLevelObs_ = basicLevelObs;
-		boolean[] actionArray = new boolean[Environment.numberOfKeys];
+		int[] actionArray = new int[Environment.numberOfKeys];
+		Arrays.fill(actionArray, ACTION_OFF);
 		if (action == null) {
 			return actionArray;
 		}
@@ -1213,7 +1220,7 @@ public class RLMarioMovement {
 
 		// TODO Mario continues to hold shell as long as possible?
 		if (carrying && !action.getFactName().equals("shootShell"))
-			actionArray[Mario.KEY_SPEED] = true;
+			actionArray[Mario.KEY_SPEED] = ACTION_ON;
 		return actionArray;
 	}
 
@@ -1296,7 +1303,10 @@ public class RLMarioMovement {
 		// run?} A non-zero value means the action has been selected (-1
 		// left/false, +1 right/true)
 		RelationalPredicate bestAction = null;
-		List<boolean[]> selectedActions = new ArrayList<boolean[]>();
+		List<int[]> selectedActions = new ArrayList<int[]>();
+		int[] partialAction = new int[Environment.numberOfKeys];
+		partialAction[Environment.MARIO_KEY_DOWN] = ACTION_OFF;
+		partialAction[5] = ACTION_OFF;
 		for (Collection<FiredAction> firedActions : actions.getActions()) {
 			double bestWeight = Integer.MIN_VALUE;
 
@@ -1304,7 +1314,7 @@ public class RLMarioMovement {
 			// action in the ArrayList
 			for (FiredAction firedAction : firedActions) {
 				RelationalPredicate action = firedAction.getAction();
-				boolean[] actionArray = applyAction(action, marioGroundPos_,
+				int[] actionArray = applyAction(action, marioGroundPos_,
 						marioFloatPos, basicLevelObservation, prevBoolAction_,
 						marioDirection_, bigMario, carrying);
 				float distance = Math.abs(Float.parseFloat(action
@@ -1317,27 +1327,43 @@ public class RLMarioMovement {
 					bestAction = action;
 				}
 				if (actionWeight == bestWeight) {
-					// If two objects are of the same distance, and they're not
-					// the same boolean[] action, skip this action and move onto
-					// the next to decide.
+					// If two objects are of the same distance, add them both
+					// and select a random one.
 					selectedActions.add(actionArray);
 					firedAction.triggerRule();
-					break;
 				}
 			}
 
+			// Incorporate a selected action into the partial action.
 			if (!selectedActions.isEmpty()) {
 				if (RRLExperiment.debugMode_)
 					System.out.println(bestAction);
-				break;
+
+				int[] randomSelected = selectedActions
+						.get(RRLExperiment.random_.nextInt(selectedActions
+								.size()));
+				boolean resolvedAction = true;
+				// Apply it to the boolean array
+				for (int i = 0; i < partialAction.length; i++) {
+					if (partialAction[i] == 0) {
+						if (randomSelected[i] != 0)
+							partialAction[i] = randomSelected[i];
+						else
+							resolvedAction = false;
+					}
+				}
+
+				if (resolvedAction)
+					break;
 			}
 		}
 
 		// If the selected action isn't null, reset the previous bool action.
 		Arrays.fill(prevBoolAction_, false);
-		if (!selectedActions.isEmpty())
-			prevBoolAction_ = selectedActions.get(RRLExperiment.random_
-					.nextInt(selectedActions.size()));
+		for (int i = 0; i < partialAction.length; i++) {
+			if (partialAction[i] != 0)
+				prevBoolAction_[i] = partialAction[i] == 1;
+		}
 
 		// If Mario is on the ground and cannot jump, allow him time to breathe
 		if (environment.isMarioOnGround() && !environment.isMarioAbleToJump()) {

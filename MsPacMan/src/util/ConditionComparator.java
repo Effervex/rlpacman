@@ -72,7 +72,7 @@ public class ConditionComparator implements Comparator<RelationalPredicate>,
 		// Compare by num arguments
 		int result = Double.compare(numArgs0, numArgs1);
 		if (result != 0)
-			return -result;
+			return result;
 		
 		// Compare by cond type
 		int condType0 = BASE;

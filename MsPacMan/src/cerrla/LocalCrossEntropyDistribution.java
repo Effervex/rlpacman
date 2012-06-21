@@ -83,6 +83,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** If the AgentObsrvations were settled last episode. */
 	private boolean oldAOSettled_;
 
+	/** If the policy generator has updated yet. */
+	private boolean oldUpdated_;
+
 	/** The performance object, noting figures. */
 	private final Performance performance_;
 
@@ -98,6 +101,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	/** The current testing episode. */
 	private transient int testEpisode_;
 
+	/** The current best policy testing episode. */
+	private transient int bestPolicyEpisode_ = -1;
+
 	/** A stack of policies that have not been tested fully. */
 	private transient Queue<ModularPolicy> undertestedPolicies_;
 
@@ -106,6 +112,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * rules.
 	 */
 	private transient int policyIDCounter_;
+
+	/** Best policy to be tested */
+	private ModularPolicy bestPolicy_;
 
 	/**
 	 * Create new sub-goal behaviour using information from another
@@ -266,13 +275,15 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * 
 	 * @param elites
 	 *            The elite values (+ 1 more sample).
-	 * @return True if the distribution changed drastically (new slots/rules
-	 *         created).
+	 * @param population
+	 *            The population size.
+	 * @param numElites
+	 *            The minimum number of elites.
 	 */
-	private boolean updateDistributions(SortedSet<PolicyValue> elites,
+	private void updateDistributions(SortedSet<PolicyValue> elites,
 			int population, int numElites) {
 		if (population == 0)
-			return false;
+			return;
 
 		double minReward = performance_.getMinimumReward();
 
@@ -280,9 +291,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		SortedSet<PolicyValue> removed = preUpdateModification(elites,
 				numElites, population, minReward);
 
-		policyGenerator_.updateDistributions(elites,
-				ProgramArgument.ALPHA.doubleValue(), population, numElites,
+		ElitesData ed = policyGenerator_.updateDistributions(elites,
+				ProgramArgument.ALPHA.doubleValue(), numElites, population,
 				minReward);
+		if (ed != null)
+			performance_.noteElitesReward(currentEpisode_,
+					ed.getMeanEliteValue(), ed.getMaxEliteValue());
+
 		// Negative updates:
 		if (ProgramArgument.NEGATIVE_UPDATES.booleanValue())
 			policyGenerator_.updateNegative(elites,
@@ -290,8 +305,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					removed);
 
 		// Run the post update operations
-		boolean resetElites = policyGenerator_.postUpdateOperations(numElites);
-		return resetElites;
+		boolean newSlotCreated = policyGenerator_
+				.postUpdateOperations(numElites);
+		if (ProgramArgument.RESET_ELITES.booleanValue() && newSlotCreated)
+			elites.clear();
 	}
 
 	/**
@@ -366,24 +383,32 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			System.out.println();
 			if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue())
 				System.out.println("Testing...");
+
+			// Determine best elite sample
+			bestPolicy_ = new ModularPolicy(policyGenerator_.generatePolicy(
+					false, true), this);
 		}
 
 		frozen_ = b;
 		policyGenerator_.freeze(b);
 		performance_.freeze(b);
 		testEpisode_ = 0;
+		bestPolicyEpisode_ = -1;
 	}
 
 	/**
 	 * Generates a policy from the current distribution.
 	 * 
-	 * @param existingSubGoal
+	 * @param existingSubGoals
 	 *            A collection of all existing sub-goals in the parent policy
 	 *            this policy is to be put into.
 	 * @return A newly generated policy from the current distribution.
 	 */
 	public ModularPolicy generatePolicy(
 			Collection<ModularPolicy> existingSubGoals) {
+		if (frozen_ && bestPolicyEpisode_ > -1)
+			return bestPolicy_;
+
 		// Initialise undertested
 		if (undertestedPolicies_ == null)
 			undertestedPolicies_ = new LinkedList<ModularPolicy>();
@@ -405,7 +430,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		}
 
 		// Otherwise generate a new policy
-		RelationalPolicy newPol = policyGenerator_.generatePolicy(false);
+		RelationalPolicy newPol = policyGenerator_.generatePolicy(true, false);
 		ModularPolicy newModPol = null;
 		if (newPol instanceof ModularPolicy)
 			newModPol = new ModularPolicy((ModularPolicy) newPol);
@@ -447,6 +472,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 * @return True if the distribution is converged.
 	 */
 	public boolean isConverged() {
+		// If there are a finite number of episodes, do not converge
+		if (Config.getInstance().getMaxEpisodes() != -1)
+			return false;
+
 		// Only converged if the relevant sub-goals are converged
 		if (relevantSubDistEpisodeMap_ == null)
 			relevantSubDistEpisodeMap_ = new HashMap<LocalCrossEntropyDistribution, Integer>();
@@ -458,14 +487,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		}
 
 		// Check elite convergence
-		if (elites_.size() >= population_
-				* (1 - ProgramArgument.RHO.doubleValue())
+		if (ProgramArgument.ELITES_CONVERGENCE.booleanValue()
+				&& elites_.size() >= population_
+						* (1 - ProgramArgument.RHO.doubleValue())
 				&& elites_.first().getValue() == elites_.last().getValue()
 				&& elites_.first().getValue() > performance_.getMinimumReward())
 			return true;
 
-		// Check distribution convergence
-		if (policyGenerator_.isConverged())
+		// Check distribution convergence (Need at least N samples)
+		if (currentEpisode_ >= population_
+				* ProgramArgument.POLICY_REPEATS.intValue()
+				&& policyGenerator_.isConverged())
 			return true;
 
 		return false;
@@ -482,7 +514,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public boolean isLearningComplete() {
 		return frozen_
-				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue();
+				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue()
+				&& bestPolicyEpisode_ >= ProgramArgument.TEST_ITERATIONS
+						.intValue();
 	}
 
 	/**
@@ -499,8 +533,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// Performance
 		if (!frozen_)
 			currentEpisode_ += policyRewards.size();
-		double average = performance_.noteSampleRewards(policyRewards,
-				currentEpisode_);
+		double average = 0;
+		if (testEpisode_ < ProgramArgument.TEST_ITERATIONS.intValue()) {
+			average = performance_.noteSampleRewards(policyRewards,
+					currentEpisode_);
+		} else {
+			average = performance_.noteBestPolicyValue(policyRewards);
+		}
 
 		// Mutate new rules, if necessary.
 		policyGenerator_.mutateRLGGRules();
@@ -509,11 +548,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		population_ = policyGenerator_.determinePopulation();
 		numElites_ = (int) Math.ceil(population_
 				* ProgramArgument.RHO.doubleValue());
-		if (!frozen_ && isValidSample(sample)) {
+		if (!frozen_) {
 			// Add sample to elites
-			PolicyValue pv = new PolicyValue(sample, average,
-					policyGenerator_.getPoliciesEvaluated());
-			elites_.add(pv);
+			if (isValidSample(sample)) {
+				PolicyValue pv = new PolicyValue(sample, average,
+						policyGenerator_.getPoliciesEvaluated());
+				elites_.add(pv);
+			}
 			policyGenerator_.incrementPoliciesEvaluated();
 
 			// Update distributions (depending on number of elites)
@@ -534,9 +575,22 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// Estimate experiment convergence
 		double convergence = policyGenerator_.getConvergenceValue();
 		if (frozen_) {
-			testEpisode_++;
-			convergence = testEpisode_
-					/ ProgramArgument.TEST_ITERATIONS.doubleValue();
+			if (testEpisode_ < ProgramArgument.TEST_ITERATIONS.doubleValue()) {
+				testEpisode_++;
+				convergence = testEpisode_
+						/ ProgramArgument.TEST_ITERATIONS.doubleValue();
+				if (testEpisode_ == ProgramArgument.TEST_ITERATIONS
+						.doubleValue()) {
+					System.out.println("Beginning [" + goalCondition_
+							+ "] BEST POLICY testing for episode "
+							+ currentEpisode_ + ".");
+					bestPolicyEpisode_ = 0;
+				}
+			} else {
+				bestPolicyEpisode_++;
+				convergence = bestPolicyEpisode_
+						/ ProgramArgument.TEST_ITERATIONS.doubleValue();
+			}
 		}
 		int numSlots = policyGenerator_.size();
 		performance_.estimateETA(convergence, numElites_, elites_, numSlots,
@@ -554,6 +608,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		if (!frozen_) {
 			// Save files if necessary
 			if ((localAgentObservations_.isSettled() && !oldAOSettled_)
+					|| (policyGenerator_.hasUpdated() && !oldUpdated_)
 					|| policyGenerator_.getPoliciesEvaluated()
 							% ProgramArgument.PERFORMANCE_TESTING_SIZE
 									.doubleValue() == 1) {
@@ -562,6 +617,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			}
 
 			oldAOSettled_ = localAgentObservations_.isSettled();
+			oldUpdated_ = policyGenerator_.hasUpdated();
 		}
 	}
 
@@ -575,6 +631,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 *         contains old, invalid rules.
 	 */
 	private boolean isValidSample(ModularPolicy sample) {
+		// If no rules fired, this sample is invalid.
+		if (sample.getFiringRules().isEmpty())
+			return false;
+		// Check each rule for validity
 		for (PolicyItem pi : sample.getRules()) {
 			if (pi instanceof RelationalRule) {
 				// Check that the rule is valid within this distribution

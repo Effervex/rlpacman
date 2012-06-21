@@ -611,16 +611,16 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * @return The absolute amount of difference in the probabilities for each
 	 *         element.
 	 */
-	public double updateDistribution(double numSamples, Map<T, Double> counts,
+	public double updateDistribution(double numSamples, Map<T, Integer> counts,
 			double stepSize) {
 		double absoluteChange = 0;
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
 			for (T element : itemProbs_.keySet()) {
 				// Update every element within the distribution
-				Double itemCount = counts.get(element);
+				Integer itemCount = counts.get(element);
 				if (itemCount == null)
-					itemCount = 0d;
+					itemCount = 0;
 				absoluteChange += updateElement(element, numSamples, itemCount,
 						stepSize);
 			}
@@ -705,9 +705,9 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			double stepSize) {
 		double oldValue = itemProbs_.get(element);
 		// Calculate the new ratio.
-		double ratio = count / numSamples;
+		double observedProb = count / numSamples;
 		// Update the value
-		double newValue = stepSize * ratio + (1 - stepSize) * oldValue;
+		double newValue = stepSize * observedProb + (1 - stepSize) * oldValue;
 		// Set the new value.
 		itemProbs_.put(element, newValue);
 		probTree_ = null;
