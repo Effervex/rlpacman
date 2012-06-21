@@ -3,6 +3,7 @@ package cerrla.modular;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -27,6 +28,7 @@ import relationalFramework.RelationalRule;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 import util.ArgumentComparator;
+import util.GoalConditionComparator;
 import util.MultiMap;
 import util.Recursive;
 
@@ -121,36 +123,49 @@ public class ModularPolicy extends RelationalPolicy {
 		policySize_ = newPol.size();
 
 		// Add the rules, creating ModularHoles where appropriate.
+		SortedSet<GoalCondition> subGoals = new TreeSet<GoalCondition>(
+				new GoalConditionComparator());
 		for (PolicyItem reo : newPol.getRules()) {
 			if (reo instanceof RelationalRule) {
 				RelationalRule rule = (RelationalRule) reo;
 				policyRules_.add(reo);
 
 				// Checking for sub-goals
+				// Only have each sub-goal once
 				if (ProgramArgument.USE_MODULES.booleanValue()) {
 					Collection<SpecificGoalCondition> goalConds = rule
 							.getSpecificSubGoals();
 					for (GoalCondition gc : goalConds) {
-						ModularSubGoal subGoal = new ModularSubGoal(gc, rule);
-						policyRules_.add(subGoal);
-						childrenPolicies_.put(rule, subGoal);
-					}
-
-					// General sub-goals
-					if (ProgramArgument.USE_GENERAL_MODULES.booleanValue()) {
-						Collection<GeneralGoalCondition>[] generalisedConds = rule
-								.getGeneralisedConditions();
-						// Add all general conditions, and fill in the blanks
-						// when necessary.
-						for (GoalCondition gc : generalisedConds[0]) {
+						if (!subGoals.contains(gc)) {
 							ModularSubGoal subGoal = new ModularSubGoal(gc,
 									rule);
+							subGoals.add(gc);
 							policyRules_.add(subGoal);
 							childrenPolicies_.put(rule, subGoal);
 						}
-						for (GoalCondition gc : generalisedConds[1]) {
+					}
+				}
+
+				// General sub-goals
+				if (ProgramArgument.USE_GENERAL_MODULES.booleanValue()) {
+					Collection<GeneralGoalCondition>[] generalisedConds = rule
+							.getGeneralisedConditions();
+					// Add all general conditions, and fill in the blanks
+					// when necessary.
+					for (GoalCondition gc : generalisedConds[0]) {
+						if (!subGoals.contains(gc)) {
 							ModularSubGoal subGoal = new ModularSubGoal(gc,
 									rule);
+							subGoals.add(gc);
+							policyRules_.add(subGoal);
+							childrenPolicies_.put(rule, subGoal);
+						}
+					}
+					for (GoalCondition gc : generalisedConds[1]) {
+						if (!subGoals.contains(gc)) {
+							ModularSubGoal subGoal = new ModularSubGoal(gc,
+									rule);
+							subGoals.add(gc);
 							policyRules_.add(subGoal);
 							childrenPolicies_.put(rule, subGoal);
 						}
@@ -527,7 +542,7 @@ public class ModularPolicy extends RelationalPolicy {
 	public boolean noteStepReward(double[] reward) {
 		if (episodeReward_ == null)
 			episodeReward_ = new double[2];
-		
+
 		// Note reward if a rule in this policy fired (or it's the main policy).
 		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
 				|| !firedLastStep_.isEmpty();
@@ -660,5 +675,30 @@ public class ModularPolicy extends RelationalPolicy {
 	@Override
 	public String toString() {
 		return toNiceString();
+	}
+
+	/**
+	 * Checks if this modular policy is essentially equivalent another policy
+	 * (contains the same rules, ignoring sub-goals).
+	 * 
+	 * @param policy
+	 *            The policy to check for equivalencies.
+	 * @return True if the policy is equivalent (contaisn the same rules).
+	 */
+	public boolean equivalentTo(RelationalPolicy policy) {
+		if (this == policy)
+			return true;
+		Iterator<PolicyItem> policyIter = policy.getRules().iterator();
+		for (PolicyItem pItem : policyRules_) {
+			if (pItem instanceof RelationalRule) {
+				// Check for equality
+				if (!policyIter.hasNext() || !policyIter.next().equals(pItem))
+					return false;
+			}
+		}
+		// If the other policy still has rules, return false.
+		if (policyIter.hasNext())
+			return false;
+		return true;
 	}
 }

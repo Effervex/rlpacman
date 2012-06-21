@@ -131,6 +131,7 @@ public class RRLExperiment {
 	private void combineTempFiles(File performanceFile, int runEnd,
 			long experimentStart) throws Exception {
 		List<List<Float>> performances = new ArrayList<List<Float>>();
+		List<List<Float>> elites = new ArrayList<List<Float>>();
 		float min = Float.MAX_VALUE;
 		int minRun = -1;
 		float max = -Float.MAX_VALUE;
@@ -143,26 +144,27 @@ public class RRLExperiment {
 		// For every performance file
 		for (int i = 0; i < runEnd; i++) {
 			File tempPerf = new File(Config.TEMP_FOLDER + "/" + performanceFile
-					+ i);
+					+ i + "raw");
 			if (!PerformanceReader.readPerformanceFile(tempPerf, true)) {
 				System.err.println("Error reading performance file.");
 				return;
 			}
 
 			List<Float> thisRunPerformances = new ArrayList<Float>();
+			List<Float> thisRunElites = new ArrayList<Float>();
 			performances.add(thisRunPerformances);
+			elites.add(thisRunElites);
 
 			// Run through the performances and place them in the matrix
-			SortedMap<Integer, Float> runPerformances = PerformanceReader
+			SortedMap<Integer, Float[]> runPerformances = PerformanceReader
 					.getPerformanceArray();
-			numSlots[i] = PerformanceReader.getNumSlots();
 			Iterator<Integer> iter = runPerformances.keySet().iterator();
 			Integer current = iter.next();
 			Integer previous = null;
-			int currentKeyframeEpisode = 0;
+			int currentKeyframeEpisode = ProgramArgument.PERFORMANCE_EPISODE_GAP
+					.intValue();
 			// Run through the performances, using linear interpolation to
 			// get estimates of the performance at a given interval.
-			float interpolated = 0;
 			do {
 				// If the current segment is further along than the current
 				// value, advance to the next value.
@@ -176,38 +178,60 @@ public class RRLExperiment {
 
 				// If the keyframe isn't up to the first episode, just use
 				// the current value
+				Float[] episodePerformance = runPerformances.get(current);
 				if (previous == null) {
 					// Add to the previous value.
-					thisRunPerformances.add(runPerformances.get(current));
+					thisRunPerformances.add(episodePerformance[0]);
+					thisRunElites.add(episodePerformance[2]);
 				} else {
 					// Interpolate from the previous value to the current
 					// one.
-					interpolated = 0;
+					float interpolated = 0;
+					float eliteInterpolated = 0;
 					if (previous == current) {
-						interpolated = runPerformances.get(current);
+						interpolated = episodePerformance[0];
+						eliteInterpolated = episodePerformance[1];
 					} else {
-						float prevVal = (previous == 0) ? 0 : runPerformances
-								.get(previous);
-						float currentVal = runPerformances.get(current);
+						float prevVal = 0;
+						float elitePrevVal = 0;
+						if (previous != null) {
+							Float[] prevEpisodePerformance = runPerformances
+									.get(previous);
+							prevVal = prevEpisodePerformance[0];
+							if (prevEpisodePerformance[2] == null)
+								elitePrevVal = prevEpisodePerformance[0];
+							else
+								elitePrevVal = prevEpisodePerformance[2];
+						}
+
+						float currentVal = episodePerformance[0];
+						float currentEliteVal = (episodePerformance[2] == null) ? currentVal
+								: episodePerformance[2];
 						interpolated = (currentVal - prevVal)
 								* (1f * (currentKeyframeEpisode - previous) / (current - previous))
 								+ prevVal;
+						eliteInterpolated = (currentEliteVal - elitePrevVal)
+								* (1f * (currentKeyframeEpisode - previous) / (current - previous))
+								+ elitePrevVal;
 					}
 
 					// Add to the performances
 					thisRunPerformances.add(interpolated);
+					thisRunElites.add(eliteInterpolated);
 				}
 
 				// To the next increment
 				currentKeyframeEpisode += ProgramArgument.PERFORMANCE_EPISODE_GAP
 						.intValue();
 			} while (currentKeyframeEpisode <= runPerformances.lastKey());
-			thisRunPerformances.add(runPerformances.get(runPerformances
-					.lastKey()));
-			System.out.println(runPerformances.get(runPerformances.lastKey()));
+			Float[] lastPerf = runPerformances.get(runPerformances.lastKey());
+			thisRunPerformances.add(lastPerf[0]);
+			thisRunElites.add(lastPerf[2]);
+			System.out
+					.println(runPerformances.get(runPerformances.lastKey())[0]);
 
 			// Find min or max runs
-			float runVal = runPerformances.get(runPerformances.lastKey());
+			float runVal = runPerformances.get(runPerformances.lastKey())[0];
 			if (runVal < min) {
 				min = runVal;
 				minRun = i;
@@ -224,7 +248,7 @@ public class RRLExperiment {
 		BufferedWriter buf = new BufferedWriter(writer);
 		Config.writeFileHeader(buf, Config.getInstance().getGoal());
 
-		buf.write("Episode\tAverage\tSD\tMin\tMax\n");
+		buf.write("Episode\tAverage\tSD\tMin\tMax\tElite-Average\tElite-SD\n");
 		boolean moreEpisodes = true;
 		int index = 0;
 		Mean mean = new Mean();
@@ -233,14 +257,17 @@ public class RRLExperiment {
 			moreEpisodes = false;
 			// Compile the array of performances for the given index
 			double[] performanceArray = new double[performances.size()];
+			double[] eliteArray = new double[elites.size()];
 			double maxVal = 0;
 			double minVal = 0;
 			for (int run = 0; run < performanceArray.length; run++) {
 				List<Float> runPerformanceList = performances.get(run);
+				List<Float> runElitesList = elites.get(run);
 				int thisIndex = Math.min(index, runPerformanceList.size() - 1);
 				if (index < runPerformanceList.size() - 1)
 					moreEpisodes = true;
 				performanceArray[run] = runPerformanceList.get(thisIndex);
+				eliteArray[run] = runElitesList.get(thisIndex);
 
 				// Max and min
 				if (run == minRun)
@@ -250,11 +277,12 @@ public class RRLExperiment {
 			}
 
 			// Find the statistics
-			int episodeNum = index
+			int episodeNum = (index + 1)
 					* ProgramArgument.PERFORMANCE_EPISODE_GAP.intValue();
 			buf.write(episodeNum + "\t" + mean.evaluate(performanceArray)
 					+ "\t" + sd.evaluate(performanceArray) + "\t" + minVal
-					+ "\t" + maxVal + "\n");
+					+ "\t" + maxVal + "\t" + mean.evaluate(eliteArray) + "\t"
+					+ sd.evaluate(eliteArray) + "\n");
 			index++;
 		}
 
@@ -321,7 +349,7 @@ public class RRLExperiment {
 
 		agent_.initialise(runIndex);
 		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
-		
+
 		if (ProgramArgument.TESTING.booleanValue())
 			agent_.freeze(true);
 

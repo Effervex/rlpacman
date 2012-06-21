@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
@@ -21,6 +23,7 @@ import rrlFramework.Config;
 import rrlFramework.RRLActions;
 import rrlFramework.RRLAgent;
 import rrlFramework.RRLObservations;
+import util.GoalConditionComparator;
 import util.Recursive;
 
 /**
@@ -60,12 +63,16 @@ public class CERRLA implements RRLAgent {
 	 *            The goal condition to use.
 	 * @param subGoalPolicies
 	 *            The subgoal policies added to the main policy.
+	 * @param priorSubGoals
+	 *            The sub-goals which already have policies from earlier in the
+	 *            policy.
 	 */
 	private void addModuleToPolicy(ModularSubGoal subGoal,
 			Collection<GoalCondition> priorPolicies,
 			Map<RelationalArgument, RelationalArgument> moduleReplacementMap,
 			ModularPolicy modularPolicy,
-			Collection<ModularPolicy> subGoalPolicies) {
+			Collection<ModularPolicy> subGoalPolicies,
+			SortedSet<GoalCondition> priorSubGoals) {
 		GoalCondition subGoalCondition = subGoal.getGoalCondition();
 		LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
 				.get(subGoalCondition);
@@ -77,6 +84,10 @@ public class CERRLA implements RRLAgent {
 			Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
 					priorPolicies);
 			modulePrior.add(subGoalCondition);
+
+			SortedSet<GoalCondition> priorSubGoalsLocal = new TreeSet<GoalCondition>(
+					priorSubGoals);
+
 			// If the condition is general, then also note that the opposite of
 			// the general is used (aka always true when this is false)
 			if (subGoalCondition instanceof GeneralGoalCondition) {
@@ -103,10 +114,10 @@ public class CERRLA implements RRLAgent {
 
 				// Add the policy
 				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
-						modulePrior, newModuleReplacementMap, subGoalPolicies));
+						modulePrior, newModuleReplacementMap, subGoalPolicies, priorSubGoalsLocal));
 			} else {
 				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
-						modulePrior, moduleReplacementMap, subGoalPolicies));
+						modulePrior, moduleReplacementMap, subGoalPolicies, priorSubGoalsLocal));
 			}
 		}
 	}
@@ -168,7 +179,8 @@ public class CERRLA implements RRLAgent {
 		for (ModularPolicy modPol : existingPolicies)
 			subGoalPolicies = modPol.getAllPolicies(true, subGoalPolicies);
 
-		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies);
+		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
+				null);
 	}
 
 	/**
@@ -192,12 +204,16 @@ public class CERRLA implements RRLAgent {
 			LocalCrossEntropyDistribution policyGenerator,
 			Collection<GoalCondition> priorPolicies,
 			Map<RelationalArgument, RelationalArgument> moduleReplacementMap,
-			Collection<ModularPolicy> subGoalPolicies) {
+			Collection<ModularPolicy> subGoalPolicies,
+			SortedSet<GoalCondition> priorSubGoals) {
 		// Initialise null collections
 		if (priorPolicies == null)
 			priorPolicies = new HashSet<GoalCondition>();
 		if (subGoalPolicies == null)
 			subGoalPolicies = new HashSet<ModularPolicy>();
+		if (priorSubGoals == null)
+			priorSubGoals = new TreeSet<GoalCondition>(
+					new GoalConditionComparator());
 
 		// Build the module parameter replacement map
 		ModularPolicy modularPolicy = policyGenerator
@@ -212,8 +228,13 @@ public class CERRLA implements RRLAgent {
 			// If there is a modular sub-goal that needs regenerating
 			if (reo.shouldRegenerate()) {
 				ModularSubGoal subGoal = (ModularSubGoal) reo;
-				addModuleToPolicy(subGoal, priorPolicies, moduleReplacementMap,
-						modularPolicy, subGoalPolicies);
+				GoalCondition gc = subGoal.getGoalCondition();
+				if (!priorSubGoals.contains(gc)) {
+					addModuleToPolicy(subGoal, priorPolicies,
+							moduleReplacementMap, modularPolicy,
+							subGoalPolicies, priorSubGoals);
+					priorSubGoals.add(subGoal.getGoalCondition());
+				}
 			}
 		}
 

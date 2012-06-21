@@ -27,9 +27,9 @@ public class PacManStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("moveTo", "(thing ?X) (distance ?X ?Y)");
-		preconds.put("moveFrom", "(thing ?X) (distance ?X ?Y)");
-		preconds.put("toJunction", "(junction ?X) (junctionSafety ?X ?Y)");
+		preconds.put("moveTo", "(thing ?A) (distance ?A ?B)");
+		preconds.put("moveFrom", "(thing ?A) (distance ?A ?B)");
+		preconds.put("toJunction", "(junction ?A) (junctionSafety ?A ?B)");
 
 		return preconds;
 	}
@@ -87,7 +87,7 @@ public class PacManStateSpec extends StateSpec {
 				|| envParameter_.equals("10000points")) {
 			// Score maximisation
 			result[0] = "10000points";
-			result[1] = "(score ?Y&:(>= ?Y 10000))";
+			result[1] = "(score ?B&:(>= ?B 10000))";
 			return result;
 		}
 		
@@ -179,8 +179,8 @@ public class PacManStateSpec extends StateSpec {
 			rules.add("(distance ?Dot ?Dist0) "
 					+ "(dot ?Dot) => (moveTo ?Dot ?Dist0)");
 			rules
-					.add("(junctionSafety ?X ?__Num3&:(betweenRange ?__Num3 -16.0 28.0)) "
-							+ "=> (toJunction ?X ?__Num3)");
+					.add("(junctionSafety ?A ?__Num3&:(betweenRange ?__Num3 -16.0 28.0)) "
+							+ "=> (toJunction ?A ?__Num3)");
 		}
 
 		for (String rule : rules)

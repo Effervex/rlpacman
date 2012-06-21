@@ -40,7 +40,7 @@ import util.MultiMap;
 /**
  * A part of AgentObservations. The LocalAgentObservations contain observation
  * information regarding the local current goal. These are loaded and saved
- * serparately from the AgentObservations.
+ * separately from the AgentObservations.
  * 
  * @author Sam Sarjant
  */
@@ -128,26 +128,50 @@ public class LocalAgentObservations extends SettlingScan implements
 	private boolean checkConditionTypes(
 			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition) {
+		Map<RelationalArgument, Collection<String>> typeArguments = new HashMap<RelationalArgument, Collection<String>>();
+		RelationalArgument[] condArgs = condition.getRelationalArguments();
+		String[] condTypes = condition.getArgTypes();
+		for (int i = 0; i < condArgs.length; i++) {
+			// Negated type predicate case
+			if (condition.isNegated()
+					&& StateSpec.getInstance().isTypePredicate(
+							condition.getFactName())) {
+				typeArguments.put(condArgs[i], StateSpec.getInstance()
+						.getTypeParents(condTypes[i]));
+			} else {
+				typeArguments.put(condArgs[i], StateSpec.getInstance()
+						.getTypeLineage(condTypes[i]));
+			}
+		}
+
 		// Run through the rule conditions.
+		Collection<RelationalPredicate> removedNegated = new ArrayList<RelationalPredicate>();
 		for (RelationalPredicate ruleCond : ruleConds) {
-			// Only check type preds
-			if (StateSpec.getInstance().isTypePredicate(ruleCond.getFactName())) {
-				// Check if the type argument conflicts with the conditions
-				// arguments
-				String[] condArgs = condition.getArguments();
-				for (int i = 0; i < condArgs.length; i++) {
+			// Check the lineage against each fact.
+			RelationalArgument[] ruleArgs = ruleCond.getRelationalArguments();
+			String[] ruleTypes = ruleCond.getArgTypes();
+			for (int j = 0; j < ruleArgs.length; j++) {
+				if (typeArguments.containsKey(ruleArgs[j])) {
 					// Matching argument. Check if types conflict
-					if (condArgs[i].equals(ruleCond.getArguments()[0])) {
-						Collection<String> lineage = new HashSet<String>();
-						StateSpec.getInstance().getTypeLineage(
-								condition.getArgTypes()[i], lineage);
-						if (!lineage.contains(ruleCond.getFactName()))
+					Collection<String> lineage = typeArguments.get(ruleArgs[j]);
+
+					// Negated case
+					if (ruleCond.isNegated()) {
+						// Check the negated argument is still valid
+						if (!condition.isNegated()
+								&& !lineage.contains(ruleTypes[j])) {
+							removedNegated.add(ruleCond);
+							break;
+						}
+					} else {
+						if (!lineage.contains(ruleTypes[j]))
 							return false;
 					}
 				}
 			}
 		}
 
+		ruleConds.removeAll(removedNegated);
 		return true;
 	}
 
@@ -548,7 +572,6 @@ public class LocalAgentObservations extends SettlingScan implements
 		Collection<Fact> stateFacts = StateSpec.extractFacts(state);
 		boolean changed = scanState(stateFacts, goalReplacements);
 
-
 		// Run through each valid action.
 		for (String action : validActions.keySet()) {
 			// Gather the action facts for each valid action
@@ -743,13 +766,13 @@ public class LocalAgentObservations extends SettlingScan implements
 		if (condition != null) {
 			condition.swapNegated();
 			Collection<MergedFact> negUnification = RLGGMerger.getInstance()
-					.unifyFactToState(condition, ruleConds, null, null, false);
+					.unifyFactToState(condition, simplified, null, null, false);
 			condition.swapNegated();
 			if (!negUnification.isEmpty())
 				return null;
 
 			// Need to check type conditions
-			if (!checkConditionTypes(ruleConds, condition))
+			if (!checkConditionTypes(simplified, condition))
 				return null;
 
 			simplified.add(condition);
@@ -774,6 +797,9 @@ public class LocalAgentObservations extends SettlingScan implements
 		for (RelationalPredicate sf : simplified)
 			if (!isValidGoalCondition(sf, replacementMap))
 				return null;
+
+		// TODO Need to remove redundant negated predicates (bounded by type)
+
 
 		return simplified;
 	}
@@ -805,20 +831,22 @@ public class LocalAgentObservations extends SettlingScan implements
 		// First load the singleton environment AgentObservations.
 		EnvironmentAgentObservations.loadAgentObservations();
 
-		try {
-			File localObsFile = getLocalFile(localGoal.toString());
-			if (localObsFile.exists()) {
-				FileInputStream fis = new FileInputStream(localObsFile);
-				ObjectInputStream ois = new ObjectInputStream(fis);
-				LocalAgentObservations lao = (LocalAgentObservations) ois
-						.readObject();
-				if (lao != null) {
-					if (localGoal.isMainGoal())
-						lao.localGoal_.setAsMainGoal();
-					return lao;
+		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()) {
+			try {
+				File localObsFile = getLocalFile(localGoal.toString());
+				if (localObsFile.exists()) {
+					FileInputStream fis = new FileInputStream(localObsFile);
+					ObjectInputStream ois = new ObjectInputStream(fis);
+					LocalAgentObservations lao = (LocalAgentObservations) ois
+							.readObject();
+					if (lao != null) {
+						if (localGoal.isMainGoal())
+							lao.localGoal_.setAsMainGoal();
+						return lao;
+					}
 				}
+			} catch (Exception e) {
 			}
-		} catch (Exception e) {
 		}
 		System.out.println("No local agent observations to load.");
 		return new LocalAgentObservations(localGoal);
@@ -1108,42 +1136,36 @@ public class LocalAgentObservations extends SettlingScan implements
 				replacementMap.put(gTerm, gTerm);
 			}
 
+			// Apply the replacements, simplify the rule, then check for
+			// validity
+
+
 			// Run through the rule conditions, checking each replaced
 			// term is valid in regards to goal options.
-			boolean validRule = true;
 			for (RelationalPredicate cond : ruleConditions) {
-				// Check if the condition is a valid goal condition.
-				if (isValidGoalCondition(cond, replacementMap)) {
-					// If the replacement is valid, then add a replaced
-					// fact (retaining other args) to the specialised
-					// conditions.
-					RelationalPredicate specCond = new RelationalPredicate(cond);
-					specCond.replaceArguments(replacementMap, true, false);
-					specConditions.add(specCond);
-				} else {
-					validRule = false;
-					break;
-				}
+				RelationalPredicate specCond = new RelationalPredicate(cond);
+				specCond.replaceArguments(replacementMap, true, false);
+				specConditions.add(specCond);
 			}
 
-			if (validRule) {
-				// Simplify conditions
-				EnvironmentAgentObservations.getInstance().simplifyRule(
-						specConditions, false, false,
-						localInvariants_.getSpecificInvariants());
+			// Simplify conditions
+			EnvironmentAgentObservations.getInstance().simplifyRule(
+					specConditions, false, false,
+					localInvariants_.getSpecificInvariants());
 
-				// Create the mutant
-				RelationalRule mutant = new RelationalRule(specConditions,
-						new RelationalPredicate(rule.getAction(), newTerms),
-						rule);
-				mutant.setQueryParams(rule.getQueryParameters());
-				mutant.expandConditions();
-				return mutant;
+			// Check if the condition is a valid goal condition.
+			for (RelationalPredicate cond : specConditions) {
+				if (!isValidGoalCondition(cond, replacementMap))
+					return null;
 			}
-			return null;
+
+			// Create the mutant
+			RelationalRule mutant = new RelationalRule(specConditions,
+					new RelationalPredicate(rule.getAction(), newTerms), rule);
+			mutant.setQueryParams(rule.getQueryParameters());
+			mutant.expandConditions();
+			return mutant;
 		}
-
-
 
 		/**
 		 * Recreates all the specialisation conditions (local and environmental)
@@ -1236,6 +1258,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> actionConditions = getSpecialisationConditions(actionPred);
 			if (actionConditions == null)
 				return specialisations;
+
 			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
 					rule.getConditions(true));
 			RelationalPredicate action = rule.getAction();
@@ -1347,9 +1370,8 @@ public class LocalAgentObservations extends SettlingScan implements
 					resultPreds);
 			if (args[i].isAnonymous()) {
 				// Get this index's type lineage
-				Collection<String> lineage = new HashSet<String>();
-				StateSpec.getInstance().getTypeLineage(
-						anonVariable.getArgTypes()[i], lineage);
+				Collection<String> lineage = StateSpec.getInstance()
+						.getTypeLineage(anonVariable.getArgTypes()[i]);
 				// For every unbound argument, check that the types are in the
 				// lineage.
 				for (RelationalArgument unboundArg : unboundTypes.keySet()) {

@@ -24,6 +24,9 @@ public abstract class RRLEnvironment {
 	/** The goal replacement map. */
 	private BidiMap goalReplacementMap_;
 
+	/** The observations from the last state. */
+	protected RRLObservations observations_;
+
 	public RRLEnvironment() {
 		reteDriven_ = isReteDriven();
 	}
@@ -200,7 +203,8 @@ public abstract class RRLEnvironment {
 		startState();
 
 		// Form the relational observations
-		return formObservations(getGoalArgs(), true);
+		observations_ = formObservations(getGoalArgs(), true);
+		return observations_;
 	}
 
 	/**
@@ -219,6 +223,7 @@ public abstract class RRLEnvironment {
 		stepState(groundAction);
 
 		// Form the relational observations
-		return formObservations(getGoalArgs(), false);
+		observations_ = formObservations(getGoalArgs(), false);
+		return observations_;
 	}
 }

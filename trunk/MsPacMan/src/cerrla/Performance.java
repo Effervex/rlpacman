@@ -17,6 +17,7 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
 import cerrla.modular.GoalCondition;
+import cerrla.modular.ModularPolicy;
 
 import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
@@ -43,6 +44,10 @@ public class Performance implements Serializable {
 	private SortedMap<Integer, Double> episodeMeans_;
 	/** The episodic SD (including policy repetitions). */
 	private SortedMap<Integer, Double> episodeSDs_;
+	/** The episodic average elites value. */
+	private SortedMap<Integer, Double> episodeEliteMean_;
+	/** The episodic average elites value. */
+	private SortedMap<Integer, Double> episodeEliteMax_;
 	/** If the performance is frozen. */
 	private boolean frozen_;
 	/** A queue of the standard deviation for each single policy. */
@@ -59,6 +64,8 @@ public class Performance implements Serializable {
 	private int runIndex_;
 	/** The time at which this performance object was created. */
 	private long startTime_;
+	/** The final elite scores received for the best policy. */
+	private ArrayList<Double> finalEliteScores_;
 
 	/**
 	 * A constructor for a fresh performance object.
@@ -69,6 +76,9 @@ public class Performance implements Serializable {
 	public Performance(int runIndex) {
 		episodeMeans_ = new TreeMap<Integer, Double>();
 		episodeSDs_ = new TreeMap<Integer, Double>();
+		episodeEliteMean_ = new TreeMap<Integer, Double>();
+		episodeEliteMax_ = new TreeMap<Integer, Double>();
+		finalEliteScores_ = new ArrayList<Double>();
 		recentScores_ = new LinkedList<Double>();
 		internalSDs_ = new LinkedList<Double>();
 		minMaxReward_ = new double[2];
@@ -180,7 +190,17 @@ public class Performance implements Serializable {
 		if (newFile)
 			Config.writeFileHeader(buf, policyGenerator.getGoalCondition());
 
-		policyGenerator.saveHumanGenerators(buf, finalWrite);
+		buf.write("A typical policy:\n");
+		ModularPolicy bestPolicy = policyGenerator
+				.determineRepresentativePolicy();
+		if (bestPolicy.size() == 0)
+			buf.write("<UNCLEAR POLICY>");
+		else
+			buf.write(bestPolicy.toString());
+
+		if (finalWrite)
+			System.out.println("Best policy:\n" + bestPolicy);
+
 		buf.write("\n\n");
 		policyGenerator.saveGenerators(buf);
 		int lastKey = episodeMeans_.lastKey();
@@ -206,10 +226,25 @@ public class Performance implements Serializable {
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 				&& policyGenerator.getGoalCondition().isMainGoal())
 			System.out.println("Average episode scores:");
+		
+		if (finalWrite) {
+			// Average the final elite scores
+			Mean m = new Mean();
+			double[] finalElites = new double[finalEliteScores_.size()];
+			int i = 0;
+			for (Double val : finalEliteScores_)
+				finalElites[i++] = val;
+			double meanBestVal = m.evaluate(finalElites);
+			episodeEliteMax_.put(lastKey, meanBestVal);
+		}
+		
 		// Noting the raw numbers
 		for (Integer episode : episodeMeans_.keySet()) {
 			buf.write(episode + "\t" + episodeMeans_.get(episode) + "\t"
-					+ episodeSDs_.get(episode) + "\n");
+					+ episodeSDs_.get(episode) + "\t"
+					+ episodeEliteMean_.get(episode) + "\t"
+					+ episodeEliteMax_.get(episode) + "\n");
+			// TODO Also add in slot count
 			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 					&& policyGenerator.getGoalCondition().isMainGoal()) {
 				System.out.println(episode + "\t" + episodeMeans_.get(episode)
@@ -374,7 +409,7 @@ public class Performance implements Serializable {
 			noteScores = true;
 		}
 		recentScores_.add(environmentAverage);
-		if (noteScores)
+		if (!frozen_)
 			recordPerformanceScore(currentEpisode);
 
 		return internalAverage;
@@ -443,6 +478,8 @@ public class Performance implements Serializable {
 			if (hasUpdated) {
 				saveElitePolicies(elites, distribution.getGoalCondition());
 				// Output the episode averages
+				if (finalWrite)
+					recordPerformanceScore(currentEpisode);
 				savePerformance(distribution.getPolicyGenerator(), tempPerf,
 						finalWrite);
 			}
@@ -453,5 +490,23 @@ public class Performance implements Serializable {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	public void noteElitesReward(int episode, Double meanEliteValue,
+			Double maxEliteValue) {
+		if (meanEliteValue == null || maxEliteValue == null)
+			return;
+
+		episodeEliteMean_.put(episode, meanEliteValue);
+		episodeEliteMax_.put(episode, maxEliteValue);
+	}
+
+	public double noteBestPolicyValue(ArrayList<double[]> policyRewards) {
+		double average = 0;
+		for (double[] reward : policyRewards)
+			average += reward[RRLObservations.ENVIRONMENTAL_INDEX];
+		average /= policyRewards.size();
+		finalEliteScores_.add(average);
+		return average;
 	}
 }

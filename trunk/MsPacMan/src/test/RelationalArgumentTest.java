@@ -97,4 +97,43 @@ public class RelationalArgumentTest {
 		assertEquals(0, ra.getRangeFrac()[0], 0);
 		assertEquals(1, ra.getRangeFrac()[1], 0);
 	}
+	
+	@Test
+	public void testEqualsCompareTo() {
+		RelationalArgument ra1 = new RelationalArgument("?X");
+		RelationalArgument ra2 = new RelationalArgument("?X");
+		assertTrue(ra1.equals(ra2));
+		assertTrue(ra1.compareTo(ra2) == 0);
+		assertTrue(ra2.compareTo(ra1) == 0);
+		
+		ra2 = new RelationalArgument("?Y");
+		assertFalse(ra1.equals(ra2));
+		assertFalse(ra1.compareTo(ra2) == 0);
+		assertFalse(ra2.compareTo(ra1) == 0);
+		
+		// Ranges
+		ra1 = new RelationalArgument("?#_1");
+		ra2 = new RelationalArgument("?#_1");
+		assertTrue(ra1.equals(ra2));
+		assertTrue(ra1.compareTo(ra2) == 0);
+		assertTrue(ra2.compareTo(ra1) == 0);
+		
+		ra1 = new RelationalArgument("?#_1");
+		ra2 = new RelationalArgument("?#_0");
+		assertFalse(ra1.equals(ra2));
+		assertFalse(ra1.compareTo(ra2) == 0);
+		assertFalse(ra2.compareTo(ra1) == 0);
+		
+		ra1 = new RelationalArgument("?#_1");
+		ra2 = new RelationalArgument("?#_1&:(range ?#_1min 0.0 ?#_1 ?#_1max 0.5)");
+		assertFalse(ra1.equals(ra2));
+		assertFalse(ra1.compareTo(ra2) == 0);
+		assertFalse(ra2.compareTo(ra1) == 0);
+	}
+	
+	@Test
+	public void testVariableTermArg() {
+		assertEquals(RelationalArgument.createVariableTermArg(0).getStringArg(), "?A");
+		assertEquals(RelationalArgument.createVariableTermArg(1).getStringArg(), "?B");
+	}
 }

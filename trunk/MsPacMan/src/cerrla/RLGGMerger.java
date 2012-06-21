@@ -55,28 +55,21 @@ public class RLGGMerger {
 			Collection<RelationalPredicate> newState,
 			RelationalArgument[] oldTerms, BidiMap replacementMap) {
 		// Pre-unify and sort the state for more efficient unification
-		List<MergedFact> unified = new ArrayList<MergedFact>();
-		Collection<RelationalPredicate> dropped = new HashSet<RelationalPredicate>();
-		List<RelationalPredicate> sortedOldState = preUnifyAndSort(oldState,
-				newState, oldTerms, replacementMap, unified, dropped);
-		boolean changed = false;
-		if (sortedOldState.size() != oldState.size())
-			changed = true;
+		MergeCase initialCase = preUnifyAndSort(oldState, newState, oldTerms,
+				replacementMap);
+		boolean changed = initialCase.isChanged();
 
-		int id = 0;
-
-		// Define the initial case.
-		UnificationCase initialCase = new UnificationCase(sortedOldState,
-				newState, unified, dropped, oldTerms, replacementMap, 0,
-				changed, rangeIndex_, id++);
-		PriorityQueue<UnificationCase> pendingUnifications = new PriorityQueue<UnificationCase>();
+		// TODO Seems Carcassonne is still throwing a fit for unifying the first
+		// state in run 3
+		int id = 1;
+		PriorityQueue<MergeCase> pendingUnifications = new PriorityQueue<MergeCase>();
 		pendingUnifications.add(initialCase);
 
 		// Continue to unify until a state (the best unified state) is fully
 		// unified.
 		while (!pendingUnifications.isEmpty()) {
 			// Get the current information
-			UnificationCase currentUnification = pendingUnifications.poll();
+			MergeCase currentUnification = pendingUnifications.poll();
 			List<RelationalPredicate> currentOldState = currentUnification
 					.getOldState();
 			Collection<RelationalPredicate> currentNewState = currentUnification
@@ -133,15 +126,11 @@ public class RLGGMerger {
 					largerUnifiedOldState.add(modFact);
 
 					// Create a unified case.
-					UnificationCase unifiedCase = new UnificationCase(
-							reducedOldState,
-							reducedNewState,
-							largerUnifiedOldState,
-							droppedOldFacts,
-							recursiveOldTerms,
-							recursiveReplacements,
-							currentGeneralisation + modFact.getGeneralisation(),
-							changed
+					MergeCase unifiedCase = new MergeCase(reducedOldState,
+							reducedNewState, largerUnifiedOldState,
+							droppedOldFacts, recursiveOldTerms,
+							recursiveReplacements, currentGeneralisation
+									+ modFact.getGeneralisation(), changed
 									|| !modFact.getResultFact().equals(
 											oldStateFact), rangeIndex_, id++);
 					pendingUnifications.add(unifiedCase);
@@ -158,8 +147,8 @@ public class RLGGMerger {
 				largerDroppedOldFacts.add(oldStateFact);
 
 				// Create an ununified case
-				UnificationCase noUnifyCase = new UnificationCase(
-						reducedOldState, currentNewState, unifiedOldState,
+				MergeCase noUnifyCase = new MergeCase(reducedOldState,
+						currentNewState, unifiedOldState,
 						largerDroppedOldFacts, currentActionTerms,
 						currentReplacementMap, currentGeneralisation
 								+ NO_FACT_UNIFY, true, rangeIndex_, id++);
@@ -241,17 +230,13 @@ public class RLGGMerger {
 	 *            The action terms.
 	 * @param replacementMap
 	 *            The original replacement map.
-	 * @param unified
-	 *            The set of unified facts to fill.
-	 * @param dropped
-	 *            The facts that have been dropped.
-	 * @return A sorted list of the old state.
+	 * @return The initial unification case, with a sorted old state.
 	 */
-	private List<RelationalPredicate> preUnifyAndSort(
-			Collection<RelationalPredicate> oldState,
+	private MergeCase preUnifyAndSort(Collection<RelationalPredicate> oldState,
 			Collection<RelationalPredicate> newState,
-			RelationalArgument[] oldTerms, BidiMap replacementMap,
-			List<MergedFact> unified, Collection<RelationalPredicate> dropped) {
+			RelationalArgument[] oldTerms, BidiMap replacementMap) {
+		List<MergedFact> unified = new ArrayList<MergedFact>();
+		Collection<RelationalPredicate> dropped = new HashSet<RelationalPredicate>();
 		MultiMap<Integer, RelationalPredicate> complexityMap = MultiMap
 				.createListMultiMap();
 
@@ -278,14 +263,27 @@ public class RLGGMerger {
 					// Unify the fact here and now.
 					MergedFact unifact = unifiedFacts.iterator().next();
 					unified.add(unifact);
-					newState.remove(unifact.getUnityFact());
-					if (oldStateFact.isNumerical())
-						beforeRangeIndex = rangeIndex_;
 				}
 			} else if (numUnifiedFacts > 1) {
-				// If there are N > 1 unified facts, return complexity N
-				complexityMap.put(numUnifiedFacts, oldStateFact);
-				maxComplexity = Math.max(maxComplexity, numUnifiedFacts);
+				// If there is a unification that does not require extra
+				// replacements, it may still be able to be unified here and
+				// now.
+				boolean singleUnify = false;
+				for (MergedFact unifiedFact : unifiedFacts) {
+					if (unifiedFact.getResultReplacements().equals(
+							replacementMap)) {
+						unified.add(unifiedFact);
+						newState.remove(unifiedFact.getUnityFact());
+						singleUnify = true;
+						break;
+					}
+				}
+
+				if (!singleUnify) {
+					// If there are N > 1 unified facts, return complexity N
+					complexityMap.put(numUnifiedFacts, oldStateFact);
+					maxComplexity = Math.max(maxComplexity, numUnifiedFacts);
+				}
 			}
 			rangeIndex_ = beforeRangeIndex;
 		}
@@ -302,7 +300,17 @@ public class RLGGMerger {
 			complexity++;
 		}
 
-		return sortedOldState;
+		// Create the output initial merge case.
+		boolean changed = false;
+		if (sortedOldState.size() != oldState.size())
+			changed = true;
+
+		// Define the initial case.
+		MergeCase initialCase = new MergeCase(sortedOldState, newState,
+				unified, dropped, oldTerms, replacementMap, 0, changed,
+				rangeIndex_, 0);
+
+		return initialCase;
 	}
 
 	/**
@@ -439,8 +447,8 @@ public class RLGGMerger {
 			return NO_CHANGE;
 
 		// Unify the states
-		List<MergedFact> unified = bestFirstUnify(oldState, newState,
-				oldTerms, replacementMap);
+		List<MergedFact> unified = bestFirstUnify(oldState, newState, oldTerms,
+				replacementMap);
 
 		if (unified.isEmpty())
 			return CANNOT_UNIFY;
@@ -448,8 +456,8 @@ public class RLGGMerger {
 		// Change the parameter values.
 		boolean changed = false;
 		int oldStateSize = oldState.size();
-		oldState.clear();
 		newState.addAll(oldState);
+		oldState.clear();
 		MergedFact lastFact = null;
 		for (MergedFact unifact : unified) {
 			RelationalPredicate oldFact = unifact.getBaseFact();
@@ -604,7 +612,7 @@ public class RLGGMerger {
 	 * 
 	 * @author Sam Sarjant
 	 */
-	private class UnificationCase implements Comparable<UnificationCase> {
+	private class MergeCase implements Comparable<MergeCase> {
 		/** The action arguments. */
 		private RelationalArgument[] actionArgs_;
 		/** The replacement map used to unify. */
@@ -653,7 +661,7 @@ public class RLGGMerger {
 		 * @param id
 		 *            The unique ID assigned to this unification case.
 		 */
-		public UnificationCase(List<RelationalPredicate> oldState,
+		public MergeCase(List<RelationalPredicate> oldState,
 				Collection<RelationalPredicate> newState,
 				List<MergedFact> unifiedOldState,
 				Collection<RelationalPredicate> droppedOldFacts,
@@ -672,7 +680,7 @@ public class RLGGMerger {
 		}
 
 		@Override
-		public int compareTo(UnificationCase uc) {
+		public int compareTo(MergeCase uc) {
 			int result = Double.compare(generalisationValue_,
 					uc.generalisationValue_);
 			if (result != 0)
@@ -705,7 +713,7 @@ public class RLGGMerger {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			UnificationCase other = (UnificationCase) obj;
+			MergeCase other = (MergeCase) obj;
 			if (id_ != other.id_)
 				return false;
 			return true;

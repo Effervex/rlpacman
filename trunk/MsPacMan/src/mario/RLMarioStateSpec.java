@@ -28,44 +28,43 @@ public class RLMarioStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
-		preconds.put("moveTo", "(canJumpOn ?X) (thing ?X) "
-				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
+		// TODO
+		preconds.put("moveTo", "(canJumpOn ?A) (thing ?A) "
+				+ "(distance ?A ?B&~:(<= -16 ?B 16)) (mario ?C)");
 		// Moving away from a given object
-//		preconds.put("moveFrom", "(canJumpOn ?X) (thing ?X) "
-//				+ "(distance ?X ?Y&~:(<= -16 ?Y 16))");
+		// preconds.put("moveFrom", "(canJumpOn ?A) (thing ?A) "
+		// + "(distance ?A ?B&~:(<= -16 ?B 16))");
 		// Search entails being under a searchable block and moving towards it
 		// (possibly jumping).
-		preconds.put("search",
-				"(brick ?X) (distance ?X ?D&:(<= -32 ?D 32)) "
-						+ "(heightDiff ?X ?Y&:(<= 16 ?Y 80))");
+		preconds.put("search", "(brick ?A) (distance ?A ?D) "
+				+ "(heightDiff ?A ?B&:(<= 16 ?B 80))");
 		// Jump onto entails jumping onto a specific thing, moving towards it if
 		// necessary.
-		preconds.put("jumpOnto",
-				"(canJumpOn ?X) (thing ?X) (distance ?X ?Y&:(<= -160 ?Y 160))");
+		preconds.put("jumpOnto", "(canJumpOn ?A) (thing ?A) (distance ?A ?B)");
 		// Jump over entails jumping over a specific thing, moving towards it if
 		// necessary.
-		preconds.put("jumpOver", "(canJumpOver ?X) (thing ?X) "
-				+ "(distance ?X ?Y&:(<= -160 ?Y 160)) (width ?X ?Z)");
+		preconds.put("jumpOver", "(canJumpOver ?A) (thing ?A) "
+				+ "(distance ?A ?B) (width ?A ?C)");
 
 		// Pickup a shell
 		preconds.put("pickup",
-				"(canJumpOn ?X) (passive ?X) (shell ?X) (distance ?X ?Y)");
+				"(canJumpOn ?A) (passive ?A) (shell ?A) (distance ?A ?B)");
 
 		// Shoot a fireball at an enemy
-		preconds.put("shootFireball", "(marioPower ?Z&:(= ?Z fire)) "
-				+ "(distance ?X ?Y) "
-				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
+		preconds.put("shootFireball", "(marioPower ?C&:(= ?C fire)) "
+				+ "(distance ?A ?B) "
+				+ "(heightDiff ?A ?H&:(<= -16 ?H 16)) (enemy ?A)");
 
 		// Shoot a held shell at an enemy
-		preconds.put("shootShell", "(carrying ?Z) (shell ?Z) (distance ?X ?Y) "
-				+ "(heightDiff ?X ?H&:(<= -16 ?H 16)) (enemy ?X)");
+		preconds.put("shootShell", "(carrying ?C) (shell ?C) (distance ?A ?B) "
+				+ "(heightDiff ?A ?H&:(<= -16 ?H 16)) (enemy ?A)");
 
 		return preconds;
 	}
 
 	@Override
 	protected int initialiseActionsPerStep() {
-		return 1;
+		return -1;
 	}
 
 	@Override
@@ -92,10 +91,10 @@ public class RLMarioStateSpec extends StateSpec {
 		actions.add(new RelationalPredicate("moveTo", structure));
 
 		// Move away from something
-//		structure = new String[2];
-//		structure[0] = "thing";
-//		structure[1] = NumberEnum.Integer.toString();
-//		actions.add(new RelationalPredicate("moveFrom", structure));
+		// structure = new String[2];
+		// structure[0] = "thing";
+		// structure[1] = NumberEnum.Integer.toString();
+		// actions.add(new RelationalPredicate("moveFrom", structure));
 
 		// Search a brick
 		structure = new String[2];
@@ -132,21 +131,26 @@ public class RLMarioStateSpec extends StateSpec {
 
 		// Squashable enemies
 		bckKnowledge.put("squashableRule", new BackgroundKnowledge(
-				"(enemy ?X) (not (spiky ?X)) (not (pirahnaPlant ?X)) "
-						+ "=> (assert (squashable ?X))", false));
+				"(enemy ?A) (not (spiky ?A)) (not (pirahnaPlant ?A)) "
+						+ "=> (assert (squashable ?A))", false));
 
 		// Blastable enemies
-		bckKnowledge.put("blastableRule", new BackgroundKnowledge(
-				"(enemy ?X) (not (spiky ?X)) => (assert (blastable ?X))",
-				false));
+		bckKnowledge
+				.put("blastableRule",
+						new BackgroundKnowledge(
+								"(enemy ?A) (not (spiky ?A)) => (assert (blastable ?A))",
+								false));
 
 		return bckKnowledge;
 	}
 
 	@Override
 	protected String[] initialiseGoalState() {
-		// The goal is 0 units away.
-		String[] result = { "goal", "(distance goal 0)" };
+		if (envParameter_ == null)
+			envParameter_ = "Diff1";
+
+		String[] result = { envParameter_,
+				"(distance goal 0)" };
 		return result;
 	}
 
@@ -158,27 +162,27 @@ public class RLMarioStateSpec extends StateSpec {
 		ArrayList<String> rules = new ArrayList<String>();
 
 		// Jump pit
-		rules.add("(pit ?X) (distance ?X ?Y&:(> ?Y 0))"
-				+ " (width ?X ?Z) => (jumpOver ?X ?Y ?Z)");
+		rules.add("(pit ?A) (distance ?A ?B&:(> ?B 0))"
+				+ " (width ?A ?C) => (jumpOver ?A ?B ?C)");
 		// Shoot enemies
-		rules.add("(blastable ?X) (distance ?X ?Y&:(betweenRange ?Y -32 100))"
-				+ " (heightDiff ?X ?Z&:(betweenRange ?Z -10 32))"
-				+ " (marioPower fire) => (shootFireball ?X ?Y fire)");
+		rules.add("(blastable ?A) (distance ?A ?B&:(betweenRange ?B -32 100))"
+				+ " (heightDiff ?A ?C&:(betweenRange ?C -10 32))"
+				+ " (marioPower fire) => (shootFireball ?A ?B fire)");
 		// Pickup shell
-		rules.add("(passive ?X) (distance ?X ?Y) (carrying ?X) (shell ?X)"
-				+ "=> (pickup ?X ?Y)");
+		rules.add("(passive ?A) (distance ?A ?B) (carrying ?A) (shell ?A)"
+				+ "=> (pickup ?A ?B)");
 		// Shoot shell
-		rules.add("(enemy ?X) (distance ?X ?Y&:(betweenRange ?Y -32 64))"
-				+ " => (shootShell ?X ?Y fire)");
+		rules.add("(enemy ?A) (distance ?A ?B&:(betweenRange ?B -32 64))"
+				+ " => (shootShell ?A ?B fire)");
 		// Stomp enemies
-		rules.add("(canJumpOn ?X) (squashable ?X) (distance ?X ?Y&:(betweenRange ?Y -32 64))"
-				+ " (heightDiff ?X ?Z&:(< ?Z 32)) => (jumpOnto ?X ?Y)");
+		rules.add("(canJumpOn ?A) (squashable ?A) (distance ?A ?B&:(betweenRange ?B -32 64))"
+				+ " (heightDiff ?A ?C&:(< ?C 32)) => (jumpOnto ?A ?B)");
 		// Collect powerups
-		rules.add("(canJumpOn ?X) (powerup ?X) (distance ?X ?Y) => (jumpOnto ?X ?Y)");
+		rules.add("(canJumpOn ?A) (powerup ?A) (distance ?A ?B) => (jumpOnto ?A ?B)");
 		// Search bricks
-		rules.add("(brick ?X) (heightDiff ?X ?Y) => (search ?X ?Y)");
+		rules.add("(brick ?A) (heightDiff ?A ?B) => (search ?A ?B)");
 		// To the goal
-		rules.add("(flag ?X) (distance ?X ?Y) => (moveTo ?X ?Y)");
+		rules.add("(flag ?A) (distance ?A ?B) => (moveTo ?A ?B)");
 
 		for (String rule : rules)
 			goodPolicy.addRule(new RelationalRule(rule));

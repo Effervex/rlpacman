@@ -7,14 +7,12 @@ import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
+import util.MultiMap;
 import util.Pair;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import jess.Rete;
 
@@ -31,9 +29,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 	/** If we're running an optimal agent. */
 	private boolean optimal_ = false;
-
-	/** The optimal number of steps for a state to be solved. */
-	private Map<BlocksState, Integer> optimalMap_ = new HashMap<BlocksState, Integer>();
 
 	/** The optimal number of steps. */
 	private int optimalSteps_;
@@ -59,6 +54,9 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	/** The block ratios pre-calculated, using [ungrounded][grounded] index. */
 	private float[][] blockRatios_;
 
+	/** The BWStates ratio 1d array (use pos()). */
+	private float[] ratio;
+
 	/**
 	 * Calculates the optimal number of steps to solve the problem.
 	 * 
@@ -69,14 +67,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				.getHandCodedPolicy();
 		steps_ = 0;
 
-		// Check it hasn't already solved the state
-		if (optimalMap_.containsKey(state_)) {
-			// System.out.println("\t\t\tAlready calculated ("
-			// + optimalMap_.get(state_) + ")");
-			return optimalMap_.get(state_);
-		}
-
 		optimal_ = true;
+		optimalSteps_ = 0;
 		BlocksState initialState = state_.clone();
 		// Run the policy through the environment until goal is satisfied.
 		double oldActionSuccess = actionSuccess_;
@@ -86,12 +78,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		int numActions = StateSpec.getInstance().getNumReturnedActions();
 		RRLObservations obs = startEpisode();
 		while (!obs.isTerminal()) {
-			// Check if the optimal policy has already seen this state
-			if (optimalMap_.containsKey(state_)) {
-				steps_ += optimalMap_.get(state_);
-				break;
-			}
-
 			// Apply the policy
 			PolicyActions actions = optimalPolicy.evaluatePolicy(obs,
 					numActions);
@@ -101,8 +87,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		// Return the state to normal
 		state_ = initialState;
 		actionSuccess_ = oldActionSuccess;
-		// formState(state_);
-		optimalMap_.put(state_, steps_);
 		optimal_ = false;
 		return steps_;
 	}
@@ -143,6 +127,9 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			else
 				reward[0] = MINIMAL_REWARD * (steps_ - optimalSteps_)
 						/ (maxSteps_ - optimalSteps_);
+			
+			// Adjust to 0..1
+			reward[0] = -1 * (reward[0] - MINIMAL_REWARD) / MINIMAL_REWARD;
 		}
 		reward[1] = reward[0];
 		return reward;
@@ -156,20 +143,34 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	@Override
 	protected Object groundActions(PolicyActions actions) {
 		RelationalPredicate action = null;
-		if (!actions.isEmpty()) {
+		if (!actions.isEmpty())
 			action = actions.getFirstRandomAction();
 
-			// Assert the action to the Rete object.
+		// Select a random action
+		if (action == null) {
+			// return state_;
+			// Select random action predicate
+			MultiMap<String, String[]> validActions = observations_
+					.getValidActions();
+			Object[] moveArgs = null;
 			try {
-				StateSpec.getInstance().getRete()
-						.assertString(action.toString());
-			} catch (Exception e) {
+				moveArgs = validActions.getSortedSet("move").toArray();
+			} catch (IllegalAccessException e) {
 				e.printStackTrace();
 			}
+
+			Object randomAction = moveArgs[RRLExperiment.random_
+					.nextInt(moveArgs.length)];
+			action = new RelationalPredicate(StateSpec.getInstance()
+					.getActions().get("move"), (String[]) randomAction);
 		}
 
-		if (action == null)
-			return state_;
+		// Assert the action to the Rete object.
+		try {
+			StateSpec.getInstance().getRete().assertString(action.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		BlocksState newState = state_.clone();
 
@@ -200,15 +201,13 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	 */
 	@SuppressWarnings("unchecked")
 	protected void initialiseBlocksState(int numBlocks) {
-		// TODO Modify this to a fair distribution of block states
-
 		Pair<Integer, Integer>[] rooted = new Pair[numBlocks];
 		Pair<Integer, Integer>[] floating = new Pair[numBlocks];
 		Integer[] worldState = new Integer[numBlocks];
 
 		for (int x = 0; x < numBlocks; x++) {
-			rooted[x] = new Pair<Integer, Integer>(0, 0);
-			floating[x] = new Pair<Integer, Integer>(x + 1, x + 1);
+			rooted[x] = new Pair<Integer, Integer>(-1, -1);
+			floating[x] = new Pair<Integer, Integer>(x, x);
 			worldState[x] = 0;
 		} /* Initially, each block is a floating tower */
 		int nrt = 0;
@@ -217,7 +216,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		while (nft-- != 0) {
 			float r = RRLExperiment.random_.nextFloat();
 			int choice = nft + nrt;
-			float rat = blockRatios_[nft][nrt];
+			float rat = Ratio(ratio,numBlocks,nft,nrt);
 			float p = rat / (rat + choice);
 			if (r <= p) { /* Put the next block on the table */
 				rooted[nrt].objA_ = floating[nft].objA_;
@@ -227,15 +226,16 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				int b = (int) Math.round(Math.floor((r - p)
 						/ ((1.0 - p) / choice)));
 				if (b < nrt) { /* Destination is a rooted tower */
-					worldState[floating[nft].objB_ - 1] = rooted[b].objA_;
+					worldState[floating[nft].objB_] = rooted[b].objA_ + 1;
 					rooted[b].objA_ = floating[nft].objA_;
 				} else { /* Destination is a floating tower */
 					b -= nrt;
-					worldState[floating[nft].objB_ - 1] = floating[b].objA_;
+					worldState[floating[nft].objB_] = floating[b].objA_ + 1;
 					floating[b].objA_ = floating[nft].objA_;
 				}
 			}
 		}
+					
 		//
 		//
 		// Integer[] worldState = new Integer[numBlocks];
@@ -299,7 +299,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 		// Check this isn't the goal state
 		state_ = new BlocksState(worldState);
-		System.out.println(state_);
 	}
 
 	@Override
@@ -378,36 +377,69 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			} else {
 				try {
 					numBlocks_ = Integer.parseInt(arg);
-					optimalMap_ = new HashMap<BlocksState, Integer>();
 				} catch (Exception e) {
 				}
 			}
 		}
 
 		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
+		// maxSteps_ *= 2;
 
 		precalculateBlockRatios(numBlocks_);
 	}
 
 	private void precalculateBlockRatios(int numBlocks) {
-		blockRatios_ = new float[numBlocks + 1][numBlocks + 1];
+		// blockRatios_ = new float[numBlocks + 1][numBlocks + 1];
+		ratio = new float[numBlocks * numBlocks];
+
+		// int n, k;
+		// float[] temp = new float[numBlocks + 1];
+		// Arrays.fill(temp, 1.0f);
+		//
+		// for (n = 0; n <= numBlocks; n++)
+		// for (k = 0; k + n <= numBlocks; k++) {
+		// if (n <= 1)
+		// blockRatios_[n][k] = 1.0f;
+		// else {
+		// blockRatios_[n][k] = (blockRatios_[n - 1][k] * (n - 1 + k +
+		// blockRatios_[n - 1][k + 1]))
+		// / (n - 2 + k + blockRatios_[n - 1][k]);
+		// // temp[k] = (temp[k] * (temp[k + 1] + n + k))
+		// // / (temp[k] + n + k - 1.0f);
+		// // if (n % 2 == 0)
+		// // blockRatios_[n / 2][k] = temp[k];
+		// }
+		// }
 
 		int n, k;
-		float[] temp = new float[numBlocks + 1];
+		float temp[] = new float[numBlocks + 1];
 		Arrays.fill(temp, 1.0f);
 
 		for (n = 0; n <= numBlocks; n++)
 			for (k = 0; k + n <= numBlocks; k++) {
-				if (n == 0)
-					blockRatios_[n][k] = 1.0f;
+				if (n < 1)
+					ratio[pos(numBlocks, n, k)] = 1.0f;
 				else {
-//					blockRatios_[n][k] = (blockRatios_[n - 1][k] * (n + k + blockRatios_[n - 1][k + 1]))
-//							/ (n - 1 + k + blockRatios_[n - 1][k]);
-					 temp[k] = (temp[k] * (temp[k + 1] + n + k))
-					 / (temp[k] + n + k - 1.0f);
-					 if (n % 2 == 0)
-					 blockRatios_[n / 2][k] = temp[k];
+					temp[k] = (temp[k] * (temp[k + 1] + n + k))
+							/ (temp[k] + n + k - 1.0f);
+					if ((n % 2) == 0)
+						ratio[pos(numBlocks, n / 2, k)] = temp[k];
 				}
 			}
+	}
+
+	private int pos(int N, int x, int y) {
+		return ((x * (N + 2 - x)) + y);
+	}
+
+	private float Ratio(float ratio[], int N, int x, int y) {
+		int z;
+
+		z = pos(N, x / 2, y);
+		if (x % 2 != 0)
+			return (ratio[z + 1] + x + y)
+					/ (((1 / ratio[z]) * (x + y - 1)) + 1);
+		else
+			return ratio[z];
 	}
 }

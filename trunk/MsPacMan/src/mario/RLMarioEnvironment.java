@@ -6,6 +6,7 @@ import java.util.List;
 import jess.Rete;
 
 import relationalFramework.PolicyActions;
+import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
 
@@ -104,7 +105,7 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	@Override
 	protected void startState() {
 		cmdLineOptions_.setLevelRandSeed(RRLExperiment.random_.nextInt());
-		cmdLineOptions_.setLevelDifficulty(3);
+		cmdLineOptions_.setLevelDifficulty(levelDifficulty_);
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();
@@ -157,11 +158,8 @@ public class RLMarioEnvironment extends RRLEnvironment {
 		environment_ = MarioEnvironment.getInstance();
 		marioMovement_ = new RLMarioMovement();
 
-		for (String arg0 : extraArgs) {
-			if (arg0.startsWith("Diff")) {
-				levelDifficulty_ = Integer.parseInt(arg0.split(" ")[1]);
-			}
-		}
+		String goalName = StateSpec.getInstance().getGoalName();
+		levelDifficulty_ = Integer.parseInt(goalName.substring(4));
 
 		cmdLineOptions_ = new MarioAIOptions();
 		cmdLineOptions_.setVisualization(!ProgramArgument.EXPERIMENT_MODE

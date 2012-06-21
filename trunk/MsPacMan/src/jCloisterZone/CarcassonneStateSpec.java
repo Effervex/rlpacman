@@ -23,12 +23,12 @@ public class CarcassonneStateSpec extends StateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// A tile may be placed if all edges fit nicely
-		preconds.put("placeTile", "(currentPlayer ?X) (validLoc ?Y ?Z ?A)");
+		preconds.put("placeTile", "(currentPlayer ?A) (validLoc ?B ?C ?D)");
 
 		// A meeple can be played when it is meeple playing stage on the placed
 		// tile
 		preconds.put("placeMeeple",
-				"(currentPlayer ?X) (meepleLoc ?Y ?Z) (meeplesLeft ?X ?#_M&:(> ?#_M 0))");
+				"(currentPlayer ?A) (meepleLoc ?B ?C) (meeplesLeft ?A ?#_M&:(> ?#_M 0))");
 
 		return preconds;
 	}
@@ -77,8 +77,8 @@ public class CarcassonneStateSpec extends StateSpec {
 		bckKnowledge
 				.put("nextToRule",
 						new BackgroundKnowledge(
-								"(locationXY ?L1 ?X ?Y) (not (tileLocation ?T1 ?L1)) "
-										+ "(edgeDirection ?E ?Ex ?Ey) (locationXY ?L2 ?X2&:(= ?X2 (+ ?X ?Ex)) ?Y2&:(= ?Y2 (+ ?Y ?Ey))) "
+								"(locationXY ?L1 ?A ?B) (not (tileLocation ?T1 ?L1)) "
+										+ "(edgeDirection ?E ?Ex ?Ey) (locationXY ?L2 ?A2&:(= ?A2 (+ ?A ?Ex)) ?B2&:(= ?B2 (+ ?B ?Ey))) "
 										+ "(tileLocation ?T2 ?L2) (oppEdge ?E ?Eopp) "
 										+ "(tileEdge ?T2 ?Eopp ?Ter) => (assert (nextTo ?L1 ?E ?Ter))",
 								false));

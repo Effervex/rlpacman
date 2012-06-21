@@ -352,8 +352,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 				seedRule_.getConditions(true));
 		RelationalRule rlggRule = parentDistribution_.getRLGGRules().get(
 				action_);
-		if (rlggRule != null)
+		if (rlggRule != null) {
 			splitFacts.removeAll(rlggRule.getConditions(true));
+		}
 		return splitFacts;
 	}
 
@@ -391,6 +392,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 				return true;
 		} else
 			convergedCount_ = 0;
+		// if (klSize() == 1)
+		// return true;
 		return false;
 	}
 
@@ -437,6 +440,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 
 	public void resetPolicyCount() {
 		numUpdates_ = 0;
+	}
+
+	public void incrementSamples() {
+		numUpdates_++;
 	}
 
 	/**
@@ -534,41 +541,39 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The elites data to perform the update with.
 	 * @param alpha
 	 *            The amount the value should update by.
+	 * @param numEliteSamples
+	 *            The number of samples present in the elites.
 	 * @param population
-	 *            The size of the population.
-	 * @param numElites
-	 *            The minimum number of elite samples.
-	 * @param totalPoliciesEvaluated
-	 *            The number of policies evaluated so far.
-	 * @return The 'normalised to 1' sum absolute updates, or null if no
-	 *         updates.
+	 *            The current population size.
+	 * @return The sum absolute updates or Integer.MAX_VALUE if no update.
 	 */
-	public Double updateProbabilities(ElitesData ed, double alpha,
-			int population, int numElites, int totalPoliciesEvaluated) {
-		numUpdates_++;
+	public double updateProbabilities(ElitesData ed, double alpha,
+			int numEliteSamples, int population) {
 		updateDelta_ = Integer.MAX_VALUE;
 		if (ed == null || alpha == 0)
-			return null;
-
-		double alphaPrime = determineLocalAlpha(alpha, population, numElites,
-				totalPoliciesEvaluated);
-		if (alphaPrime > 0) {
-			// Update the slot values
-			updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
-					ed.getSlotNumeracyMean(this), alphaPrime);
-
-			// If not fixed, update the rule values.
-			if (!fixed_) {
-				updateDelta_ = ruleGenerator_.updateDistribution(
-						ed.getSlotCount(this), ed.getRuleCounts(), alphaPrime);
-			}
-
-			// Normalise to 1
-			updateDelta_ /= alphaPrime;
 			return updateDelta_;
+
+		// double factor = 1;
+		// if (numUpdates_ < population) {
+		// factor = 1.0 * numUpdates_ / population;
+		// alpha = alpha * factor;
+		// }
+		//
+		// if (alpha == 0)
+		// return updateDelta_;
+
+		// Update the slot values
+		updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
+				ed.getSlotNumeracyMean(this), alpha);
+
+		// If not fixed, update the rule values.
+		if (!fixed_) {
+			updateDelta_ += ruleGenerator_.updateDistribution(
+					ed.getSlotCount(this), ed.getRuleCounts(), alpha);
 		}
 
-		return null;
+		// return updateDelta_ / factor;
+		return updateDelta_;
 	}
 
 	/**
@@ -592,7 +597,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 			absDiff += Math.abs(diff);
 		}
 		double diff = slotMean_;
-		slotMean_ = mean * alpha + (1 - alpha) * slotMean_;
+		// if (mean > 0)
+		// slotMean_ = alpha * mean + (1 - alpha * mean) * slotMean_;
+		// else
+		// slotMean_ = (1 - alpha) * slotMean_;
+		slotMean_ = alpha * mean + (1 - alpha) * slotMean_;
 		diff -= slotMean_;
 		absDiff += Math.abs(diff);
 		return absDiff;
@@ -603,9 +612,28 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * 
 	 * @param random
 	 *            The random number generator.
+	 * @param deterministicGeneration
+	 *            If this slot is sampled either with 0 or 1 probability.
 	 * @return True if the slot should be used.
 	 */
-	public boolean useSlot(Random random) {
+	public boolean useSlot(Random random, boolean deterministicGeneration) {
+		if (deterministicGeneration) {
+			if (slotMean_ > .5)
+				return true;
+			else
+				return false;
+		}
 		return random.nextDouble() < slotMean_;
+	}
+
+	/**
+	 * If this slot is ready to update.
+	 * 
+	 * @param population
+	 *            The current population.
+	 * @return True if it is ready to update yet.
+	 */
+	public boolean isUpdating(int population) {
+		return numUpdates_ >= determineEvaluationThreshold();
 	}
 }

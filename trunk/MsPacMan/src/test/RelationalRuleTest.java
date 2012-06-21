@@ -194,15 +194,19 @@ public class RelationalRuleTest {
 		conditions.add(StateSpec.toRelationalPredicate("(clear ?X)"));
 		conditions.add(StateSpec.toRelationalPredicate("(clear ?G_1)"));
 		conditions.add(StateSpec.toRelationalPredicate("(above ?G_1 ?Unb_0)"));
+		conditions.add(StateSpec.toRelationalPredicate("(above ?X ?Y)"));
 		conditions.add(StateSpec.toRelationalPredicate("(on ?X ?Unb_1)"));
 		RelationalPredicate action = StateSpec
 				.toRelationalPredicate("(move ?X ?G_1)");
 		RelationalRule rule = new RelationalRule(conditions, action, null);
-		List<RelationalPredicate> ruleConditions = rule.getConditions(false);
+		List<RelationalPredicate> ruleConditions = rule.getConditions(true);
 		// No more automatically added type conds
 		assertEquals(ruleConditions.get(0).toString(), "(clear ?G_1)");
 		assertEquals(ruleConditions.get(1).toString(), "(above ?X ?G_0)");
-		assertEquals(ruleConditions.get(1).toString(), "(above ?X ?G_0)");
+		assertEquals(ruleConditions.get(2).toString(), "(above ?G_1 ?Unb_1)");
+		assertEquals(ruleConditions.get(3).toString(), "(clear ?X)");
+		assertEquals(ruleConditions.get(4).toString(), "(above ?X ?Z)");
+		assertEquals(ruleConditions.get(5).toString(), "(on ?X ?Unb_0)");
 	}
 
 	@Test
