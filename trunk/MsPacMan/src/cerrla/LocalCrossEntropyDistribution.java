@@ -70,7 +70,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	private transient boolean frozen_;
 
 	/** If this generator is not specialising new rules. */
-	private transient boolean haltSpecialisations_;
+	private transient boolean isSpecialising_;
 
 	/** The goal condition for this cross-entropy behaviour. */
 	private final GoalCondition goalCondition_;
@@ -161,6 +161,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		localAgentObservations_ = LocalAgentObservations
 				.loadAgentObservations(goal);
 		policyIDCounter_ = 0;
+		isSpecialising_ = true;
 
 		// Load in RLGG rules and mutate them if possible
 		Collection<RelationalRule> covered = localAgentObservations_
@@ -866,6 +867,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 				lced.localAgentObservations_ = LocalAgentObservations
 						.loadAgentObservations(lced.goalCondition_);
 				lced.policyGenerator_.rebuildCurrentData();
+				lced.isSpecialising_ = true;
 
 				return lced;
 			}
@@ -885,10 +887,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	}
 
 	public void setSpecialisation(boolean b) {
-		haltSpecialisations_ = b;
+		isSpecialising_ = b;
 	}
 
 	public boolean isSpecialising() {
-		return !haltSpecialisations_;
+		return isSpecialising_;
 	}
 }
