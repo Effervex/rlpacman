@@ -38,7 +38,6 @@ public class PacManEnvironment extends RRLEnvironment {
 	private boolean experimentMode_ = false;
 	private PacManLowAction lastDirection_;
 	private GameModel model_;
-	private int prevLives_;
 	private int prevScore_;
 
 	/**
@@ -319,14 +318,9 @@ public class PacManEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double[] calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(int isTerminal) {
 		int scoreDiff = model_.m_player.m_score - prevScore_;
 		prevScore_ += scoreDiff;
-		// Including -10000 if survival environment
-		if (StateSpec.getInstance().getGoalName().equals("survive")
-				&& model_.m_nLives < prevLives_)
-			scoreDiff -= (prevLives_ - model_.m_nLives) * 10000;
-		prevLives_ = model_.m_nLives;
 		return new double[] { scoreDiff, scoreDiff };
 	}
 
@@ -455,8 +449,12 @@ public class PacManEnvironment extends RRLEnvironment {
 	 * @return True if Game over or level complete, false otherwise.
 	 */
 	@Override
-	protected boolean isTerminal() {
-		return model_.m_state == GameModel.STATE_GAMEOVER || super.isTerminal();
+	protected int isTerminal() {
+		if (super.isTerminal() == 1)
+			return 1;
+		if (model_.m_state == GameModel.STATE_GAMEOVER)
+			return -1;
+		return 0;
 	}
 
 	/**
@@ -479,7 +477,6 @@ public class PacManEnvironment extends RRLEnvironment {
 		model_.setRandom(RRLExperiment.random_);
 
 		prevScore_ = 0;
-		prevLives_ = model_.m_nLives;
 
 		// Letting the thread 'sleep' when not experiment mode, so it's
 		// watchable for humans.
@@ -561,6 +558,9 @@ public class PacManEnvironment extends RRLEnvironment {
 		environment_.init(ProgramArgument.EXPERIMENT_MODE.booleanValue());
 
 		model_ = environment_.getGameModel();
+		// Survival mode
+		if (StateSpec.getInstance().getGoalName().equals("survive"))
+			model_.oneLife_ = true;
 
 		// Initialise the observations
 		cacheDistanceGrids();

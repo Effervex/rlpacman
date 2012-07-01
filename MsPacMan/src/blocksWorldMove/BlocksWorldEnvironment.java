@@ -22,8 +22,7 @@ import jess.Rete;
  * @author Sam Sarjant
  */
 public class BlocksWorldEnvironment extends RRLEnvironment {
-	/** The minimal reward the agent can receive. */
-	private static final float MINIMAL_REWARD = -10;
+	private static final int MIN_NUM_BLOCKS = 3;
 
 	private List<String> goalArgs_;
 
@@ -51,8 +50,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	/** The number of steps taken. */
 	protected int steps_;
 
-	/** The block ratios pre-calculated, using [ungrounded][grounded] index. */
-	private float[][] blockRatios_;
+	/** A count of the number of failed actions. */
+	protected int failedActions_;
 
 	/** The BWStates ratio 1d array (use pos()). */
 	private float[] ratio;
@@ -77,7 +76,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		// Loop until the task is complete
 		int numActions = StateSpec.getInstance().getNumReturnedActions();
 		RRLObservations obs = startEpisode();
-		while (!obs.isTerminal()) {
+		while (obs.isTerminal() != TERMINAL_WIN) {
 			// Apply the policy
 			PolicyActions actions = optimalPolicy.evaluatePolicy(obs,
 					numActions);
@@ -119,17 +118,14 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double[] calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(int isTerminal) {
 		double[] reward = new double[2];
-		if (isTerminal || steps_ == maxSteps_) {
-			if (optimalSteps_ >= maxSteps_)
-				reward[0] = 0;
+		if (isTerminal == TERMINAL_WIN) {
+			if (steps_ == optimalSteps_)
+				reward[0] = 1;
 			else
-				reward[0] = MINIMAL_REWARD * (steps_ - optimalSteps_)
+				reward[0] = 1 - 1.0 * (steps_ - optimalSteps_)
 						/ (maxSteps_ - optimalSteps_);
-			
-			// Adjust to 0..1
-			reward[0] = -1 * (reward[0] - MINIMAL_REWARD) / MINIMAL_REWARD;
 		}
 		reward[1] = reward[0];
 		return reward;
@@ -145,50 +141,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		RelationalPredicate action = null;
 		if (!actions.isEmpty())
 			action = actions.getFirstRandomAction();
-
-		// Select a random action
-		if (action == null) {
-			// return state_;
-			// Select random action predicate
-			MultiMap<String, String[]> validActions = observations_
-					.getValidActions();
-			Object[] moveArgs = null;
-			try {
-				moveArgs = validActions.getSortedSet("move").toArray();
-			} catch (IllegalAccessException e) {
-				e.printStackTrace();
-			}
-
-			Object randomAction = moveArgs[RRLExperiment.random_
-					.nextInt(moveArgs.length)];
-			action = new RelationalPredicate(StateSpec.getInstance()
-					.getActions().get("move"), (String[]) randomAction);
-		}
-
-		// Assert the action to the Rete object.
-		try {
-			StateSpec.getInstance().getRete().assertString(action.toString());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		BlocksState newState = state_.clone();
-
-		// Finding the block objects
-		int[] indices = new int[2];
-
-		// Convert the blocks to indices
-		for (int i = 0; i < indices.length; i++) {
-			if (action.getArguments()[i].equals("floor"))
-				indices[i] = -1;
-			else
-				indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
-		}
-
-		// Perform the action
-		newState.getState()[indices[0]] = indices[1] + 1;
-
-		return new Pair<BlocksState, RelationalPredicate>(newState, action);
+		return action;
 	}
 
 	/**
@@ -200,7 +153,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	 *            The goal name.
 	 */
 	@SuppressWarnings("unchecked")
-	protected void initialiseBlocksState(int numBlocks) {
+	public void initialiseBlocksState(int numBlocks) {
+		maxSteps_ = (int) (numBlocks / actionSuccess_);
 		Pair<Integer, Integer>[] rooted = new Pair[numBlocks];
 		Pair<Integer, Integer>[] floating = new Pair[numBlocks];
 		Integer[] worldState = new Integer[numBlocks];
@@ -216,7 +170,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		while (nft-- != 0) {
 			float r = RRLExperiment.random_.nextFloat();
 			int choice = nft + nrt;
-			float rat = Ratio(ratio,numBlocks,nft,nrt);
+			float rat = Ratio(ratio, numBlocks_, nft, nrt);
 			float p = rat / (rat + choice);
 			if (r <= p) { /* Put the next block on the table */
 				rooted[nrt].objA_ = floating[nft].objA_;
@@ -235,7 +189,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 				}
 			}
 		}
-					
+
 		//
 		//
 		// Integer[] worldState = new Integer[numBlocks];
@@ -307,16 +261,25 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected boolean isTerminal() {
-		return steps_ == maxSteps_ || super.isTerminal();
+	protected int isTerminal() {
+		if (super.isTerminal() == TERMINAL_WIN)
+			return TERMINAL_WIN;
+		if (steps_ == maxSteps_)
+			return TERMINAL_LOSE;
+		return 0;
 	}
 
 	@Override
 	protected void startState() {
 		if (!optimal_) {
-			// If action is null, thn this is the first episode.
+			// If action is null, then this is the first episode.
+			failedActions_ = 0;
+			// initialiseBlocksState(RRLExperiment.random_.nextInt(numBlocks_
+			// - MIN_NUM_BLOCKS + 1)
+			// + MIN_NUM_BLOCKS);
 			initialiseBlocksState(numBlocks_);
 			optimalSteps_ = optimalSteps();
+//			maxSteps_ = optimalSteps_;
 			if (RRLExperiment.debugMode_ || viewingMode_) {
 				System.out.println("\tAgent:\n" + state_);
 			}
@@ -324,21 +287,36 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	protected void stepState(Object action) {
 		// We have an action, apply it
 		BlocksState newState = state_;
 		boolean actionFailed = false;
 		RelationalPredicate actionFact = null;
-		if (RRLExperiment.random_.nextDouble() < actionSuccess_) {
-			if (action instanceof Pair) {
-				actionFact = ((Pair<BlocksState, RelationalPredicate>) action).objB_;
-				newState = ((Pair<BlocksState, RelationalPredicate>) action).objA_;
-			} else
-				newState = (BlocksState) action;
-		} else
+		if (RRLExperiment.random_.nextDouble() >= actionSuccess_) {
 			actionFailed = true;
+			failedActions_++;
+
+			// No action or random action
+			if (RRLExperiment.random_.nextBoolean())
+				action = randomAction();
+		} else if (action == null) {
+			action = randomAction();
+		}
+
+		if (action != null) {
+			actionFact = (RelationalPredicate) action;
+			try {
+				StateSpec.getInstance().getRete()
+						.assertString(action.toString());
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+			newState = state_.clone();
+
+			resolveAction(newState, actionFact);
+		}
 
 		// Notify the user what the action is if outputting.
 		if ((RRLExperiment.debugMode_ || viewingMode_) && !optimal_) {
@@ -347,7 +325,6 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			else
 				System.out.println("\t\t\tNo action chosen.");
 		}
-
 
 		// If our new state is different, update observations
 		if (!state_.equals(newState)) {
@@ -360,6 +337,42 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		}
 
 		steps_++;
+	}
+
+	protected void resolveAction(BlocksState newState,
+			RelationalPredicate actionFact) {
+		// Finding the block objects
+		int[] indices = new int[2];
+
+		// Convert the blocks to indices
+		for (int i = 0; i < indices.length; i++) {
+			if (actionFact.getArguments()[i].equals("floor"))
+				indices[i] = -1;
+			else
+				indices[i] = (actionFact.getArguments()[i].charAt(0)) - ('a');
+		}
+
+		// Perform the action
+		newState.getState()[indices[0]] = indices[1] + 1;
+	}
+
+	private Object randomAction() {
+		Object action;
+		// Select random action predicate
+		MultiMap<String, String[]> validActions = observations_
+				.getValidActions();
+		Object[] moveArgs = null;
+		try {
+			moveArgs = validActions.getSortedSet("move").toArray();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		}
+
+		Object randomAction = moveArgs[RRLExperiment.random_
+				.nextInt(moveArgs.length)];
+		action = new RelationalPredicate(StateSpec.getInstance().getActions()
+				.get("move"), (String[]) randomAction);
+		return action;
 	}
 
 	@Override
@@ -382,15 +395,12 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			}
 		}
 
-		maxSteps_ = (int) (numBlocks_ / actionSuccess_) + 1;
-		// maxSteps_ *= 2;
-
 		precalculateBlockRatios(numBlocks_);
 	}
 
-	private void precalculateBlockRatios(int numBlocks) {
+	private void precalculateBlockRatios(int maxBlocks) {
 		// blockRatios_ = new float[numBlocks + 1][numBlocks + 1];
-		ratio = new float[numBlocks * numBlocks];
+		ratio = new float[maxBlocks * maxBlocks];
 
 		// int n, k;
 		// float[] temp = new float[numBlocks + 1];
@@ -412,18 +422,18 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		// }
 
 		int n, k;
-		float temp[] = new float[numBlocks + 1];
+		float temp[] = new float[maxBlocks + 1];
 		Arrays.fill(temp, 1.0f);
 
-		for (n = 0; n <= numBlocks; n++)
-			for (k = 0; k + n <= numBlocks; k++) {
+		for (n = 0; n <= maxBlocks; n++)
+			for (k = 0; k + n <= maxBlocks; k++) {
 				if (n < 1)
-					ratio[pos(numBlocks, n, k)] = 1.0f;
+					ratio[pos(maxBlocks, n, k)] = 1.0f;
 				else {
 					temp[k] = (temp[k] * (temp[k + 1] + n + k))
 							/ (temp[k] + n + k - 1.0f);
 					if ((n % 2) == 0)
-						ratio[pos(numBlocks, n / 2, k)] = temp[k];
+						ratio[pos(maxBlocks, n / 2, k)] = temp[k];
 				}
 			}
 	}
@@ -441,5 +451,9 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 					/ (((1 / ratio[z]) * (x + y - 1)) + 1);
 		else
 			return ratio[z];
+	}
+
+	public BlocksState getState() {
+		return state_;
 	}
 }

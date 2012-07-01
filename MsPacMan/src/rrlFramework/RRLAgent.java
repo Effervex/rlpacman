@@ -10,7 +10,8 @@ public interface RRLAgent {
 	/**
 	 * Initialise the agent.
 	 * 
-	 * @param runIndex The index of the run this agent is being initialised for. 
+	 * @param runIndex
+	 *            The index of the run this agent is being initialised for.
 	 */
 	public void initialise(int runIndex);
 
@@ -46,6 +47,7 @@ public interface RRLAgent {
 
 	/**
 	 * The final observation for the episode
+	 * 
 	 * @param observations
 	 */
 	public void endEpisode(RRLObservations observations);
@@ -53,8 +55,23 @@ public interface RRLAgent {
 	/**
 	 * Freezes/unfreezes the agent's behaviour so no more learning occurs.
 	 * 
-	 * @param If the behaviour should be frozen.
+	 * @param If
+	 *            the behaviour should be frozen.
 	 */
 	public void freeze(boolean b);
 
+	/**
+	 * Gets the number of episodes that the agent has been learning for.
+	 * 
+	 * @return The number of episodes that have passed for the agent so far.
+	 */
+	public int getNumEpisodes();
+
+	/**
+	 * If the agent is allowed to specialise new rules.
+	 * 
+	 * @param b
+	 *            The setting of specialisations.
+	 */
+	public void setSpecialisations(boolean b);
 }

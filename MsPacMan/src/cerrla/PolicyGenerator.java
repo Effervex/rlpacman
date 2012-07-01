@@ -26,6 +26,8 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
@@ -52,11 +54,13 @@ public final class PolicyGenerator implements Serializable {
 	/** The point at which low mean slots are ignored for text output. */
 	private static final double LOW_SLOT_THRESHOLD = 0.001;
 
+	private static final String POLICY_PREFIX = "A typical policy:";
+
 	/**
 	 * The increment for an ordering value to increase when resolving ordering
 	 * value clashes.
 	 */
-	private static final double ORDER_CLASH_INCREMENT = 0.001;
+	private static final double ORDER_CLASH_INCREMENT = 0.0001;
 
 	private static final long serialVersionUID = 3157117448981353095L;
 
@@ -71,6 +75,9 @@ public final class PolicyGenerator implements Serializable {
 
 	/** Policies awaiting testing. */
 	private Queue<ModularPolicy> awaitingTest_;
+
+	/** If the latest policy output was a retested policy. */
+	private boolean retestedPolicyPreviously_;
 
 	/** The number of slots which have both a fixed rule and a converged mean. */
 	private transient int convergedSlots_;
@@ -107,6 +114,12 @@ public final class PolicyGenerator implements Serializable {
 
 	/** The probability distributions defining the policy generator. */
 	private SelectableSet<Slot> slotGenerator_;
+
+	/**
+	 * A mapping of greedy policies for the state of the generator at the given
+	 * episode.
+	 */
+	private transient SortedMap<Integer, RelationalPolicy> greedyPolicyMap_;
 
 	/**
 	 * The constructor for creating a new Policy Generator.
@@ -392,7 +405,7 @@ public final class PolicyGenerator implements Serializable {
 				orderedFiredSlots.add(ruleSlot);
 
 				// Rule counts
-				ed.addRuleCount(rule, 1);
+				ed.addRuleCount(ruleSlot, rule, 1);
 
 				// Note which slots were active in this policy
 				if (!meanNotedSlots.contains(ruleSlot)) {
@@ -524,7 +537,7 @@ public final class PolicyGenerator implements Serializable {
 	 * do not create separate slots.
 	 */
 	private void splitRLGGSlots() {
-		if (Config.getInstance().getSerializedFile() != null)
+		if (Config.getInstance().getSerializedFile() != null || !parentLearner_.isSpecialising())
 			return;
 
 		for (RelationalRule rlgg : rlggRules_.values()) {
@@ -772,6 +785,21 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
+	 * Saves the generators to an existing stream.
+	 * 
+	 * @param buf
+	 *            The stream to save the generators to.
+	 * @param finalWrite
+	 *            If this is the final output for the run.
+	 */
+	public ModularPolicy determineRepresentativePolicy() throws IOException {
+		ModularPolicy modPol = new ModularPolicy(generatePolicy(false, true),
+				parentLearner_);
+		modPol.setModularParameters(null);
+		return modPol;
+	}
+
+	/**
 	 * Un/Freezes the state of the policy.
 	 * 
 	 * @param freeze
@@ -804,8 +832,11 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public RelationalPolicy generatePolicy(boolean incrementingCounts,
 			boolean deterministicGeneration) {
-		if (!deterministicGeneration && !frozen_ && !awaitingTest_.isEmpty())
+		if (!retestedPolicyPreviously_ && !deterministicGeneration && !frozen_
+				&& !awaitingTest_.isEmpty()) {
+			retestedPolicyPreviously_ = true;
 			return awaitingTest_.poll();
+		}
 
 		RelationalPolicy policy = new RelationalPolicy();
 
@@ -856,6 +887,7 @@ public final class PolicyGenerator implements Serializable {
 			policy.addRule(rule);
 		}
 
+		retestedPolicyPreviously_ = false;
 		return policy;
 	}
 
@@ -911,6 +943,15 @@ public final class PolicyGenerator implements Serializable {
 
 	public GoalCondition getGoalCondition() {
 		return parentLearner_.getGoalCondition();
+	}
+
+	/**
+	 * Gets the greedy policy map.
+	 * 
+	 * @return The greedy policy map or null.
+	 */
+	public SortedMap<Integer, RelationalPolicy> getGreedyPolicyMap() {
+		return greedyPolicyMap_;
 	}
 
 	public Collection<RelationalRule> getMutatedRules() {
@@ -971,6 +1012,76 @@ public final class PolicyGenerator implements Serializable {
 	 */
 	public boolean isRuleExists(RelationalRule rule) {
 		return currentRules_.contains(rule);
+	}
+
+	/**
+	 * Loads a generator file into memory, extracting the episode and greedy
+	 * representative policy for the state of the generator at the episode.
+	 * 
+	 * @return True if the file was loaded and the episode-mapped details
+	 *         recorded.
+	 * @throws IOException
+	 *             Should something go awry...
+	 */
+	public boolean loadGreedyGenerator(File generatorFile)
+			throws IOException {
+		if (greedyPolicyMap_ == null)
+			greedyPolicyMap_ = new TreeMap<Integer, RelationalPolicy>();
+
+		SortedMap<Double, RelationalRule> ruleOrder = new TreeMap<Double, RelationalRule>();
+		double meanThreshold = 0.5;
+
+		FileReader fr = new FileReader(generatorFile);
+		BufferedReader br = new BufferedReader(fr);
+
+		String input = null;
+		boolean recordPolicy = false;
+		Pattern slotParser = Pattern
+				.compile("Slot \\(.+?\\[MU:(.+?);ORD:(.+?);.+\\{\\((.+?):\\d.+?$");
+		Pattern episodeParser = Pattern.compile("(\\d+)\\s\\d+\\.\\d+$");
+		while ((input = br.readLine()) != null) {
+			Matcher m = slotParser.matcher(input);
+			if (m.matches()) {
+				// Record the rule details
+				double slotMean = Double.parseDouble(m.group(1));
+				if (!recordPolicy) {
+					// First slot of the distribution
+					ruleOrder.clear();
+					meanThreshold = Math.min(0.5 + ORDER_CLASH_INCREMENT, slotMean);
+				}
+				if (slotMean >= meanThreshold) {
+					double order = Double.parseDouble(m.group(2));
+					// Ensure the slot is placed in a unique order - no clashes.
+					while (ruleOrder.containsKey(order))
+						order += ORDER_CLASH_INCREMENT;
+
+					RelationalRule probableRule = new RelationalRule(m.group(3));
+					ruleOrder.put(order, probableRule);
+				}
+
+				recordPolicy = true;
+			} else {
+				m = episodeParser.matcher(input);
+				if (m.matches()) {
+					// Record the policy
+					int episode = Integer.parseInt(m.group(1));
+					RelationalPolicy policy = new RelationalPolicy();
+					for (Double orders : ruleOrder.keySet()) {
+						RelationalRule rule = ruleOrder.get(orders);
+						policy.addRule(rule);
+					}
+					policy.toString();
+					greedyPolicyMap_.put(episode, policy);
+
+					recordPolicy = false;
+				}
+			}
+		}
+
+		br.close();
+		fr.close();
+
+		return true;
 	}
 
 	/**
@@ -1035,7 +1146,7 @@ public final class PolicyGenerator implements Serializable {
 			} else {
 				// Continue to split slot until its KL size has increased to a
 				// non-splitting threshold.
-				while (slot.isSplittable()) {
+				while (parentLearner_.isSpecialising() && slot.isSplittable()) {
 					ProbabilityDistribution<RelationalRule> ruleGenerator = slot
 							.getGenerator();
 					RelationalRule bestRule = ruleGenerator.getBestElement();
@@ -1063,43 +1174,15 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Splits a rule from a given slot, creating a new slot with mutated rules.
-	 * 
-	 * @param splitRule
-	 *            The rule being split from the slot.
-	 * @param ruleSlot
-	 *            The slot to split the rule from.
+	 * Rebuilds the current data.
 	 */
-	public Slot splitSlot(RelationalRule splitRule, Slot ruleSlot) {
-		int newSlotLevel = ruleSlot.getLevel() + 1;
-		ProbabilityDistribution<RelationalRule> ruleGenerator = ruleSlot
-				.getGenerator();
-		Slot newSlot = new Slot(splitRule, false, newSlotLevel, this);
-		if (slotGenerator_.contains(newSlot)) {
-			// If the slot already exists, update the level if
-			// lower
-			Slot existingSlot = slotGenerator_.findMatch(newSlot);
-			existingSlot.updateLevel(newSlotLevel);
-			// Move the rule's slot to the existing slot for
-			// further update operations.
-			splitRule.setSlot(existingSlot);
-			newSlot = existingSlot;
-		} else {
-			if (ProgramArgument.INHERIT_PARENT_SLOT_VALS.booleanValue()) {
-				// Set ordering to be the same
-				newSlot.setOrdering(ruleSlot.getOrdering());
-				newSlot.setSelectionProb(ruleSlot.getSelectionProbability());
-			}
-			mutateRule(splitRule, newSlot, -1);
+	public void rebuildCurrentData() {
+		currentRules_ = new SelectableSet<RelationalRule>();
+		currentSlots_ = MultiMap.createListMultiMap();
+		for (Slot slot : slotGenerator_) {
+			currentSlots_.put(slot.getAction(), slot);
+			currentRules_.addAll(slot.getGenerator());
 		}
-		ruleGenerator.remove(splitRule);
-		ruleGenerator.normaliseProbs();
-
-		if (ProgramArgument.RESET_SLOT_COUNT.booleanValue())
-			ruleSlot.resetPolicyCount();
-
-		// slot.resetPolicyCount();
-		return newSlot;
 	}
 
 	/**
@@ -1131,8 +1214,24 @@ public final class PolicyGenerator implements Serializable {
 	 * 
 	 * @param buf
 	 *            The predefined stream to write to.
+	 * @param finalWrite
 	 */
-	public void saveGenerators(BufferedWriter buf) throws Exception {
+	public void saveGenerators(BufferedWriter buf, boolean finalWrite)
+			throws Exception {
+
+		// Write the greedy policy.
+		buf.write(POLICY_PREFIX + "\n");
+		ModularPolicy bestPolicy = determineRepresentativePolicy();
+		if (bestPolicy.size() == 0)
+			buf.write("<UNCLEAR POLICY>");
+		else
+			buf.write(bestPolicy.toString());
+
+		if (finalWrite)
+			System.out.println("Best policy:\n" + bestPolicy);
+
+		buf.write("\n\n");
+
 		SortedSet<Slot> orderSlots = new TreeSet<Slot>(
 				SlotOrderComparator.getInstance());
 		orderSlots.addAll(slotGenerator_);
@@ -1166,21 +1265,6 @@ public final class PolicyGenerator implements Serializable {
 		DecimalFormat formatter = new DecimalFormat("#0.0000");
 		buf.write("Estimated Convergence: "
 				+ formatter.format(100 * convergedValue_) + "%");
-	}
-
-	/**
-	 * Saves the generators to an existing stream.
-	 * 
-	 * @param buf
-	 *            The stream to save the generators to.
-	 * @param finalWrite
-	 *            If this is the final output for the run.
-	 */
-	public ModularPolicy determineRepresentativePolicy() throws IOException {
-		ModularPolicy modPol = new ModularPolicy(generatePolicy(false, true),
-				parentLearner_);
-		modPol.setModularParameters(null);
-		return modPol;
 	}
 
 	/**
@@ -1279,6 +1363,46 @@ public final class PolicyGenerator implements Serializable {
 		return slotGenerator_.size();
 	}
 
+	/**
+	 * Splits a rule from a given slot, creating a new slot with mutated rules.
+	 * 
+	 * @param splitRule
+	 *            The rule being split from the slot.
+	 * @param ruleSlot
+	 *            The slot to split the rule from.
+	 */
+	public Slot splitSlot(RelationalRule splitRule, Slot ruleSlot) {
+		int newSlotLevel = ruleSlot.getLevel() + 1;
+		ProbabilityDistribution<RelationalRule> ruleGenerator = ruleSlot
+				.getGenerator();
+		Slot newSlot = new Slot(splitRule, false, newSlotLevel, this);
+		if (slotGenerator_.contains(newSlot)) {
+			// If the slot already exists, update the level if
+			// lower
+			Slot existingSlot = slotGenerator_.findMatch(newSlot);
+			existingSlot.updateLevel(newSlotLevel);
+			// Move the rule's slot to the existing slot for
+			// further update operations.
+			splitRule.setSlot(existingSlot);
+			newSlot = existingSlot;
+		} else {
+			if (ProgramArgument.INHERIT_PARENT_SLOT_VALS.booleanValue()) {
+				// Set ordering to be the same
+				newSlot.setOrdering(ruleSlot.getOrdering());
+				newSlot.setSelectionProb(ruleSlot.getSelectionProbability());
+			}
+			mutateRule(splitRule, newSlot, -1);
+		}
+		ruleGenerator.remove(splitRule);
+		ruleGenerator.normaliseProbs();
+
+		if (ProgramArgument.RESET_SLOT_COUNT.booleanValue())
+			ruleSlot.resetPolicyCount();
+
+		// slot.resetPolicyCount();
+		return newSlot;
+	}
+
 	@Override
 	public String toString() {
 		return slotGenerator_.toString();
@@ -1303,16 +1427,12 @@ public final class PolicyGenerator implements Serializable {
 		double alpha1 = 0;
 		boolean updated = false;
 		convergedValue_ = 0;
-		int numEliteSamples = numElites;
 
 		// Calculate elites data.
 		ElitesData ed = new ElitesData(elites.size());
-		numEliteSamples = countRules(elites, ed, minValue);
-		if (numEliteSamples < numElites) {
-			if (ProgramArgument.EARLY_UPDATING.booleanValue())
-				alpha1 = (alpha * numEliteSamples) / (numElites * numElites);
-		} else
-			alpha1 = alpha / numElites;
+		int numEliteSamples = countRules(elites, ed, minValue);
+		numEliteSamples = Math.min(numEliteSamples, numElites);
+		alpha1 = alpha / population;
 
 		// Check if any slots are updating yet
 		for (Slot slot : slotGenerator_) {
@@ -1320,13 +1440,18 @@ public final class PolicyGenerator implements Serializable {
 			// them.
 			if (slot.isUpdating(population)) {
 				// Update the slot
-				double result = slot.updateProbabilities(ed, alpha1,
-						numEliteSamples, population);
+				if (ProgramArgument.ONLINE_UPDATES.booleanValue())
+					slot.updateProbabilities(ed, alpha, population,
+							numEliteSamples);
+				else
+					slot.updateProbabilities(ed, alpha1, population,
+							numEliteSamples);
 				updated = true;
-				convergedValue_ += Math.min(result / (3 * alpha1), 1);
-			} else {
-				convergedValue_ += 1;
 			}
+			double updateDelta = slot.getUpdateDelta();
+			updated |= updateDelta != 1;
+			convergedValue_ += Math.max(0,
+					updateDelta - ProgramArgument.BETA.doubleValue());
 			// slot.incrementSamples();
 		}
 
@@ -1389,18 +1514,6 @@ public final class PolicyGenerator implements Serializable {
 					}
 				}
 			}
-		}
-	}
-
-	/**
-	 * Rebuilds the current data.
-	 */
-	public void rebuildCurrentData() {
-		currentRules_ = new SelectableSet<RelationalRule>();
-		currentSlots_ = MultiMap.createListMultiMap();
-		for (Slot slot : slotGenerator_) {
-			currentSlots_.put(slot.getAction(), slot);
-			currentRules_.addAll(slot.getGenerator());
 		}
 	}
 }

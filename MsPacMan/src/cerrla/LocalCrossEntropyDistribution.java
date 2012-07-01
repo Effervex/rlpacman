@@ -15,6 +15,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -67,6 +68,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 	/** If this generator is currently frozen (not learning). */
 	private transient boolean frozen_;
+
+	/** If this generator is not specialising new rules. */
+	private transient boolean haltSpecialisations_;
 
 	/** The goal condition for this cross-entropy behaviour. */
 	private final GoalCondition goalCondition_;
@@ -385,8 +389,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 				System.out.println("Testing...");
 
 			// Determine best elite sample
-			bestPolicy_ = new ModularPolicy(policyGenerator_.generatePolicy(
-					false, true), this);
+			if (Config.getInstance().getGeneratorFile() == null)
+				bestPolicy_ = getBestElite(elites_);
+			// bestPolicy_ = new ModularPolicy(policyGenerator_.generatePolicy(
+			// false, true), this);
 		}
 
 		frozen_ = b;
@@ -394,6 +400,30 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		performance_.freeze(b);
 		testEpisode_ = 0;
 		bestPolicyEpisode_ = -1;
+	}
+
+	private ModularPolicy getBestElite(SortedSet<PolicyValue> elites) {
+		Map<ModularPolicy, Integer> policyCount = new HashMap<ModularPolicy, Integer>();
+		double bestValue = elites.first().getValue();
+		ModularPolicy bestPol = null;
+		int largestCount = 0;
+		for (PolicyValue pv : elites) {
+			if (pv.getValue() == bestValue) {
+				Integer count = policyCount.get(pv.getPolicy());
+				if (count == null)
+					count = 0;
+				count++;
+				policyCount.put(pv.getPolicy(), count);
+
+				if (count > largestCount) {
+					largestCount = count;
+					bestPol = pv.getPolicy();
+				}
+			} else
+				break;
+		}
+
+		return bestPol;
 	}
 
 	/**
@@ -406,8 +436,36 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public ModularPolicy generatePolicy(
 			Collection<ModularPolicy> existingSubGoals) {
-		if (frozen_ && bestPolicyEpisode_ > -1)
+		// If testing greedy policies
+		if (Config.getInstance().getGeneratorFile() != null) {
+			if (bestPolicy_ == null
+					|| testEpisode_ >= ProgramArgument.TEST_ITERATIONS
+							.intValue()) {
+				SortedMap<Integer, RelationalPolicy> greedyPolicies = policyGenerator_
+						.getGreedyPolicyMap();
+				SortedMap<Integer, RelationalPolicy> nextKey = greedyPolicies.tailMap(currentEpisode_ + 1);
+
+				if (nextKey == null || nextKey.isEmpty()) {
+					// End of testing. Exit.
+					bestPolicyEpisode_ = ProgramArgument.TEST_ITERATIONS
+							.intValue();
+				} else {
+					// Next policy and next episode.
+					currentEpisode_ = nextKey.firstKey();
+					bestPolicy_ = new ModularPolicy(
+							greedyPolicies.get(currentEpisode_), this);
+					testEpisode_ = 0;
+				}
+			}
+
+			bestPolicy_.clearPolicyRewards();
 			return bestPolicy_;
+		}
+
+		if (frozen_ && bestPolicyEpisode_ > -1) {
+			bestPolicy_.clearPolicyRewards();
+			return bestPolicy_;
+		}
 
 		// Initialise undertested
 		if (undertestedPolicies_ == null)
@@ -581,10 +639,17 @@ public class LocalCrossEntropyDistribution implements Serializable {
 						/ ProgramArgument.TEST_ITERATIONS.doubleValue();
 				if (testEpisode_ == ProgramArgument.TEST_ITERATIONS
 						.doubleValue()) {
-					System.out.println("Beginning [" + goalCondition_
-							+ "] BEST POLICY testing for episode "
-							+ currentEpisode_ + ".");
-					bestPolicyEpisode_ = 0;
+					if (Config.getInstance().getGeneratorFile() == null) {
+						// End of testing, test best policy
+						System.out.println("Beginning [" + goalCondition_
+								+ "] BEST POLICY testing for episode "
+								+ currentEpisode_ + ".");
+						bestPolicyEpisode_ = 0;
+					} else {
+						// End of this greedy generator test
+						performance_.recordPerformanceScore(currentEpisode_);
+						performance_.freeze(true);
+					}
 				}
 			} else {
 				bestPolicyEpisode_++;
@@ -606,6 +671,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 
 		if (!frozen_) {
+			performance_.noteGeneratorDetails(currentEpisode_,
+					policyGenerator_, population_, convergence);
+
 			// Save files if necessary
 			if ((localAgentObservations_.isSettled() && !oldAOSettled_)
 					|| (policyGenerator_.hasUpdated() && !oldUpdated_)
@@ -814,5 +882,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 	 */
 	public String generateUniquePolicyID() {
 		return goalCondition_.toString() + "_" + policyIDCounter_++;
+	}
+
+	public void setSpecialisation(boolean b) {
+		haltSpecialisations_ = b;
+	}
+
+	public boolean isSpecialising() {
+		return !haltSpecialisations_;
 	}
 }

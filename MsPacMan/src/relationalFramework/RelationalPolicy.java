@@ -15,7 +15,6 @@ import org.apache.commons.collections.BidiMap;
 
 import cerrla.modular.PolicyItem;
 
-
 import relationalFramework.agentObservations.EnvironmentAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 import rrlFramework.RRLObservations;
@@ -146,8 +145,10 @@ public class RelationalPolicy implements Serializable {
 	 *            The rule to be added.
 	 */
 	public void addRule(RelationalRule rule) {
-		policyRules_.add(rule);
-		policySize_++;
+		if (!policyRules_.contains(rule)) {
+			policyRules_.add(rule);
+			policySize_++;
+		}
 	}
 
 	@Override
@@ -186,8 +187,7 @@ public class RelationalPolicy implements Serializable {
 
 		try {
 			// Evaluate the policy rules.
-			Iterator<PolicyItem> iter = policyRules_
-					.iterator();
+			Iterator<PolicyItem> iter = policyRules_.iterator();
 			while (iter.hasNext() && actionsFound < actionsReturnedModified) {
 				RelationalRule polRule = (RelationalRule) iter.next();
 				Collection<FiredAction> firedActions = evaluateRule(polRule,

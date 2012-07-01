@@ -73,7 +73,7 @@ public class LocalCrossEntropyDistributionTest {
 		goalReplacements.put("x", "?G_1");
 		List<RelationalRule> rlggRules = sut_.coverState(null,
 				new RRLObservations(state, validActions, new double[] { 0, 0 },
-						goalReplacements, false), activatedActions, null);
+						goalReplacements, 0), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(above ?X ?) (height ?X ?#_0) (clear ?X) => (moveFloor ?X)");
 		List<RelationalArgument> queryParameters = new ArrayList<RelationalArgument>();
@@ -113,7 +113,7 @@ public class LocalCrossEntropyDistributionTest {
 		validActions = StateSpec.getInstance().generateValidActions(state);
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
-				validActions, new double[] { 0, 0 }, goalReplacements, false),
+				validActions, new double[] { 0, 0 }, goalReplacements, 0),
 				activatedActions, null);
 		assertTrue(rlggRules.isEmpty());
 
@@ -151,7 +151,7 @@ public class LocalCrossEntropyDistributionTest {
 
 		List<RelationalRule> rlggRules = sut_.coverState(null,
 				new RRLObservations(state, validActions, new double[] { 0, 0 },
-						new DualHashBidiMap(), false), activatedActions, null);
+						new DualHashBidiMap(), 0), activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 4))");
@@ -168,7 +168,7 @@ public class LocalCrossEntropyDistributionTest {
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, new double[] { 0, 0 }, new DualHashBidiMap(),
-				false), activatedActions, null);
+				0), activatedActions, null);
 
 		state.reset();
 		state.eval("(assert (distanceGhost player inky 5))");
@@ -184,7 +184,7 @@ public class LocalCrossEntropyDistributionTest {
 
 		rlggRules = sut_.coverState(null, new RRLObservations(state,
 				validActions, new double[] { 0, 0 }, new DualHashBidiMap(),
-				false), activatedActions, null);
+				0), activatedActions, null);
 		RelationalRule rlggRule = new RelationalRule(
 				"(distanceGhost ? ?X ?__Num0&:(betweenRange ?__Num0 4.0 25.0))"
 						+ " => (toGhost ?X ?__Num0)");

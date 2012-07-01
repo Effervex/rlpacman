@@ -137,8 +137,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 			equivalentRule_ = false;
 		}
 
-		initialise(RelationalRule.splitConditions(split[0]), equivalentRule_,
-				StateSpec.toRelationalPredicate(split[1]));
+		initialise(RelationalRule.splitConditions(split[0], null),
+				equivalentRule_, StateSpec.toRelationalPredicate(split[1]));
 	}
 
 	/**
@@ -211,8 +211,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 
 		// Unify with the preConds to check if they're there
 		Collection<RelationalPredicate> allFacts = getAllFacts();
-		Collection<MergedFact> unified = RLGGMerger.getInstance()
-				.unifyStates(allFacts, ruleConds, replacementTerms);
+		Collection<MergedFact> unified = RLGGMerger.getInstance().unifyStates(
+				allFacts, ruleConds, replacementTerms);
 		if (unified.size() == allFacts.size()) {
 			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
 			for (MergedFact unifact : unified) {
@@ -274,8 +274,8 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		// Check for illegal rules
 		BidiMap replacementTerms = new DualHashBidiMap();
 		Collection<RelationalPredicate> conjugated = getConjugatedConditions();
-		Collection<MergedFact> unified = RLGGMerger.getInstance()
-				.unifyStates(conjugated, ruleConds, replacementTerms);
+		Collection<MergedFact> unified = RLGGMerger.getInstance().unifyStates(
+				conjugated, ruleConds, replacementTerms);
 		// If the rule is found to be illegal using the conjugated
 		// conditions, remove the illegal condition
 		if (unified.size() == conjugated.size()) {

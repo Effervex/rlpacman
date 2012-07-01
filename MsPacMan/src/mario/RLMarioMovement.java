@@ -821,6 +821,7 @@ public class RLMarioMovement {
 		int[] actionArray = new int[Environment.numberOfKeys];
 
 		actionArray[direction_] = ACTION_ON;
+		actionArray[oppDirection_] = ACTION_OFF;
 		actionArray[Environment.MARIO_KEY_SPEED] = ACTION_ON;
 
 		// Jumping if thing is in same column
@@ -890,6 +891,7 @@ public class RLMarioMovement {
 				&& Math.abs(currentEndDiffs_[1]) < CELL_SIZE) {
 			actionArray[Mario.KEY_SPEED] = ACTION_ON;
 			actionArray[direction_] = ACTION_ON;
+			actionArray[oppDirection_] = ACTION_OFF;
 			return actionArray;
 		} else
 			return moveTo(startX, startY, currentX, currentY, shellX, shellY,
@@ -996,10 +998,13 @@ public class RLMarioMovement {
 
 		// Otherwise, Mario is under it enough to jump and centre on it
 		actionArray[Environment.MARIO_KEY_JUMP] = ACTION_ON;
-		if (currentX < endX - CELL_SIZE / 2)
+		if (currentX < endX - CELL_SIZE / 2) {
 			actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_ON;
-		else if (currentX > endX + CELL_SIZE / 2)
+			actionArray[Environment.MARIO_KEY_LEFT] = ACTION_OFF;
+		} else if (currentX > endX + CELL_SIZE / 2) {
 			actionArray[Environment.MARIO_KEY_LEFT] = ACTION_ON;
+			actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_OFF;
+		}
 
 		return actionArray;
 	}
@@ -1016,10 +1021,13 @@ public class RLMarioMovement {
 	private int[] shoot(boolean[] prevAction, int marioDirection) {
 		int[] actionArray = new int[Environment.numberOfKeys];
 		if (direction_ != marioDirection) {
-			if (marioDirection == Environment.MARIO_KEY_RIGHT)
+			if (marioDirection == Environment.MARIO_KEY_RIGHT) {
 				actionArray[Environment.MARIO_KEY_LEFT] = ACTION_ON;
-			else if (marioDirection == Environment.MARIO_KEY_LEFT)
+				actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_OFF;
+			} else if (marioDirection == Environment.MARIO_KEY_LEFT) {
 				actionArray[Environment.MARIO_KEY_RIGHT] = ACTION_ON;
+				actionArray[Environment.MARIO_KEY_LEFT] = ACTION_OFF;
+			}
 		} else {
 			// If holding fire, release it and vice-versa
 			actionArray[Environment.MARIO_KEY_SPEED] = (prevAction[Environment.MARIO_KEY_SPEED]) ? -1

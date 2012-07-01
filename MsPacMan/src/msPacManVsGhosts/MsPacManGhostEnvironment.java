@@ -255,7 +255,7 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 	 * @return The difference in score.
 	 */
 	@Override
-	protected double[] calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(int isTerminal) {
 		double scoreDiff = game_.getScore() - prevScore_;
 		prevScore_ = game_.getScore();
 		if (StateSpec.getInstance().getGoalName().equals("survive")
@@ -381,7 +381,11 @@ public class MsPacManGhostEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	public boolean isTerminal() {
-		return game_.gameOver() || super.isTerminal();
+	public int isTerminal() {
+		if (super.isTerminal() == 1)
+			return 1;
+		if (game_.gameOver())
+			return -1;
+		return 0;
 	}
 }

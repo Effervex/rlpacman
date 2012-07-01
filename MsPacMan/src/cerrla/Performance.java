@@ -1,8 +1,11 @@
 package cerrla;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.RandomAccessFile;
 import java.io.Serializable;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -17,8 +20,6 @@ import org.apache.commons.math.stat.descriptive.moment.Mean;
 import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
 import cerrla.modular.GoalCondition;
-import cerrla.modular.ModularPolicy;
-
 import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
@@ -40,14 +41,8 @@ public class Performance implements Serializable {
 	/** Unicode symbol for +-. */
 	public static final String SD_SYMBOL = "\u00b1";
 
-	/** The episodic reward (including policy repetitions). */
-	private SortedMap<Integer, Double> episodeMeans_;
-	/** The episodic SD (including policy repetitions). */
-	private SortedMap<Integer, Double> episodeSDs_;
-	/** The episodic average elites value. */
-	private SortedMap<Integer, Double> episodeEliteMean_;
-	/** The episodic average elites value. */
-	private SortedMap<Integer, Double> episodeEliteMax_;
+	private SortedMap<Integer, Double[]> performanceDetails_;
+
 	/** If the performance is frozen. */
 	private boolean frozen_;
 	/** A queue of the standard deviation for each single policy. */
@@ -67,26 +62,10 @@ public class Performance implements Serializable {
 	/** The final elite scores received for the best policy. */
 	private ArrayList<Double> finalEliteScores_;
 
-	/**
-	 * A constructor for a fresh performance object.
-	 * 
-	 * @param runIndex
-	 *            The run index to append to saved files.
-	 */
-	public Performance(int runIndex) {
-		episodeMeans_ = new TreeMap<Integer, Double>();
-		episodeSDs_ = new TreeMap<Integer, Double>();
-		episodeEliteMean_ = new TreeMap<Integer, Double>();
-		episodeEliteMax_ = new TreeMap<Integer, Double>();
-		finalEliteScores_ = new ArrayList<Double>();
-		recentScores_ = new LinkedList<Double>();
-		internalSDs_ = new LinkedList<Double>();
-		minMaxReward_ = new double[2];
-		minMaxReward_[0] = Float.MAX_VALUE;
-		minMaxReward_[1] = -Float.MAX_VALUE;
-		startTime_ = System.currentTimeMillis();
-		runIndex_ = runIndex;
-	}
+	/** A recording of performance scores for each value. */
+	private static SortedMap<Integer, Float[]> performanceMap_;
+	/** The parsed runtime (in seconds) of the experiment. */
+	private static long runTime_;
 
 	/**
 	 * A new performance object for a module learner, so files are saved in the
@@ -101,12 +80,32 @@ public class Performance implements Serializable {
 	}
 
 	/**
+	 * A constructor for a fresh performance object.
+	 * 
+	 * @param runIndex
+	 *            The run index to append to saved files.
+	 */
+	public Performance(int runIndex) {
+		performanceDetails_ = new TreeMap<Integer, Double[]>();
+		finalEliteScores_ = new ArrayList<Double>();
+		recentScores_ = new LinkedList<Double>();
+		internalSDs_ = new LinkedList<Double>();
+		minMaxReward_ = new double[2];
+		minMaxReward_[0] = Float.MAX_VALUE;
+		minMaxReward_[1] = -Float.MAX_VALUE;
+		startTime_ = System.currentTimeMillis();
+		runIndex_ = runIndex;
+	}
+
+	/**
 	 * Records performance scores using sliding windows of results.
 	 * 
 	 * @param currentEpisode
 	 *            The current episode.
 	 */
-	private void recordPerformanceScore(int currentEpisode) {
+	public void recordPerformanceScore(int currentEpisode) {
+		if (recentScores_.isEmpty())
+			return;
 		// Transform the queues into arrays
 		double[] vals = new double[recentScores_.size()];
 		int i = 0;
@@ -122,8 +121,12 @@ public class Performance implements Serializable {
 		double mean = m.evaluate(vals);
 		double meanDeviation = sd.evaluate(envSDs) * CONVERGENCE_PERCENT_BUFFER;
 
-		episodeMeans_.put(currentEpisode, mean);
-		episodeSDs_.put(currentEpisode, sd.evaluate(vals));
+		Double[] details = new Double[PerformanceDetails.values().length];
+		details[PerformanceDetails.EPISODE.ordinal()] = Double
+				.valueOf(currentEpisode);
+		details[PerformanceDetails.MEAN.ordinal()] = mean;
+		details[PerformanceDetails.SD.ordinal()] = sd.evaluate(vals);
+		performanceDetails_.put(currentEpisode, details);
 
 		// Output current means
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue() && !frozen_) {
@@ -176,49 +179,48 @@ public class Performance implements Serializable {
 	 */
 	private void savePerformance(PolicyGenerator policyGenerator,
 			File perfFile, boolean finalWrite) throws Exception {
-		if (episodeMeans_.isEmpty())
+		if (performanceDetails_.isEmpty())
 			return;
 
-		// If the file has just been created, add the arguments to the head of
-		// the file
-		boolean newFile = perfFile.createNewFile();
+		FileWriter wr = null;
+		BufferedWriter buf = null;
+		int lastKey = performanceDetails_.lastKey();
+		Double[] lastDetails = performanceDetails_.get(lastKey);
 
-		FileWriter wr = new FileWriter(perfFile, true);
-		BufferedWriter buf = new BufferedWriter(wr);
+		if (Config.getInstance().getGeneratorFile() == null) {
+			// If the file has just been created, add the arguments to the head
+			// of the file
+			boolean newFile = perfFile.createNewFile();
 
-		// If the file is fresh, add the program args to the top
-		if (newFile)
-			Config.writeFileHeader(buf, policyGenerator.getGoalCondition());
+			wr = new FileWriter(perfFile, true);
+			buf = new BufferedWriter(wr);
 
-		buf.write("A typical policy:\n");
-		ModularPolicy bestPolicy = policyGenerator
-				.determineRepresentativePolicy();
-		if (bestPolicy.size() == 0)
-			buf.write("<UNCLEAR POLICY>");
-		else
-			buf.write(bestPolicy.toString());
+			// If the file is fresh, add the program args to the top
+			if (newFile)
+				Config.writeFileHeader(buf, policyGenerator.getGoalCondition());
 
-		if (finalWrite)
-			System.out.println("Best policy:\n" + bestPolicy);
+			policyGenerator.saveGenerators(buf, finalWrite);
+			buf.write("\n\n" + lastKey + "\t"
+					+ lastDetails[PerformanceDetails.MEAN.ordinal()] + "\n");
+			buf.write("\n\n\n");
 
-		buf.write("\n\n");
-		policyGenerator.saveGenerators(buf);
-		int lastKey = episodeMeans_.lastKey();
-		buf.write("\n\n" + lastKey + "\t" + episodeMeans_.get(lastKey) + "\n");
-		buf.write("\n\n\n");
+			if (finalWrite) {
+				buf.write(Config.END_PERFORMANCE + "\n");
+				buf.write("Total run time: "
+						+ RRLExperiment.toTimeFormat(System.currentTimeMillis()
+								- startTime_));
+			}
 
-		if (finalWrite) {
-			buf.write(Config.END_PERFORMANCE + "\n");
-			buf.write("Total run time: "
-					+ RRLExperiment.toTimeFormat(System.currentTimeMillis()
-							- startTime_));
+			buf.close();
+			wr.close();
 		}
 
-		buf.close();
-		wr.close();
-
 		// Writing the raw performance
-		File rawNumbers = new File(perfFile.getAbsoluteFile() + "raw");
+		File rawNumbers = null;
+		if (Config.getInstance().getGeneratorFile() == null)
+			rawNumbers = new File(perfFile.getAbsoluteFile() + "raw");
+		else
+			rawNumbers = new File(perfFile.getAbsoluteFile() + "greedy");
 
 		wr = new FileWriter(rawNumbers);
 		buf = new BufferedWriter(wr);
@@ -226,7 +228,7 @@ public class Performance implements Serializable {
 		if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 				&& policyGenerator.getGoalCondition().isMainGoal())
 			System.out.println("Average episode scores:");
-		
+
 		if (finalWrite) {
 			// Average the final elite scores
 			Mean m = new Mean();
@@ -235,36 +237,49 @@ public class Performance implements Serializable {
 			for (Double val : finalEliteScores_)
 				finalElites[i++] = val;
 			double meanBestVal = m.evaluate(finalElites);
-			episodeEliteMax_.put(lastKey, meanBestVal);
+			lastDetails[PerformanceDetails.ELITEMAX.ordinal()] = meanBestVal;
 		}
-		
+
 		// Noting the raw numbers
-		for (Integer episode : episodeMeans_.keySet()) {
-			buf.write(episode + "\t" + episodeMeans_.get(episode) + "\t"
-					+ episodeSDs_.get(episode) + "\t"
-					+ episodeEliteMean_.get(episode) + "\t"
-					+ episodeEliteMax_.get(episode) + "\n");
-			// TODO Also add in slot count
+		buf.write("Episode\tMean\tSD\tEliteMean\tEliteMax\tNumSlots\tNumRules\tN\tConvergence\n");
+		for (Integer episode : performanceDetails_.keySet()) {
+			Double[] details = performanceDetails_.get(episode);
+			String performanceData = episode + "\t"
+					+ details[PerformanceDetails.MEAN.ordinal()] + "\t"
+					+ details[PerformanceDetails.SD.ordinal()] + "\t"
+					+ details[PerformanceDetails.ELITEMEAN.ordinal()] + "\t"
+					+ details[PerformanceDetails.ELITEMAX.ordinal()] + "\t"
+					+ details[PerformanceDetails.NUMSLOTS.ordinal()] + "\t"
+					+ details[PerformanceDetails.NUMRULES.ordinal()] + "\t"
+					+ details[PerformanceDetails.POPULATION.ordinal()] + "\t"
+					+ details[PerformanceDetails.CONVERGENCE.ordinal()] + "\t"
+					+ "\n";
+			buf.write(performanceData);
+
 			if (ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 					&& policyGenerator.getGoalCondition().isMainGoal()) {
-				System.out.println(episode + "\t" + episodeMeans_.get(episode)
-						+ "\t" + SD_SYMBOL + "\t" + episodeSDs_.get(episode));
+				System.out.println(episode + "\t"
+						+ details[PerformanceDetails.MEAN.ordinal()] + "\t"
+						+ SD_SYMBOL + "\t"
+						+ details[PerformanceDetails.SD.ordinal()]);
 			}
 		}
 
 		buf.close();
 		wr.close();
 
-		// Writing the mutation tree
-		File mutationTreeFile = new File(perfFile.getAbsoluteFile()
-				+ "mutation");
+		if (Config.getInstance().getGeneratorFile() == null) {
+			// Writing the mutation tree
+			File mutationTreeFile = new File(perfFile.getAbsoluteFile()
+					+ "mutation");
 
-		wr = new FileWriter(mutationTreeFile);
-		buf = new BufferedWriter(wr);
-		policyGenerator.saveMutationTree(buf);
+			wr = new FileWriter(mutationTreeFile);
+			buf = new BufferedWriter(wr);
+			policyGenerator.saveMutationTree(buf);
 
-		buf.close();
-		wr.close();
+			buf.close();
+			wr.close();
+		}
 	}
 
 	/**
@@ -364,6 +379,41 @@ public class Performance implements Serializable {
 		return minMaxReward_[0];
 	}
 
+	public double noteBestPolicyValue(ArrayList<double[]> policyRewards) {
+		double average = 0;
+		for (double[] reward : policyRewards)
+			average += reward[RRLObservations.ENVIRONMENTAL_INDEX];
+		average /= policyRewards.size();
+		finalEliteScores_.add(average);
+		return average;
+	}
+
+	public void noteElitesReward(int episode, Double meanEliteValue,
+			Double maxEliteValue) {
+		if (meanEliteValue == null || maxEliteValue == null)
+			return;
+
+		Double[] details = performanceDetails_.get(episode);
+		details[PerformanceDetails.ELITEMEAN.ordinal()] = meanEliteValue;
+		details[PerformanceDetails.ELITEMAX.ordinal()] = maxEliteValue;
+	}
+
+	public void noteGeneratorDetails(int episode, PolicyGenerator generator,
+			int population, double convergence) {
+		Double[] details = performanceDetails_.get(episode);
+		details[PerformanceDetails.NUMSLOTS.ordinal()] = Double
+				.valueOf(generator.size());
+		double numRules = 0;
+		for (Slot s : generator.getGenerator()) {
+			numRules += s.size();
+		}
+		details[PerformanceDetails.NUMRULES.ordinal()] = numRules;
+		details[PerformanceDetails.POPULATION.ordinal()] = Double
+				.valueOf(population);
+		details[PerformanceDetails.CONVERGENCE.ordinal()] = Math.max(0,
+				convergence);
+	}
+
 	/**
 	 * Notes the rewards the sample received.
 	 * 
@@ -430,29 +480,6 @@ public class Performance implements Serializable {
 	public void saveFiles(LocalCrossEntropyDistribution distribution,
 			SortedSet<PolicyValue> elites, int currentEpisode,
 			boolean hasUpdated, boolean finalWrite) {
-		// Basic update of run
-		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()
-				&& !modularPerformance_) {
-			long elapsedTime = System.currentTimeMillis() - startTime_;
-			String elapsed = "Elapsed: "
-					+ RRLExperiment.toTimeFormat(elapsedTime);
-			if (hasUpdated && !episodeMeans_.isEmpty()) {
-				PolicyGenerator policyGenerator = distribution
-						.getPolicyGenerator();
-				DecimalFormat formatter = new DecimalFormat("#0.0000");
-				String percentStr = "~"
-						+ formatter.format(100 * policyGenerator
-								.getConvergenceValue()) + "% " + "converged ("
-						+ policyGenerator.getGenerator().size() + " slots).";
-				System.out.println("Run " + runIndex_ + ", learning: "
-						+ currentEpisode + ": "
-						+ episodeMeans_.get(episodeMeans_.lastKey()) + ", "
-						+ elapsed + ", " + percentStr);
-				System.out.println("Learning...");
-			} else
-				System.out.println("Learning...");
-		}
-
 		// Determine the temp filenames
 		File tempPerf = null;
 		if (modularPerformance_) {
@@ -468,45 +495,165 @@ public class Performance implements Serializable {
 		}
 
 		// Remove any old file if this is the first run
-		if (episodeMeans_.size() <= 1
+		if (performanceDetails_.size() <= 1
 				&& Config.getInstance().getSerializedFile() == null)
 			tempPerf.delete();
-
 
 		// Write the files
 		try {
 			if (hasUpdated) {
 				saveElitePolicies(elites, distribution.getGoalCondition());
 				// Output the episode averages
-				if (finalWrite)
+				if (finalWrite
+						&& Config.getInstance().getGeneratorFile() == null)
 					recordPerformanceScore(currentEpisode);
 				savePerformance(distribution.getPolicyGenerator(), tempPerf,
 						finalWrite);
 			}
-			// Serialise the generator
-			distribution.saveCEDistribution(new File(tempPerf.getAbsolutePath()
-					+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX),
-					!modularPerformance_);
+
+			if (Config.getInstance().getGeneratorFile() == null) {
+				// Serialise the generator
+				distribution
+						.saveCEDistribution(
+								new File(
+										tempPerf.getAbsolutePath()
+												+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX),
+								!modularPerformance_);
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		// Basic update of run
+		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()
+				&& !modularPerformance_) {
+			long elapsedTime = System.currentTimeMillis() - startTime_;
+			String elapsed = "Elapsed: "
+					+ RRLExperiment.toTimeFormat(elapsedTime);
+			if (hasUpdated && !performanceDetails_.isEmpty()) {
+				PolicyGenerator policyGenerator = distribution
+						.getPolicyGenerator();
+				DecimalFormat formatter = new DecimalFormat("#0.0000");
+				String percentStr = "~"
+						+ formatter.format(100 * policyGenerator
+								.getConvergenceValue()) + "% " + "converged ("
+						+ policyGenerator.getGenerator().size() + " slots).";
+				System.out
+						.println("Run "
+								+ runIndex_
+								+ ", learning: "
+								+ currentEpisode
+								+ ": "
+								+ performanceDetails_.get(performanceDetails_
+										.lastKey())[PerformanceDetails.MEAN
+										.ordinal()] + ", " + elapsed + ", "
+								+ percentStr);
+				System.out.println("Learning...");
+			} else
+				System.out.println("Learning...");
+		}
 	}
 
-	public void noteElitesReward(int episode, Double meanEliteValue,
-			Double maxEliteValue) {
-		if (meanEliteValue == null || maxEliteValue == null)
-			return;
-
-		episodeEliteMean_.put(episode, meanEliteValue);
-		episodeEliteMax_.put(episode, maxEliteValue);
+	public static SortedMap<Integer, Float[]> getPerformanceArray() {
+		return performanceMap_;
 	}
 
-	public double noteBestPolicyValue(ArrayList<double[]> policyRewards) {
-		double average = 0;
-		for (double[] reward : policyRewards)
-			average += reward[RRLObservations.ENVIRONMENTAL_INDEX];
-		average /= policyRewards.size();
-		finalEliteScores_.add(average);
-		return average;
+	public static long getRunTime() {
+		return runTime_;
+	}
+
+	/**
+	 * Reads a raw numerical performance file and stores the values as
+	 * accessible private values.
+	 * 
+	 * @param perfFile
+	 *            The performance file to read.
+	 * @return True if the file was read successfully, false otherwise.
+	 */
+	public static boolean readRawPerformanceFile(File perfFile,
+			boolean byEpisode) throws Exception {
+		if (Config.getInstance().getGeneratorFile() == null) {
+			// First, read the last line of the normal file for the time
+			RandomAccessFile raf = new RandomAccessFile(perfFile, "r");
+			long pos = perfFile.length() - 1;
+			StringBuffer line = new StringBuffer();
+			char c;
+			do {
+				raf.seek(pos);
+				c = (char) raf.read();
+				line.append(c);
+				pos--;
+			} while (Character.isDigit(c) || c == ':');
+			raf.close();
+			String time = line.reverse().toString().trim();
+			String[] timeSplit = time.split(":");
+			runTime_ = (Long.parseLong(timeSplit[2]) + 60
+					* Long.parseLong(timeSplit[1]) + 3600 * Long
+					.parseLong(timeSplit[0])) * 1000;
+		}
+
+		if (Config.getInstance().getGeneratorFile() == null)
+			perfFile = new File(perfFile.getPath() + "raw");
+		else
+			perfFile = new File(perfFile.getPath() + "greedy");
+		performanceMap_ = new TreeMap<Integer, Float[]>();
+		FileReader reader = new FileReader(perfFile);
+		BufferedReader buf = new BufferedReader(reader);
+
+		// For every value within the performance file
+		String input = null;
+		Float[] prevPerfs = null;
+		while ((input = buf.readLine()) != null) {
+			String[] vals = input.split("\t");
+			if (vals[PerformanceDetails.EPISODE.ordinal()].equals("Episode"))
+				continue;
+
+			Float[] perfs = new Float[PerformanceDetails.values().length];
+			int episode = 0;
+			for (PerformanceDetails detail : PerformanceDetails.values()) {
+				if (vals.length > detail.ordinal()) {
+					if (!vals[detail.ordinal()].equals("null"))
+						perfs[detail.ordinal()] = Float.parseFloat(vals[detail
+								.ordinal()]);
+					else if (detail.equals(PerformanceDetails.ELITEMEAN)
+							&& !vals[PerformanceDetails.ELITEMAX.ordinal()]
+									.equals("null"))
+						perfs[detail.ordinal()] = Float
+								.parseFloat(vals[PerformanceDetails.ELITEMAX
+										.ordinal()]);
+					else if (detail.equals(PerformanceDetails.ELITEMEAN)
+							|| detail.equals(PerformanceDetails.ELITEMAX))
+						perfs[detail.ordinal()] = Float
+								.parseFloat(vals[PerformanceDetails.MEAN
+										.ordinal()]);
+					else if (prevPerfs != null)
+						perfs[detail.ordinal()] = prevPerfs[detail.ordinal()];
+				}
+
+				if (detail.equals(PerformanceDetails.EPISODE))
+					episode = perfs[detail.ordinal()].intValue();
+			}
+
+			performanceMap_.put(episode, perfs);
+			prevPerfs = perfs;
+		}
+
+		buf.close();
+		reader.close();
+
+		return true;
+	}
+
+	/** The details recorded by Performance. */
+	public enum PerformanceDetails {
+		EPISODE,
+		MEAN,
+		SD,
+		ELITEMEAN,
+		ELITEMAX,
+		NUMSLOTS,
+		NUMRULES,
+		POPULATION,
+		CONVERGENCE;
 	}
 }

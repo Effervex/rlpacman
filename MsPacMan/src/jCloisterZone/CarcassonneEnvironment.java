@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.collections.BidiMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jess.Rete;
 import relationalFramework.PolicyActions;
@@ -174,14 +176,14 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected double[] calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(int isTerminal) {
 		return calculateReward(currentPlayer_);
 	}
 
 	@Override
 	protected RRLObservations compileObservation(Rete rete,
 			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
-			boolean isTerminal) {
+			int isTerminal) {
 		// If only a single leaerner, proceed as normal
 		if (!multiLearners_)
 			return super.compileObservation(rete, validActions,
@@ -232,17 +234,17 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected boolean isTerminal() {
+	protected int isTerminal() {
 		boolean terminal = earlyExit_
 				|| environment_.getPhase() instanceof GameOverPhase
-				|| super.isTerminal();
+				|| super.isTerminal() == 1;
 		if (terminal && playerDelay > 0) {
 			try {
 				Thread.sleep(playerDelay * 10);
 			} catch (InterruptedException e) {
 			}
 		}
-		return terminal;
+		return (terminal) ? 1 : 0;
 	}
 
 	@Override
@@ -309,6 +311,9 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			}
 			relationalWrapper_.setGame(environment_);
 			environment_.addGameListener(relationalWrapper_);
+			// Ad-hoc fix
+			if (ProgramArgument.EXPERIMENT_MODE.booleanValue())
+				environment_.addUserInterface(relationalWrapper_);
 			clientInterface_ = environment_.getUserInterface();
 		} else if (players_.length > 1) {
 			// Reset the UIs
@@ -321,7 +326,10 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 				server_.updateSlot(new PlayerSlot(i), null);
 			}
 		}
-		environment_.addUserInterface(relationalWrapper_);
+		// Ad-hoc fix
+		if (!ProgramArgument.EXPERIMENT_MODE.booleanValue()) {
+			environment_.addUserInterface(relationalWrapper_);
+		}
 
 		// Randomise the slots
 		Collections.shuffle(slots_, RRLExperiment.random_);

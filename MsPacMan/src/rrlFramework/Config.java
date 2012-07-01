@@ -40,8 +40,6 @@ public class Config {
 	private String comment_;
 	/** The class prefix for the environment. */
 	private String environmentClass_;
-	/** The time that the experiment started. */
-	private long experimentStart_;
 	/** The extra arguments to message the environment. */
 	private String[] extraArgs_;
 	/** The goal string provided by the file. */
@@ -60,15 +58,17 @@ public class Config {
 	private int repetitionsStart_ = 0;
 	/** If optional rules are seeded from file. */
 	private File ruleFile_;
-
 	/** The loaded serializable file. */
 	private File serializedFile_;
-
 	/** The handled arguments (passed in command line). */
 	private SortedSet<String> handledArgs_;
-
 	/** The singleton instance. */
 	private static Config instance_;
+	/**
+	 * The filepath for the generator text file (to be parsed). Used for greedy
+	 * testing.
+	 */
+	private File generatorFile_;
 
 	/**
 	 * Initialising the configuration details.
@@ -133,15 +133,18 @@ public class Config {
 
 			SortedSet<String> handledArgs = new TreeSet<String>();
 			for (int i = 1; i < args.length; i++) {
-				if (args[i].equals("-d"))
+				if (args[i].equals("-d")) {
 					// Enable debug mode
 					RRLExperiment.debugMode_ = true;
-				else if (args[i].equals("-s")) {
+				} else if (args[i].equals("-s")) {
 					i++;
 					serializedFile_ = new File(args[i]);
-				} else if (args[i].equals("-ruleFile")) {
+				} else if (args[i].equals("-seedRules") || args[i].equals("-S")) {
 					i++;
 					ruleFile_ = new File(args[i]);
+				} else if (args[i].equals("-g")) {
+					i++;
+					generatorFile_ = new File(args[i]);
 				} else {
 					// Handle the argument
 					Pair<Integer, String> handled = ProgramArgument.handleArg(
@@ -279,6 +282,10 @@ public class Config {
 		return mainGoal_;
 	}
 
+	public File getSeedRuleFile() {
+		return ruleFile_;
+	}
+
 	public File getPerformanceFile() {
 		if (performanceFile_ == null)
 			generateFileNames();
@@ -287,6 +294,10 @@ public class Config {
 
 	public File getSerializedFile() {
 		return serializedFile_;
+	}
+
+	public File getGeneratorFile() {
+		return generatorFile_;
 	}
 
 	public String getComment() {
