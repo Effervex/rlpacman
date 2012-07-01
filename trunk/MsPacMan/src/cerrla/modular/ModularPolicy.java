@@ -3,7 +3,6 @@ package cerrla.modular;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -70,12 +69,17 @@ public class ModularPolicy extends RelationalPolicy {
 
 	/** The rewards this policy achieved for each episode. */
 	private ArrayList<double[]> policyRewards_;
+	
+	
 
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
 
 	/** A unique ID for this modular policy. */
 	private String uniqueID_;
+
+	/** If this policy has been evaluated yet. */
+	private boolean isEvaluated_;
 
 	/**
 	 * A constructor for a blank modular policy.
@@ -89,6 +93,7 @@ public class ModularPolicy extends RelationalPolicy {
 		triggeredRules_ = new HashSet<RelationalRule>();
 		childrenPolicies_ = MultiMap.createListMultiMap();
 		policyRewards_ = new ArrayList<double[]>();
+		isEvaluated_ = false;
 
 		uniqueID_ = ceDistribution_.generateUniquePolicyID();
 	}
@@ -107,6 +112,7 @@ public class ModularPolicy extends RelationalPolicy {
 		policySize_ = policy.policySize_;
 		childrenPolicies_ = new MultiMap<RelationalRule, ModularSubGoal>(
 				policy.childrenPolicies_);
+		isEvaluated_ = false;
 	}
 
 	/**
@@ -121,6 +127,7 @@ public class ModularPolicy extends RelationalPolicy {
 			LocalCrossEntropyDistribution policyGenerator) {
 		this(policyGenerator);
 		policySize_ = newPol.size();
+		isEvaluated_ = false;
 
 		// Add the rules, creating ModularHoles where appropriate.
 		SortedSet<GoalCondition> subGoals = new TreeSet<GoalCondition>(
@@ -423,6 +430,7 @@ public class ModularPolicy extends RelationalPolicy {
 	@Override
 	public PolicyActions evaluatePolicy(RRLObservations observations,
 			int actionsReturned) {
+		isEvaluated_ = true;
 		PolicyActions policyActions = new PolicyActions();
 		MultiMap<String, String[]> activatedActions = MultiMap
 				.createSortedSetMultiMap(ArgumentComparator.getInstance());
@@ -522,7 +530,7 @@ public class ModularPolicy extends RelationalPolicy {
 	}
 
 	public boolean isFresh() {
-		return policyRewards_.isEmpty();
+		return !isEvaluated_;
 	}
 
 	/**
@@ -700,5 +708,9 @@ public class ModularPolicy extends RelationalPolicy {
 		if (policyIter.hasNext())
 			return false;
 		return true;
+	}
+
+	public void clearPolicyRewards() {
+		policyRewards_.clear();	
 	}
 }

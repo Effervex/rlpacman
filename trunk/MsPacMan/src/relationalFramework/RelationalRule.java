@@ -157,9 +157,9 @@ public class RelationalRule implements Serializable,
 	 */
 	public RelationalRule(String ruleString) {
 		String[] split = ruleString.split(StateSpec.INFERS_ACTION);
-		ruleConditions_ = splitConditions(split[0]);
 		if (split.length == 2)
 			ruleAction_ = StateSpec.toRelationalPredicate(split[1].trim());
+		ruleConditions_ = splitConditions(split[0], ruleAction_);
 		slot_ = null;
 		ancestryCount_ = 0;
 		expandConditions();
@@ -492,7 +492,8 @@ public class RelationalRule implements Serializable,
 						} else if (arguments[i].isAnonymous() && !negated) {
 							// If the argument is anonymous, convert it to an
 							// unbound variable.
-							// TODO Convert to singleton, but be careful with bindings.
+							// TODO Convert to singleton, but be careful with
+							// bindings.
 							arguments[i] = RelationalArgument
 									.createUnboundVariable(normalisedIndex[0]++);
 						} else if (arguments[i].isConstant())
@@ -1055,7 +1056,7 @@ public class RelationalRule implements Serializable,
 	 * @return The facts of the string in segments.
 	 */
 	public static List<RelationalPredicate> splitConditions(
-			String conditionString) {
+			String conditionString, RelationalPredicate action) {
 		List<RelationalPredicate> conds = null;
 		conds = new ArrayList<RelationalPredicate>();
 		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
@@ -1063,6 +1064,8 @@ public class RelationalRule implements Serializable,
 		while (m.find()) {
 			RelationalPredicate cond = StateSpec.toRelationalPredicate(m
 					.group());
+			if (cond.isNumerical() && action != null)
+				cond.configureRangeContexts(action);
 			conds.add(cond);
 		}
 		return conds;

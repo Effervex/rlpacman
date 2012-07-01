@@ -17,6 +17,10 @@ import util.MultiMap;
  */
 public abstract class RRLEnvironment {
 	public static final String ENVIRONMENT_CLASS_SUFFIX = "Environment";
+	
+	public static final int TERMINAL_WIN = 1;
+	public static final int TERMINAL_LOSE = -1;
+	public static final int NOT_TERMINAL = 0;
 
 	/** If the environment is updated by Rete or scanning the state. */
 	private boolean reteDriven_;
@@ -67,7 +71,7 @@ public abstract class RRLEnvironment {
 			e.printStackTrace();
 		}
 
-		boolean isTerminal = isTerminal();
+		int isTerminal = isTerminal();
 		return compileObservation(rete, StateSpec.getInstance()
 				.generateValidActions(rete), goalReplacementMap_, isTerminal);
 	}
@@ -87,7 +91,7 @@ public abstract class RRLEnvironment {
 	 */
 	protected RRLObservations compileObservation(Rete rete,
 			MultiMap<String, String[]> validActions, BidiMap goalReplacements,
-			boolean isTerminal) {
+			int isTerminal) {
 		return new RRLObservations(rete, validActions,
 				calculateReward(isTerminal), goalReplacements, isTerminal);
 	}
@@ -135,7 +139,7 @@ public abstract class RRLEnvironment {
 	 *            If at the terminal state.
 	 * @return The reward received at this given interval.
 	 */
-	protected abstract double[] calculateReward(boolean isTerminal);
+	protected abstract double[] calculateReward(int isTerminal);
 
 	/**
 	 * Get the goal argument list (if any).
@@ -168,12 +172,12 @@ public abstract class RRLEnvironment {
 	 * 
 	 * @param args
 	 *            The state parameters.
-	 * @return True if terminal, false otherwise.
+	 * @return 1 if goal met, 0 if not terminal, -1 if terminal but goal not met.
 	 */
-	protected boolean isTerminal() {
+	protected int isTerminal() {
 		if (StateSpec.getInstance().isGoal(StateSpec.getInstance().getRete()))
-			return true;
-		return false;
+			return 1;
+		return 0;
 	}
 
 	/**

@@ -6,7 +6,11 @@ import java.util.*;
 
 import org.junit.*;
 
+import relationalFramework.StateSpec;
+import rrlFramework.RRLExperiment;
+
 import blocksWorldMove.BlocksState;
+import blocksWorldMove.BlocksWorldEnvironment;
 
 public class BlocksWorldEnvironmentTest {
 
@@ -20,4 +24,76 @@ public class BlocksWorldEnvironmentTest {
 		assertTrue(map.containsKey(state2));
 	}
 
+	@Test
+	public void testInitialiseState() {
+		StateSpec.initInstance("blocksWorldMove.BlocksWorld");
+		BlocksWorldEnvironment bwe = new BlocksWorldEnvironment();
+		bwe.initialise(0, new String[] { "3" });
+		Map<BlocksState, Integer> stateCounter = new HashMap<BlocksState, Integer>();
+		for (int i = 0; i < 10000; i++) {
+			bwe.initialiseBlocksState(3);
+			Integer count = stateCounter.get(bwe.getState());
+			if (count == null)
+				count = 0;
+			stateCounter.put(bwe.getState(), count + 1);
+		}
+		
+		for (BlocksState bState : stateCounter.keySet()) {
+			double ratio = stateCounter.get(bState) / 10000.0;
+			System.out.println(ratio);
+			assertEquals(ratio, 1.0/13, 0.01);
+		}
+		
+		
+		bwe.initialise(0, new String[] { "10" });
+		stateCounter.clear();
+		for (int i = 0; i < 10000; i++) {
+			bwe.initialiseBlocksState(3);
+			Integer count = stateCounter.get(bwe.getState());
+			if (count == null)
+				count = 0;
+			stateCounter.put(bwe.getState(), count + 1);
+		}
+		
+		for (BlocksState bState : stateCounter.keySet()) {
+			double ratio = stateCounter.get(bState) / 10000.0;
+			System.out.println(ratio);
+			assertEquals(ratio, 1.0/13, 0.01);
+		}
+		
+		
+		
+		bwe.initialise(0, new String[] { "4" });
+		stateCounter.clear();
+		for (int i = 0; i < 10000; i++) {
+			bwe.initialiseBlocksState(4);
+			Integer count = stateCounter.get(bwe.getState());
+			if (count == null)
+				count = 0;
+			stateCounter.put(bwe.getState(), count + 1);
+		}
+		
+		for (BlocksState bState : stateCounter.keySet()) {
+			double ratio = stateCounter.get(bState) / 10000.0;
+			System.out.println(ratio);
+			assertEquals(ratio, 1.0/73, 0.005);
+		}
+		
+		
+		bwe.initialise(0, new String[] { "10" });
+		stateCounter.clear();
+		for (int i = 0; i < 10000; i++) {
+			bwe.initialiseBlocksState(4);
+			Integer count = stateCounter.get(bwe.getState());
+			if (count == null)
+				count = 0;
+			stateCounter.put(bwe.getState(), count + 1);
+		}
+		
+		for (BlocksState bState : stateCounter.keySet()) {
+			double ratio = stateCounter.get(bState) / 10000.0;
+			System.out.println(ratio);
+			assertEquals(ratio, 1.0/73, 0.005);
+		}
+	}
 }

@@ -32,7 +32,7 @@ public class CERRLATest {
 		MultiMap<String, String[]> validActions = MultiMap.createListMultiMap();
 		RRLObservations obs = new RRLObservations(StateSpec.getInstance()
 				.getRete(), validActions, new double[] { 0, 0 },
-				new DualHashBidiMap(), false);
+				new DualHashBidiMap(), 0);
 		sut_.startEpisode(obs);
 	}
 

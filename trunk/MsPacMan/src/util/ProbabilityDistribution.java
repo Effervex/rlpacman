@@ -33,6 +33,9 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	private transient SortedMap<Double, T> probTree_;
 
+	/** The KL size of this distribution. */
+	private double klSize_;
+
 	/** The random number generator. */
 	protected Random random_;
 
@@ -105,6 +108,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public boolean add(T element) {
 		itemProbs_.put(element, 1d);
 		probTree_ = null;
+		klSize_ = 0;
 		return true;
 	}
 
@@ -120,6 +124,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public boolean add(T element, double prob) {
 		itemProbs_.put(element, prob);
 		probTree_ = null;
+		klSize_ = 0;
 		return true;
 	}
 
@@ -217,6 +222,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public void clear() {
 		itemProbs_.clear();
 		probTree_ = null;
+		klSize_ = 0;
 	}
 
 	/**
@@ -382,17 +388,19 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *         empty).
 	 */
 	public double klSize() {
-		double klSum = 0;
-		int size = size();
-		if (size <= 1)
-			return 0;
-		double uniform = 1.0 / size;
-		for (Double prob : itemProbs_.values()) {
-			klSum += klDivergence(prob, uniform);
+		if (klSize_ == 0) {
+			double klSum = 0;
+			int size = size();
+			if (size <= 1)
+				return 0;
+			double uniform = 1.0 / size;
+			for (Double prob : itemProbs_.values()) {
+				klSum += klDivergence(prob, uniform);
+			}
+			double logBase = Math.log(size);
+			klSize_ = Math.max(size * (1 - klSum / logBase), 1);
 		}
-		double logBase = Math.log(size);
-		double klSize = Math.max(size * (1 - klSum / logBase), 1);
-		return klSize;
+		return klSize_;
 	}
 
 	/**
@@ -419,6 +427,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 				itemProbs_.put(element, itemProbs_.get(element) / sum);
 		}
 		probTree_ = null;
+		klSize_ = 0;
 	}
 
 	@Override
@@ -426,6 +435,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		Double val = itemProbs_.remove(arg0);
 		if (val != null) {
 			probTree_ = null;
+			klSize_ = 0;
 			return true;
 		}
 		return false;
@@ -449,6 +459,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			itemProbs_.put(element, 1.0 / itemProbs_.size());
 		}
 		probTree_ = null;
+		klSize_ = 0;
 	}
 
 	/**
@@ -460,6 +471,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			itemProbs_.put(element, prob);
 		}
 		probTree_ = null;
+		klSize_ = 0;
 	}
 
 	@Override
@@ -535,6 +547,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		if (itemProbs_.containsKey(element)) {
 			itemProbs_.put(element, newProb);
 			probTree_ = null;
+			klSize_ = 0;
 			return true;
 		}
 		return false;
@@ -613,23 +626,25 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public double updateDistribution(double numSamples, Map<T, Integer> counts,
 			double stepSize) {
-		double absoluteChange = 0;
 		if (numSamples != 0) {
 			// For each of the rules within the distribution
+			double absDiff = 0;
 			for (T element : itemProbs_.keySet()) {
 				// Update every element within the distribution
 				Integer itemCount = counts.get(element);
 				if (itemCount == null)
 					itemCount = 0;
-				absoluteChange += updateElement(element, numSamples, itemCount,
+				absDiff += updateElement(element, numSamples, itemCount,
 						stepSize);
 			}
 
 			// Normalise the probabilities
 			normaliseProbs();
+			absDiff /= (2 * stepSize);
+			return absDiff;
 		}
 
-		return absoluteChange;
+		return 0;
 	}
 
 	/**
@@ -705,13 +720,16 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			double stepSize) {
 		double oldValue = itemProbs_.get(element);
 		// Calculate the new ratio.
-		double observedProb = count / numSamples;
+		double observedProb = Math.min(count / numSamples, 1);
 		// Update the value
 		double newValue = stepSize * observedProb + (1 - stepSize) * oldValue;
 		// Set the new value.
 		itemProbs_.put(element, newValue);
 		probTree_ = null;
+		klSize_ = 0;
 
+		// TODO Note the '2' coefficient. The maximum (normalised) divergence
+		// for a distribution approaches the limit of 2.
 		return Math.abs(newValue - oldValue);
 	}
 

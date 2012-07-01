@@ -102,7 +102,7 @@ public class PacManStateSpec extends StateSpec {
 		
 		if (envParameter_.equals("survival")
 				|| envParameter_.equals("survive")) {
-			// Score maximisation over a single level
+			// Score maximisation over a single life
 			result[0] = "survive";
 			result[1] = "(level 11)";
 			return result;

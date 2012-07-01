@@ -68,17 +68,16 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	 * @return The reward received from the environment.
 	 */
 	@Override
-	protected double[] calculateReward(boolean isTerminal) {
+	protected double[] calculateReward(int isTerminal) {
 		double[] reward = new double[2];
-		if (isTerminal) {
-			if (noActionCount_ >= TIMEOUT_THRESHOLD) {
-				EvaluationInfo ei = environment_.getEvaluationInfo();
-				ei.timeSpent += ei.timeLeft;
-				ei.timeLeft = 0;
-				reward[0] = ei.computeWeightedFitness();
-			} else
-				reward[0] = environment_.getEvaluationInfo()
-						.computeWeightedFitness();
+		if (isTerminal == TERMINAL_LOSE) {
+			EvaluationInfo ei = environment_.getEvaluationInfo();
+			ei.timeSpent += ei.timeLeft;
+			ei.timeLeft = 0;
+			reward[0] = ei.computeWeightedFitness();
+		} else if (isTerminal == TERMINAL_WIN) {
+			reward[0] = environment_.getEvaluationInfo()
+					.computeWeightedFitness();
 		}
 		reward[1] = reward[0];
 		return reward;
@@ -139,12 +138,12 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	}
 
 	@Override
-	protected boolean isTerminal() {
-		boolean result = super.isTerminal();
-		if (noActionCount_ >= TIMEOUT_THRESHOLD)
-			return true;
+	protected int isTerminal() {
+		int result = super.isTerminal();
 		if (environment_.isLevelFinished())
-			return true;
+			return 1;
+		if (noActionCount_ >= TIMEOUT_THRESHOLD)
+			return -1;
 		return result;
 	}
 

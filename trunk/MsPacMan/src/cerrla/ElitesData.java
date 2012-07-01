@@ -21,15 +21,11 @@ public class ElitesData {
 	/** The average positions for each slot within the elite policies. */
 	private Map<Slot, SlotData> slotData_;
 
-	/** The number of times each rule was used within the elite policies. */
-	private Map<RelationalRule, Integer> ruleCounts_;
-
 	/** The elite values. */
 	private ArrayList<Double> elitesValues_;
 
 	public ElitesData(int numElites) {
 		slotData_ = new HashMap<Slot, SlotData>();
-		ruleCounts_ = new HashMap<RelationalRule, Integer>();
 		elitesValues_ = new ArrayList<Double>(numElites);
 	}
 
@@ -51,16 +47,20 @@ public class ElitesData {
 	/**
 	 * Adds the weighted count of a rule in.
 	 * 
+	 * @param ruleSlot
+	 * 
 	 * @param rule
 	 *            The rule for which he data is being recorded.
 	 * @param weight
 	 *            The weight to add to the rule [0-1].
 	 */
-	public void addRuleCount(RelationalRule rule, int weight) {
-		Integer oldWeight = ruleCounts_.get(rule);
+	public void addRuleCount(Slot ruleSlot, RelationalRule rule, int weight) {
+		Map<RelationalRule, Integer> ruleCounts = getSlotData(ruleSlot)
+				.getRuleCounts();
+		Integer oldWeight = ruleCounts.get(rule);
 		if (oldWeight == null)
 			oldWeight = 0;
-		ruleCounts_.put(rule, oldWeight + weight);
+		ruleCounts.put(rule, oldWeight + weight);
 	}
 
 	/**
@@ -99,10 +99,15 @@ public class ElitesData {
 	/**
 	 * Gets the rule counts.
 	 * 
+	 * @param slot
+	 *            The slot to get the rule counts for.
 	 * @return A mapping of rules to their weighted counts.
 	 */
-	public Map<RelationalRule, Integer> getRuleCounts() {
-		return ruleCounts_;
+	public Map<RelationalRule, Integer> getSlotRuleCounts(Slot slot) {
+		SlotData slotData = slotData_.get(slot);
+		if (slotData == null)
+			return null;
+		return slotData.getRuleCounts();
 	}
 
 	/**
@@ -140,16 +145,16 @@ public class ElitesData {
 	 */
 	private SlotData getSlotData(Slot slot) {
 		if (!slotData_.containsKey(slot))
-			slotData_.put(slot, new SlotData());
+			slotData_.put(slot, new SlotData(slot.size()));
 		return slotData_.get(slot);
 	}
-	
+
 	public Double getMaxEliteValue() {
 		if (elitesValues_.isEmpty())
 			return null;
 		return elitesValues_.get(0);
 	}
-	
+
 	public Double getMeanEliteValue() {
 		if (elitesValues_.isEmpty())
 			return null;
@@ -166,27 +171,27 @@ public class ElitesData {
 		StringBuffer buffer = new StringBuffer();
 
 		buffer.append("Slot counts: \n");
-		for (Slot slot : slotData_.keySet()) {
-			if (slot.getSlotSplitFacts().isEmpty())
-				buffer.append("\tSlot " + slot.getAction() + ":\n"
-						+ slotData_.get(slot) + "\n");
-			else
-				buffer.append("\tSlot " + slot.getSlotSplitFacts() + " => "
-						+ slot.getAction() + ":\n" + slotData_.get(slot) + "\n");
-		}
-
-		buffer.append("Rule counts: \n");
-		MultiMap<Integer, RelationalRule> orderedMap = MultiMap
-				.createSortedSetMultiMap();
+		MultiMap<Integer, Slot> orderedMap = MultiMap.createSortedSetMultiMap();
 		SortedSet<Integer> keys = new TreeSet<Integer>();
-		for (RelationalRule rule : ruleCounts_.keySet()) {
-			orderedMap.put(ruleCounts_.get(rule), rule);
-			keys.add(ruleCounts_.get(rule));
+		for (Slot slot : slotData_.keySet()) {
+			int count = (int) slotData_.get(slot).getCount();
+			orderedMap.put(count, slot);
+			keys.add(count);
 		}
 		for (Integer count : keys) {
-			for (RelationalRule rule : orderedMap.get(count))
-				buffer.append("\t" + rule + ": " + count + "\n");
+			for (Slot slot : orderedMap.get(count)) {
+				SlotData slotData = slotData_.get(slot);
+				if (slot.getSlotSplitFacts().isEmpty())
+					buffer.append("\tSlot " + slot.getAction() + ":\n"
+							+ slotData + "\n");
+				else
+					buffer.append("\tSlot " + slot.getSlotSplitFacts() + " => "
+							+ slot.getAction() + ":\n" + slotData_.get(slot)
+							+ "\n");
+			}
 		}
+
+
 
 		return buffer.toString();
 	}
@@ -209,8 +214,19 @@ public class ElitesData {
 		/** The average number of slots per policy. */
 		private double mean_;
 
+		/** The rule counts for this slot. */
+		private Map<RelationalRule, Integer> ruleCounts_;
+
+		public SlotData(int numRules) {
+			ruleCounts_ = new HashMap<RelationalRule, Integer>(numRules);
+		}
+
 		public void addCount(double weight) {
 			count_ += weight;
+		}
+
+		public Map<RelationalRule, Integer> getRuleCounts() {
+			return ruleCounts_;
 		}
 
 		public void setMean(double mean) {
@@ -244,14 +260,41 @@ public class ElitesData {
 		@Override
 		public String toString() {
 			StringBuffer buffer = new StringBuffer("\tCount: " + count_);
-			buffer.append("\n\tRaw Count: " + rawCount_);
-			buffer.append("\n\tPosition: " + getAverageOrdering());
-			buffer.append("\n\tNumeracy: " + mean_);
+			buffer.append("\tRaw Count: " + rawCount_);
+			buffer.append("\tPosition: " + getAverageOrdering());
+			buffer.append("\tNumeracy: " + mean_);
+
+			// Rule counts for the slot.
+			buffer.append("\n\tRule counts: \n");
+			MultiMap<Integer, RelationalRule> orderedMap = MultiMap
+					.createSortedSetMultiMap();
+			SortedSet<Integer> keys = new TreeSet<Integer>();
+			for (RelationalRule rule : ruleCounts_.keySet()) {
+				orderedMap.put(ruleCounts_.get(rule), rule);
+				keys.add(ruleCounts_.get(rule));
+			}
+			for (Integer count : keys) {
+				for (RelationalRule rule : orderedMap.get(count))
+					buffer.append("\t\t" + rule + ": " + count + "\n");
+			}
 			return buffer.toString();
 		}
 	}
 
 	public void noteSampleValue(double value) {
 		elitesValues_.add(value);
+	}
+
+	/**
+	 * If all elite values are the same value, then set all probabilities to
+	 * one.
+	 */
+	public void setEqualValues() {
+		for (SlotData sd : slotData_.values()) {
+			if (sd.mean_ > 0) {
+				sd.mean_ = 1;
+				sd.count_ = 1;
+			}
+		}
 	}
 }

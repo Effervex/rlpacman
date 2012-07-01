@@ -131,7 +131,7 @@ public class ProbabilityDistributionTest {
 		counts.put("c", 3);
 		counts.put("d", 3);
 		counts.put("e", 1);
-		sut_.updateDistribution(10, counts, 0.6);
+		double delta = sut_.updateDistribution(10, counts, 0.6);
 		assertEquals(0.2, sut_.getProb("a"), 0.0001);
 		assertEquals(0.14, sut_.getProb("b"), 0.0001);
 		assertEquals(0.26, sut_.getProb("c"), 0.0001);
@@ -142,12 +142,45 @@ public class ProbabilityDistributionTest {
 		for (String val : sut_)
 			sut_.set(val, 0.2);
 		counts.put("c", 7);
-		sut_.updateDistribution(14, counts, 0.6);
+		delta = sut_.updateDistribution(14, counts, 0.6);
 		assertEquals(0.1657, sut_.getProb("a"), 0.0001);
 		assertEquals(0.1229, sut_.getProb("b"), 0.0001);
 		assertEquals(0.38, sut_.getProb("c"), 0.0001);
 		assertEquals(0.2086, sut_.getProb("d"), 0.0001);
 		assertEquals(0.1229, sut_.getProb("e"), 0.0001);
+		
+		// Delta
+		for (String val : sut_)
+			sut_.set(val, 0.2);
+		counts.put("a", 10);
+		delta = sut_.updateDistribution(10, counts, 0.06);
+		//assertEquals(delta, 1, 0.1);
+		
+		for (String val : sut_)
+			sut_.set(val, 0.2);
+		counts.put("a", 10);
+		delta = sut_.updateDistribution(10, counts, 0.006);
+//		assertEquals(delta, 1, 0.1);
+		
+		for (String val : sut_)
+			sut_.set(val, 0.25);
+		sut_.remove("b");
+		counts.put("a", 10);
+		delta = sut_.updateDistribution(10, counts, 0.6);
+//		assertEquals(delta, 1, 0.1);
+		
+		for (String val : sut_)
+			sut_.set(val, 1d/3d);
+		sut_.remove("c");
+		counts.put("a", 10);
+		delta = sut_.updateDistribution(10, counts, 0.00006);
+//		assertEquals(delta, 1, 0.1);
+		
+		for (String val : sut_)
+			sut_.set(val, 1d/2d);
+		sut_.remove("d");
+		counts.put("a", 10);
+		delta = sut_.updateDistribution(10, counts, 0.6);
 	}
 
 	@Test

@@ -32,7 +32,7 @@ public class RRLObservations {
 	private Rete state_;
 
 	/** Flag if this state is a terminal state. */
-	private boolean terminal_;
+	private int terminal_;
 
 	/** The valid actions the agent can take. */
 	private MultiMap<String, String[]> validActions_;
@@ -58,7 +58,7 @@ public class RRLObservations {
 	 *            If this state is terminal.
 	 */
 	public RRLObservations(Rete state, MultiMap<String, String[]> validActions,
-			double[] reward, BidiMap goalReplacements, boolean terminal) {
+			double[] reward, BidiMap goalReplacements, int terminal) {
 		this(state, validActions, terminal, goalReplacements, ALL_PLAYERS);
 		agentRewards_.put(ALL_PLAYERS, reward);
 		agentTurn_ = ALL_PLAYERS;
@@ -78,7 +78,7 @@ public class RRLObservations {
 	 *            The replacements for the goal terms.
 	 */
 	public RRLObservations(Rete state, MultiMap<String, String[]> validActions,
-			boolean terminal, BidiMap goalReplacements, String agentTurn) {
+			int terminal, BidiMap goalReplacements, String agentTurn) {
 		state_ = state;
 		goalReplacements_ = goalReplacements;
 		validActions_ = validActions;
@@ -139,7 +139,7 @@ public class RRLObservations {
 		return validActions_;
 	}
 
-	public boolean isTerminal() {
+	public int isTerminal() {
 		return terminal_;
 	}
 

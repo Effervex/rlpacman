@@ -1,14 +1,10 @@
 package blocksWorld;
 
-import relationalFramework.FiredAction;
 import relationalFramework.PolicyActions;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 import rrlFramework.RRLExperiment;
-import util.Pair;
-
-import java.util.ArrayList;
-import java.util.Collection;
+import util.MultiMap;
 import java.util.List;
 
 import jess.Rete;
@@ -51,49 +47,62 @@ public class BlocksWorldEnvironment extends
 
 	@Override
 	protected Object groundActions(PolicyActions actions) {
-		Collection<FiredAction> firedActions = actions.getFirstActionList();
 		RelationalPredicate action = null;
-		if (firedActions != null) {
-			List<FiredAction> actionsList = new ArrayList<FiredAction>(
-					firedActions);
-			FiredAction selectedAction = actionsList
-					.get(RRLExperiment.random_.nextInt(actionsList.size()));
-			selectedAction.triggerRule();
-			action = selectedAction.getAction();
+		if (!actions.isEmpty())
+			action = actions.getFirstRandomAction();
+		return action;
+	}
 
-			// Assert the action to the Rete object.
-			try {
-				StateSpec.getInstance().getRete()
-						.assertString(action.toString());
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+	protected Object randomAction() {
+		Object action;
+		// Select random action predicate
+		MultiMap<String, String[]> validActions = observations_
+				.getValidActions();
+		Object[] moveArgs = new Object[0];
+		Object[] moveFlArgs = new Object[0];
+		try {
+			if (validActions.containsKey("move"))
+				moveArgs = validActions.getSortedSet("move").toArray();
+			if (validActions.containsKey("moveFloor"))
+				moveFlArgs = validActions.getSortedSet("moveFloor").toArray();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
 		}
 
-		if (action == null)
-			return state_;
+		int randomIndex = RRLExperiment.random_.nextInt(moveArgs.length
+				+ moveFlArgs.length);
+		if (randomIndex < moveArgs.length) {
+			Object randomAction = moveArgs[randomIndex];
+			action = new RelationalPredicate(StateSpec.getInstance()
+					.getActions().get("move"), (String[]) randomAction);
+		} else {
+			Object randomAction = moveFlArgs[randomIndex - moveArgs.length];
+			action = new RelationalPredicate(StateSpec.getInstance()
+					.getActions().get("moveFloor"), (String[]) randomAction);
+		}
+		return action;
+	}
 
-		BlocksState newState = state_.clone();
-
+	@Override
+	protected void resolveAction(BlocksState newState,
+			RelationalPredicate actionFact) {
 		// Finding the block objects
-		if (action.getFactName().equals("move")) {
+		if (actionFact.getFactName().equals("move")) {
 			int[] indices = new int[2];
 
 			// Convert the blocks to indices
 			for (int i = 0; i < indices.length; i++) {
-				if (action.getArguments()[i].equals("floor"))
+				if (actionFact.getArguments()[i].equals("floor"))
 					indices[i] = -1;
 				else
-					indices[i] = (action.getArguments()[i].charAt(0)) - ('a');
+					indices[i] = (actionFact.getArguments()[i].charAt(0)) - ('a');
 			}
 
 			// Perform the action
 			newState.getState()[indices[0]] = indices[1] + 1;
-		} else if (action.getFactName().equals("moveFloor")) {
-			int index = action.getArguments()[0].charAt(0) - 'a';
+		} else if (actionFact.getFactName().equals("moveFloor")) {
+			int index = actionFact.getArguments()[0].charAt(0) - 'a';
 			newState.getState()[index] = 0;
 		}
-
-		return new Pair<BlocksState, RelationalPredicate>(newState, action);
 	}
 }

@@ -18,8 +18,8 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
-		actionPreconditions.put("move", "(clear ?X) (clear ?Y &:(neq ?X ?Y))");
-		actionPreconditions.put("moveFloor", "(clear ?X) (on ?X ?)");
+		actionPreconditions.put("move", "(clear ?A) (clear ?B &:(neq ?A ?B))");
+		actionPreconditions.put("moveFloor", "(clear ?A) (on ?A ?)");
 
 		return actionPreconditions;
 	}
@@ -46,14 +46,14 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 	protected Collection<String> initialiseActionRules() {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
-		actionRules.add("?action <- (move ?X ?Y) ?oldOn <- (on ?X ?Z)"
-				+ " => (assert (on ?X ?Y)) (retract ?oldOn ?action)");
+		actionRules.add("?action <- (move ?A ?B) ?oldOn <- (on ?A ?C)"
+				+ " => (assert (on ?A ?B)) (retract ?oldOn ?action)");
 		// Floor block to block movement
-		actionRules.add("?action <- (move ?X ?Y) ?oldOnFl <- (onFloor ?X)"
-				+ " => (assert (on ?X ?Y)) (retract ?oldOnFl ?action)");
+		actionRules.add("?action <- (move ?A ?B) ?oldOnFl <- (onFloor ?A)"
+				+ " => (assert (on ?A ?B)) (retract ?oldOnFl ?action)");
 		// Move floor movement
-		actionRules.add("?action <- (moveFloor ?X) ?oldOn <- (on ?X ?Z)"
-				+ " => (assert (onFloor ?X)) (retract ?oldOn ?action)");
+		actionRules.add("?action <- (moveFloor ?A) ?oldOn <- (on ?A ?C)"
+				+ " => (assert (onFloor ?A)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 
@@ -63,29 +63,29 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 
 		// Block(Y) & !On(?,Y) -> Clear(Y)
 		bkMap.put("clearRule", new BackgroundKnowledge(
-				"(block ?Y) (not (on ? ?Y)) => (assert (clear ?Y))", true));
+				"(block ?B) (not (on ? ?B)) => (assert (clear ?B))", true));
 
 		// On(X,Y) -> Above(X,Y)
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
-				"(on ?X ?Y) => (assert (above ?X ?Y))", true));
+				"(on ?A ?B) => (assert (above ?A ?B))", true));
 
 		// Blocks on floor is at height a
 		bkMap.put("floorTruthB", new BackgroundKnowledge(
-				"(onFloor ?X) => (assert (height ?X 1))", true));
+				"(onFloor ?A) => (assert (height ?A 1))", true));
 
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
-				"(on ?X ?Y) (above ?Y ?Z) => (assert (above ?X ?Z))", true));
+				"(on ?A ?B) (above ?B ?C) => (assert (above ?A ?C))", true));
 
 		// Height of individual blocks (for highest calcs)
 		bkMap.put("heightRule", new BackgroundKnowledge(
-				"(on ?X ?Y) (height ?Y ?N) => (assert (height ?X (+ ?N 1)))",
+				"(on ?A ?B) (height ?B ?N) => (assert (height ?A (+ ?N 1)))",
 				true));
 
 		// Highest rule
 		bkMap.put("highestRule", new BackgroundKnowledge(
-				"(height ?X ?N) (forall (block ?Y) (height ?Y ?M&:(<= ?M ?N)))"
-						+ " => (assert (highest ?X))", true));
+				"(height ?A ?N) (forall (block ?B) (height ?B ?M&:(<= ?M ?N)))"
+						+ " => (assert (highest ?A))", true));
 
 		return bkMap;
 	}
@@ -97,14 +97,14 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(not (on ?X ?Y))";
+			result[1] = "(not (on ?A ?B))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(onFloor ?X) (not (onFloor ?Z&:(<> ?Z ?X)))";
+			result[1] = "(onFloor ?A) (not (onFloor ?C&:(<> ?C ?A)))";
 			return result;
 		}
 		return result;
@@ -119,27 +119,27 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
+					+ "(clear ?A) (above ?A ?G_0) => (moveFloor ?A)";
 			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
-					+ "(clear ?X) (above ?X ?G_1) => (moveFloor ?X)";
+					+ "(clear ?A) (above ?A ?G_1) => (moveFloor ?A)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
-			rules[0] = "(clear ?X) (highest ?Y) => (move ?X ?Y)";
+			rules[0] = "(clear ?A) (highest ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
-			rules[0] = "(highest ?X) => (moveFloor ?X)";
+			rules[0] = "(highest ?A) => (moveFloor ?A)";
 		} else if (envParameter_.equals("clearA")
 				|| envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
+					+ "(clear ?A) (above ?A ?G_0) => (moveFloor ?A)";
 		} else if (envParameter_.equals("highestA")
 				|| envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?X) (above ?X ?G_0) => (moveFloor ?X)";
+					+ "(clear ?A) (above ?A ?G_0) => (moveFloor ?A)";
 			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0) "
-					+ "(clear ?G_0) (highest ?Y) => (move ?G_0 ?Y)";
+					+ "(clear ?G_0) (highest ?B) => (move ?G_0 ?B)";
 		}
 
 		RelationalPolicy optimal = new RelationalPolicy();

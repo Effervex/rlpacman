@@ -25,7 +25,7 @@ public class BlocksWorldEnvironment extends
 	}
 
 	@Override
-	protected void initialiseBlocksState(int numBlocks) {
+	public void initialiseBlocksState(int numBlocks) {
 		super.initialiseBlocksState(numBlocks);
 		state_ = new BoundedBlocksState(state_.getState());
 	}

@@ -1,5 +1,6 @@
 package cerrla;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +46,9 @@ public class CERRLA implements RRLAgent {
 
 	/** The CEDistribution for the environment goal. */
 	private LocalCrossEntropyDistribution mainGoalCECortex_;
+
+	/** The old policy repeat value when not frozen. */
+	private int oldPolicyRepeats_;
 
 	/**
 	 * 
@@ -114,10 +118,12 @@ public class CERRLA implements RRLAgent {
 
 				// Add the policy
 				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
-						modulePrior, newModuleReplacementMap, subGoalPolicies, priorSubGoalsLocal));
+						modulePrior, newModuleReplacementMap, subGoalPolicies,
+						priorSubGoalsLocal));
 			} else {
 				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
-						modulePrior, moduleReplacementMap, subGoalPolicies, priorSubGoalsLocal));
+						modulePrior, moduleReplacementMap, subGoalPolicies,
+						priorSubGoalsLocal));
 			}
 		}
 	}
@@ -252,6 +258,9 @@ public class CERRLA implements RRLAgent {
 				lced.saveModule();
 		}
 
+		if (oldPolicyRepeats_ != 0)
+			ProgramArgument.POLICY_REPEATS.setDoubleValue(oldPolicyRepeats_);
+		oldPolicyRepeats_ = 0;
 		mainGoalCECortex_ = null;
 		goalMappedGenerators_.clear();
 		agentPolicy_.clear();
@@ -274,6 +283,11 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void freeze(boolean b) {
+		// During frozen testing, each policy only has one test per episode
+		if (oldPolicyRepeats_ == 0)
+			oldPolicyRepeats_ = ProgramArgument.POLICY_REPEATS.intValue();
+		ProgramArgument.POLICY_REPEATS.setDoubleValue(1);
+
 		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
 				.values())
 			distribution.freeze(b);
@@ -283,6 +297,7 @@ public class CERRLA implements RRLAgent {
 	public void initialise(int run) {
 		goalMappedGenerators_ = new HashMap<GoalCondition, LocalCrossEntropyDistribution>();
 		GoalCondition mainGC = Config.getInstance().getGoal();
+		// Load serialised file.
 		if (Config.getInstance().getSerializedFile() != null) {
 			mainGoalCECortex_ = LocalCrossEntropyDistribution
 					.loadDistribution(Config.getInstance().getSerializedFile());
@@ -297,6 +312,26 @@ public class CERRLA implements RRLAgent {
 		goalMappedGenerators_.put(mainGC, mainGoalCECortex_);
 		agentPolicy_ = new HashMap<String, ModularPolicy>();
 		startedAgents_ = new HashSet<String>();
+
+		// Check for generator file.
+		if (Config.getInstance().getGeneratorFile() != null) {
+			// Load a run based file
+			File genFile = new File(Config.getInstance().getGeneratorFile()
+					.getAbsolutePath()
+					+ run);
+			if (!genFile.exists()) {
+				System.out
+						.println("No generator file found. Exiting immediately.");
+				System.exit(1);
+			}
+
+			try {
+				mainGoalCECortex_.getPolicyGenerator().loadGreedyGenerator(
+						genFile);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	@Override
@@ -361,4 +396,15 @@ public class CERRLA implements RRLAgent {
 		return evaluatePolicy(observations);
 	}
 
+	@Override
+	public int getNumEpisodes() {
+		return mainGoalCECortex_.getCurrentEpisode();
+	}
+
+	@Override
+	public void setSpecialisations(boolean b) {
+		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
+				.values())
+			distribution.setSpecialisation(b);
+	}
 }

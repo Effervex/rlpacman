@@ -4,6 +4,7 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import rrlFramework.Config;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -331,8 +332,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 							termFact);
 					int unboundOffset = replacementMap.size() - replBefore;
 					actionCond.replaceArguments(replacementMap, false, true);
-//					TODO actionCond.flexibleReplaceArguments(replacementMap,
-//							unboundOffset);
+					// TODO actionCond.flexibleReplaceArguments(replacementMap,
+					// unboundOffset);
 					actionConds.add(actionCond);
 
 
@@ -743,7 +744,9 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		if (instance_ != null && instance_.environment_.equals(environment))
 			return false;
 
-		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()) {
+		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
+				|| Config.getInstance().getSerializedFile() != null
+				|| Config.getInstance().getGeneratorFile() != null) {
 			try {
 				File globalObsFile = new File(AGENT_OBSERVATIONS_DIR,
 						environment + File.separatorChar + SERIALISATION_FILE);

@@ -34,7 +34,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	private RelationalRule fixedRule_;
 
 	/** The number of updates this slot has performed. */
-	private int numUpdates_;
+	private int numSamples_;
 
 	/** The ordering of the slot (0..1) */
 	private double ordering_;
@@ -195,14 +195,14 @@ public class Slot implements Serializable, Comparable<Slot> {
 		// updates this slot has been present in.
 		if (ProgramArgument.LOCAL_ALPHA.booleanValue()
 				&& ProgramArgument.DYNAMIC_SLOTS.booleanValue())
-			totalPoliciesEvaluated = numUpdates_;
+			totalPoliciesEvaluated = numSamples_;
 
 		// If the slot has not seen enough samples to update, return 0.
 		int evaluationThreshold = determineEvaluationThreshold();
 		if (totalPoliciesEvaluated < evaluationThreshold)
 			return 0;
 
-		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numUpdates_
+		int policiesEvaluated = (ProgramArgument.LOCAL_ALPHA.booleanValue()) ? numSamples_
 				: totalPoliciesEvaluated;
 		return alpha / Math.max(population - policiesEvaluated, numElites);
 	}
@@ -327,9 +327,14 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	public double getOrderingSD() {
-		double slotFillLevel = (1.0 * klSize()) / size();
-		slotFillLevel = Math.max(slotFillLevel, 0);
-		slotFillLevel = Math.min(slotFillLevel, 1);
+		double slotFillLevel = 1;
+		if (slotMean_ < .5)
+			slotFillLevel = 2 * slotMean_;
+		else
+			slotFillLevel = 2 * (1 - slotMean_);
+//		slotFillLevel = (1.0 * klSize() - 1) / size();
+//		slotFillLevel = Math.max(slotFillLevel, 0);
+//		slotFillLevel = Math.min(slotFillLevel, 1);
 		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()
 				* slotFillLevel;
 	}
@@ -421,11 +426,21 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public boolean isSplittable() {
 		if (fixed_)
 			return false;
+		if (ProgramArgument.ONLY_SPLIT_PROBABLE.booleanValue()
+				&& slotMean_ < .5)
+			return false;
 
-		double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
+//		double threshold = Math.min(slotMean_,
+//				ProgramArgument.SLOT_THRESHOLD.doubleValue());
+		double threshold = Math.min(1.0 / slotLevel_, slotMean_);
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
-		threshold = Math.max(Math.pow(threshold, slotLevel_ + 1) * size(), 1);
+		threshold = Math.max(threshold * size(), 1);
+		// double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
+		// if (threshold == -1)
+		// threshold = 1 - 1.0 / size();
+		// threshold = Math.max(Math.pow(threshold, slotLevel_ + 1) * size(),
+		// 1);
 
 		if (klSize() <= threshold)
 			return true;
@@ -439,11 +454,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	public void resetPolicyCount() {
-		numUpdates_ = 0;
+		numSamples_ = 0;
 	}
 
 	public void incrementSamples() {
-		numUpdates_++;
+		numSamples_++;
 	}
 
 	/**
@@ -520,7 +535,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		buffer.append(slotSplitToString());
 		buffer.append(" [MU:" + slotMean_ + ";ORD:" + ordering_ + ";KL_SIZE:"
 				+ klSize() + ";SIZE:" + size() + ";LVL:" + slotLevel_
-				+ ";#UPDATES:" + numUpdates_ + "]");
+				+ ";#UPDATES:" + numSamples_ + "]");
 		if (fixed_)
 			buffer.append(" " + fixedRule_.toString());
 		else
@@ -541,14 +556,16 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The elites data to perform the update with.
 	 * @param alpha
 	 *            The amount the value should update by.
-	 * @param numEliteSamples
-	 *            The number of samples present in the elites.
 	 * @param population
 	 *            The current population size.
-	 * @return The sum absolute updates or Integer.MAX_VALUE if no update.
+	 * @param minimumElites
+	 *            The minimal number of elite samples.
+	 * @return The amount of change 0..1 or Integer.MAX_VALUE if no update.
 	 */
 	public double updateProbabilities(ElitesData ed, double alpha,
-			int numEliteSamples, int population) {
+			int population, int minimumElites) {
+		if (updateDelta_ == Integer.MAX_VALUE)
+			alpha *= numSamples_;
 		updateDelta_ = Integer.MAX_VALUE;
 		if (ed == null || alpha == 0)
 			return updateDelta_;
@@ -563,16 +580,20 @@ public class Slot implements Serializable, Comparable<Slot> {
 		// return updateDelta_;
 
 		// Update the slot values
+//		double slotMean = Math.min(ed.getSlotCount(this) / minimumElites, 1);
+		double actualSlotMean = ed.getSlotNumeracyMean(this);
 		updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
-				ed.getSlotNumeracyMean(this), alpha);
+				actualSlotMean, alpha);
 
 		// If not fixed, update the rule values.
 		if (!fixed_) {
-			updateDelta_ += ruleGenerator_.updateDistribution(
-					ed.getSlotCount(this), ed.getRuleCounts(), alpha);
+			updateDelta_ = slotMean_
+					* ruleGenerator_.updateDistribution(ed.getSlotCount(this),
+							ed.getSlotRuleCounts(this), alpha);
 		}
 
 		// return updateDelta_ / factor;
+		// updateDelta_ /= 2;
 		return updateDelta_;
 	}
 
@@ -586,7 +607,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 *            The mean value to step towards.
 	 * @param alpha
 	 *            The amount the value should update by.
-	 * @return The absolute difference of the update values.
+	 * @return The absolute difference of the update values, normalised between
+	 *         0..2.
 	 */
 	public double updateSlotValues(Double ordering, double mean, double alpha) {
 		double absDiff = 0;
@@ -594,7 +616,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 			double diff = ordering_;
 			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
 			diff -= ordering_;
-			absDiff += Math.abs(diff);
+			// absDiff += Math.abs(diff) / alpha;
 		}
 		double diff = slotMean_;
 		// if (mean > 0)
@@ -603,7 +625,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		// slotMean_ = (1 - alpha) * slotMean_;
 		slotMean_ = alpha * mean + (1 - alpha) * slotMean_;
 		diff -= slotMean_;
-		absDiff += Math.abs(diff);
+		absDiff += Math.abs(diff) / alpha;
 		return absDiff;
 	}
 
@@ -618,7 +640,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean useSlot(Random random, boolean deterministicGeneration) {
 		if (deterministicGeneration) {
-			if (slotMean_ > .5)
+			if (slotMean_ >= .5)
 				return true;
 			else
 				return false;
@@ -634,6 +656,25 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 * @return True if it is ready to update yet.
 	 */
 	public boolean isUpdating(int population) {
-		return numUpdates_ >= determineEvaluationThreshold();
+		int threshold = determineEvaluationThreshold();
+		if (ProgramArgument.ONLINE_UPDATES.booleanValue()) {
+			if (numSamples_ % threshold == 0 && numSamples_ > 0) {
+				numSamples_ = 0;
+				return true;
+			} else
+				return false;
+		}
+		return numSamples_ >= threshold;
+	}
+
+	/**
+	 * Gets the amount of change the last update created.
+	 * 
+	 * @return The update difference (delta).
+	 */
+	public double getUpdateDelta() {
+		if (updateDelta_ == Integer.MAX_VALUE)
+			return 1;
+		return updateDelta_;
 	}
 }

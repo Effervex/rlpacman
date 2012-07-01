@@ -5,6 +5,7 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
+import rrlFramework.Config;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
 
@@ -831,7 +832,9 @@ public class LocalAgentObservations extends SettlingScan implements
 		// First load the singleton environment AgentObservations.
 		EnvironmentAgentObservations.loadAgentObservations();
 
-		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()) {
+		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
+				|| Config.getInstance().getSerializedFile() != null
+				|| Config.getInstance().getGeneratorFile() != null) {
 			try {
 				File localObsFile = getLocalFile(localGoal.toString());
 				if (localObsFile.exists()) {

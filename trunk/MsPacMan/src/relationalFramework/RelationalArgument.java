@@ -180,6 +180,12 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		argType_ = ArgumentType.NUMBER_RANGE;
 	}
 
+	public RelationalArgument(RelationalArgument otherArg, RangeContext context) {
+		this(otherArg.stringArg_, otherArg.rangeBounds_[0],
+				otherArg.rangeFrac_[0], otherArg.rangeBounds_[1],
+				otherArg.rangeFrac_[1], context);
+	}
+
 	/**
 	 * Creates a perfect duplicate of this arg.
 	 * 
@@ -347,7 +353,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	}
 
 	public boolean isRange(boolean isDefinedRange) {
-		return argType_ == ArgumentType.NUMBER_RANGE && (!isDefinedRange || rangeContext_ != null);
+		return argType_ == ArgumentType.NUMBER_RANGE
+				&& (!isDefinedRange || rangeContext_ != null);
 	}
 
 	public boolean isRangeVariable() {

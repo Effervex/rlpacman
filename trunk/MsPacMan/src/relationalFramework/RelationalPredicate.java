@@ -2,6 +2,7 @@ package relationalFramework;
 
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.LocalAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 
 import java.io.Serializable;
@@ -629,5 +630,22 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (negated_)
 			buffer.append(")");
 		return buffer.toString();
+	}
+
+	/**
+	 * Creates the range contexts for Relational Arguments using the given
+	 * action to identify the context.
+	 * 
+	 * @param action
+	 *            The action this predicate is a condition for.
+	 */
+	public void configureRangeContexts(RelationalPredicate action) {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isRangeVariable() && arguments_[i].getRangeBounds()[0] != null) {
+				RangeContext context = new RangeContext(i, this, action);
+				arguments_[i] = new RelationalArgument(arguments_[i], context);
+				rangeContexts_.add(context);
+			}
+		}
 	}
 }
