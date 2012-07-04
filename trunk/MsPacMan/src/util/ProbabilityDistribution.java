@@ -2,6 +2,7 @@ package util;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,8 +11,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 /**
  * A class representing a probability distribution of values. These values are
@@ -24,14 +23,14 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	private static final long serialVersionUID = 297675144227949310L;
 	public static final int MAX_RULES_STRING = 5;
 	/** The instances in the distribution with associated weights. */
-	// TODO Change this to a sorted structure (Ensure to re-sort on update)
 	private Map<T, Double> itemProbs_;
 
-	/**
-	 * The probability tree representing the summed probabilities of the
-	 * elements for quick access.
-	 */
-	private transient SortedMap<Double, T> probTree_;
+	/** A summed probability array for searching. */
+	private transient double[] probArray_;
+	/** If the prob array should be recalculated. */
+	private transient boolean rebuildProbs_;
+	/** The elements of the distribution in an array. */
+	private transient T[] elementArray_;
 
 	/** The KL size of this distribution. */
 	private double klSize_;
@@ -63,17 +62,18 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 * sorted order. It is assumed that the probabilities sum to one.
 	 */
 	private void buildProbTree() {
-		probTree_ = new TreeMap<Double, T>();
+		if (probArray_ == null)
+			probArray_ = new double[elementArray_.length];
 		// Iterate through the items
 		double sumProb = 0;
-		for (T item : itemProbs_.keySet()) {
+		for (int i = 0; i < elementArray_.length; i++) {
 			if (sumProb >= 1)
 				break;
 
-			sumProb += itemProbs_.get(item);
-			if (!probTree_.containsKey(sumProb))
-				probTree_.put(sumProb, item);
+			sumProb += itemProbs_.get(elementArray_[i]);
+			probArray_[i] = sumProb;
 		}
+		rebuildProbs_ = false;
 	}
 
 	/**
@@ -107,7 +107,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public boolean add(T element) {
 		itemProbs_.put(element, 1d);
-		probTree_ = null;
+		elementArray_ = null;
 		klSize_ = 0;
 		return true;
 	}
@@ -123,7 +123,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 */
 	public boolean add(T element, double prob) {
 		itemProbs_.put(element, prob);
-		probTree_ = null;
+		elementArray_ = null;
 		klSize_ = 0;
 		return true;
 	}
@@ -221,7 +221,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	@Override
 	public void clear() {
 		itemProbs_.clear();
-		probTree_ = null;
+		elementArray_ = null;
 		klSize_ = 0;
 	}
 
@@ -426,7 +426,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 			else
 				itemProbs_.put(element, itemProbs_.get(element) / sum);
 		}
-		probTree_ = null;
+		rebuildProbs_ = true;
 		klSize_ = 0;
 	}
 
@@ -434,7 +434,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public boolean remove(Object arg0) {
 		Double val = itemProbs_.remove(arg0);
 		if (val != null) {
-			probTree_ = null;
+			elementArray_ = null;
 			klSize_ = 0;
 			return true;
 		}
@@ -458,7 +458,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		for (T element : itemProbs_.keySet()) {
 			itemProbs_.put(element, 1.0 / itemProbs_.size());
 		}
-		probTree_ = null;
+		rebuildProbs_ = true;
 		klSize_ = 0;
 	}
 
@@ -470,7 +470,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		for (T element : itemProbs_.keySet()) {
 			itemProbs_.put(element, prob);
 		}
-		probTree_ = null;
+		rebuildProbs_ = true;
 		klSize_ = 0;
 	}
 
@@ -502,6 +502,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	 *            If we sample the most likely element.
 	 * @return The element sampled, according to weight, or null.
 	 */
+	@SuppressWarnings("unchecked")
 	public T sample(boolean useMostLikely) {
 		if (itemProbs_.isEmpty())
 			return null;
@@ -510,13 +511,20 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		if (useMostLikely)
 			return getOrderedElements().get(0);
 
-		if (probTree_ == null)
+		if (elementArray_ == null) {
+			probArray_ = null;
+			elementArray_ = (T[]) new Object[itemProbs_.size()];
+			elementArray_ = itemProbs_.keySet().toArray(elementArray_);
+		}
+		if (rebuildProbs_ || probArray_ == null)
 			buildProbTree();
 
 		double val = random_.nextDouble();
-		SortedMap<Double, T> tailMap = probTree_.tailMap(val);
-		double itemKey = tailMap.firstKey();
-		return tailMap.get(itemKey);
+		int index = Arrays.binarySearch(probArray_, val);
+		if (index < 0)
+			index = Math.min(-index - 1, elementArray_.length - 1);
+
+		return elementArray_[index];
 	}
 
 	/**
@@ -546,7 +554,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	public boolean set(T element, double newProb) {
 		if (itemProbs_.containsKey(element)) {
 			itemProbs_.put(element, newProb);
-			probTree_ = null;
+			rebuildProbs_ = true;
 			klSize_ = 0;
 			return true;
 		}
@@ -725,7 +733,7 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		double newValue = stepSize * observedProb + (1 - stepSize) * oldValue;
 		// Set the new value.
 		itemProbs_.put(element, newValue);
-		probTree_ = null;
+		rebuildProbs_ = true;
 		klSize_ = 0;
 
 		// TODO Note the '2' coefficient. The maximum (normalised) divergence
