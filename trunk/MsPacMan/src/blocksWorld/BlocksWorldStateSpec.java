@@ -32,12 +32,12 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		actions.add(new RelationalPredicate("move", structure));
+		actions.add(new RelationalPredicate("move", structure, false));
 
 		// MoveFloor action
 		structure = new String[1];
 		structure[0] = "block";
-		actions.add(new RelationalPredicate("moveFloor", structure));
+		actions.add(new RelationalPredicate("moveFloor", structure, false));
 
 		return actions;
 	}
@@ -157,34 +157,34 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		predicates.add(new RelationalPredicate("on", structure));
+		predicates.add(new RelationalPredicate("on", structure, false));
 
 		// OnFloor predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new RelationalPredicate("onFloor", structure));
+		predicates.add(new RelationalPredicate("onFloor", structure, false));
 
 		// Clear predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new RelationalPredicate("clear", structure));
+		predicates.add(new RelationalPredicate("clear", structure, false));
 
 		// Above predicate
 		structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		predicates.add(new RelationalPredicate("above", structure));
+		predicates.add(new RelationalPredicate("above", structure, false));
 
 		// Height predicate
 		structure = new String[2];
 		structure[0] = "block";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("height", structure));
+		predicates.add(new RelationalPredicate("height", structure, true));
 
 		// Highest predicate
 		structure = new String[1];
 		structure[0] = "block";
-		predicates.add(new RelationalPredicate("highest", structure));
+		predicates.add(new RelationalPredicate("highest", structure, false));
 
 		return predicates;
 	}

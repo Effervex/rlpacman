@@ -208,4 +208,24 @@ public class BackgroundKnowledgeTest {
 		assertTrue(ruleConds.size() == 1);
 		assertTrue(ruleConds.toString().contains("(controls ?A ?B)"));
 	}
+	
+	@Test
+	public void testUnboundRangeRemoval() {
+		// Replacing an unbound range
+		BackgroundKnowledge bk = new BackgroundKnowledge(
+				"(thing ?A) <=> (height ?A ?)");
+		SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>();
+		ruleConds.add(StateSpec.toRelationalPredicate("(height ?A ?#_0)"));
+		boolean result = bk.simplify(ruleConds);
+		assertTrue(ruleConds.toString(), result);
+		assertTrue(ruleConds.contains(StateSpec
+				.toRelationalPredicate("(thing ?A)")));
+		assertTrue(ruleConds.size() == 1);
+
+		// Bound case
+		ruleConds.clear();
+		ruleConds.add(StateSpec.toRelationalPredicate("(above ?A ?#_0&:(0.0 <= ?#_0 <= 1.0))"));
+		result = bk.simplify(ruleConds);
+		assertFalse(ruleConds.toString(), result);
+	}
 }

@@ -102,111 +102,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Simplifies a single condition using equivalence rules.
-	 * 
-	 * @param condition
-	 *            The condition to simplify.
-	 * @param action
-	 *            The action this condition is for.
-	 * @param localInvariants
-	 *            The optional local invariants for this action.
-	 * @param localVariants
-	 *            The optional local variants for this action.
-	 * @return The simplified condition (or the condition itself).
-	 */
-	private RelationalPredicate simplifyCondition(
-			RelationalPredicate condition, String action,
-			Collection<RelationalPredicate> localInvariants,
-			Collection<RelationalPredicate> localVariants) {
-		SortedSet<RelationalPredicate> set = new TreeSet<RelationalPredicate>(
-				ConditionComparator.getInstance());
-		set.add(condition);
-		if (simplifyRule(set, false, true, null) == 1) {
-			RelationalPredicate simplify = set.first();
-			// If the condition is not in the invariants and if it's not
-			// negated, IS in the variants, keep it.
-			Collection<RelationalPredicate> invariantConds = actionBasedObservations_
-					.get(action).invariantActionConditions_;
-			if (!invariantConds.contains(simplify)
-					&& (localInvariants == null || !localInvariants
-							.contains(simplify))) {
-				Collection<RelationalPredicate> variantConds = actionBasedObservations_
-						.get(action).variantActionConditions_;
-				if (simplify.isNegated() || variantConds.contains(simplify)
-						|| localVariants == null
-						|| localVariants.contains(simplify))
-					return simplify;
-			}
-		} else
-			return condition;
-		return null;
-	}
-
-	/**
-	 * Creates the set of specialisation conditions, which are basically the
-	 * variant conditions, both negated and normal, and simplified to exclude
-	 * the invariant and illegal conditions.
-	 * 
-	 * @param variants
-	 *            The variant conditions to simplify into a smaller subset.
-	 * @param checkNegated
-	 *            If adding negated versions of the variant too.
-	 * @param action
-	 *            The action this condition is for.
-	 * @param localInvariants
-	 *            The optional local invariants for this action.
-	 * @param localVariants
-	 *            The optional local variants for this action.
-	 * @return The collection of specialisation conditions, not containing any
-	 *         conditions in the invariants, and not containing any conditions
-	 *         not in either invariants or variants.
-	 */
-	// protected Collection<RelationalPredicate> createSpecialisations(
-	// Collection<RelationalPredicate> variants, boolean checkNegated,
-	// String action, Collection<RelationalPredicate> localInvariants,
-	// Collection<RelationalPredicate> localVariants) {
-	// SortedSet<RelationalPredicate> specialisations = new
-	// TreeSet<RelationalPredicate>(
-	// ConditionComparator.getInstance());
-	// if (variants == null)
-	// return specialisations;
-	//
-	// for (RelationalPredicate condition : variants) {
-	// // Check the non-negated version
-	// condition = simplifyCondition(condition, action, localInvariants,
-	// localVariants);
-	// if (condition != null && specialisations.add(condition)) {
-	// // Check the negated version (only for non-types)
-	// if (checkNegated
-	// && !StateSpec.getInstance().isTypePredicate(
-	// condition.getFactName())) {
-	// RelationalArgument[] negArgs = new RelationalArgument[condition
-	// .getArgTypes().length];
-	// // Special case for numerical values - negated
-	// // numericals are made anonymous
-	// for (int i = 0; i < condition.getArgTypes().length; i++) {
-	// if (StateSpec.isNumberType(condition.getArgTypes()[i]))
-	// negArgs[i] = RelationalArgument.ANONYMOUS;
-	// else
-	// negArgs[i] = condition.getRelationalArguments()[i]
-	// .clone();
-	// }
-	//
-	// RelationalPredicate negCondition = new RelationalPredicate(
-	// condition, negArgs);
-	// negCondition.swapNegated();
-	// negCondition = simplifyCondition(negCondition, action,
-	// localInvariants, localVariants);
-	// if (negCondition != null)
-	// specialisations.add(negCondition);
-	// }
-	// }
-	// }
-	//
-	// return specialisations;
-	// }
-
-	/**
 	 * Creates the specialisation conditions from the variants by simply using
 	 * negated and non-negated conditions.
 	 * 
@@ -451,8 +346,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 */
 	public Collection<RelationalPredicate> getRLGGConditions(
 			RelationalPredicate action) {
-		List<RelationalPredicate> rlggConds = actionBasedObservations_
-				.get(action.getFactName()).getRLGGRule().getConditions(true);
+		Collection<RelationalPredicate> rlggConds = actionBasedObservations_
+				.get(action.getFactName()).getRLGGRule().getRawConditions(true);
 		Collection<RelationalPredicate> termSwappedConds = new ArrayList<RelationalPredicate>(
 				rlggConds.size());
 		String[] actionTerms = action.getArguments();
@@ -681,20 +576,17 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			boolean exitIfIllegalRule, boolean onlyEquivalencies,
 			Collection<RelationalPredicate> localConditionInvariants) {
 		// Simplify using background knowledge
-		int simplResult = conditionObservations_.simplifyRule(simplified,
-				exitIfIllegalRule, onlyEquivalencies, localConditionInvariants);
-		if (simplResult == -1 && exitIfIllegalRule)
-			return -1;
-		boolean result = (simplResult != 0);
-
-		// // Simplify using invariants
-		// if (!onlyEquivalencies) {
-		// result |= simplified.removeAll(conditionObservations_.invariants_
-		// .getSpecificInvariants());
-		// if (localConditionInvariants != null)
-		// result |= simplified.removeAll(localConditionInvariants);
-		// }
-		return (result) ? 1 : 0;
+		boolean changed = false;
+		int simplResult = 0;
+		do {
+			simplResult = conditionObservations_.simplifyRule(simplified,
+					exitIfIllegalRule, onlyEquivalencies,
+					localConditionInvariants);
+			changed |= (simplResult == 1);
+			if (simplResult == -1 && exitIfIllegalRule)
+				return -1;
+		} while (simplResult == 1);
+		return (changed) ? 1 : 0;
 	}
 
 	/**
@@ -961,10 +853,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				}
 
 				// Simplify the rule conditions
-				simplifyRule(ruleConds, false, false, null);
-				rlggRule_ = new RelationalRule(ruleConds, action_, null);
+				rlggRule_ = new RelationalRule(ruleConds, action_, null, null);
 
-				rlggRule_.expandConditions();
 				recreateRLGG_ = false;
 			}
 			return rlggRule_;
@@ -1517,6 +1407,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// they're added
 			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
 					.getPredicateMappedRules();
+			// TODO Need a smarter method of selecting which simplification rules to use.
 			while (changedThisIter) {
 				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
 				changedThisIter = false;

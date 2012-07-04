@@ -384,8 +384,8 @@ public class RLGGMerger {
 					// so good
 					unification[i] = factTerm;
 					validFact = true;
-				} else if (!fact.isNegated() && unityTerm.isUnboundVariable()
-						&& factTerm.isUnboundVariable()) {
+				} else if (!fact.isNegated() && unityTerm.isFreeVariable()
+						&& factTerm.isFreeVariable()) {
 					// If the fact term and unity term are unbound variables
 					// (and one of them is anonymous)
 					unification[i] = RelationalArgument.ANONYMOUS;

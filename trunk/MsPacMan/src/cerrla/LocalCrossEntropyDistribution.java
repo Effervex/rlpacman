@@ -159,7 +159,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Load the local agent observations
 		localAgentObservations_ = LocalAgentObservations
-				.loadAgentObservations(goal);
+				.loadAgentObservations(this);
 		policyIDCounter_ = 0;
 		isSpecialising_ = true;
 
@@ -243,8 +243,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			if (goalRule_ == null) {
 				SortedSet<RelationalPredicate> conditions = new TreeSet<RelationalPredicate>();
 				conditions.add(goalCondition_.getFact());
-				goalRule_ = new RelationalRule(conditions, null, null);
-				goalRule_.expandConditions();
+				goalRule_ = new RelationalRule(conditions, null, null, this);
+				if (!goalRule_.isLegal())
+					System.err.println("Illegal goal condition: " + conditions);
 			}
 		} else
 			goalRule_ = null;
@@ -444,7 +445,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 							.intValue()) {
 				SortedMap<Integer, RelationalPolicy> greedyPolicies = policyGenerator_
 						.getGreedyPolicyMap();
-				SortedMap<Integer, RelationalPolicy> nextKey = greedyPolicies.tailMap(currentEpisode_ + 1);
+				SortedMap<Integer, RelationalPolicy> nextKey = greedyPolicies
+						.tailMap(currentEpisode_ + 1);
 
 				if (nextKey == null || nextKey.isEmpty()) {
 					// End of testing. Exit.
@@ -865,7 +867,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 				// Load Local Agent Observations
 				lced.localAgentObservations_ = LocalAgentObservations
-						.loadAgentObservations(lced.goalCondition_);
+						.loadAgentObservations(lced);
 				lced.policyGenerator_.rebuildCurrentData();
 				lced.isSpecialising_ = true;
 

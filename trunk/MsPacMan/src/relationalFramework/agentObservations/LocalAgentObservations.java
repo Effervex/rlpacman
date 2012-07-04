@@ -29,6 +29,7 @@ import java.util.TreeSet;
 
 import jess.Fact;
 import jess.Rete;
+import cerrla.LocalCrossEntropyDistribution;
 import cerrla.ProgramArgument;
 import cerrla.RLGGMerger;
 import cerrla.MergedFact;
@@ -80,14 +81,19 @@ public class LocalAgentObservations extends SettlingScan implements
 	/** The action conditions orientated towards the goal. */
 	private MultiMap<String, RelationalPredicate> variantGoalActionConditions_;
 
+	/** The local distribution for these agent observations. */
+	private transient LocalCrossEntropyDistribution lced_;
+
 	/**
 	 * The constructor for a new local goal object.
 	 * 
 	 * @param localGoal
 	 *            The local goal these observations relate to.
 	 */
-	public LocalAgentObservations(GoalCondition localGoal) {
+	public LocalAgentObservations(GoalCondition localGoal,
+			LocalCrossEntropyDistribution lced) {
 		localGoal_ = localGoal;
+		lced_ = lced;
 		invariantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		variantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		observedGoalPredicates_ = MultiMap.createSortedSetMultiMap();
@@ -330,6 +336,21 @@ public class LocalAgentObservations extends SettlingScan implements
 		return changed;
 	}
 
+	/**
+	 * Gets the maximum number of specialisations for a given action.
+	 * 
+	 * @param actionPred
+	 *            The action used for determining the number of specialisations.
+	 * @return The total number of specialisations for an action.
+	 */
+	public int getNumSpecialisations(String actionPred) {
+		int num = ruleMutation_.getSpecialisationConditions(actionPred).size();
+		if (StateSpec.getInstance().getPredicateByName(actionPred)
+				.isNumerical())
+			num += ProgramArgument.NUM_NUMERICAL_SPLITS.intValue();
+		return num;
+	}
+
 	@Override
 	public int getObservationHash() {
 		final int prime = 13;
@@ -337,105 +358,6 @@ public class LocalAgentObservations extends SettlingScan implements
 				* prime
 				+ EnvironmentAgentObservations.getInstance()
 						.getObservationHash();
-	}
-
-	/**
-	 * Gets the RLGG rules with respect to the goal replacements for this goal.
-	 * 
-	 * @param oldRLGGs
-	 *            The old RLGG rules to potentially modify.
-	 * @return A collection of RLGG rules - at most one for each action.
-	 */
-	public Collection<RelationalRule> getRLGGRules(
-			Collection<RelationalRule> oldRLGGs) {
-		// If the RLGG hasn't changed, return the already calculated RLGG rules.
-		if (EnvironmentAgentObservations.getInstance().isChanged()
-				|| rlggRules_ == null) {
-			if (rlggRules_ == null) {
-				rlggRules_ = new HashMap<String, RelationalRule>();
-				for (RelationalRule oldRLGG : oldRLGGs)
-					rlggRules_.put(oldRLGG.getActionPredicate(), oldRLGG);
-			}
-
-			// Get the RLGG from the invariant conditions from the action
-			// conditions.
-			int numGoalArgs = localGoal_.getNumArgs();
-			List<RelationalArgument> queryTerms = new ArrayList<RelationalArgument>(
-					numGoalArgs);
-			for (int i = 0; i < numGoalArgs; i++)
-				queryTerms.add(RelationalArgument.createGoalTerm(i));
-			for (RelationalRule envRLGG : EnvironmentAgentObservations
-					.getInstance().getRLGGActionRules()) {
-				String actionPred = envRLGG.getActionPredicate();
-				RelationalRule localisedRLGG = null;
-				if (rlggRules_.containsKey(actionPred)) {
-					// Modify the local RLGG rule
-					localisedRLGG = rlggRules_.get(actionPred);
-					localisedRLGG.setConditions(envRLGG.getConditions(false));
-					localisedRLGG.setActionTerms(envRLGG.getActionTerms());
-					localisedRLGG.setQueryParams(queryTerms);
-				} else {
-					// Insert the new RLGG (with query params) into the rlgg
-					// rules.
-					localisedRLGG = envRLGG.clone(true);
-					localisedRLGG.setQueryParams(queryTerms);
-					rlggRules_.put(actionPred, localisedRLGG);
-				}
-
-				// Add the negated general goal conditions and check the RLGG is
-				// still valid.
-				if (localGoal_ instanceof GeneralGoalCondition) {
-					// First check that the RLGG doesn't contain the goal
-					Collection<RelationalPredicate> rlggConds = localisedRLGG
-							.getConditions(false);
-					boolean validRLGG = true;
-					for (RelationalPredicate rlggCond : rlggConds) {
-						if (rlggCond.getFactName().equals(
-								localGoal_.getFactName())
-								&& rlggCond.isNegated() == localGoal_.getFact()
-										.isNegated()) {
-							// The rule is invalid for this sub-goal and won't
-							// be used.
-							rlggRules_.remove(actionPred);
-							validRLGG = false;
-							break;
-						}
-					}
-
-					// Next, add the general RLGG conditions to the rule
-					// (various negations of the goal).
-					if (validRLGG) {
-						Collection<RelationalPredicate> generalRLGGConds = ruleMutation_
-								.getGeneralRLGGConds(actionPred);
-						if (generalRLGGConds != null
-								&& !generalRLGGConds.isEmpty()) {
-
-							rlggConds.addAll(generalRLGGConds);
-							rlggConds = simplifyRule(rlggConds, null,
-									localisedRLGG.getAction(), true);
-
-							// Checking the RLGG is still valid.
-							if (rlggConds == null)
-								rlggRules_.remove(actionPred);
-							else {
-								localisedRLGG.setConditions(rlggConds);
-								localisedRLGG.expandConditions();
-							}
-						}
-					}
-				}
-			}
-		}
-		return rlggRules_.values();
-	}
-
-	/**
-	 * Gets the rule mutation object.
-	 * 
-	 * @return The internal rule mutation object.
-	 */
-	public RuleMutation getRuleMutation() {
-		return ruleMutation_;
 	}
 
 	/**
@@ -474,18 +396,98 @@ public class LocalAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Gets the maximum number of specialisations for a given action.
+	 * Gets the RLGG rules with respect to the goal replacements for this goal.
 	 * 
-	 * @param actionPred
-	 *            The action used for determining the number of specialisations.
-	 * @return The total number of specialisations for an action.
+	 * @param oldRLGGs
+	 *            The old RLGG rules to potentially modify.
+	 * @return A collection of RLGG rules - at most one for each action.
 	 */
-	public int getNumSpecialisations(String actionPred) {
-		int num = ruleMutation_.getSpecialisationConditions(actionPred).size();
-		if (StateSpec.getInstance().getPredicateByName(actionPred)
-				.isNumerical())
-			num += ProgramArgument.NUM_NUMERICAL_SPLITS.intValue();
-		return num;
+	public Collection<RelationalRule> getRLGGRules(
+			Collection<RelationalRule> oldRLGGs) {
+		// If the RLGG hasn't changed, return the already calculated RLGG rules.
+		if (EnvironmentAgentObservations.getInstance().isChanged()
+				|| rlggRules_ == null) {
+			if (rlggRules_ == null) {
+				rlggRules_ = new HashMap<String, RelationalRule>();
+				for (RelationalRule oldRLGG : oldRLGGs)
+					rlggRules_.put(oldRLGG.getActionPredicate(), oldRLGG);
+			}
+
+			// Get the RLGG from the invariant conditions from the action
+			// conditions.
+			int numGoalArgs = localGoal_.getNumArgs();
+			List<RelationalArgument> queryTerms = new ArrayList<RelationalArgument>(
+					numGoalArgs);
+			for (int i = 0; i < numGoalArgs; i++)
+				queryTerms.add(RelationalArgument.createGoalTerm(i));
+			for (RelationalRule envRLGG : EnvironmentAgentObservations
+					.getInstance().getRLGGActionRules()) {
+				String actionPred = envRLGG.getActionPredicate();
+				RelationalRule localisedRLGG = null;
+				if (rlggRules_.containsKey(actionPred)) {
+					// Modify the local RLGG rule
+					localisedRLGG = rlggRules_.get(actionPred);
+					localisedRLGG.setActionTerms(envRLGG.getActionTerms());
+					localisedRLGG.setQueryParams(queryTerms);
+					localisedRLGG
+							.setConditions(envRLGG.getRawConditions(false));
+				} else {
+					// Insert the new RLGG (with query params) into the rlgg
+					// rules.
+					localisedRLGG = envRLGG.clone(true, lced_);
+					localisedRLGG.setQueryParams(queryTerms);
+					rlggRules_.put(actionPred, localisedRLGG);
+				}
+
+				// Add the negated general goal conditions and check the RLGG is
+				// still valid.
+				if (localGoal_ instanceof GeneralGoalCondition) {
+					// First check that the RLGG doesn't contain the goal
+					Collection<RelationalPredicate> rlggConds = localisedRLGG
+							.getRawConditions(false);
+					boolean validRLGG = true;
+					for (RelationalPredicate rlggCond : rlggConds) {
+						if (rlggCond.getFactName().equals(
+								localGoal_.getFactName())
+								&& rlggCond.isNegated() == localGoal_.getFact()
+										.isNegated()) {
+							// The rule is invalid for this sub-goal and won't
+							// be used.
+							rlggRules_.remove(actionPred);
+							validRLGG = false;
+							break;
+						}
+					}
+
+					// Next, add the general RLGG conditions to the rule
+					// (various negations of the goal).
+					if (validRLGG) {
+						Collection<RelationalPredicate> generalRLGGConds = ruleMutation_
+								.getGeneralRLGGConds(actionPred);
+						if (generalRLGGConds != null
+								&& !generalRLGGConds.isEmpty()) {
+
+							rlggConds.addAll(generalRLGGConds);
+							localisedRLGG.setConditions(rlggConds);
+
+							// Checking the RLGG is still valid.
+							if (!localisedRLGG.isLegal())
+								rlggRules_.remove(actionPred);
+						}
+					}
+				}
+			}
+		}
+		return rlggRules_.values();
+	}
+
+	/**
+	 * Gets the rule mutation object.
+	 * 
+	 * @return The internal rule mutation object.
+	 */
+	public RuleMutation getRuleMutation() {
+		return ruleMutation_;
 	}
 
 	@Override
@@ -606,11 +608,6 @@ public class LocalAgentObservations extends SettlingScan implements
 		super.resetInactivity();
 		ruleMutation_.specialisationConditions_ = null;
 		ruleMutation_.localRLGGConditions_ = null;
-	}
-
-	@Override
-	public String toString() {
-		return "'" + localGoal_.toString() + "' local agent observations.";
 	}
 
 	/**
@@ -750,16 +747,11 @@ public class LocalAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition, RelationalPredicate ruleAction,
 			boolean exitIfIllegalRule) {
-		Collection<RelationalPredicate> simplified = new HashSet<RelationalPredicate>(
-				ruleConds);
-		// Add the RLGG conditions to assist in simplification (don't add
-		// numerical predicates)
-		if (ruleAction != null) {
-			for (RelationalPredicate rlggPred : EnvironmentAgentObservations
-					.getInstance().getRLGGConditions(ruleAction)) {
-				if (!rlggPred.isNumerical())
-					simplified.add(rlggPred);
-			}
+		Collection<RelationalPredicate> simplified = new HashSet<RelationalPredicate>();
+		RelationalArgument[] actionArgs = ruleAction.getRelationalArguments();
+		for (RelationalPredicate cond : ruleConds) {
+			cond.setActionVariables(actionArgs);
+			simplified.add(cond);
 		}
 
 		// If we have an optional added condition, check for
@@ -776,6 +768,9 @@ public class LocalAgentObservations extends SettlingScan implements
 			if (!checkConditionTypes(simplified, condition))
 				return null;
 
+			if (ruleAction != null)
+				condition.setActionVariables(ruleAction
+						.getRelationalArguments());
 			simplified.add(condition);
 		}
 
@@ -805,6 +800,11 @@ public class LocalAgentObservations extends SettlingScan implements
 		return simplified;
 	}
 
+	@Override
+	public String toString() {
+		return "'" + localGoal_.toString() + "' local agent observations.";
+	}
+
 	/**
 	 * Gets the local observations file.
 	 * 
@@ -823,14 +823,16 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * Loads the local agent observations from serialised file if possible.
 	 * Otherwise, it just creates a new local agent observations object.
 	 * 
-	 * @param localGoal
-	 *            The local goal observations to load.
+	 * @param lced
+	 *            The local distribution these observations are for.
+	 * 
 	 * @return The local agent observations object (loaded or new).
 	 */
 	public static LocalAgentObservations loadAgentObservations(
-			GoalCondition localGoal) {
+			LocalCrossEntropyDistribution lced) {
 		// First load the singleton environment AgentObservations.
 		EnvironmentAgentObservations.loadAgentObservations();
+		GoalCondition localGoal = lced.getGoalCondition();
 
 		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
 				|| Config.getInstance().getSerializedFile() != null
@@ -842,6 +844,7 @@ public class LocalAgentObservations extends SettlingScan implements
 					ObjectInputStream ois = new ObjectInputStream(fis);
 					LocalAgentObservations lao = (LocalAgentObservations) ois
 							.readObject();
+					lao.lced_ = lced;
 					if (lao != null) {
 						if (localGoal.isMainGoal())
 							lao.localGoal_.setAsMainGoal();
@@ -852,7 +855,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			}
 		}
 		System.out.println("No local agent observations to load.");
-		return new LocalAgentObservations(localGoal);
+		return new LocalAgentObservations(localGoal, lced);
 	}
 
 	/**
@@ -940,349 +943,67 @@ public class LocalAgentObservations extends SettlingScan implements
 			mutantArgs[condArgIndex] = subRangeArg;
 			RelationalPredicate mutantFact = new RelationalPredicate(condition,
 					mutantArgs);
-			List<RelationalPredicate> cloneConds = baseRule
-					.getConditions(false);
-			int index = cloneConds.indexOf(condition);
-			cloneConds.set(index, mutantFact);
+			Collection<RelationalPredicate> cloneConds = baseRule
+					.getRawConditions(false);
+			cloneConds.remove(condition);
+			cloneConds.add(mutantFact);
 
 			RelationalRule mutant = new RelationalRule(cloneConds,
-					baseRule.getAction(), baseRule);
+					baseRule.getAction(), baseRule, lced_);
 			mutant.setQueryParams(baseRule.getQueryParameters());
 			return mutant;
 		}
 
 		/**
-		 * Gets the specialisation conditions (both global and local conditions)
-		 * for an action.
+		 * Creates a specialised rule.
 		 * 
-		 * @param actionPred
-		 *            The action for getting the conditions.
-		 * @return A collection of specialisation conditions.
-		 */
-		public Collection<RelationalPredicate> getSpecialisationConditions(
-				String actionPred) {
-			if (specialisationConditions_ == null
-					|| specialisationConditions_.get(actionPred) == null)
-				recreateAllSpecialisations(actionPred);
-			return specialisationConditions_.get(actionPred);
-		}
-
-		/**
-		 * Gets the conditions which are always true whenever the goal is.
-		 * 
-		 * @param actionPred
-		 *            The action for getting the conditions.
-		 * @return A collection of conditions that are RLGG conds for this
-		 *         general goal.
-		 */
-		public Collection<RelationalPredicate> getGeneralRLGGConds(
-				String actionPred) {
-			if (localRLGGConditions_ == null
-					|| localRLGGConditions_.get(actionPred) == null)
-				recreateAllSpecialisations(actionPred);
-			return localRLGGConditions_.get(actionPred);
-		}
-
-		/**
-		 * A wrapper method for ease.
-		 * 
-		 * @param baseRule
-		 *            The base rule to mutate.
 		 * @param condition
-		 *            The original condition being mutated.
-		 * @param condArgIndex
-		 *            The index of the mutation.
-		 * @param rangeArg
-		 *            The actual ranged argument itself.
-		 * @param context
-		 *            The context of the range.
-		 * @return Three subranges.
-		 */
-		private Collection<RelationalRule> splitExistingRange(
-				RelationalRule baseRule, RelationalPredicate condition,
-				int condArgIndex, RelationalArgument rangeArg,
-				RangeContext context) {
-			RangeBound[] rangeBounds = rangeArg.getRangeBounds();
-			double[] rangeFracs = rangeArg.getRangeFrac();
-
-			return splitIntoThree(baseRule, condition, condArgIndex,
-					rangeArg.getStringArg(), rangeBounds[0], rangeBounds[1],
-					rangeFracs[0], rangeFracs[1], context);
-		}
-
-		/**
-		 * Splits an existing range into 3: first half, last half, and middle
-		 * half.
 		 * 
-		 * @param baseRule
-		 *            The rule to insert the subrange into.
-		 * @param condition
-		 *            The condition to insert the subrange into.
-		 * @param condArgIndex
-		 *            The index of the subrange.
-		 * @param rangeVariable
-		 *            The range variable.
-		 * @param minBound
-		 *            The lower bound of the range (possibly null).
-		 * @param maxBound
-		 *            The upper bound of the range (possibly null).
-		 * @param minFrac
-		 *            The lower fraction of the range.
-		 * @param maxFrac
-		 *            The upper fraction of the range.
-		 * @param context
-		 *            The context of the range.
+		 * @param conditions
+		 *            The conditions of the specialised rule.
+		 * @param action
+		 *            The action of the rule.
+		 * @param rule
+		 *            The parent rule.
+		 * @param specialisations
+		 *            The specialisations set to add to.
 		 */
-		private Collection<RelationalRule> splitIntoThree(
-				RelationalRule baseRule, RelationalPredicate condition,
-				int condArgIndex, String rangeVariable, RangeBound minBound,
-				RangeBound maxBound, double minFrac, double maxFrac,
-				RangeContext context) {
-			Collection<RelationalRule> subranges = new HashSet<RelationalRule>();
-			double diff = maxFrac - minFrac;
-			// First half
-			RelationalArgument subrange = new RelationalArgument(rangeVariable,
-					minBound, minFrac, maxBound, minFrac + 0.5 * diff, context);
-			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, subrange));
+		private void createSpecialisation(RelationalPredicate condition,
+				Collection<RelationalPredicate> conditions,
+				RelationalPredicate action, RelationalRule rule,
+				Set<RelationalRule> specialisations) {
+			// Simplify the conds first
+			Collection<RelationalPredicate> specConditions = new HashSet<RelationalPredicate>(
+					conditions);
+			specConditions.add(condition);
 
-			// Last half
-			subrange = new RelationalArgument(rangeVariable, minBound, minFrac
-					+ 0.5 * diff, maxBound, maxFrac, context);
-			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, subrange));
-
-			// Middle half
-			subrange = new RelationalArgument(rangeVariable, minBound, minFrac
-					+ 0.25 * diff, maxBound, minFrac + 0.75 * diff, context);
-			subranges.add(createRangedSpecialisation(baseRule, condition,
-					condArgIndex, subrange));
-			return subranges;
-		}
-
-		/**
-		 * Splits any ranges in a rule into a number of smaller uniform
-		 * sub-ranges.
-		 * 
-		 * @param baseRule
-		 *            The base rule to mutate.
-		 * @param isRuleMutant
-		 *            If the rule is a mutant or not.
-		 * @return A collection of any sub-ranged mutants created from the rule.
-		 */
-		private Set<RelationalRule> splitRanges(RelationalRule baseRule,
-				boolean isRuleMutant) {
-			Set<RelationalRule> subranges = new HashSet<RelationalRule>();
-
-			// Run through each condition
-			for (RelationalPredicate condition : baseRule.getConditions(false)) {
-				if (condition.isNumerical() && !condition.isNegated()) {
-					String[] argTypes = condition.getArgTypes();
-					for (int i = 0; i < condition.getArguments().length; i++) {
-						RelationalArgument arg = condition
-								.getRelationalArguments()[i];
-						// If the arg is a variable number
-						if (StateSpec.isNumberType(argTypes[i])
-								&& arg.isVariable()) {
-							RangeContext context = new RangeContext(i,
-									condition, baseRule.getAction());
-							// If the arg is a range or represents a range, can
-							// split it
-							if (arg.isRange(true)) {
-								subranges.addAll(splitExistingRange(baseRule,
-										condition, i, arg, context));
-							} else {
-								double[] range = EnvironmentAgentObservations
-										.getActionRanges(context);
-								if (range != null) {
-									subranges.addAll(createNewSubRanges(
-											baseRule, condition, i,
-											arg.getStringArg(), context,
-											range[0] * range[1] < 0));
-								}
-							}
-						}
-					}
+			// Create the specialisation
+			RelationalRule specialisation = new RelationalRule(specConditions,
+					action, rule, lced_);
+			specialisation.setQueryParams(rule.getQueryParameters());
+			if (condition.isNumerical()
+					&& !specialisation.getSimplifiedConditions(false).contains(
+							condition)) {
+				// If a numerical condition was added, but simplified away, then
+				// split it and add the splits.
+				for (RelationalRule subrange : splitConditionsRanges(specialisation, condition)) {
+					if (subrange.isLegal() && !specialisations.contains(subrange))
+						specialisations.add(subrange);
 				}
 			}
 
-			return subranges;
-		}
-
-		/**
-		 * Swaps a term in a rule for another goal term, assuming the swap is
-		 * valid in regards to the existing conditions.
-		 * 
-		 * @param rule
-		 *            The rule.
-		 * @param goalPredicates
-		 *            The goal predicate replacement map.
-		 * @param oldTerms
-		 *            The rule action terms.
-		 * @param i
-		 *            The action term index.
-		 * @param goalTerm
-		 *            The goal term to replace in.
-		 * @return The swapped rule term (if valid).
-		 */
-		private RelationalRule swapRuleTerm(RelationalRule rule,
-				String[] oldTerms, int i, String goalTerm) {
-			String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
-			newTerms[i] = goalTerm;
-			List<RelationalPredicate> ruleConditions = rule.getConditions(true);
-			List<RelationalPredicate> specConditions = new ArrayList<RelationalPredicate>(
-					ruleConditions.size());
-			// Form the replacement map
-			Map<String, String> replacementMap = new HashMap<String, String>();
-			replacementMap.put(oldTerms[i], newTerms[i]);
-			for (String gTerm : observedGoalPredicates_.keySet()) {
-				replacementMap.put(gTerm, gTerm);
-			}
-
-			// Apply the replacements, simplify the rule, then check for
-			// validity
-
-
-			// Run through the rule conditions, checking each replaced
-			// term is valid in regards to goal options.
-			for (RelationalPredicate cond : ruleConditions) {
-				RelationalPredicate specCond = new RelationalPredicate(cond);
-				specCond.replaceArguments(replacementMap, true, false);
-				specConditions.add(specCond);
-			}
-
-			// Simplify conditions
-			EnvironmentAgentObservations.getInstance().simplifyRule(
-					specConditions, false, false,
-					localInvariants_.getSpecificInvariants());
-
-			// Check if the condition is a valid goal condition.
-			for (RelationalPredicate cond : specConditions) {
-				if (!isValidGoalCondition(cond, replacementMap))
-					return null;
-			}
-
-			// Create the mutant
-			RelationalRule mutant = new RelationalRule(specConditions,
-					new RelationalPredicate(rule.getAction(), newTerms), rule);
-			mutant.setQueryParams(rule.getQueryParameters());
-			mutant.expandConditions();
-			return mutant;
-		}
-
-		/**
-		 * Recreates all the specialisation conditions (local and environmental)
-		 * that can be added to rules.
-		 * 
-		 * @param actionPred
-		 *            The action to create the conditions for.
-		 */
-		public void recreateAllSpecialisations(String actionPred) {
-			if (specialisationConditions_ == null)
-				specialisationConditions_ = MultiMap.createSortedSetMultiMap();
-			else
-				specialisationConditions_.clear();
-
-			if (localRLGGConditions_ == null)
-				localRLGGConditions_ = MultiMap.createSortedSetMultiMap();
-			else
-				localRLGGConditions_.clear();
-
-			// Add the environment specialisation conditions
-			for (RelationalPredicate specialisation : EnvironmentAgentObservations
-					.getInstance().getSpecialisationConditions(actionPred)) {
-				// If not a general goal, or not the general goal predicate
-				if (!(localGoal_ instanceof GeneralGoalCondition && specialisation
-						.getFactName().equals(localGoal_.getFactName())))
-					specialisationConditions_.put(actionPred, specialisation);
-				else if (specialisation.isNegated() != localGoal_.getFact()
-						.isNegated())
-					localRLGGConditions_.put(actionPred, specialisation);
-			}
-
-			if (localGoal_ instanceof SpecificGoalCondition) {
-				// Adding specific goal-orientated conditions for specific goal
-				// conds
-				specialisationConditions_.putCollection(
-						actionPred,
-						EnvironmentAgentObservations.getInstance()
-								.createSpecialisations(
-										variantGoalActionConditions_
-												.get(actionPred),
-										false,
-										actionPred,
-										invariantGoalActionConditions_
-												.get(actionPred),
-										variantGoalActionConditions_
-												.get(actionPred)));
-			}/*
-			 * else if (localGoal_ instanceof GeneralGoalCondition) { //
-			 * Removing specialisation preds that include the goal (both //
-			 * negated and non-negated) and all facts that imply the fact. try {
-			 * Collection<RelationalPredicate> removables = new
-			 * ArrayList<RelationalPredicate>(); SortedSet<RelationalPredicate>
-			 * specialisations = specialisationConditions_
-			 * .getSortedSet(actionPred); String localGoalStr =
-			 * localGoal_.getFact().getFactName();
-			 * 
-			 * // TODO Remove all conditions that imply this condition //
-			 * (blinking -> edible) // Collection<BackgroundKnowledge> impliers
-			 * = // EnvironmentAgentObservations //
-			 * .getInstance().getReverseMappedConditions( // localGoalStr); //
-			 * if (impliers != null) { // for (BackgroundKnowledge bckKnow :
-			 * impliers) { // Collection<RelationalPredicate> thisFact = bckKnow
-			 * // .getNonPreferredFacts(); // Collection<RelationalPredicate>
-			 * implierFacts = bckKnow // .getPreferredFacts(); // // TODO
-			 * Extract it appropriately. // } // }
-			 * 
-			 * for (RelationalPredicate pred : specialisations) { if
-			 * (pred.getFactName().equals(localGoalStr)) removables.add(pred); }
-			 * 
-			 * Collection<RelationalPredicate> goalRelatedConditions =
-			 * getGoalRelatedSpecialisationConditions(specialisations);
-			 * specialisations.removeAll(removables); } catch (Exception e) {
-			 * e.printStackTrace(); } }
-			 */
-		}
-
-		/**
-		 * Specialise a rule by adding a condition to it which includes a term
-		 * used in the action.
-		 * 
-		 * @param rule
-		 *            The rule to specialise.
-		 * @return A collection of possible specialisations of the rule.
-		 */
-		public Set<RelationalRule> specialiseRule(RelationalRule rule) {
-			Set<RelationalRule> specialisations = new HashSet<RelationalRule>();
-
-			String actionPred = rule.getActionPredicate();
-			// If the action has no action conditions, return empty
-			Collection<RelationalPredicate> actionConditions = getSpecialisationConditions(actionPred);
-			if (actionConditions == null)
-				return specialisations;
-
-			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
-					rule.getConditions(true));
-			RelationalPredicate action = rule.getAction();
-			String[] actionTerms = action.getArguments();
-
-			// Add conditions, one-by-one, using both negation and regular
-			for (RelationalPredicate condition : actionConditions) {
-				specialisations.addAll(groundAnonymousTerms(condition,
-						conditions, action, actionTerms, rule));
-			}
-
-			// Also add the wider specialisations
-			if (ProgramArgument.WIDER_SPECIALISATION.booleanValue()) {
-				for (RelationalPredicate generalVariant : EnvironmentAgentObservations
-						.getInstance().getGeneralSpecialisationConditions()) {
-					specialisations.addAll(groundAnonymousTerms(generalVariant,
-							conditions, action, actionTerms, rule));
+			if (specialisation.isLegal()
+					&& !specialisations.contains(specialisation)
+					&& !specialisation.equals(rule)) {
+				// Only add specialisations if they contain goal
+				// conditions (if there are goal conditions).
+				if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
+						|| localGoal_.getNumArgs() == 0
+						|| conditions.toString().contains(
+								RelationalArgument.GOAL_VARIABLE_PREFIX)) {
+					specialisations.add(specialisation);
 				}
 			}
-
-			return specialisations;
 		}
 
 		/**
@@ -1298,6 +1019,8 @@ public class LocalAgentObservations extends SettlingScan implements
 		 *            The rule that the specialised rules came from.
 		 * @param condition
 		 *            The condition that is to be added.
+		 * @param specialisations
+		 *            The existing specialisations.
 		 * @return A collection of all possible specialisations (usually just
 		 *         one).
 		 */
@@ -1305,9 +1028,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				RelationalPredicate condition,
 				Collection<RelationalPredicate> conditions,
 				RelationalPredicate action, String[] actionTerms,
-				RelationalRule rule) {
-			Set<RelationalRule> specialisations = new HashSet<RelationalRule>();
-
+				RelationalRule rule, Set<RelationalRule> specialisations) {
 			// Modify the condition arguments to match the action arguments.
 			condition = new RelationalPredicate(condition);
 			condition.replaceArguments(actionTerms);
@@ -1389,46 +1110,294 @@ public class LocalAgentObservations extends SettlingScan implements
 		}
 
 		/**
-		 * Creates a specialised rule.
+		 * A wrapper method for ease.
 		 * 
+		 * @param baseRule
+		 *            The base rule to mutate.
 		 * @param condition
-		 * 
-		 * @param conditions
-		 *            The conditions of the specialised rule.
-		 * @param action
-		 *            The action of the rule.
-		 * @param rule
-		 *            The parent rule.
-		 * @param specialisations
-		 *            The specialisations set to add to.
+		 *            The original condition being mutated.
+		 * @param condArgIndex
+		 *            The index of the mutation.
+		 * @param rangeArg
+		 *            The actual ranged argument itself.
+		 * @param context
+		 *            The context of the range.
+		 * @return Three subranges.
 		 */
-		private void createSpecialisation(RelationalPredicate condition,
-				Collection<RelationalPredicate> conditions,
-				RelationalPredicate action, RelationalRule rule,
-				Set<RelationalRule> specialisations) {
-			// Simplify the conds first
-			Collection<RelationalPredicate> specConditions = simplifyRule(
-					conditions, condition, action, true);
+		private Collection<RelationalRule> splitExistingRange(
+				RelationalRule baseRule, RelationalPredicate condition,
+				int condArgIndex, RelationalArgument rangeArg,
+				RangeContext context) {
+			RangeBound[] rangeBounds = rangeArg.getRangeBounds();
+			double[] rangeFracs = rangeArg.getRangeFrac();
 
-			if (specConditions != null && !specConditions.equals(conditions)) {
-				// Create the specialisation
-				RelationalRule specialisation = new RelationalRule(
-						specConditions, action, rule);
-				specialisation.setQueryParams(rule.getQueryParameters());
-				specialisation.expandConditions();
+			return splitIntoThree(baseRule, condition, condArgIndex,
+					rangeArg.getStringArg(), rangeBounds[0], rangeBounds[1],
+					rangeFracs[0], rangeFracs[1], context);
+		}
 
-				if (!specialisations.contains(specialisation)
-						&& !specialisation.equals(rule)) {
-					// Only add specialisations if they contain goal
-					// conditions (if there are goal conditions).
-					if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
-							|| localGoal_.getNumArgs() == 0
-							|| conditions.toString().contains(
-									RelationalArgument.GOAL_VARIABLE_PREFIX)) {
-						specialisations.add(specialisation);
+		/**
+		 * Splits an existing range into 3: first half, last half, and middle
+		 * half.
+		 * 
+		 * @param baseRule
+		 *            The rule to insert the subrange into.
+		 * @param condition
+		 *            The condition to insert the subrange into.
+		 * @param condArgIndex
+		 *            The index of the subrange.
+		 * @param rangeVariable
+		 *            The range variable.
+		 * @param minBound
+		 *            The lower bound of the range (possibly null).
+		 * @param maxBound
+		 *            The upper bound of the range (possibly null).
+		 * @param minFrac
+		 *            The lower fraction of the range.
+		 * @param maxFrac
+		 *            The upper fraction of the range.
+		 * @param context
+		 *            The context of the range.
+		 */
+		private Collection<RelationalRule> splitIntoThree(
+				RelationalRule baseRule, RelationalPredicate condition,
+				int condArgIndex, String rangeVariable, RangeBound minBound,
+				RangeBound maxBound, double minFrac, double maxFrac,
+				RangeContext context) {
+			Collection<RelationalRule> subranges = new HashSet<RelationalRule>();
+			double diff = maxFrac - minFrac;
+			// First half
+			RelationalArgument subrange = new RelationalArgument(rangeVariable,
+					minBound, minFrac, maxBound, minFrac + 0.5 * diff, context);
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, subrange));
+
+			// Last half
+			subrange = new RelationalArgument(rangeVariable, minBound, minFrac
+					+ 0.5 * diff, maxBound, maxFrac, context);
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, subrange));
+
+			// Middle half
+			subrange = new RelationalArgument(rangeVariable, minBound, minFrac
+					+ 0.25 * diff, maxBound, minFrac + 0.75 * diff, context);
+			subranges.add(createRangedSpecialisation(baseRule, condition,
+					condArgIndex, subrange));
+			return subranges;
+		}
+
+		/**
+		 * Splits any ranges in a condition within a rule into a number of
+		 * smaller uniform sub-ranges.
+		 * 
+		 * @param baseRule
+		 *            The base rule to mutate.
+		 * @param isRuleMutant
+		 *            If the rule is a mutant or not.
+		 * @return A collection of any sub-ranged mutants created from the rule.
+		 */
+		protected Set<RelationalRule> splitConditionsRanges(
+				RelationalRule baseRule, RelationalPredicate condition) {
+			Set<RelationalRule> subranges = new HashSet<RelationalRule>();
+			if (condition.isNumerical() && !condition.isNegated()) {
+				String[] argTypes = condition.getArgTypes();
+				for (int i = 0; i < condition.getArguments().length; i++) {
+					RelationalArgument arg = condition.getRelationalArguments()[i];
+					// If the arg is a variable number
+					if (StateSpec.isNumberType(argTypes[i]) && arg.isVariable()) {
+						RangeContext context = new RangeContext(i, condition,
+								baseRule.getAction());
+						// If the arg is a range or represents a range, can
+						// split it
+						if (arg.isRange(true)) {
+							subranges.addAll(splitExistingRange(baseRule,
+									condition, i, arg, context));
+						} else {
+							double[] range = EnvironmentAgentObservations
+									.getActionRanges(context);
+							if (range != null) {
+								subranges.addAll(createNewSubRanges(baseRule,
+										condition, i, arg.getStringArg(),
+										context, range[0] * range[1] < 0));
+							}
+						}
 					}
 				}
 			}
+			return subranges;
+		}
+
+		/**
+		 * Swaps a term in a rule for another goal term, assuming the swap is
+		 * valid in regards to the existing conditions.
+		 * 
+		 * @param rule
+		 *            The rule.
+		 * @param goalPredicates
+		 *            The goal predicate replacement map.
+		 * @param oldTerms
+		 *            The rule action terms.
+		 * @param i
+		 *            The action term index.
+		 * @param goalTerm
+		 *            The goal term to replace in.
+		 * @return The swapped rule term (if valid).
+		 */
+		private RelationalRule swapRuleTerm(RelationalRule rule,
+				String[] oldTerms, int i, String goalTerm) {
+			String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
+			newTerms[i] = goalTerm;
+			Collection<RelationalPredicate> ruleConditions = rule
+					.getRawConditions(true);
+			List<RelationalPredicate> specConditions = new ArrayList<RelationalPredicate>(
+					ruleConditions.size());
+			// Form the replacement map
+			Map<String, String> replacementMap = new HashMap<String, String>();
+			replacementMap.put(oldTerms[i], newTerms[i]);
+			for (String gTerm : observedGoalPredicates_.keySet()) {
+				replacementMap.put(gTerm, gTerm);
+			}
+
+			// Run through the rule conditions, replacing the arguments
+			for (RelationalPredicate cond : ruleConditions) {
+				RelationalPredicate specCond = new RelationalPredicate(cond);
+				specCond.replaceArguments(replacementMap, true, false);
+				specConditions.add(specCond);
+			}
+
+			// Create the mutant
+			RelationalRule mutant = new RelationalRule(specConditions,
+					new RelationalPredicate(rule.getAction(), newTerms), rule,
+					lced_);
+			mutant.setQueryParams(rule.getQueryParameters());
+
+			// Check if each condition is a valid goal condition.
+			if (!mutant.isLegal())
+				return null;
+
+			return mutant;
+		}
+
+		/**
+		 * Gets the conditions which are always true whenever the goal is.
+		 * 
+		 * @param actionPred
+		 *            The action for getting the conditions.
+		 * @return A collection of conditions that are RLGG conds for this
+		 *         general goal.
+		 */
+		public Collection<RelationalPredicate> getGeneralRLGGConds(
+				String actionPred) {
+			if (localRLGGConditions_ == null
+					|| localRLGGConditions_.get(actionPred) == null)
+				recreateAllSpecialisations(actionPred);
+			return localRLGGConditions_.get(actionPred);
+		}
+
+		/**
+		 * Gets the specialisation conditions (both global and local conditions)
+		 * for an action.
+		 * 
+		 * @param actionPred
+		 *            The action for getting the conditions.
+		 * @return A collection of specialisation conditions.
+		 */
+		public Collection<RelationalPredicate> getSpecialisationConditions(
+				String actionPred) {
+			if (specialisationConditions_ == null
+					|| specialisationConditions_.get(actionPred) == null)
+				recreateAllSpecialisations(actionPred);
+			return specialisationConditions_.get(actionPred);
+		}
+
+		/**
+		 * Recreates all the specialisation conditions (local and environmental)
+		 * that can be added to rules.
+		 * 
+		 * @param actionPred
+		 *            The action to create the conditions for.
+		 */
+		public void recreateAllSpecialisations(String actionPred) {
+			if (specialisationConditions_ == null)
+				specialisationConditions_ = MultiMap.createSortedSetMultiMap();
+			else
+				specialisationConditions_.clear();
+
+			if (localRLGGConditions_ == null)
+				localRLGGConditions_ = MultiMap.createSortedSetMultiMap();
+			else
+				localRLGGConditions_.clear();
+
+			// Add the environment specialisation conditions
+			for (RelationalPredicate specialisation : EnvironmentAgentObservations
+					.getInstance().getSpecialisationConditions(actionPred)) {
+				// If not a general goal, or not the general goal predicate
+				if (!(localGoal_ instanceof GeneralGoalCondition && specialisation
+						.getFactName().equals(localGoal_.getFactName())))
+					specialisationConditions_.put(actionPred, specialisation);
+				else if (specialisation.isNegated() != localGoal_.getFact()
+						.isNegated())
+					localRLGGConditions_.put(actionPred, specialisation);
+			}
+
+			if (localGoal_ instanceof SpecificGoalCondition) {
+				// Adding specific goal-orientated conditions for specific goal
+				// conds
+				specialisationConditions_.putCollection(
+						actionPred,
+						EnvironmentAgentObservations.getInstance()
+								.createSpecialisations(
+										variantGoalActionConditions_
+												.get(actionPred),
+										false,
+										actionPred,
+										invariantGoalActionConditions_
+												.get(actionPred),
+										variantGoalActionConditions_
+												.get(actionPred)));
+			}
+		}
+
+		/**
+		 * Specialise a rule by adding a condition to it which includes a term
+		 * used in the action.
+		 * 
+		 * @param rule
+		 *            The rule to specialise.
+		 * @return A collection of possible specialisations of the rule.
+		 */
+		public Set<RelationalRule> specialiseRule(RelationalRule rule) {
+			Set<RelationalRule> specialisations = new HashSet<RelationalRule>();
+
+			String actionPred = rule.getActionPredicate();
+			// If the action has no action conditions, return empty
+			Collection<RelationalPredicate> actionConditions = getSpecialisationConditions(actionPred);
+			if (actionConditions == null)
+				return specialisations;
+
+			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
+					rule.getRawConditions(true));
+			RelationalPredicate action = rule.getAction();
+			String[] actionTerms = action.getArguments();
+
+			// Add conditions, one-by-one, using both negation and regular
+			for (RelationalPredicate condition : actionConditions) {
+				specialisations
+						.addAll(groundAnonymousTerms(condition, conditions,
+								action, actionTerms, rule, specialisations));
+			}
+
+			// Also add the wider specialisations
+			if (ProgramArgument.WIDER_SPECIALISATION.booleanValue()) {
+				for (RelationalPredicate generalVariant : EnvironmentAgentObservations
+						.getInstance().getGeneralSpecialisationConditions()) {
+					specialisations.addAll(groundAnonymousTerms(generalVariant,
+							conditions, action, actionTerms, rule,
+							specialisations));
+				}
+			}
+
+			return specialisations;
 		}
 
 		/**
@@ -1471,8 +1440,10 @@ public class LocalAgentObservations extends SettlingScan implements
 				}
 			}
 
-			// Split any ranges up
-			mutants.addAll(splitRanges(rule, rule.isMutant()));
+			// Run through each condition
+			for (RelationalPredicate condition : rule.getRawConditions(false)) {
+				mutants.addAll(splitConditionsRanges(rule, condition));
+			}
 
 			return mutants;
 		}

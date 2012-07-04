@@ -6,7 +6,6 @@ import rrlFramework.RRLExperiment;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -332,9 +331,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 			slotFillLevel = 2 * slotMean_;
 		else
 			slotFillLevel = 2 * (1 - slotMean_);
-//		slotFillLevel = (1.0 * klSize() - 1) / size();
-//		slotFillLevel = Math.max(slotFillLevel, 0);
-//		slotFillLevel = Math.min(slotFillLevel, 1);
+		// slotFillLevel = (1.0 * klSize() - 1) / size();
+		// slotFillLevel = Math.max(slotFillLevel, 0);
+		// slotFillLevel = Math.min(slotFillLevel, 1);
 		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()
 				* slotFillLevel;
 	}
@@ -354,11 +353,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public Collection<RelationalPredicate> getSlotSplitFacts() {
 		SortedSet<RelationalPredicate> splitFacts = new TreeSet<RelationalPredicate>(
-				seedRule_.getConditions(true));
+				seedRule_.getSimplifiedConditions(true));
 		RelationalRule rlggRule = parentDistribution_.getRLGGRules().get(
 				action_);
 		if (rlggRule != null) {
-			splitFacts.removeAll(rlggRule.getConditions(true));
+			splitFacts.removeAll(rlggRule.getSimplifiedConditions(true));
 		}
 		return splitFacts;
 	}
@@ -430,8 +429,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 				&& slotMean_ < .5)
 			return false;
 
-//		double threshold = Math.min(slotMean_,
-//				ProgramArgument.SLOT_THRESHOLD.doubleValue());
+		// double threshold = Math.min(slotMean_,
+		// ProgramArgument.SLOT_THRESHOLD.doubleValue());
 		double threshold = Math.min(1.0 / slotLevel_, slotMean_);
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
@@ -564,8 +563,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public double updateProbabilities(ElitesData ed, double alpha,
 			int population, int minimumElites) {
-		if (updateDelta_ == Integer.MAX_VALUE)
-			alpha *= numSamples_;
+		// if (updateDelta_ == Integer.MAX_VALUE)
+		// alpha *= numSamples_;
 		updateDelta_ = Integer.MAX_VALUE;
 		if (ed == null || alpha == 0)
 			return updateDelta_;
@@ -580,7 +579,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 		// return updateDelta_;
 
 		// Update the slot values
-//		double slotMean = Math.min(ed.getSlotCount(this) / minimumElites, 1);
+		// double slotMean = Math.min(ed.getSlotCount(this) / minimumElites, 1);
 		double actualSlotMean = ed.getSlotNumeracyMean(this);
 		updateDelta_ = updateSlotValues(ed.getSlotPosition(this),
 				actualSlotMean, alpha);
@@ -613,9 +612,9 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public double updateSlotValues(Double ordering, double mean, double alpha) {
 		double absDiff = 0;
 		if (ordering != null) {
-			double diff = ordering_;
+			// double diff = ordering_;
 			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
-			diff -= ordering_;
+			// diff -= ordering_;
 			// absDiff += Math.abs(diff) / alpha;
 		}
 		double diff = slotMean_;
@@ -630,32 +629,11 @@ public class Slot implements Serializable, Comparable<Slot> {
 	}
 
 	/**
-	 * Checks if this slot should be used.
-	 * 
-	 * @param random
-	 *            The random number generator.
-	 * @param deterministicGeneration
-	 *            If this slot is sampled either with 0 or 1 probability.
-	 * @return True if the slot should be used.
-	 */
-	public boolean useSlot(Random random, boolean deterministicGeneration) {
-		if (deterministicGeneration) {
-			if (slotMean_ >= .5)
-				return true;
-			else
-				return false;
-		}
-		return random.nextDouble() < slotMean_;
-	}
-
-	/**
 	 * If this slot is ready to update.
 	 * 
-	 * @param population
-	 *            The current population.
 	 * @return True if it is ready to update yet.
 	 */
-	public boolean isUpdating(int population) {
+	public boolean isUpdating() {
 		int threshold = determineEvaluationThreshold();
 		if (ProgramArgument.ONLINE_UPDATES.booleanValue()) {
 			if (numSamples_ % threshold == 0 && numSamples_ > 0) {

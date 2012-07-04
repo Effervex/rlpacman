@@ -22,7 +22,7 @@ public enum ProgramArgument implements Serializable {
 			"If KL sum updates are less than Beta * Alpha"),
 	BOUNDED_ELITES(true, "boundedElites", null, ParameterType.UPDATING,
 			"If the minimum number of elites = |D_S|."),
-	CONFIDENCE_INTERVAL(6.0, "confidenceInterval", "-C",
+	CONFIDENCE_INTERVAL(3.0, "confidenceInterval", "-C",
 			ParameterType.SAMPLING, "The amount of confidence for sampling "
 					+ "every element at least once."),
 	DYNAMIC_SLOTS(true, "dynamicSlots", null, ParameterType.SPECIALISATION,
@@ -32,7 +32,7 @@ public enum ProgramArgument implements Serializable {
 	ELITES_CONVERGENCE(true, "elitesConvergence", null,
 			ParameterType.CONVERGENCE,
 			"If the distribution can converge when the elites grow too large."),
-	ELITES_FUNCTION(4, "elitesFunction", null, ParameterType.SAMPLING,
+	ELITES_FUNCTION(3, "elitesFunction", null, ParameterType.SAMPLING,
 			"The size of the elites: 0=Av # rules, 1=Sum slot means, "
 					+ "2=Sum # KL rules, 3=Max KL weighted rules, "
 					+ "4=Confidence * Max KL weighted rules * num slots * rho"),
@@ -82,7 +82,7 @@ public enum ProgramArgument implements Serializable {
 			"If the entire elites are reset when a new slot is created."),
 	RESET_SLOT_COUNT(false, "resetSlotCount", null, ParameterType.UPDATING,
 			"Resets the update counter in the slot after splitting."),
-	RETEST_STALE_POLICIES(false, "retestStale", null, ParameterType.SAMPLING,
+	RETEST_STALE_POLICIES(true, "retestStale", null, ParameterType.SAMPLING,
 			"If stale policies should be immediately retested."),
 	RHO(0.05, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
 	SAVE_EXPERIMENT_FILES(false, "saveExperimentFiles", "-m",

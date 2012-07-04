@@ -51,47 +51,47 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 		String[] structure = new String[2];
 		structure[0] = "dot";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toDot", structure));
+		actions.add(new RelationalPredicate("toDot", structure, false));
 
 		structure = new String[2];
 		structure[0] = "powerDot";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toPowerDot", structure));
+		actions.add(new RelationalPredicate("toPowerDot", structure, false));
 
 		structure = new String[2];
 		structure[0] = "powerDot";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("fromPowerDot", structure));
+		actions.add(new RelationalPredicate("fromPowerDot", structure, false));
 
 		structure = new String[2];
 		structure[0] = "fruit";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toFruit", structure));
+		actions.add(new RelationalPredicate("toFruit", structure, false));
 
 		structure = new String[2];
 		structure[0] = "ghost";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toGhost", structure));
+		actions.add(new RelationalPredicate("toGhost", structure, false));
 
 		structure = new String[2];
 		structure[0] = "ghost";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("fromGhost", structure));
+		actions.add(new RelationalPredicate("fromGhost", structure, false));
 
 		structure = new String[2];
 		structure[0] = "ghostCentre";
 		structure[1] = NumberEnum.Double.toString();
-		actions.add(new RelationalPredicate("toGhostCentre", structure));
+		actions.add(new RelationalPredicate("toGhostCentre", structure, false));
 
 		structure = new String[2];
 		structure[0] = "ghostCentre";
 		structure[1] = NumberEnum.Double.toString();
-		actions.add(new RelationalPredicate("fromGhostCentre", structure));
+		actions.add(new RelationalPredicate("fromGhostCentre", structure, false));
 
 		structure = new String[2];
 		structure[0] = "junction";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toJunction", structure));
+		actions.add(new RelationalPredicate("toJunction", structure, false));
 
 		// TODO Add ghost density
 

@@ -54,7 +54,7 @@ public final class PolicyGenerator implements Serializable {
 	/** The point at which low mean slots are ignored for text output. */
 	private static final double LOW_SLOT_THRESHOLD = 0.001;
 
-	private static final String POLICY_PREFIX = "A typical policy:";
+	private static final String POLICY_PREFIX = "Greedy policy:";
 
 	/**
 	 * The increment for an ordering value to increase when resolving ordering
@@ -537,7 +537,9 @@ public final class PolicyGenerator implements Serializable {
 	 * do not create separate slots.
 	 */
 	private void splitRLGGSlots() {
-		if (Config.getInstance().getSerializedFile() != null || !parentLearner_.isSpecialising())
+		if (Config.getInstance() != null
+				&& Config.getInstance().getSerializedFile() != null
+				|| !parentLearner_.isSpecialising())
 			return;
 
 		for (RelationalRule rlgg : rlggRules_.values()) {
@@ -600,7 +602,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @return True if the rule is a valid initial splitting rule.
 	 */
 	private boolean validInitialSplitRule(RelationalRule rule) {
-		for (RelationalPredicate cond : rule.getConditions(true)) {
+		for (RelationalPredicate cond : rule.getSimplifiedConditions(true)) {
 			if (cond.isNegated())
 				return false;
 			if (cond.isNumerical()) {
@@ -841,6 +843,7 @@ public final class PolicyGenerator implements Serializable {
 		RelationalPolicy policy = new RelationalPolicy();
 
 		SortedMap<Double, RelationalRule> policyOrdering = new TreeMap<Double, RelationalRule>();
+		double slotThreshold = 0;
 
 		// Run through every slot, adding them where possible. Add slots to a
 		// sorted map, which determines the ordering.
@@ -853,7 +856,10 @@ public final class PolicyGenerator implements Serializable {
 			// Only add slot if it isn't empty
 			if (!slot.isEmpty()) {
 				noRules = false;
-				if (slot.useSlot(RRLExperiment.random_, deterministicGeneration)) {
+				Pair<Boolean, Double> useSlot = useSlot(slot, slotThreshold,
+						deterministicGeneration, policyOrdering);
+				if (useSlot.objA_) {
+					slotThreshold = useSlot.objB_;
 					double slotOrderVal = slotOrdering
 							+ RRLExperiment.random_.nextGaussian()
 							* slotOrderSD;
@@ -889,6 +895,40 @@ public final class PolicyGenerator implements Serializable {
 
 		retestedPolicyPreviously_ = false;
 		return policy;
+	}
+
+	/***
+	 * Checks if this slot is being used. It also modifies the threshold value
+	 * if using deterministic generation.
+	 * 
+	 * @param slot
+	 *            The slot being checked.
+	 * @param threshold
+	 *            The deterministic threshold value for using a slot. Max 0.5.
+	 * @param deterministicGeneration
+	 *            If performing deterministic policy generation.
+	 * @param policyOrdering
+	 *            The currently sampled rules, ordered by ordering.
+	 * @return A pair of whether to use the slot, and the new threshold.
+	 */
+	private Pair<Boolean, Double> useSlot(Slot slot, double threshold,
+			boolean deterministicGeneration,
+			SortedMap<Double, RelationalRule> policyOrdering) {
+		double random = RRLExperiment.random_.nextDouble();
+		double slotMean = slot.getSelectionProbability();
+
+		if (deterministicGeneration) {
+			if (!slot.isUpdating())
+				return new Pair<Boolean, Double>(false, threshold);
+			if (threshold < .5 && slotMean > threshold) {
+				threshold = Math.min(0.5, slotMean);
+				policyOrdering.clear();
+			}
+
+			return new Pair<Boolean, Double>(slotMean >= threshold, threshold);
+		} else
+			return new Pair<Boolean, Double>(
+					random < slot.getSelectionProbability(), threshold);
 	}
 
 	/**
@@ -1023,8 +1063,7 @@ public final class PolicyGenerator implements Serializable {
 	 * @throws IOException
 	 *             Should something go awry...
 	 */
-	public boolean loadGreedyGenerator(File generatorFile)
-			throws IOException {
+	public boolean loadGreedyGenerator(File generatorFile) throws IOException {
 		if (greedyPolicyMap_ == null)
 			greedyPolicyMap_ = new TreeMap<Integer, RelationalPolicy>();
 
@@ -1047,7 +1086,8 @@ public final class PolicyGenerator implements Serializable {
 				if (!recordPolicy) {
 					// First slot of the distribution
 					ruleOrder.clear();
-					meanThreshold = Math.min(0.5 + ORDER_CLASH_INCREMENT, slotMean);
+					meanThreshold = Math.min(0.5 + ORDER_CLASH_INCREMENT,
+							slotMean);
 				}
 				if (slotMean >= meanThreshold) {
 					double order = Double.parseDouble(m.group(2));
@@ -1228,7 +1268,7 @@ public final class PolicyGenerator implements Serializable {
 			buf.write(bestPolicy.toString());
 
 		if (finalWrite)
-			System.out.println("Best policy:\n" + bestPolicy);
+			System.out.println("Greedy policy:\n" + bestPolicy);
 
 		buf.write("\n\n");
 
@@ -1339,13 +1379,14 @@ public final class PolicyGenerator implements Serializable {
 			while ((input = br.readLine()) != null) {
 				RelationalRule seedRule = new RelationalRule(input);
 				Collection<RelationalPredicate> ruleConds = seedRule
-						.getConditions(false);
-				ruleConds = parentLearner_.getLocalAgentObservations()
-						.simplifyRule(ruleConds, null, seedRule.getAction(),
-								false);
+						.getRawConditions(false);
 				seedRule = new RelationalRule(ruleConds, seedRule.getAction(),
-						null);
-				createSeededSlot(seedRule);
+						null, parentLearner_);
+				if (seedRule.isLegal())
+					createSeededSlot(seedRule);
+				else
+					System.out.println("Illegal rule: " + ruleConds
+							+ " was not loaded.");
 			}
 
 			br.close();
@@ -1438,7 +1479,7 @@ public final class PolicyGenerator implements Serializable {
 		for (Slot slot : slotGenerator_) {
 			// If the slot is updating and elites haven't been counted, count
 			// them.
-			if (slot.isUpdating(population)) {
+			if (slot.isUpdating()) {
 				// Update the slot
 				if (ProgramArgument.ONLINE_UPDATES.booleanValue())
 					slot.updateProbabilities(ed, alpha, population,

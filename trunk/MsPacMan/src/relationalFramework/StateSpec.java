@@ -61,7 +61,7 @@ public abstract class StateSpec {
 
 	/** The StringFact definition for the test predicate. */
 	public static final RelationalPredicate TEST_DEFINITION = new RelationalPredicate(
-			"test", new String[] { "testArgs" });
+			"test", new String[] { "testArgs" }, false);
 
 	/** The valid actions predicate name. */
 	public static final String VALID_ACTIONS = "validActions";
@@ -102,6 +102,9 @@ public abstract class StateSpec {
 
 	/** The hand coded policy for the goal. */
 	private RelationalPolicy handCodedPolicy_;
+
+	/** Internal predicates used by the environment. */
+	private Map<String, RelationalPredicate> internalPredicates_;
 
 	/** The prerequisites of the rules and their structure. */
 	private Map<String, RelationalPredicate> predicates_;
@@ -302,7 +305,8 @@ public abstract class StateSpec {
 		factTypes[0] = "goalPred";
 		for (int i = 1; i < factTypes.length; i++)
 			factTypes[i] = "arg" + (i - 1);
-		goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED, factTypes);
+		goalStringFactDef_ = new RelationalPredicate(GOALARGS_PRED, factTypes,
+				false);
 		rete_.eval("(deftemplate goal (slot goalMet))");
 		String goalPred = formGoalPred(constants_);
 		String goalRule = "(defrule goalState " + goalPred + " " + goalState_
@@ -314,11 +318,16 @@ public abstract class StateSpec {
 
 	private void initialiseRegularPredicates() {
 		predicates_ = new HashMap<String, RelationalPredicate>();
+		internalPredicates_ = new HashMap<String, RelationalPredicate>();
 		for (RelationalPredicate pred : initialisePredicateTemplates()) {
-			predicates_.put(pred.getFactName(), pred);
-			for (String type : pred.getArgTypes())
-				if (isNumberType(type))
-					numberPreds_.add(pred.getFactName());
+			if (pred.isInternal())
+				internalPredicates_.put(pred.getFactName(), pred);
+			else {
+				predicates_.put(pred.getFactName(), pred);
+				for (String type : pred.getArgTypes())
+					if (isNumberType(type))
+						numberPreds_.add(pred.getFactName());
+			}
 			defineTemplate(pred, rete_);
 		}
 	}
@@ -330,7 +339,7 @@ public abstract class StateSpec {
 		typeHierarchy_ = new HashMap<String, ParentChildren>();
 		for (String type : typeParents.keySet()) {
 			RelationalPredicate typePred = new RelationalPredicate(type,
-					new String[] { type });
+					new String[] { type }, false);
 			typePredicates_.put(type, typePred);
 			defineTemplate(typePred, rete_);
 
@@ -719,6 +728,8 @@ public abstract class StateSpec {
 	public RelationalPredicate getPredicateByName(String factName) {
 		if (predicates_.containsKey(factName))
 			return predicates_.get(factName);
+		if (internalPredicates_.containsKey(factName))
+			return internalPredicates_.get(factName);
 		if (actions_.containsKey(factName))
 			return actions_.get(factName);
 		if (typePredicates_.containsKey(factName))
@@ -851,6 +862,8 @@ public abstract class StateSpec {
 		if (predicate.equals("initial-fact"))
 			return false;
 		if (predicate.equals(GOALARGS_PRED))
+			return false;
+		if (internalPredicates_.containsKey(predicate))
 			return false;
 		return true;
 	}
@@ -1174,7 +1187,7 @@ public abstract class StateSpec {
 		public RuleQuery(Object queriable) throws Exception {
 			if (queriable instanceof RelationalRule) {
 				RelationalRule rule = (RelationalRule) queriable;
-				ruleConds_ = rule.getConditions(false);
+				ruleConds_ = rule.getSimplifiedConditions(false);
 				queryParams_ = rule.getQueryParameters();
 				rangeContexts_ = rule.getRangeContexts();
 			} else if (queriable instanceof RelationalPredicate) {
