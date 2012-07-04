@@ -2,7 +2,6 @@ package relationalFramework;
 
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
-import relationalFramework.agentObservations.LocalAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 
 import java.io.Serializable;
@@ -33,6 +32,11 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	protected String[] factTypes_;
 	/** If this fact is negated (prefixed by not) */
 	protected boolean negated_ = false;
+	/**
+	 * If this predicate is an internal environmental predicate, not to be used
+	 * by the agent.
+	 */
+	private boolean isInternal_;
 
 	/**
 	 * Constructor for a clone StringFact.
@@ -115,12 +119,14 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 *            The name of the fact.
 	 * @param factTypes
 	 *            The types of the fact.
+	 * @param isInternal TODO
 	 */
-	public RelationalPredicate(String factName, String[] factTypes) {
+	public RelationalPredicate(String factName, String[] factTypes, boolean isInternal) {
 		factName_ = factName;
 		factTypes_ = factTypes;
 		arguments_ = new RelationalArgument[factTypes.length];
 		Arrays.fill(arguments_, RelationalArgument.ANONYMOUS);
+		isInternal_ = isInternal;
 	}
 
 	private RelationalArgument[] cloneArgs(RelationalArgument[] arguments) {
@@ -270,6 +276,23 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (result != 0)
 			return result;
 		return 0;
+	}
+
+	/**
+	 * Creates the range contexts for Relational Arguments using the given
+	 * action to identify the context.
+	 * 
+	 * @param action
+	 *            The action this predicate is a condition for.
+	 */
+	public void configureRangeContexts(RelationalPredicate action) {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isRange(true)) {
+				RangeContext context = new RangeContext(i, this, action);
+				arguments_[i] = new RelationalArgument(arguments_[i], context);
+				rangeContexts_.add(context);
+			}
+		}
 	}
 
 	/**
@@ -452,6 +475,10 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		return true;
 	}
 
+	public boolean isInternal() {
+		return isInternal_;
+	}
+
 	public boolean isNegated() {
 		return negated_;
 	}
@@ -527,7 +554,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 */
 	public void replaceUnboundWithAnonymous() {
 		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].isUnboundVariable())
+			if (arguments_[i].isFreeVariable())
 				arguments_[i] = RelationalArgument.ANONYMOUS;
 		}
 	}
@@ -576,6 +603,21 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 						RelationalArgument.createVariableTermArg(tempCounter++));
 				arguments_[i] = tempRepl.get(arg).clone();
 			}
+		}
+	}
+
+	/**
+	 * Sets any arguments within this predicate which are also in the action
+	 * arguments as action arguments.
+	 * 
+	 * @param actionArgs
+	 */
+	public void setActionVariables(RelationalArgument[] actionArgs) {
+		for (RelationalArgument arg : arguments_) {
+			if (arg.isVariable())
+				for (RelationalArgument actionArg : actionArgs)
+					if (arg.equals(actionArg))
+						arg.setFreeVariable(false);
 		}
 	}
 
@@ -630,22 +672,5 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		if (negated_)
 			buffer.append(")");
 		return buffer.toString();
-	}
-
-	/**
-	 * Creates the range contexts for Relational Arguments using the given
-	 * action to identify the context.
-	 * 
-	 * @param action
-	 *            The action this predicate is a condition for.
-	 */
-	public void configureRangeContexts(RelationalPredicate action) {
-		for (int i = 0; i < arguments_.length; i++) {
-			if (arguments_[i].isRangeVariable() && arguments_[i].getRangeBounds()[0] != null) {
-				RangeContext context = new RangeContext(i, this, action);
-				arguments_[i] = new RelationalArgument(arguments_[i], context);
-				rangeContexts_.add(context);
-			}
-		}
 	}
 }

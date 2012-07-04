@@ -356,8 +356,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		newState.getState()[indices[0]] = indices[1] + 1;
 	}
 
-	private Object randomAction() {
-		Object action;
+	protected RelationalPredicate randomAction() {
 		// Select random action predicate
 		MultiMap<String, String[]> validActions = observations_
 				.getValidActions();
@@ -370,9 +369,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 
 		Object randomAction = moveArgs[RRLExperiment.random_
 				.nextInt(moveArgs.length)];
-		action = new RelationalPredicate(StateSpec.getInstance().getActions()
+		return new RelationalPredicate(StateSpec.getInstance().getActions()
 				.get("move"), (String[]) randomAction);
-		return action;
 	}
 
 	@Override

@@ -47,17 +47,17 @@ public class PacManStateSpec extends StateSpec {
 		String[] structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("moveTo", structure));
+		actions.add(new RelationalPredicate("moveTo", structure, false));
 
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("moveFrom", structure));
+		actions.add(new RelationalPredicate("moveFrom", structure, false));
 
 		structure = new String[2];
 		structure[0] = "junction";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toJunction", structure));
+		actions.add(new RelationalPredicate("toJunction", structure, false));
 
 		return actions;
 	}
@@ -196,43 +196,43 @@ public class PacManStateSpec extends StateSpec {
 		// Score
 		String[] structure = new String[1];
 		structure[0] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("score", structure));
+		predicates.add(new RelationalPredicate("score", structure, false));
 
 		// High Score
 		structure = new String[1];
 		structure[0] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("highScore", structure));
+		predicates.add(new RelationalPredicate("highScore", structure, false));
 
 		// Lives
 		structure = new String[1];
 		structure[0] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("lives", structure));
+		predicates.add(new RelationalPredicate("lives", structure, false));
 
 		// Level
 		structure = new String[1];
 		structure[0] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("level", structure));
+		predicates.add(new RelationalPredicate("level", structure, false));
 
 		// Edible
 		structure = new String[1];
 		structure[0] = "ghost";
-		predicates.add(new RelationalPredicate("edible", structure));
+		predicates.add(new RelationalPredicate("edible", structure, false));
 
 		// Blinking
 		structure = new String[1];
 		structure[0] = "ghost";
-		predicates.add(new RelationalPredicate("blinking", structure));
+		predicates.add(new RelationalPredicate("blinking", structure, false));
 
 		// Distance Metric
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("distance", structure));
+		predicates.add(new RelationalPredicate("distance", structure, false));
 
 		structure = new String[2];
 		structure[0] = "junction";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("junctionSafety", structure));
+		predicates.add(new RelationalPredicate("junctionSafety", structure, false));
 
 		return predicates;
 	}

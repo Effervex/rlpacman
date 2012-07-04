@@ -44,6 +44,11 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public static final String RANGE_VARIABLE_PREFIX = "?#_";
 	/** Defines the arg type. */
 	private ArgumentType argType_;
+	/**
+	 * If this arg is a free (lonesome) variable. Only true if non-action
+	 * variable.
+	 */
+	private boolean freeVariable_;
 
 	private final RangeBound[] rangeBounds_ = new RangeBound[2];
 
@@ -74,6 +79,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		if (arg.length() >= MIN_RANGE) {
 			Matcher m = RANGE_PATTERN.matcher(arg);
 
+			// Ranges are not free if they have bounds
 			if (m.find()) {
 				stringArg_ = m.group(1);
 				rangeBounds_[0] = new RangeBound(m.group(2));
@@ -81,6 +87,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				rangeBounds_[1] = new RangeBound(m.group(4));
 				rangeFrac_[1] = Double.parseDouble(m.group(5));
 				argType_ = ArgumentType.NUMBER_RANGE;
+				freeVariable_ = false;
 				return;
 			} else {
 				m = DEPRECATED_RANGE_PATTERN.matcher(arg);
@@ -92,6 +99,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 					rangeBounds_[1] = new RangeBound(m.group(3));
 					rangeFrac_[1] = 1;
 					argType_ = ArgumentType.NUMBER_RANGE;
+					freeVariable_ = false;
 					return;
 				}
 			}
@@ -113,17 +121,24 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		if (stringArg_.charAt(0) == '?') {
 			if (stringArg_.length() == 1) {
 				argType_ = ArgumentType.ANON;
+				freeVariable_ = true;
 			} else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
 				argType_ = ArgumentType.GOAL_VARIABLE;
 			else {
-				if (stringArg_.startsWith("?Unb_"))
-					argType_ = ArgumentType.UNBOUND_VAR;
-				else if (stringArg_.startsWith("?Bnd_"))
-					argType_ = ArgumentType.BOUND_VAR;
-				else if (stringArg_.startsWith(RANGE_VARIABLE_PREFIX))
+				if (stringArg_.startsWith("?Unb_")
+						|| stringArg_.startsWith("?V_")) {
+					argType_ = ArgumentType.NON_ACTION;
+					freeVariable_ = true;
+				} else if (stringArg_.startsWith("?Bnd_")) {
+					argType_ = ArgumentType.NON_ACTION;
+					freeVariable_ = false;
+				} else if (stringArg_.startsWith(RANGE_VARIABLE_PREFIX)) {
 					argType_ = ArgumentType.NUMBER_RANGE;
-				else
+					freeVariable_ = true; // Can change
+				} else {
 					argType_ = ArgumentType.ACTION_VAR;
+					freeVariable_ = false;
+				}
 			}
 		} else {
 			argType_ = ArgumentType.CONST;
@@ -197,6 +212,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				rangeBounds_[0], rangeFrac_[0], rangeBounds_[1], rangeFrac_[1],
 				rangeContext_);
 		relArg.argType_ = argType_;
+		relArg.freeVariable_ = freeVariable_;
 		return relArg;
 	}
 
@@ -322,7 +338,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return True if this argument is a bound free variable.
 	 */
 	public boolean isBoundVariable() {
-		return argType_ == ArgumentType.BOUND_VAR;
+		return argType_ == ArgumentType.NON_ACTION && !freeVariable_;
 	}
 
 	public boolean isConstant() {
@@ -338,9 +354,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return True if this argument is a free variable.
 	 */
 	public boolean isFreeVariable() {
-		return argType_ == ArgumentType.BOUND_VAR
-				|| argType_ == ArgumentType.UNBOUND_VAR
-				|| argType_ == ArgumentType.ANON;
+		return freeVariable_;
 	}
 
 	public boolean isGoalCondition() {
@@ -354,7 +368,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 	public boolean isRange(boolean isDefinedRange) {
 		return argType_ == ArgumentType.NUMBER_RANGE
-				&& (!isDefinedRange || rangeContext_ != null);
+				&& (!isDefinedRange || rangeBounds_[0] != null);
 	}
 
 	public boolean isRangeVariable() {
@@ -367,35 +381,26 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 * @return True if this argument is an unbound variable.
 	 */
 	public boolean isUnboundVariable() {
-		return argType_ == ArgumentType.UNBOUND_VAR
-				|| argType_ == ArgumentType.ANON;
+		if (argType_ == ArgumentType.NON_ACTION && freeVariable_
+				|| argType_ == ArgumentType.ANON)
+			return true;
+		return false;
 	}
 
 	public boolean isVariable() {
 		return argType_ == ArgumentType.ACTION_VAR
 				|| argType_ == ArgumentType.NUMBER_RANGE
-				|| argType_ == ArgumentType.UNBOUND_VAR
-				|| argType_ == ArgumentType.BOUND_VAR;
+				|| argType_ == ArgumentType.NON_ACTION;
 	}
 
 	/**
-	 * Sets this relational argument as a bound variable.
+	 * Sets this variable as a free variable (or not).
 	 */
-	public void setAsBoundVariable() {
+	public void setFreeVariable(boolean isFree) {
 		if (!isVariable())
 			throw new IllegalAccessError(this
-					+ " is not a variable. Cannot be set as unbound!");
-		argType_ = ArgumentType.BOUND_VAR;
-	}
-
-	/**
-	 * Sets this relational argument as an unbound variable.
-	 */
-	public void setAsUnboundVariable() {
-		if (!isVariable())
-			throw new IllegalAccessError(this
-					+ " is not a variable. Cannot be set as bound!");
-		argType_ = ArgumentType.UNBOUND_VAR;
+					+ " is not a variable. Cannot be set as free!");
+		freeVariable_ = isFree;
 	}
 
 	/**
@@ -448,7 +453,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	public static RelationalArgument createBoundVariable(int i) {
 		RelationalArgument bound = new RelationalArgument(VARIABLE_PREFIX + i);
-		bound.setAsBoundVariable();
+		bound.setFreeVariable(false);
 		return bound;
 	}
 
@@ -474,7 +479,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 */
 	public static RelationalArgument createUnboundVariable(int i) {
 		RelationalArgument unbound = new RelationalArgument(VARIABLE_PREFIX + i);
-		unbound.setAsUnboundVariable();
+		unbound.setFreeVariable(true);
 		return unbound;
 	}
 

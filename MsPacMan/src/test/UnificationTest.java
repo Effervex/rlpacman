@@ -470,7 +470,7 @@ public class UnificationTest {
 		RelationalArgument[] arguments = new RelationalArgument[2];
 		arguments[0] = new RelationalArgument("?X");
 		arguments[1] = new RelationalArgument("?Z");
-		arguments[1].setAsUnboundVariable();
+		arguments[1].setFreeVariable(true);
 		RelationalPredicate predA = new RelationalPredicate(StateSpec
 				.getInstance().getPredicateByName("on"), arguments);
 		oldState.add(predA);
@@ -481,14 +481,14 @@ public class UnificationTest {
 		arguments = new RelationalArgument[2];
 		arguments[0] = new RelationalArgument("?X");
 		arguments[1] = new RelationalArgument("?Z");
-		arguments[1].setAsUnboundVariable();
+		arguments[1].setFreeVariable(true);
 		RelationalPredicate predC = new RelationalPredicate(StateSpec
 				.getInstance().getPredicateByName("on"), arguments);
 		newState.add(predC);
 		arguments = new RelationalArgument[2];
 		arguments[0] = new RelationalArgument("?X");
 		arguments[1] = new RelationalArgument("?A");
-		arguments[1].setAsUnboundVariable();
+		arguments[1].setFreeVariable(true);
 		RelationalPredicate predD = new RelationalPredicate(StateSpec
 				.getInstance().getPredicateByName("above"), arguments);
 		newState.add(predD);

@@ -8,9 +8,8 @@ public enum ArgumentType {
 	CONST, // A constant ('a')
 	NUMBER_CONST, // A numerical constant ('8')
 	GOAL_VARIABLE, // A goal variable ('?G_0')
-	ACTION_VAR, // An action variable ('?Y')
+	ACTION_VAR, // An action variable ('?A')
 	NUMBER_RANGE, // A numerical range variable ('?#_5')
-	BOUND_VAR, // A bound free variable ('?Bnd_3')
-	UNBOUND_VAR, // An unbound free variable ('?Unb_2')
+	NON_ACTION, // A non-action variable
 	ANON; // An anonymous variable ('?')
 }

@@ -75,20 +75,20 @@ public class RLMarioStateSpec extends StateSpec {
 		String[] structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("jumpOnto", structure));
+		actions.add(new RelationalPredicate("jumpOnto", structure, false));
 
 		// Jump over something
 		structure = new String[3];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
 		structure[2] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("jumpOver", structure));
+		actions.add(new RelationalPredicate("jumpOver", structure, false));
 
 		// Move towards something
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("moveTo", structure));
+		actions.add(new RelationalPredicate("moveTo", structure, false));
 
 		// Move away from something
 		// structure = new String[2];
@@ -100,27 +100,27 @@ public class RLMarioStateSpec extends StateSpec {
 		structure = new String[2];
 		structure[0] = "brick";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("search", structure));
+		actions.add(new RelationalPredicate("search", structure, false));
 
 		// Pickup a shell
 		structure = new String[2];
 		structure[0] = "shell";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("pickup", structure));
+		actions.add(new RelationalPredicate("pickup", structure, false));
 
 		// Shoot an enemy with a fireball
 		structure = new String[3];
 		structure[0] = "enemy";
 		structure[1] = NumberEnum.Integer.toString();
 		structure[2] = "marioPower";
-		actions.add(new RelationalPredicate("shootFireball", structure));
+		actions.add(new RelationalPredicate("shootFireball", structure, false));
 
 		// Shoot an enemy with a held shell
 		structure = new String[3];
 		structure[0] = "enemy";
 		structure[1] = NumberEnum.Integer.toString();
 		structure[2] = "shell";
-		actions.add(new RelationalPredicate("shootShell", structure));
+		actions.add(new RelationalPredicate("shootShell", structure, false));
 
 		return actions;
 	}
@@ -198,54 +198,54 @@ public class RLMarioStateSpec extends StateSpec {
 		String[] structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("distance", structure));
+		predicates.add(new RelationalPredicate("distance", structure, false));
 
 		// Height diff
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("heightDiff", structure));
+		predicates.add(new RelationalPredicate("heightDiff", structure, false));
 
 		// Width (usually 1, except for pits)
 		structure = new String[2];
 		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		predicates.add(new RelationalPredicate("width", structure));
+		predicates.add(new RelationalPredicate("width", structure, false));
 
 		// Can Jump On
 		structure = new String[1];
 		structure[0] = "thing";
-		predicates.add(new RelationalPredicate("canJumpOn", structure));
+		predicates.add(new RelationalPredicate("canJumpOn", structure, false));
 
 		// Can Jump On
 		structure = new String[1];
 		structure[0] = "thing";
-		predicates.add(new RelationalPredicate("canJumpOver", structure));
+		predicates.add(new RelationalPredicate("canJumpOver", structure, false));
 
 		// Flying (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new RelationalPredicate("flying", structure));
+		predicates.add(new RelationalPredicate("flying", structure, false));
 
 		// Squashable (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new RelationalPredicate("squashable", structure));
+		predicates.add(new RelationalPredicate("squashable", structure, false));
 
 		// Blastable (enemy)
 		structure = new String[1];
 		structure[0] = "enemy";
-		predicates.add(new RelationalPredicate("blastable", structure));
+		predicates.add(new RelationalPredicate("blastable", structure, false));
 
 		// Holding a shell
 		structure = new String[1];
 		structure[0] = "shell";
-		predicates.add(new RelationalPredicate("carrying", structure));
+		predicates.add(new RelationalPredicate("carrying", structure, false));
 
 		// Shell is passive (not moving)
 		structure = new String[1];
 		structure[0] = "shell";
-		predicates.add(new RelationalPredicate("passive", structure));
+		predicates.add(new RelationalPredicate("passive", structure, false));
 
 		return predicates;
 	}

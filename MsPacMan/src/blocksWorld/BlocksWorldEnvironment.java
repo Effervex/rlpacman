@@ -45,16 +45,7 @@ public class BlocksWorldEnvironment extends
 		}
 	}
 
-	@Override
-	protected Object groundActions(PolicyActions actions) {
-		RelationalPredicate action = null;
-		if (!actions.isEmpty())
-			action = actions.getFirstRandomAction();
-		return action;
-	}
-
-	protected Object randomAction() {
-		Object action;
+	protected RelationalPredicate randomAction() {
 		// Select random action predicate
 		MultiMap<String, String[]> validActions = observations_
 				.getValidActions();
@@ -73,14 +64,13 @@ public class BlocksWorldEnvironment extends
 				+ moveFlArgs.length);
 		if (randomIndex < moveArgs.length) {
 			Object randomAction = moveArgs[randomIndex];
-			action = new RelationalPredicate(StateSpec.getInstance()
+			return new RelationalPredicate(StateSpec.getInstance()
 					.getActions().get("move"), (String[]) randomAction);
 		} else {
 			Object randomAction = moveFlArgs[randomIndex - moveArgs.length];
-			action = new RelationalPredicate(StateSpec.getInstance()
+			return new RelationalPredicate(StateSpec.getInstance()
 					.getActions().get("moveFloor"), (String[]) randomAction);
 		}
-		return action;
 	}
 
 	@Override

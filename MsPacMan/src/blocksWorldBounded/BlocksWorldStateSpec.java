@@ -35,12 +35,12 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		actions.add(new RelationalPredicate("bind", structure));
+		actions.add(new RelationalPredicate("bind", structure, false));
 
 		structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		actions.add(new RelationalPredicate("unbind", structure));
+		actions.add(new RelationalPredicate("unbind", structure, false));
 
 		return actions;
 	}
@@ -177,7 +177,7 @@ public class BlocksWorldStateSpec extends blocksWorldMove.BlocksWorldStateSpec {
 		String[] structure = new String[2];
 		structure[0] = "block";
 		structure[1] = "block";
-		predicates.add(new RelationalPredicate("bound", structure));
+		predicates.add(new RelationalPredicate("bound", structure, false));
 
 		return predicates;
 	}

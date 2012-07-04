@@ -62,62 +62,51 @@ public class LocalAgentObservationsTest {
 	}
 
 	@Test
-	public void testGatherActionFacts() {
-		fail("Not yet implemented");
-	}
-
-	@Test
 	public void testGetRLGGRules() {
 		Collection<RelationalRule> rlggRules = sut_
 				.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
-			Collection<RelationalPredicate> conds = rr.getConditions(true);
+			Collection<RelationalPredicate> conds = rr.getSimplifiedConditions(true);
 			if (rr.getActionPredicate().equals("move")) {
-				// Clear ?X and Clear ?Y
-				RelationalArgument[] args = { new RelationalArgument("?X") };
-				RelationalPredicate fact = new RelationalPredicate(StateSpec
-						.getInstance().getPredicateByName("clear"), args);
-				assertTrue(conds.contains(fact));
+				// Clear ?A and Clear ?B
+				assertTrue(conds.contains(StateSpec
+						.toRelationalPredicate("(clear ?A)")));
+				assertTrue(conds.contains(StateSpec
+						.toRelationalPredicate("(clear ?B)")));
 
-				args[0] = new RelationalArgument("?Y");
-				fact = new RelationalPredicate(StateSpec.getInstance()
-						.getPredicateByName("clear"), args);
-				assertTrue(conds.contains(fact));
-
-				// 4 other conditions.
-				assertTrue(conds.size() == 6);
+				// Should NOT contain height predicates
+				for (RelationalPredicate cond : conds)
+					assertFalse(cond.getFactName().equals("height"));
 			} else if (rr.getActionPredicate().equals("moveFloor")) {
-				// Clear ?X and Clear ?Y
-				RelationalArgument[] args = { new RelationalArgument("?X") };
-				RelationalPredicate fact = new RelationalPredicate(StateSpec
-						.getInstance().getPredicateByName("clear"), args);
-				assertTrue(conds.contains(fact));
+				// Clear ?A
+				assertTrue(conds.contains(StateSpec
+						.toRelationalPredicate("(clear ?A)")));
 
-				// 4 other conditions.
-				assertTrue(conds.size() == 4);
+				// Should NOT contain height predicates
+				for (RelationalPredicate cond : conds)
+					assertFalse(cond.getFactName().equals("height"));
 			} else
 				fail("Untested action RLGG.");
 		}
 	}
 
 	@Test
-	public void testGetSpecificGoalConditions() {
-		fail("Not yet implemented");
-	}
+	public void testGetRLGGRulesBWMove() {
+		Collection<RelationalRule> rlggRules = sut_
+				.getRLGGRules(new HashSet<RelationalRule>());
+		for (RelationalRule rr : rlggRules) {
+			assertTrue(rr.getActionPredicate().equals("move"));
+			Collection<RelationalPredicate> conds = rr.getSimplifiedConditions(true);
+			// Clear ?A and Clear ?B
+			assertTrue(conds.contains(StateSpec
+					.toRelationalPredicate("(clear ?A)")));
+			assertTrue(conds.contains(StateSpec
+					.toRelationalPredicate("(clear ?B)")));
 
-	@Test
-	public void testIsValidGoalCondition() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testObserveState() {
-		fail("Not yet implemented");
-	}
-
-	@Test
-	public void testScanState() {
-		fail("Not yet implemented");
+			// Should NOT contain height predicates
+			for (RelationalPredicate cond : conds)
+				assertFalse(cond.getFactName().equals("height"));
+		}
 	}
 
 	@Test

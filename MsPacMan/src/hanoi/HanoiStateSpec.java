@@ -38,7 +38,7 @@ public class HanoiStateSpec extends StateSpec {
 
 		// Move action
 		String[] structure = { "tile", "tower", "tile", "tower" };
-		actions.add(new RelationalPredicate("move", structure));
+		actions.add(new RelationalPredicate("move", structure, false));
 
 		return actions;
 	}
@@ -110,48 +110,48 @@ public class HanoiStateSpec extends StateSpec {
 		structure[0] = "tile";
 		structure[1] = "tile";
 		structure[2] = "tower";
-		predicates.add(new RelationalPredicate("on", structure));
+		predicates.add(new RelationalPredicate("on", structure, false));
 
 		// Clear predicate
 		structure = new String[2];
 		structure[0] = "tile";
 		structure[1] = "tower";
-		predicates.add(new RelationalPredicate("clear", structure));
+		predicates.add(new RelationalPredicate("clear", structure, false));
 
 		// Above predicate
 		structure = new String[3];
 		structure[0] = "tile";
 		structure[1] = "tile";
 		structure[2] = "tower";
-		predicates.add(new RelationalPredicate("above", structure));
+		predicates.add(new RelationalPredicate("above", structure, false));
 
 		// Smaller predicate
 		structure = new String[2];
 		structure[0] = "tile";
 		structure[1] = "tile";
-		predicates.add(new RelationalPredicate("smaller", structure));
+		predicates.add(new RelationalPredicate("smaller", structure, false));
 
 		// NumTiles predicate
 		structure = new String[1];
 		structure[0] = "evenOdd";
-		predicates.add(new RelationalPredicate("numTiles", structure));
+		predicates.add(new RelationalPredicate("numTiles", structure, false));
 
 		// LastMoved predicate
 		structure = new String[1];
 		structure[0] = "tile";
-		predicates.add(new RelationalPredicate("lastMoved", structure));
+		predicates.add(new RelationalPredicate("lastMoved", structure, false));
 
 		// NextTower predicate
 		structure = new String[2];
 		structure[0] = "tower";
 		structure[1] = "tower";
-		predicates.add(new RelationalPredicate("nextTower", structure));
+		predicates.add(new RelationalPredicate("nextTower", structure, false));
 
 		// PrevTower predicate
 		structure = new String[2];
 		structure[0] = "tower";
 		structure[1] = "tower";
-		predicates.add(new RelationalPredicate("prevTower", structure));
+		predicates.add(new RelationalPredicate("prevTower", structure, false));
 
 		return predicates;
 	}
