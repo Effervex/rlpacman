@@ -244,7 +244,7 @@ public final class PolicyGenerator implements Serializable {
 			// If the rule can mutate.
 			boolean needToPause = false;
 			// Remove old rules if this rule is an LGG rule.
-			boolean removeOld = (baseRule.isMutant()) ? false : true;
+			boolean removeOld = baseRule.equals(ruleSlot.getSeedRule());
 			if (RRLExperiment.debugMode_) {
 				try {
 					System.out.println(" [" + getGoalCondition()
@@ -1426,14 +1426,13 @@ public final class PolicyGenerator implements Serializable {
 			// further update operations.
 			splitRule.setSlot(existingSlot);
 			newSlot = existingSlot;
-		} else {
-			if (ProgramArgument.INHERIT_PARENT_SLOT_VALS.booleanValue()) {
-				// Set ordering to be the same
-				newSlot.setOrdering(ruleSlot.getOrdering());
-				newSlot.setSelectionProb(ruleSlot.getSelectionProbability());
-			}
-			mutateRule(splitRule, newSlot, -1);
+		} else if (ProgramArgument.INHERIT_PARENT_SLOT_VALS.booleanValue()) {
+			// Set ordering to be the same
+			newSlot.setOrdering(ruleSlot.getOrdering());
+			newSlot.setSelectionProb(ruleSlot.getSelectionProbability());
 		}
+
+		mutateRule(splitRule, newSlot, -1);
 		ruleGenerator.remove(splitRule);
 		ruleGenerator.normaliseProbs();
 

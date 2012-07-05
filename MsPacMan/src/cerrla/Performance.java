@@ -58,7 +58,9 @@ public class Performance implements Serializable {
 	/** The current run for this performance object. */
 	private int runIndex_;
 	/** The time at which this performance object was created. */
-	private long startTime_;
+	private long trainingStartTime_;
+	/** The time at which this performance object was created. */
+	private long trainingEndTime_;
 	/** The final elite scores received for the best policy. */
 	private ArrayList<Double> finalEliteScores_;
 
@@ -93,7 +95,7 @@ public class Performance implements Serializable {
 		minMaxReward_ = new double[2];
 		minMaxReward_[0] = Float.MAX_VALUE;
 		minMaxReward_[1] = -Float.MAX_VALUE;
-		startTime_ = System.currentTimeMillis();
+		trainingStartTime_ = System.currentTimeMillis();
 		runIndex_ = runIndex;
 	}
 
@@ -206,9 +208,9 @@ public class Performance implements Serializable {
 
 			if (finalWrite) {
 				buf.write(Config.END_PERFORMANCE + "\n");
-				buf.write("Total run time: "
-						+ RRLExperiment.toTimeFormat(System.currentTimeMillis()
-								- startTime_));
+				buf.write("Total training time: "
+						+ RRLExperiment.toTimeFormat(trainingEndTime_
+								- trainingStartTime_));
 			}
 
 			buf.close();
@@ -306,7 +308,7 @@ public class Performance implements Serializable {
 
 		if (mainGoal) {
 			long currentTime = System.currentTimeMillis();
-			long elapsedTime = currentTime - startTime_;
+			long elapsedTime = currentTime - trainingStartTime_;
 			String elapsed = "Elapsed: "
 					+ RRLExperiment.toTimeFormat(elapsedTime);
 			System.out.println(elapsed);
@@ -371,6 +373,8 @@ public class Performance implements Serializable {
 	 */
 	public void freeze(boolean b) {
 		frozen_ = b;
+		if (frozen_)
+			trainingEndTime_ = System.currentTimeMillis();
 		recentScores_.clear();
 		internalSDs_.clear();
 	}
@@ -527,7 +531,7 @@ public class Performance implements Serializable {
 		// Basic update of run
 		if (!ProgramArgument.SYSTEM_OUTPUT.booleanValue()
 				&& !modularPerformance_) {
-			long elapsedTime = System.currentTimeMillis() - startTime_;
+			long elapsedTime = System.currentTimeMillis() - trainingStartTime_;
 			String elapsed = "Elapsed: "
 					+ RRLExperiment.toTimeFormat(elapsedTime);
 			if (hasUpdated && !performanceDetails_.isEmpty()) {

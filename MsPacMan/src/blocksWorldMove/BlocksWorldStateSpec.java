@@ -12,7 +12,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-
 import relationalFramework.agentObservations.BackgroundKnowledge;
 
 public class BlocksWorldStateSpec extends StateSpec {
@@ -50,9 +49,8 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Collection<String> initialiseActionRules() {
 		Collection<String> actionRules = new ArrayList<String>();
 		// Block to block movement
-		actionRules
-				.add("?action <- (move ?A ?B) ?oldOn <- (on ?A ?C)"
-						+ " => (assert (on ?A ?B)) (retract ?oldOn ?action)");
+		actionRules.add("?action <- (move ?A ?B) ?oldOn <- (on ?A ?C)"
+				+ " => (assert (on ?A ?B)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 
@@ -101,6 +99,19 @@ public class BlocksWorldStateSpec extends StateSpec {
 			return result;
 		}
 
+		// On(a,b,c) goal
+		if (envParameter_.equals("onabc") || envParameter_.equals("on$A$Bon$B$C")) {
+			result[0] = "on$A$Bon$B$C";
+			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
+					+ RelationalArgument.createGoalTerm(1) + ") (on "
+					+ RelationalArgument.createGoalTerm(1) + " "
+					+ RelationalArgument.createGoalTerm(2) + ") (block "
+					+ RelationalArgument.createGoalTerm(0) + ") (block "
+					+ RelationalArgument.createGoalTerm(1) + ") (block "
+					+ RelationalArgument.createGoalTerm(2) + ")";
+			return result;
+		}
+
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
@@ -145,17 +156,31 @@ public class BlocksWorldStateSpec extends StateSpec {
 					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
 			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1) "
 					+ "(clear ?A) (above ?A ?G_1) (floor ?B) => (move ?A ?B)";
+		} else if (envParameter_.equals("on$A$Bon$B$C")) {
+			rules = new String[5];
+			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1 ?G_2) "
+					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
+			rules[1] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1 ?G_2) "
+					+ "(clear ?A) (above ?A ?G_1) (floor ?B) => (move ?A ?B)";
+			rules[2] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1 ?G_2) "
+					+ "(clear ?A) (above ?A ?G_2) (floor ?B) => (move ?A ?B)";
+			rules[3] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1 ?G_2) "
+					+ "(clear ?G_1) (clear ?G_2) => (move ?G_1 ?G_2)";
+			rules[4] = "(" + GOALARGS_PRED + " ? ?G_0 ?G_1 ?G_2) "
+					+ "(clear ?G_0) (clear ?G_1) => (move ?G_0 ?G_1)";
 		} else if (envParameter_.equals("stack")) {
 			rules = new String[1];
 			rules[0] = "(clear ?A) (highest ?B) => (move ?A ?B)";
 		} else if (envParameter_.equals("unstack")) {
 			rules = new String[1];
 			rules[0] = "(highest ?A) (floor ?B) => (move ?A ?B)";
-		} else if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
+		} else if (envParameter_.equals("clearA")
+				|| envParameter_.equals("clear$A")) {
 			rules = new String[1];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";
-		} else if (envParameter_.equals("highestA") || envParameter_.equals("highest$A")) {
+		} else if (envParameter_.equals("highestA")
+				|| envParameter_.equals("highest$A")) {
 			rules = new String[2];
 			rules[0] = "(" + GOALARGS_PRED + " ? ?G_0) "
 					+ "(clear ?A) (above ?A ?G_0) (floor ?B) => (move ?A ?B)";

@@ -159,7 +159,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 		// Load the local agent observations
 		localAgentObservations_ = LocalAgentObservations
-				.loadAgentObservations(this);
+				.loadAgentObservations(goalCondition_, this);
 		policyIDCounter_ = 0;
 		isSpecialising_ = true;
 
@@ -867,7 +867,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 
 				// Load Local Agent Observations
 				lced.localAgentObservations_ = LocalAgentObservations
-						.loadAgentObservations(lced);
+						.loadAgentObservations(lced.getGoalCondition(), lced);
 				lced.policyGenerator_.rebuildCurrentData();
 				lced.isSpecialising_ = true;
 

@@ -29,7 +29,8 @@ public class LocalAgentObservationsTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld");
 		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
-				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()),
+				null);
 		assertNotNull("No loaded onAB agent observations. Cannot run test.",
 				sut_);
 	}
@@ -38,7 +39,7 @@ public class LocalAgentObservationsTest {
 	public void testHashCode() throws JessException {
 		sut_ = new LocalAgentObservations(
 				GoalCondition.parseGoalCondition(StateSpec.getInstance()
-						.getGoalName()));
+						.getGoalName()), null);
 		int prevHash = sut_.hashCode();
 
 		Rete state = StateSpec.getInstance().getRete();
@@ -66,7 +67,8 @@ public class LocalAgentObservationsTest {
 		Collection<RelationalRule> rlggRules = sut_
 				.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
-			Collection<RelationalPredicate> conds = rr.getSimplifiedConditions(true);
+			Collection<RelationalPredicate> conds = rr
+					.getSimplifiedConditions(true);
 			if (rr.getActionPredicate().equals("move")) {
 				// Clear ?A and Clear ?B
 				assertTrue(conds.contains(StateSpec
@@ -96,7 +98,8 @@ public class LocalAgentObservationsTest {
 				.getRLGGRules(new HashSet<RelationalRule>());
 		for (RelationalRule rr : rlggRules) {
 			assertTrue(rr.getActionPredicate().equals("move"));
-			Collection<RelationalPredicate> conds = rr.getSimplifiedConditions(true);
+			Collection<RelationalPredicate> conds = rr
+					.getSimplifiedConditions(true);
 			// Clear ?A and Clear ?B
 			assertTrue(conds.contains(StateSpec
 					.toRelationalPredicate("(clear ?A)")));
@@ -354,7 +357,8 @@ public class LocalAgentObservationsTest {
 	public void testSimplifyRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
-				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()),
+				null);
 		assertNotNull("No loaded onAB agent observations. Cannot run test.",
 				sut_);
 
@@ -477,7 +481,8 @@ public class LocalAgentObservationsTest {
 	public void testSimplifyNegatedGeneralGoal() {
 		StateSpec.initInstance("rlPacManGeneral.PacMan", "levelMax");
 		sut_ = LocalAgentObservations.loadAgentObservations(GoalCondition
-				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()),
+				null);
 		assertNotNull("No loaded agent observations. Cannot run test.", sut_);
 
 		// Basic rule

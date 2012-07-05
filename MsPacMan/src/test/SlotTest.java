@@ -23,7 +23,7 @@ public class SlotTest {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		GoalCondition gc = GoalCondition.parseGoalCondition("on$A$B");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(gc);
+				.loadAgentObservations(null, gc);
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		lced = new LocalCrossEntropyDistribution(gc);
 	}

@@ -633,6 +633,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	protected static boolean loadAgentObservations() {
 		String environment = StateSpec.getInstance().getEnvironmentName();
 		// Only load them once.
+		if (!ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue())
+			instance_ = null;
 		if (instance_ != null && instance_.environment_.equals(environment))
 			return false;
 
