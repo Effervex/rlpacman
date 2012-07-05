@@ -21,7 +21,7 @@ public class CERRLATest {
 		sut_ = new CERRLA();
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 
-		LocalAgentObservations.loadAgentObservations(GoalCondition
+		LocalAgentObservations.loadAgentObservations(null, GoalCondition
 				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
 		Config.newInstance(new String[] { "blocksMoveArguments.txt" });
 		sut_.initialise(0);

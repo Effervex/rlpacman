@@ -455,7 +455,8 @@ public class RelationalRule implements Serializable,
 				boolean negated = condition.isNegated();
 				for (int i = 0; i < arguments.length; i++) {
 
-					if (StateSpec.isNumberType(condition.getArgTypes()[i])) {
+					if (StateSpec.isNumberType(condition.getArgTypes()[i])
+							&& arguments[i].isRangeVariable()) {
 						// Numerical argument - resolve range context
 						RangeContext rc = new RangeContext(i, condition,
 								ruleAction_);

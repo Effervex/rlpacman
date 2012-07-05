@@ -823,20 +823,20 @@ public class LocalAgentObservations extends SettlingScan implements
 	 * Loads the local agent observations from serialised file if possible.
 	 * Otherwise, it just creates a new local agent observations object.
 	 * 
+	 * @param localGoal
+	 *            The goal condition these agent observations are for.
 	 * @param lced
 	 *            The local distribution these observations are for.
 	 * 
 	 * @return The local agent observations object (loaded or new).
 	 */
 	public static LocalAgentObservations loadAgentObservations(
-			LocalCrossEntropyDistribution lced) {
-		// First load the singleton environment AgentObservations.
-		EnvironmentAgentObservations.loadAgentObservations();
-		GoalCondition localGoal = lced.getGoalCondition();
-
+			GoalCondition localGoal, LocalCrossEntropyDistribution lced) {
 		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
 				|| Config.getInstance().getSerializedFile() != null
 				|| Config.getInstance().getGeneratorFile() != null) {
+			// First load the singleton environment AgentObservations.
+			EnvironmentAgentObservations.loadAgentObservations();
 			try {
 				File localObsFile = getLocalFile(localGoal.toString());
 				if (localObsFile.exists()) {
@@ -986,8 +986,10 @@ public class LocalAgentObservations extends SettlingScan implements
 							condition)) {
 				// If a numerical condition was added, but simplified away, then
 				// split it and add the splits.
-				for (RelationalRule subrange : splitConditionsRanges(specialisation, condition)) {
-					if (subrange.isLegal() && !specialisations.contains(subrange))
+				for (RelationalRule subrange : splitConditionsRanges(
+						specialisation, condition)) {
+					if (subrange.isLegal()
+							&& !specialisations.contains(subrange))
 						specialisations.add(subrange);
 				}
 			}

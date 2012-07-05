@@ -36,7 +36,7 @@ public class ModularPolicyTest {
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
-		LocalAgentObservations.loadAgentObservations(GoalCondition
+		LocalAgentObservations.loadAgentObservations(null, GoalCondition
 				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
 		Config.newInstance(new String[] { "blocksMoveArguments.txt" });
 	}

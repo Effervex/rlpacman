@@ -20,7 +20,7 @@ public class PacManRuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("rlPacManGeneral.PacMan");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(GoalCondition.parseGoalCondition("blah"));
+				.loadAgentObservations(null, GoalCondition.parseGoalCondition("blah"));
 		sut_ = lao.getRuleMutation();
 	}
 

@@ -155,7 +155,7 @@ public class BackgroundKnowledgeTest {
 	//@Test
 	public void testSimplifyCarcassonne() {
 		StateSpec.initInstance("jCloisterZone.Carcassonne");
-		LocalAgentObservations.loadAgentObservations(GoalCondition
+		LocalAgentObservations.loadAgentObservations(null, GoalCondition
 				.parseGoalCondition("cool"));
 
 		BackgroundKnowledge bk = new BackgroundKnowledge(
