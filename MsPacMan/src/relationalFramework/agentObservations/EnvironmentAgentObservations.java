@@ -350,7 +350,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				.get(action.getFactName()).getRLGGRule().getRawConditions(true);
 		Collection<RelationalPredicate> termSwappedConds = new ArrayList<RelationalPredicate>(
 				rlggConds.size());
-		String[] actionTerms = action.getArguments();
+		RelationalArgument[] actionTerms = action.getRelationalArguments();
 		for (RelationalPredicate rlggCond : rlggConds) {
 			rlggCond = new RelationalPredicate(rlggCond);
 			rlggCond.replaceArguments(actionTerms);
@@ -837,10 +837,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				SortedSet<RelationalPredicate> ruleConds = new TreeSet<RelationalPredicate>(
 						ConditionComparator.getInstance());
 				// Form the replacements if the action is non-variable
-				String[] replacements = null;
+				RelationalArgument[] replacements = null;
 				for (String arg : action_.getArguments()) {
 					if (arg.charAt(0) != '?') {
-						replacements = action_.getArguments();
+						replacements = action_.getRelationalArguments();
 						break;
 					}
 				}
