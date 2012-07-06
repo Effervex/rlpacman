@@ -119,9 +119,11 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 *            The name of the fact.
 	 * @param factTypes
 	 *            The types of the fact.
-	 * @param isInternal TODO
+	 * @param isInternal
+	 *            TODO
 	 */
-	public RelationalPredicate(String factName, String[] factTypes, boolean isInternal) {
+	public RelationalPredicate(String factName, String[] factTypes,
+			boolean isInternal) {
 		factName_ = factName;
 		factTypes_ = factTypes;
 		arguments_ = new RelationalArgument[factTypes.length];
@@ -535,7 +537,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 * @param replacements
 	 *            The terms to replace any variable terms with.
 	 */
-	public void replaceArguments(String[] replacements) {
+	public void replaceArguments(RelationalArgument[] replacements) {
 		// Run through the arguments, replacing variable args with the
 		// replacements.
 		for (int i = 0; i < arguments_.length; i++) {
@@ -543,8 +545,7 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			if (!arguments_[i].isFreeVariable()) {
 				int termIndex = arguments_[i].getVariableTermIndex();
 				if (termIndex != -1)
-					arguments_[i] = new RelationalArgument(
-							replacements[termIndex]);
+					arguments_[i] = replacements[termIndex];
 			}
 		}
 	}

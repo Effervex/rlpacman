@@ -122,9 +122,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			if (stringArg_.length() == 1) {
 				argType_ = ArgumentType.ANON;
 				freeVariable_ = true;
-			} else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX))
+			} else if (stringArg_.startsWith(GOAL_VARIABLE_PREFIX)) {
 				argType_ = ArgumentType.GOAL_VARIABLE;
-			else {
+				freeVariable_ = false;
+			} else {
 				if (stringArg_.startsWith("?Unb_")
 						|| stringArg_.startsWith("?V_")) {
 					argType_ = ArgumentType.NON_ACTION;
@@ -357,7 +358,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return freeVariable_;
 	}
 
-	public boolean isGoalCondition() {
+	public boolean isGoalVariable() {
 		return argType_ == ArgumentType.GOAL_VARIABLE;
 	}
 

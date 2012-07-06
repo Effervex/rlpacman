@@ -310,7 +310,7 @@ public class RelationalRule implements Serializable,
 		RelationalArgument[] actionArgs = ruleAction_.getRelationalArguments();
 		for (int i = 0; i < actionArgs.length; i++) {
 			if (actionArgs[i].isVariable()) {
-				if (actionArgs[i].isGoalCondition()
+				if (actionArgs[i].isGoalVariable()
 						|| actionArgs[i].isRangeVariable())
 					normalisationMap.put(actionArgs[i], actionArgs[i]);
 				else if (!normalisationMap.containsKey(actionArgs[i]))
@@ -468,7 +468,7 @@ public class RelationalRule implements Serializable,
 								&& normalisationMap != null) {
 							// Normalise the variable terms
 							if (!normalisationMap.containsKey(arguments[i])) {
-								if (arguments[i].isGoalCondition())
+								if (arguments[i].isGoalVariable())
 									// Maintain goal conditions.
 									normalisationMap.put(arguments[i],
 											arguments[i]);

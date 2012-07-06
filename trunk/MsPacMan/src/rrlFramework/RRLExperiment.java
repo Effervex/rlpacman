@@ -390,8 +390,10 @@ public class RRLExperiment {
 		environment_.initialise(runIndex, Config.getInstance().getExtraArgs());
 
 		if (ProgramArgument.TESTING.booleanValue()
-				|| Config.getInstance().getGeneratorFile() != null)
+				|| Config.getInstance().getGeneratorFile() != null) {
 			agent_.freeze(true);
+			environment_.freeze(true);
+		}
 
 		// Continue to run episodes until either the agent states it is
 		// converged, or a finite pre-specified number of episodes have passed.
@@ -407,13 +409,16 @@ public class RRLExperiment {
 				if (agent_.getNumEpisodes() >= splitBuffer)
 					agent_.setSpecialisations(false);
 				if (agent_.getNumEpisodes()
-						+ ProgramArgument.POLICY_REPEATS.intValue() >= finiteEpisodes)
+						+ ProgramArgument.POLICY_REPEATS.intValue() >= finiteEpisodes) {
 					agent_.freeze(true);
+					environment_.freeze(true);
+				}
 			}
 		}
 
 		agent_.cleanup();
 		environment_.cleanup();
+		environment_.freeze(false);
 	}
 
 	/**

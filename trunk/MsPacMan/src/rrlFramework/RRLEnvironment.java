@@ -17,7 +17,7 @@ import util.MultiMap;
  */
 public abstract class RRLEnvironment {
 	public static final String ENVIRONMENT_CLASS_SUFFIX = "Environment";
-	
+
 	public static final int TERMINAL_WIN = 1;
 	public static final int TERMINAL_LOSE = -1;
 	public static final int NOT_TERMINAL = 0;
@@ -30,6 +30,9 @@ public abstract class RRLEnvironment {
 
 	/** The observations from the last state. */
 	protected RRLObservations observations_;
+
+	/** If the environment is frozen (testing). */
+	protected boolean frozen_;
 
 	public RRLEnvironment() {
 		reteDriven_ = isReteDriven();
@@ -172,7 +175,8 @@ public abstract class RRLEnvironment {
 	 * 
 	 * @param args
 	 *            The state parameters.
-	 * @return 1 if goal met, 0 if not terminal, -1 if terminal but goal not met.
+	 * @return 1 if goal met, 0 if not terminal, -1 if terminal but goal not
+	 *         met.
 	 */
 	protected int isTerminal() {
 		if (StateSpec.getInstance().isGoal(StateSpec.getInstance().getRete()))
@@ -184,6 +188,16 @@ public abstract class RRLEnvironment {
 	 * Cleans up environment data.
 	 */
 	public abstract void cleanup();
+
+	/**
+	 * Freezing/unfreezing the environment.
+	 * 
+	 * @param b
+	 *            The frozen state.
+	 */
+	public void freeze(boolean b) {
+		frozen_ = b;
+	}
 
 	/**
 	 * Initialise the environment.

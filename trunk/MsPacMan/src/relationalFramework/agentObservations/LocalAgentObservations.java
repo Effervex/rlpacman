@@ -1029,7 +1029,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		private Set<RelationalRule> groundAnonymousTerms(
 				RelationalPredicate condition,
 				Collection<RelationalPredicate> conditions,
-				RelationalPredicate action, String[] actionTerms,
+				RelationalPredicate action, RelationalArgument[] actionTerms,
 				RelationalRule rule, Set<RelationalRule> specialisations) {
 			// Modify the condition arguments to match the action arguments.
 			condition = new RelationalPredicate(condition);
@@ -1380,10 +1380,28 @@ public class LocalAgentObservations extends SettlingScan implements
 			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
 					rule.getRawConditions(true));
 			RelationalPredicate action = rule.getAction();
-			String[] actionTerms = action.getArguments();
+			RelationalArgument[] actionTerms = action.getRelationalArguments();
+			Set<RelationalArgument> goalActionTerms = new HashSet<RelationalArgument>();
+			for (RelationalArgument actionTerm : actionTerms)
+				if (actionTerm.isGoalVariable())
+					goalActionTerms.add(actionTerm);
 
 			// Add conditions, one-by-one, using both negation and regular
 			for (RelationalPredicate condition : actionConditions) {
+				// If adding a goal term, be sure it is not an action term.
+				if (!goalActionTerms.isEmpty()) {
+					boolean doNotAdd = false;
+					for (RelationalArgument term : condition
+							.getRelationalArguments())
+						if (goalActionTerms.contains(term)) {
+							doNotAdd = true;
+							break;
+						}
+					
+					if (doNotAdd)
+						continue;
+				}
+
 				specialisations
 						.addAll(groundAnonymousTerms(condition, conditions,
 								action, actionTerms, rule, specialisations));
