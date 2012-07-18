@@ -183,13 +183,16 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	 *            The state facts of this state.
 	 * @param action
 	 *            The action (with arguments).
+	 * @param actionRanges
+	 *            The action ranges to observe.
 	 * @param goalTerms
 	 *            The terms present in the goal.
 	 * @return The relevant facts pertaining to the action.
 	 */
 	public Collection<RelationalPredicate> gatherActionFacts(
 			Collection<Fact> stateFacts, RelationalPredicate action,
-			Map<RelationalArgument, RelationalArgument> goalReplacements) {
+			Map<RelationalArgument, RelationalArgument> goalReplacements,
+			Map<RangeContext, double[]> actionRanges) {
 		// If the state has been scanned, then the actions do not need to be
 		// rescanned.
 		boolean needToScan = (lastScannedState_ == null || !lastScannedState_
@@ -246,13 +249,18 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		// If the environment needs to be scanned.
+		ActionBasedObservations abo = getActionBasedObservation(action
+				.getFactName());
 		if (needToScan) {
 			if (!actionConds.isEmpty()
-					&& getActionBasedObservation(action.getFactName())
-							.addActionConditions(actionConds, action)) {
+					&& abo.addActionConditions(actionConds, action,
+							actionRanges)) {
 				resetInactivity();
 			}
 		}
+
+		// Note the action ranges
+		abo.noteRanges(actionRanges);
 
 		return goalActionConds;
 	}
@@ -633,14 +641,11 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	protected static boolean loadAgentObservations() {
 		String environment = StateSpec.getInstance().getEnvironmentName();
 		// Only load them once.
-		if (!ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue())
-			instance_ = null;
 		if (instance_ != null && instance_.environment_.equals(environment))
 			return false;
 
 		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
-				|| Config.getInstance().getSerializedFile() != null
-				|| Config.getInstance().getGeneratorFile() != null) {
+				|| Config.getInstance().shouldLoadAgentObservations()) {
 			try {
 				File globalObsFile = new File(AGENT_OBSERVATIONS_DIR,
 						environment + File.separatorChar + SERIALISATION_FILE);
@@ -665,26 +670,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Gets the maximal bounds of a numerical range using a specific range
-	 * context, if such a range exists.
-	 * 
-	 * @param rangeContext
-	 *            The context of the range being selected.
-	 * @return The maximal bounds of the range.
-	 */
-	public static double[] getActionRanges(RangeContext rangeContext) {
-		if (rangeContext.getAction() != null) {
-			// Get the range from the actions
-			return instance_.actionBasedObservations_.get(
-					rangeContext.getAction()).getActionRange(rangeContext);
-		} else {
-			// Get the range from the condition beliefs.
-			return instance_.conditionObservations_.conditionRanges_
-					.get(rangeContext);
-		}
-	}
-
-	/**
 	 * An internal class to note the action-based observations.
 	 * 
 	 * @author Sam Sarjant
@@ -697,12 +682,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * constants if the action always takes a constant.
 		 */
 		private RelationalPredicate action_;
-
-		/**
-		 * Mapped by pair: fact name and range variable, observed maximal ranges
-		 * for the conditions seen in the action.
-		 */
-		private Map<RangeContext, double[]> actionRanges_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<RelationalPredicate> invariantActionConditions_;
@@ -739,16 +718,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			buf.write("RLGG conditions: " + rlggConds + "\n");
 			buf.write("Specialisation conditions: "
 					+ createSpecialisations(variantActionConditions_, true,
-							action_.getFactName(), null, null) + "\n");
-			buf.write("Observed ranges: [");
-			boolean first = true;
-			for (RangeContext rc : actionRanges_.keySet()) {
-				if (!first)
-					buf.write(", ");
-				buf.write(rc.toString(actionRanges_.get(rc)));
-				first = false;
-			}
-			buf.write("]\n\n");
+							action_.getFactName(), null, null) + "\n\n");
 		}
 
 		/**
@@ -760,12 +730,15 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 *            The action conditions including the goal terms.
 		 * @param action
 		 *            The action which added the conditions.
+		 * @param actionRanges
+		 *            The action ranges to observe.
 		 * @return True if the set of action conditions changed because of the
 		 *         addition.
 		 */
 		private boolean addActionConditions(
 				Collection<RelationalPredicate> actionConds,
-				RelationalPredicate action) {
+				RelationalPredicate action,
+				Map<RangeContext, double[]> actionRanges) {
 			boolean changed = false;
 
 			// If this is the first action condition, then all the actions are
@@ -776,7 +749,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				variantActionConditions_ = new TreeSet<RelationalPredicate>();
 				action_ = new RelationalPredicate(action);
 				recreateRLGG_ = true;
-				actionRanges_ = new HashMap<RangeContext, double[]>();
 				return true;
 			}
 
@@ -785,7 +757,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// for numerical conditions.
 			changed = InvariantObservations.intersectActionConditions(action,
 					action_, actionConds, invariantActionConditions_,
-					variantActionConditions_, actionRanges_, null);
+					variantActionConditions_, actionRanges, null);
 
 			if (changed) {
 				specialisationConditions_ = null;
@@ -793,6 +765,57 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				return true;
 			}
 			return false;
+		}
+
+		/**
+		 * Notes all the ranges from the observations.
+		 * 
+		 * @param actionRanges
+		 *            The map of facts, mapped by factName-range variable.
+		 */
+		private void noteRanges(Map<RangeContext, double[]> actionRanges) {
+			for (RelationalPredicate pred : invariantActionConditions_) {
+				if (pred.isNumerical())
+					noteRange(pred, actionRanges);
+			}
+			for (RelationalPredicate pred : variantActionConditions_) {
+				if (pred.isNumerical())
+					noteRange(pred, actionRanges);
+			}
+		}
+
+		/**
+		 * Notes a single range from a fact.
+		 * 
+		 * @param numberFact
+		 *            The fact with the number range.
+		 * @param actionRanges
+		 *            The action ranges to note the range under.
+		 */
+		private void noteRange(RelationalPredicate numberFact,
+				Map<RangeContext, double[]> actionRanges) {
+			RelationalArgument[] factArgs = numberFact.getRelationalArguments();
+			for (int i = 0; i < factArgs.length; i++) {
+				// Only note ranges
+				if (factArgs[i].isRange(false)) {
+					RangeContext context = new RangeContext(i, numberFact,
+							action_.getFactName());
+					double[] range = actionRanges.get(context);
+					double[] explicitRange = factArgs[i].getExplicitRange();
+					if (range == null) {
+						range = new double[2];
+						System.arraycopy(explicitRange, 0, range, 0, 2);
+						actionRanges.put(context, range);
+					} else {
+						// Expand the range.
+						if (explicitRange[0] < range[0])
+							range[0] = explicitRange[0];
+						if (explicitRange[1] > range[1]) {
+							range[1] = explicitRange[1];
+						}
+					}
+				}
+			}
 		}
 
 		@Override
@@ -813,17 +836,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					.equals(other.variantActionConditions_))
 				return false;
 			return true;
-		}
-
-		/**
-		 * Gets the maximum range observed so far for a given context.
-		 * 
-		 * @param rangeContext
-		 *            The context in which the range is.
-		 * @return The observed range for a given context or null.
-		 */
-		public double[] getActionRange(RangeContext rangeContext) {
-			return actionRanges_.get(rangeContext);
 		}
 
 		/**
@@ -1409,7 +1421,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			// they're added
 			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
 					.getPredicateMappedRules();
-			// TODO Need a smarter method of selecting which simplification rules to use.
+			// TODO Need a smarter method of selecting which simplification
+			// rules to use.
 			while (changedThisIter) {
 				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
 				changedThisIter = false;
@@ -1455,5 +1468,12 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 
 			return (changedOverall) ? 1 : 0;
 		}
+	}
+
+	/**
+	 * Sets the instance as clear.
+	 */
+	public static void clearInstance() {
+		instance_ = null;
 	}
 }

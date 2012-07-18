@@ -15,7 +15,7 @@ import org.apache.commons.collections.BidiMap;
 
 import cerrla.modular.PolicyItem;
 
-import relationalFramework.agentObservations.EnvironmentAgentObservations;
+import relationalFramework.agentObservations.LocalAgentObservations;
 import relationalFramework.agentObservations.RangeContext;
 import rrlFramework.RRLObservations;
 
@@ -86,8 +86,8 @@ public class RelationalPolicy implements Serializable {
 		// If there are parameters, temp or concrete, insert them here
 		ValueVector vv = new ValueVector();
 		for (RangeContext rangeContext : rule.getRangeContexts()) {
-			double[] minMax = EnvironmentAgentObservations
-					.getActionRanges(rangeContext);
+			double[] minMax = LocalAgentObservations.getActionRanges(
+					rangeContext, null);
 			if (minMax != null) {
 				vv.add(minMax[0]);
 				vv.add(minMax[1]);

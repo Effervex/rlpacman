@@ -23,8 +23,8 @@ public class RuleCreationTest {
 	public void setUp() throws Exception {
 		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(null, GoalCondition
-						.parseGoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"), null);
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 	}
@@ -205,8 +205,8 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(null, GoalCondition
-						.parseGoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"), null);
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 
@@ -328,8 +328,8 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinorBWMove() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(null, GoalCondition
-						.parseGoalCondition("on$A$B"));
+				.loadAgentObservations(GoalCondition
+						.parseGoalCondition("on$A$B"), null);
 		assertNotNull("No onAB agent observations. Cannot run test.", lao);
 		sut_ = lao.getRuleMutation();
 
@@ -394,7 +394,7 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleMinorMario() {
 		StateSpec.initInstance("mario.RLMario");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(null, GoalCondition.parseGoalCondition("cool"));
+				.loadAgentObservations(GoalCondition.parseGoalCondition("cool"), null);
 		sut_ = lao.getRuleMutation();
 
 		RelationalRule rule = new RelationalRule("(thing ?A) (canJumpOn ?A) "
@@ -410,7 +410,7 @@ public class RuleCreationTest {
 	public void testSpecialiseRuleCarcassonne() {
 		StateSpec.initInstance("jCloisterZone.Carcassonne");
 		LocalAgentObservations lao = LocalAgentObservations
-				.loadAgentObservations(null, GoalCondition.parseGoalCondition("cool"));
+				.loadAgentObservations(GoalCondition.parseGoalCondition("cool"), null);
 		sut_ = lao.getRuleMutation();
 
 		Collection<RelationalRule> rlggs = lao

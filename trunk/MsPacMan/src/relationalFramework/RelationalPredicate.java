@@ -674,4 +674,14 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 			buffer.append(")");
 		return buffer.toString();
 	}
+
+	public boolean containsArg(Object goalTerm) {
+		for (RelationalArgument arg : arguments_) {
+			if (goalTerm instanceof String && arg.toString().equals(goalTerm))
+				return true;
+			if (goalTerm instanceof RelationalArgument && arg.equals(goalTerm))
+				return true;
+		}
+		return false;
+	}
 }

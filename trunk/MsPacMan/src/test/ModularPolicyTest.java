@@ -36,8 +36,9 @@ public class ModularPolicyTest {
 	@Before
 	public void setUp() {
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
-		LocalAgentObservations.loadAgentObservations(null, GoalCondition
-				.parseGoalCondition(StateSpec.getInstance().getGoalName()));
+		LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition(StateSpec.getInstance().getGoalName()),
+				null);
 		Config.newInstance(new String[] { "blocksMoveArguments.txt" });
 	}
 
@@ -230,21 +231,23 @@ public class ModularPolicyTest {
 		assertEquals(serPol.getRules().size(), 6);
 		assertFalse(serPol.shouldRegenerate());
 	}
-	
+
 	@Test
 	public void testEquivalent() {
 		LocalCrossEntropyDistribution lced = new LocalCrossEntropyDistribution(
 				GoalCondition.parseGoalCondition("on$A$B"));
 		RelationalPolicy policy = new RelationalPolicy();
-		policy.addRule(new RelationalRule("(clear ?A) (clear ?B) => (move ?A ?B)"));
+		policy.addRule(new RelationalRule(
+				"(clear ?A) (clear ?B) => (move ?A ?B)"));
 		ModularPolicy modPol = new ModularPolicy(policy, lced);
 		assertTrue(modPol.equivalentTo(policy));
-		
-		policy.addRule(new RelationalRule("(highest ?G_0) (clear ?B) => (move ?G_0 ?B)"));
+
+		policy.addRule(new RelationalRule(
+				"(highest ?G_0) (clear ?B) => (move ?G_0 ?B)"));
 		assertFalse(modPol.equivalentTo(policy));
 		modPol = new ModularPolicy(policy, lced);
 		assertTrue(modPol.equivalentTo(policy));
-		
+
 		policy.getRules().remove(1);
 		assertFalse(modPol.equivalentTo(policy));
 	}

@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
 import java.text.DecimalFormat;
@@ -220,8 +221,10 @@ public final class PolicyGenerator implements Serializable {
 		currentRules_.add(rule);
 		// Create a new slot with that rule in it (Min level 2)
 		Slot newSlot = new Slot(rule, false, 0, this);
-		mutateRule(rule, newSlot, -1);
-		slotGenerator_.add(newSlot);
+		if (!slotGenerator_.contains(newSlot)) {
+			mutateRule(rule, newSlot, -1);
+			slotGenerator_.add(newSlot);
+		}
 	}
 
 	/**
@@ -860,9 +863,13 @@ public final class PolicyGenerator implements Serializable {
 						deterministicGeneration, policyOrdering);
 				if (useSlot.objA_) {
 					slotThreshold = useSlot.objB_;
+					// TODO Why not just use uniformly random SD?
 					double slotOrderVal = slotOrdering
-							+ RRLExperiment.random_.nextGaussian()
+							+ (RRLExperiment.random_.nextDouble() - .5) * 4
 							* slotOrderSD;
+					// double slotOrderVal = slotOrdering
+					// + RRLExperiment.random_.nextGaussian()
+					// * slotOrderSD;
 					// Ensure the slot is placed in a unique order - no clashes.
 					while (policyOrdering.containsKey(slotOrderVal))
 						slotOrderVal += ORDER_CLASH_INCREMENT;
@@ -1356,6 +1363,7 @@ public final class PolicyGenerator implements Serializable {
 		buf.append("\n");
 
 		// Output each action mutation tree
+		// TODO Seems there's a bug here which causes an infinite loop.
 		for (String action : actionRules.keySet()) {
 			buf.append("Per action (" + action + ")\n");
 			for (Pair<RelationalRule, Integer> rule : parentlessRules
@@ -1366,12 +1374,51 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
+	 * Saves the representative policy from this generator as a module.
+	 * 
+	 * @param modFile
+	 *            The file to save to.
+	 * @throws IOException
+	 *             Should something go awry...
+	 */
+	public void saveModule(File modFile) throws IOException {
+		FileWriter fw = new FileWriter(modFile);
+		BufferedWriter bw = new BufferedWriter(fw);
+
+		bw.write(determineRepresentativePolicy().toString());
+
+		bw.close();
+		fw.close();
+	}
+
+	/**
 	 * Seed rules from a file as new slots.
 	 * 
 	 * @param ruleFile
 	 */
 	public void seedRules(File ruleFile) {
 		try {
+			// If the file is in the temp folder, will need to extract the final
+			// policy of the file.
+			if (ruleFile.getParent().endsWith("temp")) {
+				loadGreedyGenerator(ruleFile);
+				RelationalPolicy bestPolicy = greedyPolicyMap_
+						.get(greedyPolicyMap_.lastKey());
+				greedyPolicyMap_.clear();
+
+				for (PolicyItem rule : bestPolicy.getRules()) {
+					if (rule instanceof RelationalRule) {
+						if (((RelationalRule) rule).isLegal())
+							createSeededSlot((RelationalRule) rule);
+						else
+							System.out.println("Illegal rule: " + rule
+									+ " was not loaded.");
+					}
+				}
+				return;
+			}
+
+			// Otherwise, load the policy as normal.
 			FileReader fr = new FileReader(ruleFile);
 			BufferedReader br = new BufferedReader(fr);
 

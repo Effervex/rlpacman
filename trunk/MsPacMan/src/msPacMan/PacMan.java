@@ -585,6 +585,8 @@ public class PacMan {
 		
 		if ((args.length >= 1) && (args[0].equals("-one")))
 			pacMan.m_gameModel.oneLife_ = true;
+		if ((args.length >= 1) && (args[0].equals("-one")))
+			pacMan.m_gameModel.oneLife_ = true;
 
 		pacMan.start();
 	}
