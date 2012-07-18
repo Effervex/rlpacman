@@ -28,7 +28,6 @@ public class RLMarioStateSpec extends StateSpec {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
-		// TODO
 		preconds.put("moveTo", "(canJumpOn ?A) (thing ?A) "
 				+ "(distance ?A ?B&~:(<= -16 ?B 16)) (mario ?C)");
 		// Moving away from a given object

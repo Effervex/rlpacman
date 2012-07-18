@@ -84,6 +84,12 @@ public class LocalAgentObservations extends SettlingScan implements
 	/** The local distribution for these agent observations. */
 	private transient LocalCrossEntropyDistribution lced_;
 
+	/** The observed ranges. */
+	private Map<RangeContext, double[]> rangeContexts_;
+
+	/** A static collection of all the active local agent observations. */
+	private transient static Map<GoalCondition, LocalAgentObservations> localAOManager_;
+
 	/**
 	 * The constructor for a new local goal object.
 	 * 
@@ -98,10 +104,25 @@ public class LocalAgentObservations extends SettlingScan implements
 		variantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		observedGoalPredicates_ = MultiMap.createSortedSetMultiMap();
 		localInvariants_ = new InvariantObservations();
+		rangeContexts_ = new HashMap<RangeContext, double[]>();
 
 		EnvironmentAgentObservations.loadAgentObservations();
 
 		ruleMutation_ = new RuleMutation();
+
+		addLAO(this);
+	}
+
+	/**
+	 * Adds a {@link LocalAgentObservations} to the laoManager.
+	 * 
+	 * @param lao
+	 *            The local agent observations to add.
+	 */
+	private static void addLAO(LocalAgentObservations lao) {
+		if (localAOManager_ == null)
+			localAOManager_ = new HashMap<GoalCondition, LocalAgentObservations>();
+		localAOManager_.put(lao.localGoal_, lao);
 	}
 
 	/**
@@ -314,7 +335,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		// Gather the facts
 		Collection<RelationalPredicate> goalActionConds = EnvironmentAgentObservations
 				.getInstance().gatherActionFacts(stateFacts, action,
-						goalReplacements);
+						goalReplacements, rangeContexts_);
 		boolean changed = initLocalActionConds(action.getFactName(),
 				goalActionConds);
 		if (changed)
@@ -664,7 +685,17 @@ public class LocalAgentObservations extends SettlingScan implements
 									invariantGoalActionConditions_.get(action),
 									variantGoalActionConditions_.get(action))
 					+ "\n");
-			localBuf.write("\n");
+			localBuf.write("Observed ranges: [");
+			boolean first = true;
+			for (RangeContext rc : rangeContexts_.keySet()) {
+				if (rc.getAction().equals(action)) {
+					if (!first)
+						buf.write(", ");
+					localBuf.write(rc.toString(rangeContexts_.get(rc)));
+					first = false;
+				}
+			}
+			localBuf.write("]\n\n");
 		}
 
 		localBuf.close();
@@ -833,8 +864,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	public static LocalAgentObservations loadAgentObservations(
 			GoalCondition localGoal, LocalCrossEntropyDistribution lced) {
 		if (ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue()
-				|| Config.getInstance().getSerializedFile() != null
-				|| Config.getInstance().getGeneratorFile() != null) {
+				|| Config.getInstance().shouldLoadAgentObservations()) {
 			// First load the singleton environment AgentObservations.
 			EnvironmentAgentObservations.loadAgentObservations();
 			try {
@@ -844,10 +874,11 @@ public class LocalAgentObservations extends SettlingScan implements
 					ObjectInputStream ois = new ObjectInputStream(fis);
 					LocalAgentObservations lao = (LocalAgentObservations) ois
 							.readObject();
-					lao.lced_ = lced;
 					if (lao != null) {
+						lao.lced_ = lced;
 						if (localGoal.isMainGoal())
 							lao.localGoal_.setAsMainGoal();
+						addLAO(lao);
 						return lao;
 					}
 				}
@@ -856,6 +887,33 @@ public class LocalAgentObservations extends SettlingScan implements
 		}
 		System.out.println("No local agent observations to load.");
 		return new LocalAgentObservations(localGoal, lced);
+	}
+
+	/**
+	 * Gets the maximal bounds of a numerical range using a specific range
+	 * context, if such a range exists.
+	 * 
+	 * @param rangeContext
+	 *            The context of the range being selected.
+	 * @param gc
+	 *            The specific goal of the object accessing the range or null if
+	 *            using main goal.
+	 * @return The maximal bounds of the range.
+	 */
+	public static double[] getActionRanges(RangeContext rangeContext,
+			GoalCondition gc) {
+		if (gc == null || !localAOManager_.containsKey(gc)) {
+			// Use the main goal (or the last one)
+			for (GoalCondition localGC : localAOManager_.keySet()) {
+				gc = localGC;
+				if (gc.isMainGoal())
+					break;
+			}
+		}
+		LocalAgentObservations lao = localAOManager_.get(gc);
+
+		// Get the range from the actions
+		return lao.rangeContexts_.get(rangeContext);
 	}
 
 	/**
@@ -1215,8 +1273,8 @@ public class LocalAgentObservations extends SettlingScan implements
 							subranges.addAll(splitExistingRange(baseRule,
 									condition, i, arg, context));
 						} else {
-							double[] range = EnvironmentAgentObservations
-									.getActionRanges(context);
+							double[] range = getActionRanges(context,
+									localGoal_);
 							if (range != null) {
 								subranges.addAll(createNewSubRanges(baseRule,
 										condition, i, arg.getStringArg(),
@@ -1262,6 +1320,9 @@ public class LocalAgentObservations extends SettlingScan implements
 
 			// Run through the rule conditions, replacing the arguments
 			for (RelationalPredicate cond : ruleConditions) {
+				// If the condition already contains the term, return null.
+				// if (cond.containsArg(goalTerm))
+				// return null;
 				RelationalPredicate specCond = new RelationalPredicate(cond);
 				specCond.replaceArguments(replacementMap, true, false);
 				specConditions.add(specCond);
@@ -1449,7 +1510,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				if (!termPresent) {
 					// For every action term
 					for (int i = 0; i < oldTerms.length; i++) {
-						// If the term is already a goal term, can't swap
+						// If the term is already a goal term, or the rule
+						// already contains the goal term, can't swap
 						if (!RelationalArgument.isGoalCondition(oldTerms[i])) {
 							RelationalRule swappedRule = swapRuleTerm(rule,
 									oldTerms, i, goalTerm);
@@ -1467,5 +1529,9 @@ public class LocalAgentObservations extends SettlingScan implements
 
 			return mutants;
 		}
+	}
+
+	public void cleanup() {
+		EnvironmentAgentObservations.clearInstance();
 	}
 }

@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import cerrla.LocalCrossEntropyDistribution.AlgorithmState;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
@@ -46,9 +47,9 @@ public class CERRLA implements RRLAgent {
 
 	/** The CEDistribution for the environment goal. */
 	private LocalCrossEntropyDistribution mainGoalCECortex_;
-
-	/** The old policy repeat value when not frozen. */
-	private int oldPolicyRepeats_;
+	
+	/** The current run index. */
+	private int currentRunIndex_;
 
 	/**
 	 * 
@@ -147,7 +148,7 @@ public class CERRLA implements RRLAgent {
 					else {
 						// The module may be learned
 						LocalCrossEntropyDistribution newModule = new LocalCrossEntropyDistribution(
-								gc);
+								gc, currentRunIndex_);
 						goalMappedGenerators_.put(gc, newModule);
 					}
 				}
@@ -254,13 +255,10 @@ public class CERRLA implements RRLAgent {
 				.values()) {
 			if (lced == mainGoalCECortex_)
 				lced.finalWrite();
-			else
-				lced.saveModule();
+			lced.saveModule(currentRunIndex_);
 		}
 
-		if (oldPolicyRepeats_ != 0)
-			ProgramArgument.POLICY_REPEATS.setDoubleValue(oldPolicyRepeats_);
-		oldPolicyRepeats_ = 0;
+		mainGoalCECortex_.cleanup();
 		mainGoalCECortex_ = null;
 		goalMappedGenerators_.clear();
 		agentPolicy_.clear();
@@ -269,11 +267,23 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void endEpisode(RRLObservations observations) {
+		AlgorithmState state = mainGoalCECortex_.getState();
+
 		// End the episode for ALL players
 		for (String player : agentPolicy_.keySet()) {
 			ModularPolicy currentPolicy = agentPolicy_.get(player);
 			currentPolicy.noteStepReward(observations.getRewards(player));
 			boolean regeneratePolicy = currentPolicy.endEpisode();
+
+			// Propagate any state changes along
+			if (!state.equals(mainGoalCECortex_.getState())) {
+				state = mainGoalCECortex_.getState();
+				for (LocalCrossEntropyDistribution lced : goalMappedGenerators_
+						.values()) {
+					lced.setState(state);
+				}
+			}
+
 			if (regeneratePolicy)
 				agentPolicy_.put(player,
 						recreateCurrentPolicy(agentPolicy_.values()));
@@ -283,11 +293,6 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void freeze(boolean b) {
-		// During frozen testing, each policy only has one test per episode
-		if (oldPolicyRepeats_ == 0)
-			oldPolicyRepeats_ = ProgramArgument.POLICY_REPEATS.intValue();
-		ProgramArgument.POLICY_REPEATS.setDoubleValue(1);
-
 		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
 				.values())
 			distribution.freeze(b);
@@ -295,6 +300,7 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void initialise(int run) {
+		currentRunIndex_ = run;
 		goalMappedGenerators_ = new HashMap<GoalCondition, LocalCrossEntropyDistribution>();
 		GoalCondition mainGC = Config.getInstance().getGoal();
 		// Load serialised file.

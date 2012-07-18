@@ -59,8 +59,6 @@ public class RLGGMerger {
 				replacementMap);
 		boolean changed = initialCase.isChanged();
 
-		// TODO Seems Carcassonne is still throwing a fit for unifying the first
-		// state in run 3
 		int id = 1;
 		PriorityQueue<MergeCase> pendingUnifications = new PriorityQueue<MergeCase>();
 		pendingUnifications.add(initialCase);

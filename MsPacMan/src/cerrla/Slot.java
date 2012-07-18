@@ -429,17 +429,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 				&& slotMean_ < .5)
 			return false;
 
-		// double threshold = Math.min(slotMean_,
-		// ProgramArgument.SLOT_THRESHOLD.doubleValue());
 		double threshold = Math.min(1.0 / slotLevel_, slotMean_);
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
 		threshold = Math.max(threshold * size(), 1);
-		// double threshold = ProgramArgument.SLOT_THRESHOLD.doubleValue();
-		// if (threshold == -1)
-		// threshold = 1 - 1.0 / size();
-		// threshold = Math.max(Math.pow(threshold, slotLevel_ + 1) * size(),
-		// 1);
 
 		if (klSize() <= threshold)
 			return true;

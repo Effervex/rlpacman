@@ -294,11 +294,11 @@ public class InvariantObservations implements Serializable {
 		}
 
 		// Note ranges
-		for (RelationalPredicate invFact : invariants) {
-			if (invFact.isNumerical()) {
-				noteRanges(oldAction.getFactName(), invFact, actionRanges);
-			}
-		}
+//		for (RelationalPredicate invFact : invariants) {
+//			if (invFact.isNumerical()) {
+//				noteRanges(oldAction.getFactName(), invFact, actionRanges);
+//			}
+//		}
 
 		// Add any remaining action conds to the variants, merging any
 		// numerical ranges together
@@ -315,10 +315,10 @@ public class InvariantObservations implements Serializable {
 				if (!mergedFacts.isEmpty()) {
 					MergedFact unifiedFact = mergedFacts.iterator().next();
 					varFact = unifiedFact.getResultFact();
-					if (oldAction != null) {
-						noteRanges(oldAction.getFactName(), varFact,
-								actionRanges);
-					}
+//					if (oldAction != null) {
+//						noteRanges(oldAction.getFactName(), varFact,
+//								actionRanges);
+//					}
 					// If the range changed, update the variant value
 					if (!varFact.equals(unifiedFact.getUnityFact())) {
 						changed = true;
@@ -332,49 +332,6 @@ public class InvariantObservations implements Serializable {
 		if (changed && oldAction != null)
 			oldAction.setArguments(actionArgs);
 		return changed;
-	}
-
-	/**
-	 * Notes the range from a given fact.
-	 * 
-	 * @param actionName
-	 *            The name of the action being noted.
-	 * @param numberFact
-	 *            The range fact.
-	 * @param actionRanges
-	 *            The map of facts, mapped by factName-range variable.
-	 * @return The range context for the fact if the range beinbg noted is >=
-	 *         the existing noted range. Else, null.
-	 */
-	private static Collection<RangeContext> noteRanges(String actionName,
-			RelationalPredicate numberFact,
-			Map<RangeContext, double[]> actionRanges) {
-		Collection<RangeContext> result = new HashSet<RangeContext>();
-		if (actionRanges == null || !numberFact.isNumerical())
-			return null;
-		RelationalArgument[] factArgs = numberFact.getRelationalArguments();
-		for (int i = 0; i < factArgs.length; i++) {
-			// Only note ranges
-			if (factArgs[i].isRange(false)) {
-				RangeContext context = new RangeContext(i, numberFact,
-						actionName);
-				double[] range = actionRanges.get(result);
-				double[] explicitRange = factArgs[i].getExplicitRange();
-				if (range == null) {
-					range = new double[2];
-					System.arraycopy(explicitRange, 0, range, 0, 2);
-					actionRanges.put(context, range);
-				}
-				// Check that the range is bigger - only return if same or
-				// bigger
-				if (explicitRange[0] <= range[0]
-						&& explicitRange[1] >= range[1]) {
-					System.arraycopy(explicitRange, 0, range, 0, 2);
-					result.add(context);
-				}
-			}
-		}
-		return result;
 	}
 
 	public Collection<String> getGeneralVariants() {

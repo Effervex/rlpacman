@@ -155,8 +155,8 @@ public class BackgroundKnowledgeTest {
 	//@Test
 	public void testSimplifyCarcassonne() {
 		StateSpec.initInstance("jCloisterZone.Carcassonne");
-		LocalAgentObservations.loadAgentObservations(null, GoalCondition
-				.parseGoalCondition("cool"));
+		LocalAgentObservations.loadAgentObservations(GoalCondition
+				.parseGoalCondition("cool"), null);
 
 		BackgroundKnowledge bk = new BackgroundKnowledge(
 				"(controls ?A ?C) => (tileEdge ? ? ?C)");

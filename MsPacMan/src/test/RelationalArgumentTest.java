@@ -58,7 +58,18 @@ public class RelationalArgumentTest {
 		assertTrue(ra.isVariable());
 		assertFalse(ra.isConstant());
 		assertTrue(ra.isRange(false));
+		assertEquals(ra.getRangeBounds()[0], new RangeBound(0));
+		assertEquals(ra.getRangeBounds()[1], new RangeBound(10));
+		assertEquals(ra.getRangeFrac()[0], 0, 0);
+		assertEquals(ra.getRangeFrac()[1], 1, 0);
 		assertTrue(ra.isNumber());
+		
+		ra = new RelationalArgument("?#_0&:(<= ?#_0min ?#_0 0.0)");
+		assertTrue(ra.isRange(false));
+		assertEquals(ra.getRangeBounds()[0], new RangeBound("?#_0min"));
+		assertEquals(ra.getRangeBounds()[1], new RangeBound(0));
+		assertEquals(ra.getRangeFrac()[0], 0, 0);
+		assertEquals(ra.getRangeFrac()[1], 1, 0);
 	}
 
 	@Test

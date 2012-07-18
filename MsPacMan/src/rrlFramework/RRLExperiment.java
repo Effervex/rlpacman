@@ -446,6 +446,7 @@ public class RRLExperiment {
 		// Load existing runs and start from there.
 		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
 			run(i, Config.getInstance().getMaxEpisodes());
+			Config.getInstance().removeSerialised();
 		}
 
 		// Compile the files

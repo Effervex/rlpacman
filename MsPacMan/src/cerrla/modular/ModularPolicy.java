@@ -69,8 +69,8 @@ public class ModularPolicy extends RelationalPolicy {
 
 	/** The rewards this policy achieved for each episode. */
 	private ArrayList<double[]> policyRewards_;
-	
-	
+
+
 
 	/** The rules that have fired. */
 	private Set<RelationalRule> triggeredRules_;
@@ -374,13 +374,15 @@ public class ModularPolicy extends RelationalPolicy {
 		// generator
 		if (!ceDistribution_.getGoalCondition().isMainGoal()
 				&& !goalAchievedEpisode_) {
+			if (episodeReward_ == null)
+				episodeReward_ = new double[2];
 			episodeReward_[0] = MINIMUM_REWARD;
 			episodeReward_[1] = MINIMUM_REWARD;
 		}
 
 		// Note the episode reward in the generator.
 		if (ceDistribution_.getGoalCondition().isMainGoal()
-				|| episodeReward_[0] != 0) {
+				|| episodeReward_ != null) {
 			policyRewards_.add(episodeReward_);
 			episodeReward_ = null;
 		}
@@ -394,11 +396,12 @@ public class ModularPolicy extends RelationalPolicy {
 		}
 
 		// Check if sample needs to be recorded
-		if (policyRewards_.size() >= ProgramArgument.POLICY_REPEATS.intValue()) {
+		if (policyRewards_.size() >= ceDistribution_.getPolicyRepeats()) {
 			// Record the sample.
 			ceDistribution_.recordSample(this, policyRewards_);
 			regeneratePolicy = true;
 		}
+
 		return regeneratePolicy;
 	}
 
@@ -548,9 +551,6 @@ public class ModularPolicy extends RelationalPolicy {
 	 */
 	@Recursive
 	public boolean noteStepReward(double[] reward) {
-		if (episodeReward_ == null)
-			episodeReward_ = new double[2];
-
 		// Note reward if a rule in this policy fired (or it's the main policy).
 		boolean noteReward = ceDistribution_.getGoalCondition().isMainGoal()
 				|| !firedLastStep_.isEmpty();
@@ -569,10 +569,14 @@ public class ModularPolicy extends RelationalPolicy {
 				// If the episode has started and the goal hasn't been achieved,
 				// note reward.
 				if (episodeStarted_ && !goalAchievedEpisode_) {
+					if (episodeReward_ == null)
+						episodeReward_ = new double[2];
 					episodeReward_[0] += SUB_GOAL_REWARD;
 					episodeReward_[1] += SUB_GOAL_REWARD;
 				}
 			} else {
+				if (episodeReward_ == null)
+					episodeReward_ = new double[2];
 				episodeReward_[0] += reward[0];
 				episodeReward_[1] += reward[1];
 			}
@@ -627,8 +631,7 @@ public class ModularPolicy extends RelationalPolicy {
 	 * @return True if this policy has collected enough rewards to be noted.
 	 */
 	public boolean shouldRegenerate() {
-		return policyRewards_.size() >= ProgramArgument.POLICY_REPEATS
-				.intValue();
+		return policyRewards_.size() >= ceDistribution_.getPolicyRepeats();
 	}
 
 	public int size() {
@@ -711,6 +714,6 @@ public class ModularPolicy extends RelationalPolicy {
 	}
 
 	public void clearPolicyRewards() {
-		policyRewards_.clear();	
+		policyRewards_.clear();
 	}
 }

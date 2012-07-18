@@ -18,7 +18,7 @@ import util.Pair;
 
 public enum ProgramArgument implements Serializable {
 	ALPHA(0.6, "alpha", null, ParameterType.UPDATING, "Step size update"),
-	BETA(0.001, "beta", null, ParameterType.CONVERGENCE,
+	BETA(0.01, "beta", null, ParameterType.CONVERGENCE,
 			"If KL sum updates are less than Beta * Alpha"),
 	BOUNDED_ELITES(true, "boundedElites", null, ParameterType.UPDATING,
 			"If the minimum number of elites = |D_S|."),
@@ -82,7 +82,7 @@ public enum ProgramArgument implements Serializable {
 			"If the entire elites are reset when a new slot is created."),
 	RESET_SLOT_COUNT(false, "resetSlotCount", null, ParameterType.UPDATING,
 			"Resets the update counter in the slot after splitting."),
-	RETEST_STALE_POLICIES(true, "retestStale", null, ParameterType.SAMPLING,
+	RETEST_STALE_POLICIES(false, "retestStale", null, ParameterType.SAMPLING,
 			"If stale policies should be immediately retested."),
 	RHO(0.05, "rho", null, ParameterType.UPDATING, "N_E's proportion of N"),
 	SAVE_EXPERIMENT_FILES(false, "saveExperimentFiles", "-m",

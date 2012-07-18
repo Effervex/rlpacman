@@ -368,4 +368,13 @@ public class Config {
 	public String getGoalString() {
 		return goalArg_;
 	}
+
+	public void removeSerialised() {
+		serializedFile_ = null;
+	}
+
+	public boolean shouldLoadAgentObservations() {
+		return serializedFile_ != null || generatorFile_ != null
+				|| ruleFile_ != null;
+	}
 }

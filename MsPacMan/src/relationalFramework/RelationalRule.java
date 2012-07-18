@@ -427,9 +427,9 @@ public class RelationalRule implements Serializable,
 		unboundTypeMap_ = null;
 		simplifiedConditions_ = new ArrayList<RelationalPredicate>();
 		Collection<RelationalPredicate> simplified = rawConditions_;
-		if (lced_ != null)
+		if (lced_ != null && ruleAction_ != null)
 			simplified = lced_.getLocalAgentObservations().simplifyRule(
-					rawConditions_, null, ruleAction_, false);
+					rawConditions_, null, ruleAction_, true);
 		if (simplified == null)
 			return;
 
@@ -444,6 +444,9 @@ public class RelationalRule implements Serializable,
 		MultiMap<RelationalArgument, Integer> indexedUnbounds = MultiMap
 				.createListMultiMap();
 
+		// TODO Test code: Count clears
+		int clearCount = 0;
+		
 		// Scan each condition
 		int index = 0;
 		for (RelationalPredicate condition : simplified) {
@@ -511,6 +514,8 @@ public class RelationalRule implements Serializable,
 						condition.isNegated());
 
 				simplifiedConditions_.add(condition);
+				if (condition.getFactName().equals("clear") || condition.getFactName().equals("highest") || condition.getFactName().equals("floor"))
+					clearCount++;
 				index++;
 			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED)) {
 				simplifiedConditions_.add(condition);

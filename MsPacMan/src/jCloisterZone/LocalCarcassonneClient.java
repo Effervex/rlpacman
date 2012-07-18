@@ -20,7 +20,6 @@ import com.jcloisterzone.game.CustomRule;
 import com.jcloisterzone.game.Game;
 import com.jcloisterzone.game.PlayerSlot;
 import com.jcloisterzone.game.Snapshot;
-import com.jcloisterzone.game.phase.CreateGamePhase;
 import com.jcloisterzone.game.phase.Phase;
 import com.jcloisterzone.rmi.ServerIF;
 import com.jcloisterzone.ui.Client;

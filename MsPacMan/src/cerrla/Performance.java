@@ -44,12 +44,12 @@ public class Performance implements Serializable {
 	private SortedMap<Integer, Double[]> performanceDetails_;
 
 	/** If the performance is frozen. */
-	private boolean frozen_;
+	private transient boolean frozen_;
 	/** A queue of the standard deviation for each single policy. */
 	private Queue<Double> internalSDs_;
-	/** The minimum reward recieved in the episodeRewards. */
+	/** The minimum reward received in the episodeRewards. */
 	private double minEpisodeReward_;
-	/** Notes the minimum and maximum reward recieved. */
+	/** Notes the minimum and maximum reward received. */
 	private double[] minMaxReward_;
 	/** If this performance is for a modular generator. */
 	private boolean modularPerformance_;
@@ -75,9 +75,11 @@ public class Performance implements Serializable {
 	 * 
 	 * @param modulePerformance
 	 *            A throwaway boolean to denote modular performance.
+	 * @param run
+	 *            The current run number.
 	 */
-	public Performance(boolean modulePerformance) {
-		this(0);
+	public Performance(boolean modulePerformance, int run) {
+		this(run);
 		modularPerformance_ = true;
 	}
 
@@ -137,6 +139,10 @@ public class Performance implements Serializable {
 			String sdString = formatter.format(meanDeviation);
 			System.out.println("Average performance: " + meanString + " "
 					+ SD_SYMBOL + " " + sdString);
+		}
+		if (frozen_) {
+			System.out.println(currentEpisode + ": "
+					+ details[PerformanceDetails.MEAN.ordinal()]);
 		}
 	}
 
@@ -277,7 +283,7 @@ public class Performance implements Serializable {
 
 			wr = new FileWriter(mutationTreeFile);
 			buf = new BufferedWriter(wr);
-			policyGenerator.saveMutationTree(buf);
+			// policyGenerator.saveMutationTree(buf);
 
 			buf.close();
 			wr.close();
@@ -398,24 +404,28 @@ public class Performance implements Serializable {
 			return;
 
 		Double[] details = performanceDetails_.get(episode);
-		details[PerformanceDetails.ELITEMEAN.ordinal()] = meanEliteValue;
-		details[PerformanceDetails.ELITEMAX.ordinal()] = maxEliteValue;
+		if (details != null) {
+			details[PerformanceDetails.ELITEMEAN.ordinal()] = meanEliteValue;
+			details[PerformanceDetails.ELITEMAX.ordinal()] = maxEliteValue;
+		}
 	}
 
 	public void noteGeneratorDetails(int episode, PolicyGenerator generator,
 			int population, double convergence) {
 		Double[] details = performanceDetails_.get(episode);
-		details[PerformanceDetails.NUMSLOTS.ordinal()] = Double
-				.valueOf(generator.size());
-		double numRules = 0;
-		for (Slot s : generator.getGenerator()) {
-			numRules += s.size();
+		if (details != null) {
+			details[PerformanceDetails.NUMSLOTS.ordinal()] = Double
+					.valueOf(generator.size());
+			double numRules = 0;
+			for (Slot s : generator.getGenerator()) {
+				numRules += s.size();
+			}
+			details[PerformanceDetails.NUMRULES.ordinal()] = numRules;
+			details[PerformanceDetails.POPULATION.ordinal()] = Double
+					.valueOf(population);
+			details[PerformanceDetails.CONVERGENCE.ordinal()] = Math.max(0,
+					convergence);
 		}
-		details[PerformanceDetails.NUMRULES.ordinal()] = numRules;
-		details[PerformanceDetails.POPULATION.ordinal()] = Double
-				.valueOf(population);
-		details[PerformanceDetails.CONVERGENCE.ordinal()] = Math.max(0,
-				convergence);
 	}
 
 	/**
@@ -487,8 +497,8 @@ public class Performance implements Serializable {
 		// Determine the temp filenames
 		File tempPerf = null;
 		if (modularPerformance_) {
-			File modTemps = LocalCrossEntropyDistribution
-					.getModFolder(distribution.getGoalCondition().toString());
+			File modTemps = LocalCrossEntropyDistribution.getModFolder(
+					distribution.getGoalCondition().toString(), runIndex_);
 			tempPerf = new File(modTemps, distribution.getGoalCondition()
 					+ "performance.txt");
 		} else {
@@ -522,7 +532,7 @@ public class Performance implements Serializable {
 								new File(
 										tempPerf.getAbsolutePath()
 												+ LocalCrossEntropyDistribution.SERIALISED_SUFFIX),
-								!modularPerformance_);
+								!modularPerformance_, runIndex_);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -582,12 +592,14 @@ public class Performance implements Serializable {
 			long pos = perfFile.length() - 1;
 			StringBuffer line = new StringBuffer();
 			char c;
+			boolean foundIt = false;
 			do {
 				raf.seek(pos);
 				c = (char) raf.read();
+				foundIt |= Character.isDigit(c);
 				line.append(c);
 				pos--;
-			} while (Character.isDigit(c) || c == ':');
+			} while (!foundIt || Character.isDigit(c) || c == ':');
 			raf.close();
 			String time = line.reverse().toString().trim();
 			String[] timeSplit = time.split(":");
