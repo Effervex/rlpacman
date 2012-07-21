@@ -690,7 +690,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			for (RangeContext rc : rangeContexts_.keySet()) {
 				if (rc.getAction().equals(action)) {
 					if (!first)
-						buf.write(", ");
+						localBuf.write(", ");
 					localBuf.write(rc.toString(rangeContexts_.get(rc)));
 					first = false;
 				}
@@ -811,8 +811,10 @@ public class LocalAgentObservations extends SettlingScan implements
 				simplified, exitIfIllegalRule, false,
 				localInvariants_.getSpecificInvariants());
 		// If rule is illegal, return null
-		if (exitIfIllegalRule && result == -1)
+		if (result == -1) {
+//			System.out.println("Illegal rule conds: " + simplified);
 			return null;
+		}
 
 		// Check the rule contains only valid goal facts
 		Map<String, String> replacementMap = new HashMap<String, String>();
@@ -879,6 +881,14 @@ public class LocalAgentObservations extends SettlingScan implements
 						if (localGoal.isMainGoal())
 							lao.localGoal_.setAsMainGoal();
 						addLAO(lao);
+
+						// Might need to deal with deprecated range contexts
+						if (lao.rangeContexts_ == null) {
+							lao.rangeContexts_ = new HashMap<RangeContext, double[]>();
+							EnvironmentAgentObservations.getInstance()
+									.addDeprecatedRanges(lao.rangeContexts_);
+						}
+
 						return lao;
 					}
 				}
@@ -1038,6 +1048,9 @@ public class LocalAgentObservations extends SettlingScan implements
 			// Create the specialisation
 			RelationalRule specialisation = new RelationalRule(specConditions,
 					action, rule, lced_);
+			if (!specialisation.isLegal())
+				return;
+			
 			specialisation.setQueryParams(rule.getQueryParameters());
 			if (condition.isNumerical()
 					&& !specialisation.getSimplifiedConditions(false).contains(
@@ -1052,8 +1065,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				}
 			}
 
-			if (specialisation.isLegal()
-					&& !specialisations.contains(specialisation)
+			if (!specialisations.contains(specialisation)
 					&& !specialisation.equals(rule)) {
 				// Only add specialisations if they contain goal
 				// conditions (if there are goal conditions).
@@ -1442,26 +1454,27 @@ public class LocalAgentObservations extends SettlingScan implements
 					rule.getRawConditions(true));
 			RelationalPredicate action = rule.getAction();
 			RelationalArgument[] actionTerms = action.getRelationalArguments();
-			Set<RelationalArgument> goalActionTerms = new HashSet<RelationalArgument>();
-			for (RelationalArgument actionTerm : actionTerms)
-				if (actionTerm.isGoalVariable())
-					goalActionTerms.add(actionTerm);
+			// Set<RelationalArgument> goalActionTerms = new
+			// HashSet<RelationalArgument>();
+			// for (RelationalArgument actionTerm : actionTerms)
+			// if (actionTerm.isGoalVariable())
+			// goalActionTerms.add(actionTerm);
 
 			// Add conditions, one-by-one, using both negation and regular
 			for (RelationalPredicate condition : actionConditions) {
 				// If adding a goal term, be sure it is not an action term.
-				if (!goalActionTerms.isEmpty()) {
-					boolean doNotAdd = false;
-					for (RelationalArgument term : condition
-							.getRelationalArguments())
-						if (goalActionTerms.contains(term)) {
-							doNotAdd = true;
-							break;
-						}
-					
-					if (doNotAdd)
-						continue;
-				}
+				// if (!goalActionTerms.isEmpty()) {
+				// boolean doNotAdd = false;
+				// for (RelationalArgument term : condition
+				// .getRelationalArguments())
+				// if (goalActionTerms.contains(term)) {
+				// doNotAdd = true;
+				// break;
+				// }
+				//
+				// if (doNotAdd)
+				// continue;
+				// }
 
 				specialisations
 						.addAll(groundAnonymousTerms(condition, conditions,
@@ -1532,6 +1545,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	}
 
 	public void cleanup() {
+		localAOManager_ = null;
 		EnvironmentAgentObservations.clearInstance();
 	}
 }

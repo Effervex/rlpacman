@@ -429,4 +429,15 @@ public class TestTest {
 		assertTrue(pq.poll() == 6);
 		assertTrue(pq.poll() == 10);
 	}
+	
+	@Test
+	public void testDouble() {
+		double prob = 0.8675432;
+		double smallProb = 1E-16;
+		double tinyProb = 1E-17;
+		assertTrue(prob + smallProb != prob);
+		assertTrue(smallProb + tinyProb != smallProb);
+		// Value is too small.
+		assertFalse(prob + tinyProb != prob);
+	}
 }

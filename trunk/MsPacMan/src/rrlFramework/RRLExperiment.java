@@ -71,22 +71,36 @@ public class RRLExperiment {
 		// Find the last file created
 		int run = startPoint;
 		result[0] = run;
-		if (Config.getInstance().getGeneratorFile() != null)
+		if (Config.getInstance().getSerializedFile() != null)
 			return result;
 
 		File lastPerf = null;
-		File tempPerf = new File(Config.TEMP_FOLDER + "/"
-				+ Config.getInstance().getPerformanceFile().getName() + run);
+		String tempPerfName = Config.TEMP_FOLDER + "/"
+				+ Config.getInstance().getPerformanceFile().getName() + run;
+		if (Config.getInstance().getGeneratorFile() != null)
+			tempPerfName = tempPerfName + "greedy";
+		File tempPerf = new File(tempPerfName);
 		while (tempPerf.exists()) {
 			run++;
 			lastPerf = tempPerf;
-			tempPerf = new File(Config.TEMP_FOLDER + "/"
-					+ Config.getInstance().getPerformanceFile().getName() + run);
+
+			tempPerfName = Config.TEMP_FOLDER + "/"
+					+ Config.getInstance().getPerformanceFile().getName() + run;
+			if (Config.getInstance().getGeneratorFile() != null)
+				tempPerfName = tempPerfName + "greedy";
+			tempPerf = new File(tempPerfName);
 		}
 
 		// If there aren't any performance files, return 0,0
 		if (lastPerf == null)
 			return result;
+		
+		// If greedy generators, a file means the run is complete
+		if (Config.getInstance().getGeneratorFile() != null) {
+			result[0] = run + 1;
+			return result;
+		}
+			
 
 		// Otherwise, scan the last file for how far in it got through
 		try {

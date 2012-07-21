@@ -420,8 +420,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 					double maxBound = (rangeBounds_[1].getValue(minMax));
 					double diff = maxBound - minBound;
 					return "(" + (minBound + diff * rangeFrac_[0]) + " <= "
-							+ stringArg_ + " <= "
-							+ (minBound + diff * rangeFrac_[1]) + ")";
+					+ stringArg_ + " <= "
+					+ (minBound + diff * rangeFrac_[1]) + ")";
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
