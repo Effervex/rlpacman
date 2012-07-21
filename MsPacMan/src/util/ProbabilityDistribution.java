@@ -22,6 +22,8 @@ import java.util.Set;
 public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 	private static final long serialVersionUID = 297675144227949310L;
 	public static final int MAX_RULES_STRING = 5;
+	/** If probabilities are smaller than this, the probability is 0. */
+	public static final double MIN_PROB = 1E-15;
 	/** The instances in the distribution with associated weights. */
 	private Map<T, Double> itemProbs_;
 
@@ -513,8 +515,15 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 
 		if (elementArray_ == null) {
 			probArray_ = null;
-			elementArray_ = (T[]) new Object[itemProbs_.size()];
-			elementArray_ = itemProbs_.keySet().toArray(elementArray_);
+			// Need to use flexible element array which ignores extremely low
+			// probability items
+			ArrayList<T> elementArray = new ArrayList<T>();
+			for (T element : itemProbs_.keySet()) {
+				if (itemProbs_.get(element) > MIN_PROB)
+					elementArray.add(element);
+			}
+			elementArray_ = (T[]) new Object[elementArray.size()];
+			elementArray_ = elementArray.toArray(elementArray_);
 		}
 		if (rebuildProbs_ || probArray_ == null)
 			buildProbTree();
@@ -731,9 +740,16 @@ public class ProbabilityDistribution<T> implements Collection<T>, Serializable {
 		double observedProb = Math.min(count / numSamples, 1);
 		// Update the value
 		double newValue = stepSize * observedProb + (1 - stepSize) * oldValue;
+		if (newValue <= MIN_PROB) {
+			if (oldValue != 0)
+				elementArray_ = null;
+			newValue = 0;
+		}
+		if (newValue >= 1 - MIN_PROB)
+			newValue = 1;
 		// Set the new value.
 		itemProbs_.put(element, newValue);
-		rebuildProbs_ = true;
+		rebuildProbs_ |= oldValue != newValue;
 		klSize_ = 0;
 
 		// TODO Note the '2' coefficient. The maximum (normalised) divergence

@@ -591,7 +591,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					exitIfIllegalRule, onlyEquivalencies,
 					localConditionInvariants);
 			changed |= (simplResult == 1);
-			if (simplResult == -1 && exitIfIllegalRule)
+			if (simplResult == -1)
 				return -1;
 		} while (simplResult == 1);
 		return (changed) ? 1 : 0;
@@ -670,6 +670,21 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
+	 * Gets the maximal bounds of a numerical range using a specific range
+	 * context, if such a range exists.
+	 * 
+	 * @param rangeContext
+	 *            The context of the range being selected.
+	 * @return The maximal bounds of the range.
+	 */
+	@Deprecated
+	public void addDeprecatedRanges(Map<RangeContext, double[]> newRangeContexts) {
+		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
+			newRangeContexts.putAll(abo.actionRanges_);
+		}
+	}
+
+	/**
 	 * An internal class to note the action-based observations.
 	 * 
 	 * @author Sam Sarjant
@@ -682,6 +697,13 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * constants if the action always takes a constant.
 		 */
 		private RelationalPredicate action_;
+
+		/**
+		 * Mapped by pair: fact name and range variable, observed maximal ranges
+		 * for the conditions seen in the action.
+		 */
+		@Deprecated
+		private Map<RangeContext, double[]> actionRanges_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<RelationalPredicate> invariantActionConditions_;
@@ -794,6 +816,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 */
 		private void noteRange(RelationalPredicate numberFact,
 				Map<RangeContext, double[]> actionRanges) {
+			
 			RelationalArgument[] factArgs = numberFact.getRelationalArguments();
 			for (int i = 0; i < factArgs.length; i++) {
 				// Only note ranges

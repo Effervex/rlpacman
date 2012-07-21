@@ -181,9 +181,11 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			policyGenerator_.mutateRLGGRules();
 		}
 
-		File seedRules = Config.getInstance().getSeedRuleFile();
-		if (seedRules != null)
-			policyGenerator_.seedRules(seedRules);
+		if (Config.getInstance() != null) {
+			File seedRules = Config.getInstance().getSeedRuleFile();
+			if (seedRules != null)
+				policyGenerator_.seedRules(seedRules);
+		}
 
 		setState(AlgorithmState.TRAINING);
 	}
@@ -499,7 +501,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		for (Iterator<ModularPolicy> iter = undertestedPolicies_.iterator(); iter
 				.hasNext();) {
 			ModularPolicy undertested = iter.next();
-			if (undertested.shouldRegenerate() || !isValidSample(undertested, false))
+			if (undertested.shouldRegenerate()
+					|| !isValidSample(undertested, false))
 				// If the element is fully tested, remove it.
 				iter.remove();
 			else if (!existingSubGoals.contains(undertested)) {
@@ -568,7 +571,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		}
 
 		// Check elite convergence
-		if (ProgramArgument.ELITES_CONVERGENCE.booleanValue()
+		if (ProgramArgument.ELITES_CONVERGENCE.booleanValue() && !elites_.isEmpty()
 				&& elites_.size() >= population_
 						* (1 - ProgramArgument.RHO.doubleValue())
 				&& elites_.first().getValue() == elites_.last().getValue()
@@ -642,11 +645,13 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			// Update distributions (depending on number of elites)
 			updateDistributions(elites_, population_, numElites_);
 
+			// TODO Change this to only note if sub-goal dists are USED.
 			// Noting relevant sub-goal distributions
 			if (relevantSubDistEpisodeMap_ == null)
 				relevantSubDistEpisodeMap_ = new HashMap<LocalCrossEntropyDistribution, Integer>();
+
 			Collection<ModularPolicy> subPols = sample.getAllPolicies(false,
-					null);
+					true, null);
 			for (ModularPolicy subPol : subPols) {
 				if (subPol != sample)
 					relevantSubDistEpisodeMap_.put(
@@ -992,10 +997,10 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		// If frozen, only once
 		if (frozen_)
 			return 1;
-		
+
 		// If modular policy, test twice as long
-//		if (!goalCondition_.isMainGoal())
-//			return ProgramArgument.POLICY_REPEATS.intValue() * 2;
+		if (!goalCondition_.isMainGoal())
+			return ProgramArgument.POLICY_REPEATS.intValue() * 2;
 		return ProgramArgument.POLICY_REPEATS.intValue();
 	}
 }

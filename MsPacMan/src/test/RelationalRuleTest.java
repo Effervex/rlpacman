@@ -21,7 +21,7 @@ import cerrla.modular.GoalCondition;
 public class RelationalRuleTest {
 	@Before
 	public void setUp() throws Exception {
-		
+
 		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
 	}
 
@@ -247,6 +247,19 @@ public class RelationalRuleTest {
 				StateSpec.toRelationalPredicate("(move ?A ?B)"), null, lced);
 		List<RelationalPredicate> simpConds = rule
 				.getSimplifiedConditions(true);
+		assertEquals(simpConds.size(), 3);
+		assertTrue(simpConds.contains(StateSpec.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simpConds.contains(StateSpec.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simpConds.contains(StateSpec.toRelationalPredicate("(block ?A)")));
+
+		conditions = new ArrayList<RelationalPredicate>();
+		conditions.add(StateSpec.toRelationalPredicate("(clear ?A)"));
+		conditions.add(StateSpec.toRelationalPredicate("(floor ?B)"));
+		conditions.add(StateSpec.toRelationalPredicate("(above ?A ?G_0)"));
+		conditions.add(StateSpec.toRelationalPredicate("(not (highest ?B))"));
+		rule = new RelationalRule(conditions,
+				StateSpec.toRelationalPredicate("(move ?A ?B)"), null, lced);
+		simpConds = rule.getSimplifiedConditions(true);
 		assertEquals(simpConds.size(), 4);
 	}
 }

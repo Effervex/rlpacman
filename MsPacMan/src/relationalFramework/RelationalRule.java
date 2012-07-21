@@ -429,7 +429,7 @@ public class RelationalRule implements Serializable,
 		Collection<RelationalPredicate> simplified = rawConditions_;
 		if (lced_ != null && ruleAction_ != null)
 			simplified = lced_.getLocalAgentObservations().simplifyRule(
-					rawConditions_, null, ruleAction_, true);
+					rawConditions_, null, ruleAction_, false);
 		if (simplified == null)
 			return;
 
@@ -443,9 +443,6 @@ public class RelationalRule implements Serializable,
 		// Unbound collections
 		MultiMap<RelationalArgument, Integer> indexedUnbounds = MultiMap
 				.createListMultiMap();
-
-		// TODO Test code: Count clears
-		int clearCount = 0;
 		
 		// Scan each condition
 		int index = 0;
@@ -514,8 +511,6 @@ public class RelationalRule implements Serializable,
 						condition.isNegated());
 
 				simplifiedConditions_.add(condition);
-				if (condition.getFactName().equals("clear") || condition.getFactName().equals("highest") || condition.getFactName().equals("floor"))
-					clearCount++;
 				index++;
 			} else if (condition.getFactName().equals(StateSpec.GOALARGS_PRED)) {
 				simplifiedConditions_.add(condition);
@@ -1083,7 +1078,7 @@ public class RelationalRule implements Serializable,
 			String conditionString, RelationalPredicate action) {
 		List<RelationalPredicate> conds = null;
 		conds = new ArrayList<RelationalPredicate>();
-		Pattern p = Pattern.compile("\\(.+?\\)( |$)");
+		Pattern p = Pattern.compile("\\(.+?\\)(?=( (\\(|$))|$)");
 		Matcher m = p.matcher(conditionString);
 		while (m.find()) {
 			RelationalPredicate cond = StateSpec.toRelationalPredicate(m

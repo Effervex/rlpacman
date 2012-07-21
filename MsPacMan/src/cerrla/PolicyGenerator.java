@@ -224,7 +224,9 @@ public final class PolicyGenerator implements Serializable {
 		if (!slotGenerator_.contains(newSlot)) {
 			mutateRule(rule, newSlot, -1);
 			slotGenerator_.add(newSlot);
-		}
+		} else
+			newSlot = slotGenerator_.findMatch(newSlot);
+		newSlot.setSelectionProb(1);
 	}
 
 	/**
@@ -863,9 +865,8 @@ public final class PolicyGenerator implements Serializable {
 						deterministicGeneration, policyOrdering);
 				if (useSlot.objA_) {
 					slotThreshold = useSlot.objB_;
-					// TODO Why not just use uniformly random SD?
 					double slotOrderVal = slotOrdering
-							+ (RRLExperiment.random_.nextDouble() - .5) * 4
+							+ RRLExperiment.random_.nextGaussian()
 							* slotOrderSD;
 					// double slotOrderVal = slotOrdering
 					// + RRLExperiment.random_.nextGaussian()
@@ -1102,8 +1103,15 @@ public final class PolicyGenerator implements Serializable {
 					while (ruleOrder.containsKey(order))
 						order += ORDER_CLASH_INCREMENT;
 
-					RelationalRule probableRule = new RelationalRule(m.group(3));
-					ruleOrder.put(order, probableRule);
+					RelationalRule probableRule;
+					String ruleString = m.group(3);
+					try {
+						probableRule = new RelationalRule(ruleString);
+						ruleOrder.put(order, probableRule);
+					} catch (Exception e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 
 				recordPolicy = true;
@@ -1117,7 +1125,6 @@ public final class PolicyGenerator implements Serializable {
 						RelationalRule rule = ruleOrder.get(orders);
 						policy.addRule(rule);
 					}
-					policy.toString();
 					greedyPolicyMap_.put(episode, policy);
 
 					recordPolicy = false;

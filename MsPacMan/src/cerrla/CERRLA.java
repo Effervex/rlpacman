@@ -184,7 +184,7 @@ public class CERRLA implements RRLAgent {
 		// First, determine which policies already exist
 		Collection<ModularPolicy> subGoalPolicies = new HashSet<ModularPolicy>();
 		for (ModularPolicy modPol : existingPolicies)
-			subGoalPolicies = modPol.getAllPolicies(true, subGoalPolicies);
+			subGoalPolicies = modPol.getAllPolicies(true, false, subGoalPolicies);
 
 		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
 				null);

@@ -475,14 +475,20 @@ public class ModularPolicy extends RelationalPolicy {
 	 * 
 	 * @param undertestedOnly
 	 *            If only collecting undertested policies.
+	 * @param firedOnly
+	 *            If only noting fired policies.
+	 * @param recursiveCollection
+	 *            A set of the policies collected recursively.
 	 * @return A collection of policies of size at least 1.
 	 */
 	public Collection<ModularPolicy> getAllPolicies(boolean undertestedOnly,
-			Collection<ModularPolicy> recursiveCollection) {
+			boolean firedOnly, Collection<ModularPolicy> recursiveCollection) {
 		// Initialise recursive collection.
 		if (recursiveCollection == null)
 			recursiveCollection = new HashSet<ModularPolicy>();
 		if (undertestedOnly && shouldRegenerate())
+			return recursiveCollection;
+		if (firedOnly && triggeredRules_.isEmpty())
 			return recursiveCollection;
 
 		recursiveCollection.add(this);
@@ -491,7 +497,8 @@ public class ModularPolicy extends RelationalPolicy {
 		for (ModularSubGoal child : childrenPolicies_.values()) {
 			ModularPolicy childPol = child.getModularPolicy();
 			if (childPol != null)
-				childPol.getAllPolicies(undertestedOnly, recursiveCollection);
+				childPol.getAllPolicies(undertestedOnly, firedOnly,
+						recursiveCollection);
 		}
 
 		return recursiveCollection;
