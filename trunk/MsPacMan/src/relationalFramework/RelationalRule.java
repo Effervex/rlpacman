@@ -429,7 +429,7 @@ public class RelationalRule implements Serializable,
 		Collection<RelationalPredicate> simplified = rawConditions_;
 		if (lced_ != null && ruleAction_ != null)
 			simplified = lced_.getLocalAgentObservations().simplifyRule(
-					rawConditions_, null, ruleAction_, false);
+					rawConditions_, null, ruleAction_, true);
 		if (simplified == null)
 			return;
 

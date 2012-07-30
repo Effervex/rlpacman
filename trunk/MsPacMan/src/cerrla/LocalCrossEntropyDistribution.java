@@ -279,8 +279,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			// System.out.println(StateSpec.extractFacts(state));
 			ValueVector vv = new ValueVector();
 			goalRule_.setParameters(goalReplacements);
-			for (RelationalArgument param : goalRule_.getParameters())
-				vv.add(param.toString());
+			if (goalRule_.getParameters() != null)
+				for (RelationalArgument param : goalRule_.getParameters())
+					vv.add(param.toString());
 
 			// Run the query
 			String query = StateSpec.getInstance().getRuleQuery(goalRule_);
@@ -571,7 +572,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 		}
 
 		// Check elite convergence
-		if (ProgramArgument.ELITES_CONVERGENCE.booleanValue() && !elites_.isEmpty()
+		if (ProgramArgument.ELITES_CONVERGENCE.booleanValue()
+				&& !elites_.isEmpty()
 				&& elites_.size() >= population_
 						* (1 - ProgramArgument.RHO.doubleValue())
 				&& elites_.first().getValue() == elites_.last().getValue()

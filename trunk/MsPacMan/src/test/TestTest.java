@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 
 import relationalFramework.StateSpec;
 
+import java.awt.image.SampleModel;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,11 +17,15 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import jess.Fact;
@@ -429,7 +434,7 @@ public class TestTest {
 		assertTrue(pq.poll() == 6);
 		assertTrue(pq.poll() == 10);
 	}
-	
+
 	@Test
 	public void testDouble() {
 		double prob = 0.8675432;
@@ -439,5 +444,43 @@ public class TestTest {
 		assertTrue(smallProb + tinyProb != smallProb);
 		// Value is too small.
 		assertFalse(prob + tinyProb != prob);
+	}
+
+	@Test
+	public void testGreedyPolicy() {
+		char[] slots = { 'a', 'b', 'c', 'd', 'e', 'f' };
+		double[] binomialProbs = { 0.9, 0.495, 0.485, 0.475, 0.3, 0.2 };
+		Map<String, Integer> slotCounts = new HashMap<String, Integer>();
+		Random rand = new Random(1);
+		int bestCount = 0;
+		String bestSample = null;
+		for (int i = 0; i < 10000; i++) {
+			String sample = "";
+			for (int s = 0; s < binomialProbs.length; s++) {
+				if (rand.nextDouble() < binomialProbs[s])
+					sample += slots[s];
+			}
+
+			Integer count = slotCounts.get(sample);
+			if (count == null)
+				count = 0;
+			slotCounts.put(sample, count + 1);
+
+			if (count + 1 > bestCount) {
+				bestCount = count + 1;
+				bestSample = sample;
+			}
+		}
+
+		SortedMap<Double, String> sortedCounts = new TreeMap<Double, String>();
+		for (String key : slotCounts.keySet()) {
+			Double count = slotCounts.get(key).doubleValue();
+			while (sortedCounts.containsKey(count))
+				count += 0.01;
+			sortedCounts.put(count, key);
+		}
+		bestCount = sortedCounts.lastKey().intValue();
+		bestSample = sortedCounts.get(sortedCounts.lastKey());
+		System.out.println(bestSample + ": " + bestCount);
 	}
 }

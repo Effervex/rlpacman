@@ -89,7 +89,13 @@ public class CarcassonneStateSpec extends StateSpec {
 	@Override
 	protected String[] initialiseGoalState() {
 		// The goal is 0 units away.
-		String[] result = { "goal", "(tilesLeft -1)" };
+		if (envParameter_ == null)
+			envParameter_ = "SinglePlayer";
+		else {
+			// Remove whitespace
+			envParameter_ = envParameter_.replaceAll(" ", "");
+		}
+		String[] result = { envParameter_, "(tilesLeft -1)" };
 		return result;
 	}
 

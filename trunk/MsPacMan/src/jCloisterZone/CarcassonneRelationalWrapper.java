@@ -66,9 +66,9 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	/** Features that have already been asserted this iteration. */
 	private Collection<Feature> assertedFeatures_ = new HashSet<Feature>();
 	/** The positions that have already been asserted this iteration. */
-	private Collection<Position> assertedPositions_ = new HashSet<Position>();
+	private Collection<Position> assertedPositions_ = new HashSet<Position>(150);
 	/** Cache of cities for farm evaluation. */
-	private Map<City, CityScoreContext> cityCache_ = new HashMap<City, CityScoreContext>();
+	private Map<City, CityScoreContext> cityCache_ = new HashMap<City, CityScoreContext>(100);
 	/** The current game environment. */
 	private Game environment_;
 	/** A map for storing meeple feature locations. */
@@ -722,6 +722,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 
 	public void startState() {
 		readyToExecute_ = new CountDownLatch(1);
+		cityCache_.clear();
+		locationMap_.clear();
 	}
 
 	@Override

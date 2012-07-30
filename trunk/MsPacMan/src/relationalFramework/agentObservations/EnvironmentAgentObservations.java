@@ -366,6 +366,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 		return termSwappedConds;
 	}
+	
+	public double[] getGlobalRange(RangeContext rangeContext) {
+		return conditionObservations_.conditionRanges_.get(rangeContext);
+	}
 
 	public Collection<RelationalPredicate> getSpecialisationConditions(
 			String actionPred) {
@@ -1015,7 +1019,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		private Collection<GeneralGoalCondition> getGeneralGoalConditions() {
 			if (generalGoalConds_ == null) {
 				generalGoalConds_ = new HashSet<GeneralGoalCondition>();
-				for (RelationalPredicate genPredicate : generalSpecialisationConditions_)
+				for (RelationalPredicate genPredicate : getGeneralSpecialisationConditions())
 					generalGoalConds_
 							.add(new GeneralGoalCondition(genPredicate));
 			}

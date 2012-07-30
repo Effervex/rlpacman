@@ -279,7 +279,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 //					+ MIN_NUM_BLOCKS);
 			 initialiseBlocksState(numBlocks_);
 			optimalSteps_ = optimalSteps();
-			// maxSteps_ = optimalSteps_;
+//			 maxSteps_ = optimalSteps_;
 			if (RRLExperiment.debugMode_ || viewingMode_) {
 				System.out.println("\tAgent:\n" + state_);
 			}
