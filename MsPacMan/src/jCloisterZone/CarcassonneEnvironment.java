@@ -8,13 +8,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.commons.math.stat.descriptive.moment.Mean;
+import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 
 import jess.Rete;
 import relationalFramework.PolicyActions;
+import relationalFramework.StateSpec;
 import rrlFramework.RRLEnvironment;
 import rrlFramework.RRLExperiment;
 import rrlFramework.RRLObservations;
@@ -43,7 +46,9 @@ import com.jcloisterzone.rmi.mina.ClientStub;
 
 public class CarcassonneEnvironment extends RRLEnvironment {
 	private static final String AI_NAME = "AI";
+	private static final String RANDOM_NAME = "RANDOM";
 	private static final String CERRLA_NAME = "CERRLA";
+	private static final String HUMAN_NAME = "HUMAN";
 	private static final int NO_ACTION_PENALTY = -1000;
 	/** The Carcassonne client. */
 	private RRLJCloisterClient client_;
@@ -103,26 +108,32 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	 */
 	private void checkMultiplayer(String arg) {
 		// Setting up multiple agents
-		if (arg.startsWith("multi [")) {
-			// Using a defined list of players
-			String playerList = arg.substring(7, arg.indexOf("]"));
-			String[] split = playerList.split(",");
-			players_ = new String[split.length];
-			for (int i = 0; i < split.length; i++) {
-				players_[i] = split[i].trim();
-			}
-			multiLearners_ = true;
-		} else if (arg.startsWith("multi")) {
-			// 1 agent + X other players.
-			String[] split = arg.split(" ");
-			players_ = new String[Integer.parseInt(split[2])];
-			// At least one learner
-			players_[0] = CERRLA_NAME;
-			// The rest of the learners
-			for (int i = 1; i < players_.length; i++) {
-				players_[i] = split[1];
-				if (players_[i].equals(CERRLA_NAME))
-					multiLearners_ = true;
+		if (arg.startsWith("multi")) {
+			if (arg.startsWith("multi[")) {
+				// Using a defined list of players
+				String playerList = arg.substring(6, arg.indexOf("]"));
+				String[] split = playerList.split(",");
+				players_ = new String[split.length];
+				for (int i = 0; i < split.length; i++) {
+					players_[i] = split[i].trim();
+				}
+				multiLearners_ = true;
+			} else if (arg.startsWith("multi")) {
+				// 1 agent + X other players.
+				Pattern parser = Pattern.compile("multi([A-Z]+)(\\d)");
+				Matcher matcher = parser.matcher(arg);
+
+				if (matcher.find()) {
+					players_ = new String[Integer.parseInt(matcher.group(2))];
+					// At least one learner
+					players_[0] = CERRLA_NAME;
+					// The rest of the learners
+					for (int i = 1; i < players_.length; i++) {
+						players_[i] = matcher.group(1);
+						if (players_[i].equals(CERRLA_NAME))
+							multiLearners_ = true;
+					}
+				}
 			}
 		}
 	}
@@ -164,6 +175,15 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			phase.setEntered(true);
 			phase.enter();
 			phase = environment_.getPhase();
+		}
+
+		while (environment_.getTurnPlayer().getNick().startsWith(HUMAN_NAME)) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 
@@ -283,18 +303,29 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			slots_ = new ArrayList<PlayerSlot>(players_.length);
 			int slotIndex = 0;
 			for (String playerName : players_) {
+				String playerNameIndex = playerName + slotIndex;
 				if (playerName.equals(CERRLA_NAME)) {
 					// Agent-controlled
 					slots_.add(new PlayerSlot(slotIndex,
-							PlayerSlot.SlotType.PLAYER, "CERRLA" + slotIndex,
+							PlayerSlot.SlotType.PLAYER, playerNameIndex,
 							clientID));
 				} else if (playerName.equals(AI_NAME)) {
 					// AI controlled
 					PlayerSlot slot = new PlayerSlot(slotIndex,
-							PlayerSlot.SlotType.AI, playerName + slotIndex,
-							clientID);
+							PlayerSlot.SlotType.AI, playerNameIndex, clientID);
 					slot.setAiClassName(LegacyAiPlayer.class.getName());
 					slots_.add(slot);
+				} else if (playerName.equals(RANDOM_NAME)) {
+					// AI controlled
+					PlayerSlot slot = new PlayerSlot(slotIndex,
+							PlayerSlot.SlotType.AI, playerNameIndex, clientID);
+					slot.setAiClassName(RandomAIPlayer.class.getName());
+					slots_.add(slot);
+				} else if (playerName.equals(HUMAN_NAME)) {
+					// Human-controlled
+					slots_.add(new PlayerSlot(slotIndex,
+							PlayerSlot.SlotType.PLAYER, playerNameIndex,
+							clientID));
 				}
 				slotIndex++;
 			}
@@ -392,13 +423,24 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 
 	@Override
 	public void cleanup() {
-		// TODO Auto-generated method stub
-
+		client_ = null;
+		clientInterface_ = null;
+		currentPlayer_ = null;
+		slots_ = null;
+		if (earlyExitPlayers_ != null)
+			earlyExitPlayers_.clear();
+		environment_.clearUserInterface();
+		environment_ = null;
+		server_ = null;
+		if (slots_ != null)
+			slots_.clear();
 	}
 
 	@Override
 	public void initialise(int runIndex, String[] extraArg) {
 		guiMode_ = !ProgramArgument.EXPERIMENT_MODE.booleanValue();
+		String goal = StateSpec.getInstance().getGoalName();
+		checkMultiplayer(goal);
 
 		// Only initialise the client if it's not already initialised.
 		if (client_ == null) {
@@ -428,5 +470,85 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 			} else
 				client_ = new LocalCarcassonneClient("config.ini");
 		}
+	}
+
+	public static void main(String[] args) {
+		int repetitions = 100;
+		double[] scores = new double[repetitions];
+
+		RRLJCloisterClient client = new LocalCarcassonneClient("config.ini");
+		ServerIF server = null;
+		Game game = client.getGame();
+		Player firstPlayer = null;
+		ArrayList<PlayerSlot> slots = new ArrayList<PlayerSlot>();
+		for (int r = 0; r < repetitions; r++) {
+			client.createGame();
+			if (game == null) {
+				server = new LocalCarcassonneServer(client.getGame());
+				PlayerSlot slot = new PlayerSlot(0, PlayerSlot.SlotType.AI,
+						"RANDOM" + 0, client.getClientId());
+				slot.setAiClassName(RandomAIPlayer.class.getName());
+				slots.add(slot);
+				for (int j = 1; j < Integer.parseInt(args[0]); j++) {
+					slot = new PlayerSlot(j, PlayerSlot.SlotType.AI,
+							"AI" + j, client.getClientId());
+					slot.setAiClassName(LegacyAiPlayer.class.getName());
+					slots.add(slot);
+					// slot = new PlayerSlot(1, PlayerSlot.SlotType.AI,
+					// "RANDOM" + 1, client.getClientId());
+					// slot.setAiClassName(RandomAIPlayer.class.getName());
+					// slots.add(slot);
+				}
+				game = client.getGame();
+			} else {
+				// Reset the UIs
+				server.stopGame();
+				game.clearUserInterface();
+
+				// Clear the slots and re-add them.
+				for (int i = 0; i < PlayerSlot.COUNT; i++) {
+					server.updateSlot(new PlayerSlot(i), null);
+				}
+			}
+
+			Collections.shuffle(slots);
+			for (int i = 0; i < slots.size(); i++) {
+				PlayerSlot slot = slots.get(i);
+				PlayerSlot cloneSlot = new PlayerSlot(i, slot.getType(),
+						slot.getNick(), slot.getOwner());
+				cloneSlot.setAiClassName(slot.getAiClassName());
+				server.updateSlot(cloneSlot,
+						LegacyAiPlayer.supportedExpansions());
+			}
+
+			server.startGame();
+
+			Phase phase = game.getPhase();
+
+			// Cycle through (probably only once) to keep the game moving.
+			while (phase != null && !phase.isEntered()) {
+				// Modifying phases to proxyless versions
+				if (phase.getClass().equals(CreateGamePhase.class))
+					phase = game.getPhases()
+							.get(ProxylessCreateGamePhase.class);
+				if (phase.getClass().equals(DrawPhase.class))
+					phase = game.getPhases().get(ProxylessDrawPhase.class);
+
+				phase.setEntered(true);
+				phase.enter();
+				phase = game.getPhase();
+
+				if (game.getTurnPlayer().getNick().equals("RANDOM0"))
+					firstPlayer = game.getTurnPlayer();
+			}
+			int score = firstPlayer.getPoints();
+			scores[r] = score;
+			System.out.println(score);
+		}
+
+		Mean m = new Mean();
+		StandardDeviation sd = new StandardDeviation();
+		System.out.println("Mean: " + m.evaluate(scores) + ", SD: "
+				+ sd.evaluate(scores));
 	}
 }

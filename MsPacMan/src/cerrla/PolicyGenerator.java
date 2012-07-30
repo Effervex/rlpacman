@@ -1105,13 +1105,8 @@ public final class PolicyGenerator implements Serializable {
 
 					RelationalRule probableRule;
 					String ruleString = m.group(3);
-					try {
-						probableRule = new RelationalRule(ruleString);
-						ruleOrder.put(order, probableRule);
-					} catch (Exception e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
+					probableRule = new RelationalRule(ruleString);
+					ruleOrder.put(order, probableRule);
 				}
 
 				recordPolicy = true;
@@ -1407,7 +1402,8 @@ public final class PolicyGenerator implements Serializable {
 		try {
 			// If the file is in the temp folder, will need to extract the final
 			// policy of the file.
-			if (ruleFile.getParent().endsWith("temp")) {
+			if (ruleFile.getParent() != null
+					&& ruleFile.getParent().endsWith("temp")) {
 				loadGreedyGenerator(ruleFile);
 				RelationalPolicy bestPolicy = greedyPolicyMap_
 						.get(greedyPolicyMap_.lastKey());

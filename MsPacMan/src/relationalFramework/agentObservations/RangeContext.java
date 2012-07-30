@@ -110,6 +110,19 @@ public class RangeContext implements Serializable, Comparable<RangeContext> {
 		}
 	}
 
+	public RangeContext(RangeContext rangeContext) {
+		action_ = rangeContext.action_;
+		predicate_ = rangeContext.predicate_;
+		predicateArgLength_ = rangeContext.predicateArgLength_;
+		if (rangeContext.predicateArgStructure_ != null) {
+			predicateArgStructure_ = Arrays.copyOf(
+					rangeContext.predicateArgStructure_,
+					rangeContext.predicateArgStructure_.length);
+		}
+		rangeIndex_ = rangeContext.rangeIndex_;
+		rangeVariable_ = rangeContext.rangeVariable_;
+	}
+
 	@Override
 	public int compareTo(RangeContext o) {
 		int result = action_.compareTo(o.action_);
@@ -226,5 +239,10 @@ public class RangeContext implements Serializable, Comparable<RangeContext> {
 		}
 		buffer.append(")");
 		return buffer.toString();
+	}
+
+	public void removeAction() {
+		action_ = null;
+		predicateArgStructure_ = null;
 	}
 }

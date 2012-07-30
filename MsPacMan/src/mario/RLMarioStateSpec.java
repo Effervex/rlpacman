@@ -29,7 +29,7 @@ public class RLMarioStateSpec extends StateSpec {
 		// Movement entails getting to a point by moving in that direction at
 		// speed and jumping if stuck until at the point (or jumping fails)
 		preconds.put("moveTo", "(canJumpOn ?A) (thing ?A) "
-				+ "(distance ?A ?B&~:(<= -16 ?B 16)) (mario ?C)");
+				+ "(distance ?A ?B&~:(<= -16 ?B 16))");
 		// Moving away from a given object
 		// preconds.put("moveFrom", "(canJumpOn ?A) (thing ?A) "
 		// + "(distance ?A ?B&~:(<= -16 ?B 16))");

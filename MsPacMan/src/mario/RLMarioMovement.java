@@ -670,8 +670,12 @@ public class RLMarioMovement {
 
 		// If Mario is already on the end point, do nothing
 		if (startEndDiffs_[0] < CELL_SIZE / 2
-				&& Math.abs(startEndDiffs_[1]) < CELL_SIZE)
+				&& Math.abs(startEndDiffs_[1]) < CELL_SIZE) {
+			actionArray[Mario.KEY_LEFT] = ACTION_OFF;
+			actionArray[Mario.KEY_RIGHT] = ACTION_OFF;
+			actionArray[Mario.KEY_JUMP] = ACTION_OFF;
 			return actionArray;
+		}
 
 		// VERTICAL MOVEMENT
 
@@ -1361,8 +1365,9 @@ public class RLMarioMovement {
 					}
 				}
 
-				if (resolvedAction)
+				if (resolvedAction) {
 					break;
+				}
 			}
 		}
 

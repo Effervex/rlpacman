@@ -433,6 +433,8 @@ public class RRLExperiment {
 		agent_.cleanup();
 		environment_.cleanup();
 		environment_.freeze(false);
+
+		System.gc();
 	}
 
 	/**

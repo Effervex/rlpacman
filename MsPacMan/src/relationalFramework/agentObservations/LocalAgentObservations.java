@@ -812,7 +812,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				localInvariants_.getSpecificInvariants());
 		// If rule is illegal, return null
 		if (result == -1) {
-//			System.out.println("Illegal rule conds: " + simplified);
+			// System.out.println("Illegal rule conds: " + simplified);
 			return null;
 		}
 
@@ -923,7 +923,15 @@ public class LocalAgentObservations extends SettlingScan implements
 		LocalAgentObservations lao = localAOManager_.get(gc);
 
 		// Get the range from the actions
-		return lao.rangeContexts_.get(rangeContext);
+		double[] range = lao.rangeContexts_.get(rangeContext);
+		if (range == null) {
+			// Use a global range
+			rangeContext = new RangeContext(rangeContext);
+			rangeContext.removeAction();
+			range = EnvironmentAgentObservations.getInstance().getGlobalRange(
+					rangeContext);
+		}
+		return range;
 	}
 
 	/**
@@ -1050,7 +1058,7 @@ public class LocalAgentObservations extends SettlingScan implements
 					action, rule, lced_);
 			if (!specialisation.isLegal())
 				return;
-			
+
 			specialisation.setQueryParams(rule.getQueryParameters());
 			if (condition.isNumerical()
 					&& !specialisation.getSimplifiedConditions(false).contains(

@@ -47,9 +47,12 @@ public class CERRLA implements RRLAgent {
 
 	/** The CEDistribution for the environment goal. */
 	private LocalCrossEntropyDistribution mainGoalCECortex_;
-	
+
 	/** The current run index. */
 	private int currentRunIndex_;
+
+	/** The current online testing iteration. */
+	private int onlineTestingIter_;
 
 	/**
 	 * 
@@ -184,7 +187,8 @@ public class CERRLA implements RRLAgent {
 		// First, determine which policies already exist
 		Collection<ModularPolicy> subGoalPolicies = new HashSet<ModularPolicy>();
 		for (ModularPolicy modPol : existingPolicies)
-			subGoalPolicies = modPol.getAllPolicies(true, false, subGoalPolicies);
+			subGoalPolicies = modPol.getAllPolicies(true, false,
+					subGoalPolicies);
 
 		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
 				null);
@@ -296,6 +300,7 @@ public class CERRLA implements RRLAgent {
 		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
 				.values())
 			distribution.freeze(b);
+		onlineTestingIter_ = -1;
 	}
 
 	@Override
@@ -358,6 +363,30 @@ public class CERRLA implements RRLAgent {
 			// Generate a new policy
 			currentPolicy = recreateCurrentPolicy(agentPolicy_.values());
 			agentPolicy_.put(playerID, currentPolicy);
+		}
+
+		// If performing online greedy testing, freeze every X iterations to
+		// test.
+		// If frozen externally, will not test.
+		if (ProgramArgument.ONLINE_GREEDY_TESTING.booleanValue() && onlineTestingIter_ >= 0) {
+			if (onlineTestingIter_ == 0) {
+				// Not currently testing.
+				int testingIter = ProgramArgument.POLICY_REPEATS.intValue()
+						* ProgramArgument.PERFORMANCE_TESTING_SIZE.intValue();
+				int currentEpisode = mainGoalCECortex_.getCurrentEpisode();
+				if (currentEpisode > 0 && currentEpisode % testingIter == 0) {
+					// Freeze and test.
+					// TODO Be sure to stop the timer.
+					
+				}
+			} else {
+				// Currently testing
+				onlineTestingIter_--;
+				if (onlineTestingIter_ == 0) {
+					// Return to training.
+					// TODO Be sure to restart the timer
+				}
+			}
 		}
 
 		currentPolicy.startEpisode();
