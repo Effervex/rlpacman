@@ -684,4 +684,32 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 		}
 		return false;
 	}
+
+	/**
+	 * Replaces all anonymous terms with unbound terms.
+	 * 
+	 * @param unboundIndex
+	 *            The number of unbound variables to begin with.
+	 * @return The number of unbound terms after process completed.
+	 */
+	public int replaceAnonymousWithUnbound(int unboundIndex) {
+		for (int i = 0; i < arguments_.length; i++) {
+			if (arguments_[i].isAnonymous())
+				arguments_[i] = RelationalArgument
+						.createUnboundVariable(unboundIndex++);
+			else if (arguments_[i].isNonActionVar())
+				unboundIndex++;
+		}
+		return unboundIndex;
+	}
+
+	/**
+	 * This method gets the actual relational arguments of this predicate. Be
+	 * careful with what you do with it as it could mess with hashmaps, etc.
+	 * 
+	 * @return The actual arguments of the predicate.
+	 */
+	public RelationalArgument[] getActualArguments() {
+		return arguments_;
+	}
 }

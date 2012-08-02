@@ -388,6 +388,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return false;
 	}
 
+	public boolean isNonActionVar() {
+		return argType_ == ArgumentType.NON_ACTION;
+	}
+
 	public boolean isVariable() {
 		return argType_ == ArgumentType.ACTION_VAR
 				|| argType_ == ArgumentType.NUMBER_RANGE
@@ -414,14 +418,14 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		if (isNumber() && (rangeFrac_[0] != rangeFrac_[1])) {
 			if (rangeContext_ != null) {
 				try {
-					double[] minMax = LocalAgentObservations
-							.getActionRanges(rangeContext_, null);
+					double[] minMax = LocalAgentObservations.getActionRanges(
+							rangeContext_, null);
 					double minBound = (rangeBounds_[0].getValue(minMax));
 					double maxBound = (rangeBounds_[1].getValue(minMax));
 					double diff = maxBound - minBound;
 					return "(" + (minBound + diff * rangeFrac_[0]) + " <= "
-					+ stringArg_ + " <= "
-					+ (minBound + diff * rangeFrac_[1]) + ")";
+							+ stringArg_ + " <= "
+							+ (minBound + diff * rangeFrac_[1]) + ")";
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
