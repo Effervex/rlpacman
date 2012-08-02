@@ -18,7 +18,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1035,27 +1034,15 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * 
 		 * @param condition
 		 * 
-		 * @param conditions
-		 *            The conditions of the specialised rule.
-		 * @param action
-		 *            The action of the rule.
 		 * @param rule
 		 *            The parent rule.
 		 * @param specialisations
 		 *            The specialisations set to add to.
 		 */
 		private void createSpecialisation(RelationalPredicate condition,
-				Collection<RelationalPredicate> conditions,
-				RelationalPredicate action, RelationalRule rule,
-				Set<RelationalRule> specialisations) {
-			// Simplify the conds first
-			Collection<RelationalPredicate> specConditions = new HashSet<RelationalPredicate>(
-					conditions);
-			specConditions.add(condition);
-
+				RelationalRule rule, Set<RelationalRule> specialisations) {
 			// Create the specialisation
-			RelationalRule specialisation = new RelationalRule(specConditions,
-					action, rule, lced_);
+			RelationalRule specialisation = new RelationalRule(rule, condition);
 			if (!specialisation.isLegal())
 				return;
 
@@ -1079,7 +1066,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				// conditions (if there are goal conditions).
 				if (!ProgramArgument.ONLY_GOAL_RULES.booleanValue()
 						|| localGoal_.getNumArgs() == 0
-						|| conditions.toString().contains(
+						|| rule.toString().contains(
 								RelationalArgument.GOAL_VARIABLE_PREFIX)) {
 					specialisations.add(specialisation);
 				}
@@ -1091,35 +1078,32 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * rule (replacing anonymous terms with unbound variables) in all
 		 * possible combinations based on existing unbound variables.
 		 * 
-		 * @param specConditions
-		 *            The specialised conditions of the rule.
-		 * @param action
-		 *            The action of the rule.
-		 * @param rule
-		 *            The rule that the specialised rules came from.
 		 * @param condition
 		 *            The condition that is to be added.
+		 * @param rule
+		 *            The rule that the specialised rules came from.
 		 * @param specialisations
 		 *            The existing specialisations.
+		 * @param specConditions
+		 *            The specialised conditions of the rule.
 		 * @return A collection of all possible specialisations (usually just
 		 *         one).
 		 */
 		private Set<RelationalRule> groundAnonymousTerms(
-				RelationalPredicate condition,
-				Collection<RelationalPredicate> conditions,
-				RelationalPredicate action, RelationalArgument[] actionTerms,
-				RelationalRule rule, Set<RelationalRule> specialisations) {
+				RelationalPredicate condition, RelationalRule rule,
+				Set<RelationalRule> specialisations) {
 			// Modify the condition arguments to match the action arguments.
 			condition = new RelationalPredicate(condition);
-			condition.replaceArguments(actionTerms);
+			condition.replaceArguments(rule.getActionTerms());
 			if (condition.isFullyNotAnonymous()) {
-				createSpecialisation(condition, conditions, action, rule,
-						specialisations);
+				createSpecialisation(condition, rule, specialisations);
 			} else {
 				// Match the anon argument to the unbound types, wherever
 				// possible.
-				MultiMap<RelationalArgument, String> unboundTypes = rule
-						.getUnboundTypeConditions();
+				MultiMap<RelationalArgument, String> unboundTypes = MultiMap
+						.createSortedSetMultiMap();
+				// MultiMap<RelationalArgument, String> unboundTypes = rule
+				// .getUnboundTypeConditions();
 
 				// Determine the anon type
 				Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();
@@ -1129,8 +1113,7 @@ public class LocalAgentObservations extends SettlingScan implements
 
 				// Swap the grounded result preds in
 				for (RelationalPredicate result : resultPreds) {
-					createSpecialisation(result, conditions, action, rule,
-							specialisations);
+					createSpecialisation(result, rule, specialisations);
 				}
 			}
 			return specialisations;
@@ -1180,7 +1163,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				// lineage.
 				for (RelationalArgument unboundArg : unboundTypes.keySet()) {
 					if (lineage.containsAll(unboundTypes.get(unboundArg))) {
-						args[i] = unboundArg;
+						args[i] = unboundArg.clone();
 						recursivelyGroundAnons(args, i + 1, unboundTypes,
 								anonVariable, resultPreds);
 						args[i] = RelationalArgument.ANONYMOUS;
@@ -1324,16 +1307,18 @@ public class LocalAgentObservations extends SettlingScan implements
 		 * @return The swapped rule term (if valid).
 		 */
 		private RelationalRule swapRuleTerm(RelationalRule rule,
-				String[] oldTerms, int i, String goalTerm) {
-			String[] newTerms = Arrays.copyOf(oldTerms, oldTerms.length);
-			newTerms[i] = goalTerm;
+				RelationalArgument[] oldTerms, int i, String goalTerm) {
+			RelationalArgument[] newTerms = new RelationalArgument[oldTerms.length];
+			for (int j = 0; j < oldTerms.length; j++)
+				newTerms[j] = oldTerms[j].clone();
+			newTerms[i] = new RelationalArgument(goalTerm);
 			Collection<RelationalPredicate> ruleConditions = rule
 					.getRawConditions(true);
 			List<RelationalPredicate> specConditions = new ArrayList<RelationalPredicate>(
 					ruleConditions.size());
 			// Form the replacement map
 			Map<String, String> replacementMap = new HashMap<String, String>();
-			replacementMap.put(oldTerms[i], newTerms[i]);
+			replacementMap.put(oldTerms[i].toString(), newTerms[i].toString());
 			for (String gTerm : observedGoalPredicates_.keySet()) {
 				replacementMap.put(gTerm, gTerm);
 			}
@@ -1458,10 +1443,6 @@ public class LocalAgentObservations extends SettlingScan implements
 			if (actionConditions == null)
 				return specialisations;
 
-			Collection<RelationalPredicate> conditions = new HashSet<RelationalPredicate>(
-					rule.getRawConditions(true));
-			RelationalPredicate action = rule.getAction();
-			RelationalArgument[] actionTerms = action.getRelationalArguments();
 			// Set<RelationalArgument> goalActionTerms = new
 			// HashSet<RelationalArgument>();
 			// for (RelationalArgument actionTerm : actionTerms)
@@ -1484,9 +1465,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				// continue;
 				// }
 
-				specialisations
-						.addAll(groundAnonymousTerms(condition, conditions,
-								action, actionTerms, rule, specialisations));
+				specialisations.addAll(groundAnonymousTerms(condition, rule,
+						specialisations));
 			}
 
 			// Also add the wider specialisations
@@ -1494,8 +1474,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				for (RelationalPredicate generalVariant : EnvironmentAgentObservations
 						.getInstance().getGeneralSpecialisationConditions()) {
 					specialisations.addAll(groundAnonymousTerms(generalVariant,
-							conditions, action, actionTerms, rule,
-							specialisations));
+							rule, specialisations));
 				}
 			}
 
@@ -1516,13 +1495,13 @@ public class LocalAgentObservations extends SettlingScan implements
 			Set<RelationalRule> mutants = new HashSet<RelationalRule>();
 
 			// Replace the variables with constants
-			String[] oldTerms = rule.getActionTerms();
+			RelationalArgument[] oldTerms = rule.getActionTerms();
 			// For every goal term
 			for (String goalTerm : observedGoalPredicates_.keySet()) {
 				boolean termPresent = false;
 				// If the old terms already contain the goal term, can't swap
-				for (String oldTerm : oldTerms) {
-					if (goalTerm.equals(oldTerm)) {
+				for (RelationalArgument oldTerm : oldTerms) {
+					if (goalTerm.equals(oldTerm.toString())) {
 						termPresent = true;
 						break;
 					}
@@ -1533,7 +1512,8 @@ public class LocalAgentObservations extends SettlingScan implements
 					for (int i = 0; i < oldTerms.length; i++) {
 						// If the term is already a goal term, or the rule
 						// already contains the goal term, can't swap
-						if (!RelationalArgument.isGoalCondition(oldTerms[i])) {
+						if (!RelationalArgument.isGoalCondition(oldTerms[i]
+								.toString())) {
 							RelationalRule swappedRule = swapRuleTerm(rule,
 									oldTerms, i, goalTerm);
 							if (swappedRule != null)

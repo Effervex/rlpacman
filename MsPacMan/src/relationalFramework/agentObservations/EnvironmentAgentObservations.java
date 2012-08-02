@@ -366,7 +366,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 		return termSwappedConds;
 	}
-	
+
 	public double[] getGlobalRange(RangeContext rangeContext) {
 		return conditionObservations_.conditionRanges_.get(rangeContext);
 	}
@@ -591,6 +591,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		boolean changed = false;
 		int simplResult = 0;
 		do {
+			// Update the non action variable bindings
+			updateNonActionBindings(simplified);
+
+			// Simplify
 			simplResult = conditionObservations_.simplifyRule(simplified,
 					exitIfIllegalRule, onlyEquivalencies,
 					localConditionInvariants);
@@ -598,7 +602,48 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 			if (simplResult == -1)
 				return -1;
 		} while (simplResult == 1);
+
 		return (changed) ? 1 : 0;
+	}
+
+	/**
+	 * Updates the free/not free status of non-action variable bindings.
+	 * 
+	 * @param simplified
+	 *            The facts being simplified and updated.
+	 */
+	private void updateNonActionBindings(
+			Collection<RelationalPredicate> simplified) {
+		// A map which maps a particularly named non-action variable to a
+		// collection of direct pointers to the arguments.
+		MultiMap<String, RelationalArgument> nonActionMap = MultiMap
+				.createListMultiMap();
+		for (RelationalPredicate cond : simplified) {
+			for (RelationalArgument arg : cond.getActualArguments()) {
+				if (arg.isNonActionVar()) {
+					nonActionMap.put(arg.toString(), arg);
+
+					// Resolve immediately
+					try {
+						List<RelationalArgument> args = nonActionMap
+								.getList(arg.toString());
+						if (args.size() == 1) {
+							// Treat it as unbound
+							arg.setFreeVariable(true);
+						} else if (args.size() == 2) {
+							// Treat the two as bound
+							args.get(0).setFreeVariable(false);
+							arg.setFreeVariable(false);
+						} else if (args.size() > 2) {
+							// Treat this arg as bound
+							arg.setFreeVariable(false);
+						}
+					} catch (IllegalAccessException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -820,7 +865,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 */
 		private void noteRange(RelationalPredicate numberFact,
 				Map<RangeContext, double[]> actionRanges) {
-			
+
 			RelationalArgument[] factArgs = numberFact.getRelationalArguments();
 			for (int i = 0; i < factArgs.length; i++) {
 				// Only note ranges
