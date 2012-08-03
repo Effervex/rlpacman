@@ -1102,8 +1102,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				// possible.
 				MultiMap<RelationalArgument, String> unboundTypes = MultiMap
 						.createSortedSetMultiMap();
-				// MultiMap<RelationalArgument, String> unboundTypes = rule
-				// .getUnboundTypeConditions();
+//				 MultiMap<RelationalArgument, String> unboundTypes = rule
+//				 .getUnboundTypeConditions();
 
 				// Determine the anon type
 				Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();

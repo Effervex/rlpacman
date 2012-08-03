@@ -382,7 +382,7 @@ public class RLGGMerger {
 					// so good
 					unification[i] = factTerm;
 					validFact = true;
-				} else if (!fact.isNegated() && unityTerm.isFreeVariable()
+				} else if (unityTerm.isFreeVariable()
 						&& factTerm.isFreeVariable()) {
 					// If the fact term and unity term are unbound variables
 					// (and one of them is anonymous)
