@@ -271,8 +271,8 @@ public class ConditionBeliefs implements Serializable {
 					}
 				}
 
-				return createBackgroundRule(leftConds, right, negationType,
-						true, currentKnowledge);
+				return createBackgroundRule(leftConds, right, negationType, true,
+						currentKnowledge);
 			}
 		}
 
