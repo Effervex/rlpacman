@@ -73,7 +73,7 @@ public class CarcassonneEnvironment extends RRLEnvironment {
 	/** The players that did not place a tile during the game. */
 	private Collection<Player> earlyExitPlayers_ = new HashSet<Player>();
 	/** The relational wrapper for (de)relationalising the game. */
-	private CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
+	protected CarcassonneRelationalWrapper relationalWrapper_ = new CarcassonneRelationalWrapper();
 	/** The Carcassonne server. */
 	private ServerIF server_;
 	/** The current players of the game. */

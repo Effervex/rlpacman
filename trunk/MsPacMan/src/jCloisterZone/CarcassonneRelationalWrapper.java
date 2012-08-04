@@ -68,7 +68,8 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 	/** The positions that have already been asserted this iteration. */
 	private Collection<Position> assertedPositions_ = new HashSet<Position>(150);
 	/** Cache of cities for farm evaluation. */
-	private Map<City, CityScoreContext> cityCache_ = new HashMap<City, CityScoreContext>(100);
+	private Map<City, CityScoreContext> cityCache_ = new HashMap<City, CityScoreContext>(
+			100);
 	/** The current game environment. */
 	private Game environment_;
 	/** A map for storing meeple feature locations. */
@@ -627,15 +628,10 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 				}
 			}
 
-			// Get position and rotation
-			String[] args = action.getArguments();
-			Position pos = locationMap_.get(args[2]);
-			Rotation rot = Rotation.valueOf(args[3]);
-
 			if (RRLExperiment.debugMode_) {
 				System.out.println("Tile phase: " + action.toString());
 			}
-			return new Pair<Position, Rotation>(pos, rot);
+			return extractPositionRotation(action, locationMap_);
 		} else if (phase instanceof ActionPhase) {
 			// If no action, then simply don't place a meeple
 			if (action == null) {
@@ -654,6 +650,24 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 			return featureMap_.get(args[2]);
 		}
 		return null;
+	}
+
+	/**
+	 * Extracts the position and rotation of the selected action (al that
+	 * matters for tile placement).
+	 * 
+	 * @param action
+	 *            The relational action selected.
+	 * @param locationMap
+	 *            The map of locations.
+	 * @return A Pair of Position and Rotation.
+	 */
+	protected Pair<Position, Rotation> extractPositionRotation(
+			RelationalPredicate action, Map<String, Position> locationMap) {
+		String[] args = action.getArguments();
+		Position pos = locationMap.get(args[2]);
+		Rotation rot = Rotation.valueOf(args[3]);
+		return new Pair<Position, Rotation>(pos, rot);
 	}
 
 	@Override

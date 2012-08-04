@@ -1,4 +1,4 @@
-package jCloisterZone;
+package jCloisterZoneAlt;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,6 +25,21 @@ public class CarcassonneStateSpec extends StateSpec {
 		// A tile may be placed if all edges fit nicely
 		preconds.put("placeTile", "(currentPlayer ?A) (validLoc ?B ?C ?D)");
 
+		// A specialised city matching action.
+		preconds.put("expandCity",
+				"(currentPlayer ?A) (currentTile ?B) (city ?D) (tileContains ?B ?D) "
+						+ "(validLoc ?B ?E ?F) (city ?C) (nextTo ?E ? ?C)");
+
+		// A specialised city matching action.
+		preconds.put("expandRoad",
+				"(currentPlayer ?A) (currentTile ?B) (road ?D) (tileContains ?B ?D) "
+						+ "(validLoc ?B ?E ?F) (road ?C) (nextTo ?E ? ?C)");
+
+		// A specialised city matching action.
+		preconds.put("expandFarm",
+				"(currentPlayer ?A) (currentTile ?B) (farm ?D) (tileContains ?B ?D) "
+						+ "(validLoc ?B ?E ?F) (farm ?C) (nextTo ?E ? ?C)");
+
 		// A meeple can be played when it is meeple playing stage on the placed
 		// tile
 		preconds.put("placeMeeple",
@@ -49,6 +64,36 @@ public class CarcassonneStateSpec extends StateSpec {
 		structure[2] = "location";
 		structure[3] = "orientation";
 		actions.add(new RelationalPredicate("placeTile", structure, false));
+
+		// Expand a city
+		structure = new String[6];
+		structure[0] = "player";
+		structure[1] = "tile";
+		structure[2] = "city";
+		structure[3] = "city";
+		structure[4] = "location";
+		structure[5] = "orientation";
+		actions.add(new RelationalPredicate("expandCity", structure, false));
+
+		// Expand a city
+		structure = new String[6];
+		structure[0] = "player";
+		structure[1] = "tile";
+		structure[2] = "road";
+		structure[3] = "road";
+		structure[4] = "location";
+		structure[5] = "orientation";
+		actions.add(new RelationalPredicate("expandRoad", structure, false));
+
+		// Expand a city
+		structure = new String[6];
+		structure[0] = "player";
+		structure[1] = "tile";
+		structure[2] = "farm";
+		structure[3] = "farm";
+		structure[4] = "location";
+		structure[5] = "orientation";
+		actions.add(new RelationalPredicate("expandFarm", structure, false));
 
 		// Place a meeple
 		structure = new String[3];
