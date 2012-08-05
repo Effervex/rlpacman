@@ -39,7 +39,7 @@ import util.MultiMap;
  * @author Sam Sarjant
  */
 public class RelationalRule implements Serializable,
-		Comparable<RelationalRule>, PolicyItem {
+		Comparable<RelationalRule>, PolicyItem, RelationalQuery {
 	private static final long serialVersionUID = -7517726681678896438L;
 
 	/**
@@ -466,7 +466,7 @@ public class RelationalRule implements Serializable,
 	 *            An optional added condition for the raw conditions.
 	 */
 	public void expandConditions(RelationalPredicate condition) {
-		condition = preProcessRawConds(condition);
+//		condition = preProcessRawConds(condition);
 
 		unboundTypeMap_ = null;
 		simplifiedConditions_ = new ArrayList<RelationalPredicate>();
@@ -544,6 +544,11 @@ public class RelationalRule implements Serializable,
 							if (arguments[i].isFreeVariable()
 									&& !arguments[i].isAnonymous())
 								indexedUnbounds.put(arguments[i], index);
+						} else if (arguments[i].isAnonymous()) {
+							// If the argument is anonymous, convert it to an
+							// unbound variable.
+							arguments[i] = RelationalArgument
+									.createUnboundVariable(normalisedIndex[0]++);
 						} else if (arguments[i].isConstant())
 							// Adding constant terms
 							constantTerms.add(arguments[i]);
@@ -1155,5 +1160,11 @@ public class RelationalRule implements Serializable,
 
 	public boolean isLegal() {
 		return !simplifiedConditions_.isEmpty();
+	}
+
+	@Override
+	public void getRuleQuery() {
+		// TODO Auto-generated method stub
+		
 	}
 }

@@ -20,7 +20,7 @@ import java.util.TreeSet;
  * @author Sam Sarjant
  */
 public class RelationalPredicate implements Comparable<RelationalPredicate>,
-		Serializable {
+		Serializable, RelationalQuery {
 	private static final long serialVersionUID = 6131063892766663639L;
 	/** A collection of contexts which define ranges. */
 	private SortedSet<RangeContext> rangeContexts_;
@@ -711,5 +711,11 @@ public class RelationalPredicate implements Comparable<RelationalPredicate>,
 	 */
 	public RelationalArgument[] getActualArguments() {
 		return arguments_;
+	}
+
+	@Override
+	public void getRuleQuery() {
+		// TODO Auto-generated method stub
+		
 	}
 }

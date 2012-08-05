@@ -165,7 +165,7 @@ public class LocalAgentObservations extends SettlingScan implements
 							condition.getFactName())) {
 				typeArguments.put(condArgs[i], StateSpec.getInstance()
 						.getTypeParents(condTypes[i]));
-			} else {
+			} else if (condArgs[i].isVariable()) {
 				typeArguments.put(condArgs[i], StateSpec.getInstance()
 						.getTypeLineage(condTypes[i]));
 			}
@@ -1102,8 +1102,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				// possible.
 				MultiMap<RelationalArgument, String> unboundTypes = MultiMap
 						.createSortedSetMultiMap();
-//				 MultiMap<RelationalArgument, String> unboundTypes = rule
-//				 .getUnboundTypeConditions();
+				// MultiMap<RelationalArgument, String> unboundTypes = rule
+				// .getUnboundTypeConditions();
 
 				// Determine the anon type
 				Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();

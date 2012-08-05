@@ -1087,7 +1087,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				Collection<RelationalPredicate> removables = new HashSet<RelationalPredicate>();
 				for (RelationalPredicate unseenPred : unseenPreds_) {
 					String query = StateSpec.getInstance().getRuleQuery(
-							unseenPred);
+							unseenPred, false);
 					QueryResult results = state.runQueryStar(query,
 							new ValueVector());
 					if (results.next()) {

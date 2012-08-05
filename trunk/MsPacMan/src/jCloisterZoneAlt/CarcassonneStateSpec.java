@@ -26,19 +26,22 @@ public class CarcassonneStateSpec extends StateSpec {
 		preconds.put("placeTile", "(currentPlayer ?A) (validLoc ?B ?C ?D)");
 
 		// A specialised city matching action.
-		preconds.put("expandCity",
-				"(currentPlayer ?A) (currentTile ?B) (city ?D) (tileContains ?B ?D) "
-						+ "(validLoc ?B ?E ?F) (city ?C) (nextTo ?E ? ?C)");
+		preconds.put(
+				"expandCity",
+				"(currentPlayer ?A) (currentTile ?B) (validLoc ?B ?E ?F) "
+						+ "(tileContains ?B ?D) (city ?D) (nextTo ?E ? ?C) (city ?C)");
 
 		// A specialised city matching action.
-		preconds.put("expandRoad",
-				"(currentPlayer ?A) (currentTile ?B) (road ?D) (tileContains ?B ?D) "
-						+ "(validLoc ?B ?E ?F) (road ?C) (nextTo ?E ? ?C)");
+		preconds.put(
+				"expandRoad",
+				"(currentPlayer ?A) (currentTile ?B) (validLoc ?B ?E ?F) "
+						+ "(tileContains ?B ?D) (road ?D) (nextTo ?E ? ?C) (road ?C)");
 
 		// A specialised city matching action.
-		preconds.put("expandFarm",
-				"(currentPlayer ?A) (currentTile ?B) (farm ?D) (tileContains ?B ?D) "
-						+ "(validLoc ?B ?E ?F) (farm ?C) (nextTo ?E ? ?C)");
+		preconds.put(
+				"expandFarm",
+				"(currentPlayer ?A) (currentTile ?B) (validLoc ?B ?E ?F) "
+						+ "(tileContains ?B ?D) (farm ?D) (nextTo ?E ? ?C) (farm ?C)");
 
 		// A meeple can be played when it is meeple playing stage on the placed
 		// tile
