@@ -74,15 +74,18 @@ public class RelationalPolicy implements Serializable {
 	 *            The set of valid actions the agent can take at this state.
 	 * @param activatedActions
 	 *            The (possibly null) to-be-filled activated actions.
+	 * @param isTransient
+	 *            TODO
 	 * @return A collection of actions which the rule creates.
 	 */
 	protected final Collection<FiredAction> evaluateRule(RelationalRule rule,
 			Rete state, SortedSet<String[]> validActions,
-			SortedSet<String[]> activatedActions) throws Exception {
+			SortedSet<String[]> activatedActions, boolean isTransient)
+			throws Exception {
 		Collection<FiredAction> returnedActions = new TreeSet<FiredAction>();
 
 		// Forming the query
-		String query = StateSpec.getInstance().getRuleQuery(rule);
+		String query = StateSpec.getInstance().getRuleQuery(rule, isTransient);
 		// If there are parameters, temp or concrete, insert them here
 		ValueVector vv = new ValueVector();
 		for (RangeContext rangeContext : rule.getRangeContexts()) {
@@ -193,7 +196,7 @@ public class RelationalPolicy implements Serializable {
 				Collection<FiredAction> firedActions = evaluateRule(polRule,
 						observations.getState(),
 						observations.getValidActions(polRule
-								.getActionPredicate()), null);
+								.getActionPredicate()), null, false);
 				actionSwitch.addFiredRule(firedActions, this);
 				actionsFound += firedActions.size();
 			}

@@ -237,7 +237,7 @@ public class ModularPolicy extends RelationalPolicy {
 				RelationalRule polRule = (RelationalRule) polObject;
 				Collection<FiredAction> firedActions = evaluateRule(polRule,
 						state, observations.getValidActions(polRule
-								.getActionPredicate()), null);
+								.getActionPredicate()), null, true);
 				policyActions.addFiredRule(firedActions, this);
 				actionsFound += firedActions.size();
 
@@ -453,7 +453,7 @@ public class ModularPolicy extends RelationalPolicy {
 						rlgg,
 						state,
 						observations.getValidActions(rlgg.getActionPredicate()),
-						rlggActions);
+						rlggActions, false);
 				activatedActions.putCollection(rlgg.getActionPredicate(),
 						rlggActions);
 			}

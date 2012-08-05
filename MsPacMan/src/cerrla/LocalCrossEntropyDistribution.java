@@ -284,7 +284,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					vv.add(param.toString());
 
 			// Run the query
-			String query = StateSpec.getInstance().getRuleQuery(goalRule_);
+			String query = StateSpec.getInstance().getRuleQuery(goalRule_, false);
 			QueryResult results = state.runQueryStar(query, vv);
 
 			// If results, then the goal has been met!

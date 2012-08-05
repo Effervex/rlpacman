@@ -19,6 +19,9 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
 import cerrla.RLGGMerger;
+import cerrla.modular.ModularPolicy;
+import cerrla.modular.ModularSubGoal;
+import cerrla.modular.PolicyItem;
 
 import relationalFramework.agentObservations.BackgroundKnowledge;
 import relationalFramework.agentObservations.RangeContext;
@@ -114,6 +117,8 @@ public abstract class StateSpec {
 
 	/** The mapping for rules to queries in the Rete object. */
 	private Map<RuleQuery, String> queryNames_;
+
+	private Map<RuleQuery, String> immutableQueryNames_;
 
 	/** The LogicFactory for the experiment. */
 	private Rete rete_;
@@ -221,6 +226,7 @@ public abstract class StateSpec {
 			handCodedPolicy_ = initialiseHandCodedPolicy();
 
 			queryNames_ = new HashMap<RuleQuery, String>();
+			immutableQueryNames_ = new HashMap<RuleQuery, String>();
 			queryCount_ = 0;
 
 			RLGGMerger.getInstance().resetRangeIndex();
@@ -752,21 +758,76 @@ public abstract class StateSpec {
 	/**
 	 * Gets or creates a rule query for a guided rule.
 	 * 
+	 * @param isTransient
+	 *            TODO
 	 * @param gr
 	 *            The guided rule associated with a query.
+	 * 
 	 * @return The query from the rule (possibly newly created).
 	 * @throws Exception
 	 *             If an unqueriable object is given.
 	 */
-	public String getRuleQuery(Object queriable) throws Exception {
+	public String getRuleQuery(RelationalQuery queriable, boolean isTransient)
+			throws Exception {
 		RuleQuery rq = new RuleQuery(queriable);
-		String result = queryNames_.get(rq);
+		String result = (isTransient) ? queryNames_.get(rq)
+				: immutableQueryNames_.get(rq);
 		if (result == null) {
 			result = rq.makeQuery();
-			queryNames_.put(rq, result);
+			if (isTransient)
+				queryNames_.put(rq, result);
+			else
+				immutableQueryNames_.put(rq, result);
+			System.out.println(immutableQueryNames_.size());
 		}
 
 		return result;
+	}
+
+	public void cleanRuleQueries(ModularPolicy policy) {
+		Collection<RuleQuery> existingQueries = new HashSet<RuleQuery>(
+				queryNames_.keySet());
+		recurseRemoveRuleQueries(policy, existingQueries);
+
+		// Remove all queries not present.
+		try {
+			for (RuleQuery rq : existingQueries) {
+				rq.undefQuery();
+
+				queryNames_.remove(rq);
+			}
+		} catch (JessException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Recurse through a modular policy, leaving a collection of queries that no
+	 * longer exist.
+	 * 
+	 * @param policy
+	 *            The policy to recurse through.
+	 * @param existingQueries
+	 *            The collection of queries to remove from.
+	 */
+	private void recurseRemoveRuleQueries(ModularPolicy policy,
+			Collection<RuleQuery> existingQueries) {
+		for (PolicyItem pi : policy.getRules()) {
+			try {
+				if (pi instanceof RelationalRule) {
+					RuleQuery rq = new RuleQuery((RelationalQuery) pi);
+					existingQueries.remove(rq);
+				} else if (pi instanceof ModularSubGoal) {
+					ModularPolicy internalPolicy = ((ModularSubGoal) pi)
+							.getModularPolicy();
+					if (internalPolicy != null)
+						recurseRemoveRuleQueries(internalPolicy,
+								existingQueries);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -1175,6 +1236,9 @@ public abstract class StateSpec {
 		/** The conditions of the rule. */
 		private final Collection<RelationalPredicate> ruleConds_;
 
+		/** The name of this query. */
+		private String queryName_;
+
 		/**
 		 * A rule query for a single rule and its query parameters.
 		 * 
@@ -1184,7 +1248,7 @@ public abstract class StateSpec {
 		 *             If the object passed as a parameter is not a valid query
 		 *             object.
 		 */
-		public RuleQuery(Object queriable) throws Exception {
+		public RuleQuery(RelationalQuery queriable) throws Exception {
 			if (queriable instanceof RelationalRule) {
 				RelationalRule rule = (RelationalRule) queriable;
 				ruleConds_ = rule.getSimplifiedConditions(false);
@@ -1201,6 +1265,10 @@ public abstract class StateSpec {
 				rangeContexts_ = null;
 				throw new Exception(queriable + " cannot be used as a query!");
 			}
+		}
+
+		public void undefQuery() throws JessException {
+			rete_.unDefrule(queryName_);
 		}
 
 		@Override
@@ -1246,15 +1314,15 @@ public abstract class StateSpec {
 		public String makeQuery() {
 			try {
 				// Wipe the queries if there're too many
-				if (queryCount_ >= MAX_QUERIES) {
-					for (int i = 0; i < queryCount_; i++) {
-						rete_.unDefrule(POLICY_QUERY_PREFIX + i);
-					}
-					queryNames_.clear();
-					queryCount_ = 0;
-				}
+				// if (queryCount_ >= MAX_QUERIES) {
+				// for (int i = 0; i < queryCount_; i++) {
+				// rete_.unDefrule(POLICY_QUERY_PREFIX + i);
+				// }
+				// queryNames_.clear();
+				// queryCount_ = 0;
+				// }
 
-				String result = POLICY_QUERY_PREFIX + queryCount_++;
+				queryName_ = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
 				if ((queryParams_ != null && !queryParams_.isEmpty())
 						|| (rangeContexts_ != null && !rangeContexts_.isEmpty())) {
@@ -1276,16 +1344,16 @@ public abstract class StateSpec {
 					}
 					declares.append("))");
 
-					rete_.eval("(defquery " + result + " "
+					rete_.eval("(defquery " + queryName_ + " "
 							+ declares.toString() + " "
 							+ conditionsToString(ruleConds_) + ")");
 				} else {
 					// Basic condition checking
-					rete_.eval("(defquery " + result + " "
+					rete_.eval("(defquery " + queryName_ + " "
 							+ conditionsToString(ruleConds_) + ")");
 				}
 
-				return result;
+				return queryName_;
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

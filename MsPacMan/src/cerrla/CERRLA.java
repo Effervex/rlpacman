@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import com.sun.corba.se.spi.orbutil.fsm.State;
+
 import cerrla.LocalCrossEntropyDistribution.AlgorithmState;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
@@ -190,8 +192,10 @@ public class CERRLA implements RRLAgent {
 			subGoalPolicies = modPol.getAllPolicies(true, false,
 					subGoalPolicies);
 
-		return regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
+		ModularPolicy policy = regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
 				null);
+		StateSpec.getInstance().cleanRuleQueries(policy);
+		return policy;
 	}
 
 	/**
