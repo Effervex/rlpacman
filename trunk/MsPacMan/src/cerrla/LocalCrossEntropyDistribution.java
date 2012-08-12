@@ -284,7 +284,8 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					vv.add(param.toString());
 
 			// Run the query
-			String query = StateSpec.getInstance().getRuleQuery(goalRule_, false);
+			String query = StateSpec.getInstance().getRuleQuery(goalRule_,
+					false);
 			QueryResult results = state.runQueryStar(query, vv);
 
 			// If results, then the goal has been met!
@@ -417,20 +418,28 @@ public class LocalCrossEntropyDistribution implements Serializable {
 			}
 
 			// Determine best elite sample
-			if (Config.getInstance().getGeneratorFile() == null
-					&& !elites_.isEmpty())
-				bestPolicy_ = getBestElite(elites_);
+			if (Config.getInstance().getGeneratorFile() == null)
+				bestPolicy_ = getBestElite();
 		}
 
 		setState(AlgorithmState.TESTING);
 	}
 
-	private ModularPolicy getBestElite(SortedSet<PolicyValue> elites) {
+	/**
+	 * Gets the best (or majority, if equally valued) elite sample from the
+	 * current elite samples.
+	 * 
+	 * @return The best elite sample or null if empty.
+	 */
+	public ModularPolicy getBestElite() {
+		if (elites_.isEmpty())
+			return null;
+
 		Map<ModularPolicy, Integer> policyCount = new HashMap<ModularPolicy, Integer>();
-		double bestValue = elites.first().getValue();
+		double bestValue = elites_.first().getValue();
 		ModularPolicy bestPol = null;
 		int largestCount = 0;
-		for (PolicyValue pv : elites) {
+		for (PolicyValue pv : elites_) {
 			if (pv.getValue() == bestValue) {
 				Integer count = policyCount.get(pv.getPolicy());
 				if (count == null)
@@ -715,6 +724,11 @@ public class LocalCrossEntropyDistribution implements Serializable {
 									.doubleValue() == 1) {
 				performance_.saveFiles(this, elites_, currentEpisode_,
 						policyGenerator_.hasUpdated(), false);
+				if (goalCondition_.isMainGoal()
+						&& policyGenerator_.getPoliciesEvaluated()
+								% ProgramArgument.PERFORMANCE_TESTING_SIZE
+										.doubleValue() == 1)
+					StateSpec.reinitInstance();
 			}
 
 			oldAOSettled_ = localAgentObservations_.isSettled();

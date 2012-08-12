@@ -4,16 +4,14 @@ import static org.junit.Assert.*;
 
 import relationalFramework.StateSpec;
 
-import java.awt.image.SampleModel;
+import java.awt.Toolkit;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,8 +33,6 @@ import jess.Rete;
 import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
-
-import cerrla.modular.ModularPolicy;
 
 import blocksWorldMove.BlocksWorldEnvironment;
 

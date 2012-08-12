@@ -4,6 +4,7 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -55,7 +56,7 @@ public final class PolicyGenerator implements Serializable {
 	/** The point at which low mean slots are ignored for text output. */
 	private static final double LOW_SLOT_THRESHOLD = 0.001;
 
-	private static final String POLICY_PREFIX = "Greedy policy:";
+	private static final String POLICY_PREFIX = "Best elite policy:";
 
 	/**
 	 * The increment for an ordering value to increase when resolving ordering
@@ -637,6 +638,7 @@ public final class PolicyGenerator implements Serializable {
 			Slot rlggSlot = coveredRule.getSlot();
 			coveredRule.incrementStatesCovered();
 			if (coveredRule.isRecentlyModified()) {
+				StateSpec.getInstance().clearImmutableQueries();
 				System.out.println(" [" + getGoalCondition()
 						+ "] COVERED RULE: " + coveredRule);
 				if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
@@ -1270,8 +1272,8 @@ public final class PolicyGenerator implements Serializable {
 
 		// Write the greedy policy.
 		buf.write(POLICY_PREFIX + "\n");
-		ModularPolicy bestPolicy = determineRepresentativePolicy();
-		if (bestPolicy.size() == 0)
+		ModularPolicy bestPolicy = parentLearner_.getBestElite();
+		if (bestPolicy == null || bestPolicy.size() == 0)
 			buf.write("<UNCLEAR POLICY>");
 		else
 			buf.write(bestPolicy.toString());
@@ -1472,6 +1474,9 @@ public final class PolicyGenerator implements Serializable {
 			// lower
 			Slot existingSlot = slotGenerator_.findMatch(newSlot);
 			existingSlot.updateLevel(newSlotLevel);
+			// existingSlot.setSelectionProb(Math.max(
+			// existingSlot.getSelectionProbability(),
+			// ProgramArgument.INITIAL_SLOT_MEAN.doubleValue()));
 			// Move the rule's slot to the existing slot for
 			// further update operations.
 			splitRule.setSlot(existingSlot);
