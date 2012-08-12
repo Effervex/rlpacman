@@ -1,5 +1,6 @@
 package rrlFramework;
 
+import java.awt.Toolkit;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -94,13 +95,13 @@ public class RRLExperiment {
 		// If there aren't any performance files, return 0,0
 		if (lastPerf == null)
 			return result;
-		
+
 		// If greedy generators, a file means the run is complete
 		if (Config.getInstance().getGeneratorFile() != null) {
 			result[0] = run + 1;
 			return result;
 		}
-			
+
 
 		// Otherwise, scan the last file for how far in it got through
 		try {
@@ -461,6 +462,8 @@ public class RRLExperiment {
 
 		// Load existing runs and start from there.
 		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
+			if (i > run)
+				StateSpec.reinitInstance();
 			run(i, Config.getInstance().getMaxEpisodes());
 			Config.getInstance().removeSerialised();
 		}
@@ -479,6 +482,28 @@ public class RRLExperiment {
 		}
 
 		System.out.println("Average learning time: " + toTimeFormat(runTime));
+//		playSoundComplete();
+	}
+
+	private void playSoundComplete() {
+		int oneTick = 300;
+		try {
+			Toolkit.getDefaultToolkit().beep();
+			Thread.sleep(oneTick);
+			for (int i = 0; i < 3; i++) {
+				Toolkit.getDefaultToolkit().beep();
+				Thread.sleep((int) (oneTick / 3.0));
+			}
+			Toolkit.getDefaultToolkit().beep();
+			Thread.sleep(oneTick);
+			Toolkit.getDefaultToolkit().beep();
+			Thread.sleep(2 * oneTick);
+			Toolkit.getDefaultToolkit().beep();
+			Thread.sleep(oneTick);
+			Toolkit.getDefaultToolkit().beep();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**

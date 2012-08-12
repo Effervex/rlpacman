@@ -187,6 +187,7 @@ public class Performance implements Serializable {
 	 */
 	private void savePerformance(PolicyGenerator policyGenerator,
 			File perfFile, boolean finalWrite) throws Exception {
+		// TODO May be memory leak around here somewhere.
 		if (performanceDetails_.isEmpty())
 			return;
 
@@ -276,18 +277,18 @@ public class Performance implements Serializable {
 		buf.close();
 		wr.close();
 
-		if (Config.getInstance().getGeneratorFile() == null) {
-			// Writing the mutation tree
-			File mutationTreeFile = new File(perfFile.getAbsoluteFile()
-					+ "mutation");
-
-			wr = new FileWriter(mutationTreeFile);
-			buf = new BufferedWriter(wr);
-			// policyGenerator.saveMutationTree(buf);
-
-			buf.close();
-			wr.close();
-		}
+//		if (Config.getInstance().getGeneratorFile() == null) {
+//			// Writing the mutation tree
+//			File mutationTreeFile = new File(perfFile.getAbsoluteFile()
+//					+ "mutation");
+//
+//			wr = new FileWriter(mutationTreeFile);
+//			buf = new BufferedWriter(wr);
+//			// policyGenerator.saveMutationTree(buf);
+//
+//			buf.close();
+//			wr.close();
+//		}
 	}
 
 	/**

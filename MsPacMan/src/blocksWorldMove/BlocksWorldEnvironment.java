@@ -274,12 +274,12 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		if (!optimal_) {
 			// If action is null, then this is the first episode.
 			failedActions_ = 0;
-//			initialiseBlocksState(RRLExperiment.random_.nextInt(numBlocks_
-//					- MIN_NUM_BLOCKS + 1)
-//					+ MIN_NUM_BLOCKS);
-			 initialiseBlocksState(numBlocks_);
+			// initialiseBlocksState(RRLExperiment.random_.nextInt(numBlocks_
+			// - MIN_NUM_BLOCKS + 1)
+			// + MIN_NUM_BLOCKS);
+			initialiseBlocksState(numBlocks_);
 			optimalSteps_ = optimalSteps();
-//			 maxSteps_ = optimalSteps_;
+			// maxSteps_ = optimalSteps_;
 			if (RRLExperiment.debugMode_ || viewingMode_) {
 				System.out.println("\tAgent:\n" + state_);
 			}

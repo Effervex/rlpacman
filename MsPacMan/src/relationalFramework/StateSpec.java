@@ -113,7 +113,7 @@ public abstract class StateSpec {
 	private Map<String, RelationalPredicate> predicates_;
 
 	/** The count value for the query names. */
-	private int queryCount_;
+	private long queryCount_;
 
 	/** The mapping for rules to queries in the Rete object. */
 	private Map<RuleQuery, String> queryNames_;
@@ -759,7 +759,7 @@ public abstract class StateSpec {
 	 * Gets or creates a rule query for a guided rule.
 	 * 
 	 * @param isTransient
-	 *            TODO
+	 *            If the query can be removed with a new policy.
 	 * @param gr
 	 *            The guided rule associated with a query.
 	 * 
@@ -778,12 +778,31 @@ public abstract class StateSpec {
 				queryNames_.put(rq, result);
 			else
 				immutableQueryNames_.put(rq, result);
-			System.out.println(immutableQueryNames_.size());
 		}
 
 		return result;
 	}
 
+	/**
+	 * Clears the immutable queries.
+	 */
+	public void clearImmutableQueries() {
+		try {
+			for (Object obj : immutableQueryNames_.keySet().toArray()) {
+				RuleQuery rq = (RuleQuery) obj;
+				rq.undefQuery();
+				immutableQueryNames_.remove(rq);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Removes any unneeded rule queries from the Rete network.
+	 * 
+	 * @param policy The current policy.
+	 */
 	public void cleanRuleQueries(ModularPolicy policy) {
 		Collection<RuleQuery> existingQueries = new HashSet<RuleQuery>(
 				queryNames_.keySet());
@@ -799,6 +818,11 @@ public abstract class StateSpec {
 		} catch (JessException e) {
 			e.printStackTrace();
 		}
+		
+//
+//		Iterator i = rete_.listDefrules();
+//		while (i.hasNext())
+//			System.out.println(i.next());
 	}
 
 	/**
@@ -1268,7 +1292,7 @@ public abstract class StateSpec {
 		}
 
 		public void undefQuery() throws JessException {
-			rete_.unDefrule(queryName_);
+			rete_.removeDefrule(queryName_);
 		}
 
 		@Override
