@@ -45,7 +45,7 @@ public class CERRLA implements RRLAgent {
 	private Collection<String> startedAgents_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
-	private Map<GoalCondition, LocalCrossEntropyDistribution> goalMappedGenerators_;
+	private Map<GoalCondition, ModularBehaviour> goalMappedGenerators_;
 
 	/** The CEDistribution for the environment goal. */
 	private LocalCrossEntropyDistribution mainGoalCECortex_;
@@ -84,12 +84,19 @@ public class CERRLA implements RRLAgent {
 			Collection<ModularPolicy> subGoalPolicies,
 			SortedSet<GoalCondition> priorSubGoals) {
 		GoalCondition subGoalCondition = subGoal.getGoalCondition();
-		LocalCrossEntropyDistribution moduleDistribution = goalMappedGenerators_
+		ModularBehaviour modularBehaviour = goalMappedGenerators_
 				.get(subGoalCondition);
+		if (modularBehaviour == null)
+			return;
+
+		if (modularBehaviour instanceof ModularPolicy) {
+			ModularPolicy modPol = new ModularPolicy(modularPolicy);
+			subGoal.setModularPolicy(modPol);
+		}
 
 		// If there is an active module to replace this index, do so
-		if (moduleDistribution != null
-				&& moduleDistribution != mainGoalCECortex_
+		if (modularBehaviour instanceof LocalCrossEntropyDistribution
+				&& modularBehaviour != mainGoalCECortex_
 				&& !priorPolicies.contains(subGoalCondition)) {
 			Collection<GoalCondition> modulePrior = new HashSet<GoalCondition>(
 					priorPolicies);
@@ -123,11 +130,13 @@ public class CERRLA implements RRLAgent {
 				}
 
 				// Add the policy
-				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
+				subGoal.setModularPolicy(regeneratePolicy(
+						(LocalCrossEntropyDistribution) modularBehaviour,
 						modulePrior, newModuleReplacementMap, subGoalPolicies,
 						priorSubGoalsLocal));
 			} else {
-				subGoal.setModularPolicy(regeneratePolicy(moduleDistribution,
+				subGoal.setModularPolicy(regeneratePolicy(
+						(LocalCrossEntropyDistribution) modularBehaviour,
 						modulePrior, moduleReplacementMap, subGoalPolicies,
 						priorSubGoalsLocal));
 			}
@@ -192,8 +201,8 @@ public class CERRLA implements RRLAgent {
 			subGoalPolicies = modPol.getAllPolicies(true, false,
 					subGoalPolicies);
 
-		ModularPolicy policy = regeneratePolicy(mainGoalCECortex_, null, null, subGoalPolicies,
-				null);
+		ModularPolicy policy = regeneratePolicy(mainGoalCECortex_, null, null,
+				subGoalPolicies, null);
 		StateSpec.getInstance().cleanRuleQueries(policy);
 		return policy;
 	}
@@ -259,11 +268,13 @@ public class CERRLA implements RRLAgent {
 	@Override
 	public void cleanup() {
 		// Save the final output
-		for (LocalCrossEntropyDistribution lced : goalMappedGenerators_
-				.values()) {
-			if (lced == mainGoalCECortex_)
-				lced.finalWrite();
-			lced.saveModule(currentRunIndex_);
+		for (ModularBehaviour modB : goalMappedGenerators_.values()) {
+			if (modB instanceof LocalCrossEntropyDistribution) {
+				LocalCrossEntropyDistribution lced = (LocalCrossEntropyDistribution) modB;
+				if (lced == mainGoalCECortex_)
+					lced.finalWrite();
+				lced.saveModule(currentRunIndex_);
+			}
 		}
 
 		mainGoalCECortex_.cleanup();
@@ -286,9 +297,9 @@ public class CERRLA implements RRLAgent {
 			// Propagate any state changes along
 			if (!state.equals(mainGoalCECortex_.getState())) {
 				state = mainGoalCECortex_.getState();
-				for (LocalCrossEntropyDistribution lced : goalMappedGenerators_
-						.values()) {
-					lced.setState(state);
+				for (ModularBehaviour modB : goalMappedGenerators_.values()) {
+					if (modB instanceof LocalCrossEntropyDistribution)
+						((LocalCrossEntropyDistribution) modB).setState(state);
 				}
 			}
 
@@ -301,16 +312,17 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void freeze(boolean b) {
-		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
-				.values())
-			distribution.freeze(b);
+		for (ModularBehaviour modB : goalMappedGenerators_.values()) {
+			if (modB instanceof LocalCrossEntropyDistribution)
+				((LocalCrossEntropyDistribution) modB).freeze(b);
+		}
 		onlineTestingIter_ = -1;
 	}
 
 	@Override
 	public void initialise(int run) {
 		currentRunIndex_ = run;
-		goalMappedGenerators_ = new HashMap<GoalCondition, LocalCrossEntropyDistribution>();
+		goalMappedGenerators_ = new HashMap<GoalCondition, ModularBehaviour>();
 		GoalCondition mainGC = Config.getInstance().getGoal();
 		// Load serialised file.
 		if (Config.getInstance().getSerializedFile() != null) {
@@ -342,7 +354,7 @@ public class CERRLA implements RRLAgent {
 
 			try {
 				mainGoalCECortex_.getPolicyGenerator().loadGreedyGenerator(
-						genFile);
+						genFile, true);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -372,7 +384,8 @@ public class CERRLA implements RRLAgent {
 		// If performing online greedy testing, freeze every X iterations to
 		// test.
 		// If frozen externally, will not test.
-		if (ProgramArgument.ONLINE_GREEDY_TESTING.booleanValue() && onlineTestingIter_ >= 0) {
+		if (ProgramArgument.ONLINE_GREEDY_TESTING.booleanValue()
+				&& onlineTestingIter_ >= 0) {
 			if (onlineTestingIter_ == 0) {
 				// Not currently testing.
 				int testingIter = ProgramArgument.POLICY_REPEATS.intValue()
@@ -381,7 +394,7 @@ public class CERRLA implements RRLAgent {
 				if (currentEpisode > 0 && currentEpisode % testingIter == 0) {
 					// Freeze and test.
 					// TODO Be sure to stop the timer.
-					
+
 				}
 			} else {
 				// Currently testing
@@ -406,9 +419,10 @@ public class CERRLA implements RRLAgent {
 		}
 
 		// If the main generator is frozen, freeze the others too.
-		for (LocalCrossEntropyDistribution dist : goalMappedGenerators_
-				.values()) {
-			if (dist != mainGoalCECortex_) {
+		for (ModularBehaviour modB : goalMappedGenerators_.values()) {
+			if (modB instanceof LocalCrossEntropyDistribution
+					&& modB != mainGoalCECortex_) {
+				LocalCrossEntropyDistribution dist = (LocalCrossEntropyDistribution) modB;
 				// If the main goal is frozen, freeze the others too.
 				if (mainGoalCECortex_.isFrozen() && !dist.isConverged())
 					dist.freeze(true);
@@ -442,8 +456,10 @@ public class CERRLA implements RRLAgent {
 
 	@Override
 	public void setSpecialisations(boolean b) {
-		for (LocalCrossEntropyDistribution distribution : goalMappedGenerators_
-				.values())
-			distribution.setSpecialisation(b);
+		for (ModularBehaviour modB : goalMappedGenerators_
+				.values()) {
+			if (modB instanceof LocalCrossEntropyDistribution)
+				((LocalCrossEntropyDistribution) modB).setSpecialisation(b);
+		}
 	}
 }

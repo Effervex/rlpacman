@@ -47,7 +47,7 @@ import util.MultiMap;
  * 
  * @author Sam Sarjant
  */
-public class LocalCrossEntropyDistribution implements Serializable {
+public class LocalCrossEntropyDistribution implements Serializable, ModularBehaviour {
 
 	/** The collection of non existant modules. */
 	private static final Collection<String> nonExistantModule_ = new HashSet<String>();
@@ -489,6 +489,7 @@ public class LocalCrossEntropyDistribution implements Serializable {
 					currentEpisode_ = nextKey.firstKey();
 					bestPolicy_ = new ModularPolicy(
 							greedyPolicies.get(currentEpisode_), this);
+					// TODO Check if this has already been evaluated (if so, just use that value).
 					testEpisode_ = 0;
 				}
 			}
@@ -727,8 +728,9 @@ public class LocalCrossEntropyDistribution implements Serializable {
 				if (goalCondition_.isMainGoal()
 						&& policyGenerator_.getPoliciesEvaluated()
 								% ProgramArgument.PERFORMANCE_TESTING_SIZE
-										.doubleValue() == 1)
-					StateSpec.reinitInstance();
+										.doubleValue() == 1) {
+					StateSpec.reinitInstance(false);
+				}
 			}
 
 			oldAOSettled_ = localAgentObservations_.isSettled();

@@ -557,8 +557,7 @@ public class RLGGMerger {
 			if (unifiedValue.isRange(false))
 				variable = unifiedValue.getStringArg();
 			else {
-				variable = RelationalArgument.RANGE_VARIABLE_PREFIX
-						+ rangeIndex_++;
+				variable = createRangeVariable().toString();
 				// Changing the action terms
 				if (actionTerms != null) {
 					for (int i = 0; i < actionTerms.length; i++)
@@ -569,6 +568,20 @@ public class RLGGMerger {
 		}
 
 		return new RelationalArgument(variable, min, max);
+	}
+
+	/**
+	 * Creates a new range argument.
+	 * 
+	 * @return A unique range argument.
+	 */
+	public RelationalArgument createRangeVariable() {
+		return new RelationalArgument(RelationalArgument.RANGE_VARIABLE_PREFIX
+				+ rangeIndex_++);
+	}
+	
+	public void updateRangeIndex(int index) {
+		rangeIndex_ = index + 1;
 	}
 
 	/**

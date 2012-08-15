@@ -1324,6 +1324,7 @@ public class RLMarioMovement {
 
 			// Find the individual distance weighting and direction of each
 			// action in the ArrayList
+			FiredAction actionLink = null;
 			for (FiredAction firedAction : firedActions) {
 				RelationalPredicate action = firedAction.getAction();
 				int[] actionArray = applyAction(action, marioGroundPos_,
@@ -1342,7 +1343,7 @@ public class RLMarioMovement {
 					// If two objects are of the same distance, add them both
 					// and select a random one.
 					selectedActions.add(actionArray);
-					firedAction.triggerRule();
+					actionLink = firedAction;
 				}
 			}
 
@@ -1358,9 +1359,11 @@ public class RLMarioMovement {
 				// Apply it to the boolean array
 				for (int i = 0; i < partialAction.length; i++) {
 					if (partialAction[i] == 0) {
-						if (randomSelected[i] != 0)
+						if (randomSelected[i] != 0) {
 							partialAction[i] = randomSelected[i];
-						else
+							// Something changed, trigger rule
+							actionLink.triggerRule();
+						} else
 							resolvedAction = false;
 					}
 				}
