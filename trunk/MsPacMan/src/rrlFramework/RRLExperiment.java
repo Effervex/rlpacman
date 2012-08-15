@@ -463,7 +463,7 @@ public class RRLExperiment {
 		// Load existing runs and start from there.
 		for (int i = run; i < Config.getInstance().getRepetitionsEnd(); i++) {
 			if (i > run)
-				StateSpec.reinitInstance();
+				StateSpec.reinitInstance(true);
 			run(i, Config.getInstance().getMaxEpisodes());
 			Config.getInstance().removeSerialised();
 		}

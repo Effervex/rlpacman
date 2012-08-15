@@ -30,172 +30,220 @@ public class RelationalRuleTest {
 	}
 
 	@Test
+	public void testParseRule() {
+		RelationalRule rule = new RelationalRule(
+				"(above ?A ?G_0) (above ?B ?G_1) (clear ?A) (clear ?B) => (move ?A ?B)",
+				lced_);
+		List<RelationalPredicate> simplifiedConditions = rule
+				.getSimplifiedConditions(false);
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?G_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?B ?G_1)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(test (<> ?A ?G_0 ?G_1))")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(test (<> ?B ?A ?G_0 ?G_1))")));
+
+		StateSpec.initInstance("jCloisterZone.Carcassonne", "onab");
+		lced_ = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("SinglePlayer"));
+		rule = new RelationalRule(
+				"(player CERRLA0) (meeplesLeft CERRLA0 (2.5 <= ?#_4 <= 5.5)) "
+						+ "(controls CERRLA0 ?V_1) (placedMeeples CERRLA0 (1.0 <= ?#_9 <= 2.0) ?V_2) "
+						+ "(meepleLoc ?B ?C) (tileEdge ?B ?V_0 ?C) (worth ?C (4.0 <= ?#_5 <= 12.0)) "
+						+ "=> (placeMeeple CERRLA0 ?B ?C)");
+		simplifiedConditions = rule.getSimplifiedConditions(false);
+		assertEquals(simplifiedConditions.size(), 12);
+		System.out.println(simplifiedConditions);
+
+		StateSpec.initInstance("mario.RLMario", "Diff1");
+		lced_ = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("Diff1"));
+		rule = new RelationalRule(
+				"(marioPower fire) (enemy ?A) (test (<> ?A fire)) (distance ?A ?#_41) "
+						+ "(width ?A ?#_40&:(range ?#_40min 0.5 ?#_40 ?#_40max 1.0)) "
+						+ "=> (shootFireball ?A ?#_41 fire)", lced_);
+		simplifiedConditions = rule.getSimplifiedConditions(false);
+//		assertEquals(simplifiedConditions.size(), 12);
+		System.out.println(simplifiedConditions);
+		System.out.println(rule.getRangeContexts());
+	}
+
+	@Test
 	public void testExpandConditions() {
 		// Basic test
 		RelationalRule rule = new RelationalRule(
 				"(clear ?A) (clear ?B) (above ?A ?G_0) (not (highest ?B))"
 						+ " => (move ?A ?B)", lced_);
 		// No more automatically added type conds
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?A)")));
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?B)")));
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?A ?G_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (highest ?B))")));
+		List<RelationalPredicate> simplifiedConditions = rule
+				.getSimplifiedConditions(false);
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(block ?A)")));
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(block ?B)")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?G_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (highest ?B))")));
 
 		rule = new RelationalRule("(clear ?A) (clear ?B) => (move ?A ?B)",
 				lced_);
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?A)")));
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(block ?B)")));
-		assertEquals(rule.getSimplifiedConditions(false).size(), 3);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(block ?A)")));
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(block ?B)")));
+		assertEquals(simplifiedConditions.size(), 3);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
 
 		// Variable normalisation
 		rule = new RelationalRule("(clear ?F) (clear ?G) => (move ?F ?G)",
 				lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 3);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
+		assertEquals(simplifiedConditions.size(), 3);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
 
 		// Unbound normalisation
 		rule = new RelationalRule(
 				"(clear ?F) (clear ?G) (on ?F ?V_5) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 5);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?A ?V_0)")));
+		assertEquals(simplifiedConditions.size(), 5);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(on ?A ?V_0)")));
 
 		// Bound normalisation
 		rule = new RelationalRule("(clear ?F) (clear ?G) (above ?F ?V_5) "
 				+ "(on ?F ?V_5) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?A ?V_0)")));
-		assertFalse(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?A ?V_0)")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?V_0)")));
+		assertFalse(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(on ?A ?V_0)")));
 
 		// Unbound and bound
 		rule = new RelationalRule("(clear ?F) (clear ?G) (above ?F ?V_5) "
 				+ "(on ?F ?V_4) (clear ?V_5) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 8);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?A ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?A ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?V_0)")));
+		assertEquals(simplifiedConditions.size(), 8);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(on ?A ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?V_0)")));
 
 		// Binding the unbound
 		rule = new RelationalRule("(clear ?F) (clear ?G) (above ?F ?V_5) "
 				+ "(on ?F ?V_5) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?A ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?A ?V_0)")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(on ?A ?V_0)")));
 
 		// Unbounding the anonymous
 		rule = new RelationalRule("(clear ?F) (clear ?G) (above ?F ?) "
 				+ "(on ?F ?) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 7);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(above ?A ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(on ?A ?V_1)")));
+		assertEquals(simplifiedConditions.size(), 7);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(above ?A ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(on ?A ?V_1)")));
 
 		// Binding negated anonymous
 		rule = new RelationalRule("(clear ?F) (clear ?G) "
 				+ "(not (on ?F ?)) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 4);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?A ?))")));
+		assertEquals(simplifiedConditions.size(), 4);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (on ?A ?))")));
 
 		// Binding negated unbound (the only way to bind unbound negated
 		// variables)
 		rule = new RelationalRule("(clear ?F) (clear ?G) "
 				+ "(thing ?V_0) (not (on ?G ?V_0)) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?B ?V_0))")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(thing ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (on ?B ?V_0))")));
 
 		// Unbinding lonely variables
 		rule = new RelationalRule("(clear ?F) (clear ?G) "
 				+ "(not (on ?F ?V_0)) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 4);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?A ?))")));
+		assertEquals(simplifiedConditions.size(), 4);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (on ?A ?))")));
 
 		rule = new RelationalRule("(clear ?F) (clear ?G) "
 				+ "(thing ?V_4) (not (on ?F ?V_4)) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (on ?A ?V_0))")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(thing ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (on ?A ?V_0))")));
 
 		// Negated numerical condition
 		rule = new RelationalRule("(clear ?F) (clear ?G) "
 				+ "(thing ?V_4) (not (height ?F ?)) => (move ?F ?G)", lced_);
-		assertEquals(rule.getSimplifiedConditions(false).size(), 6);
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?A)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(clear ?B)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(thing ?V_0)")));
-		assertTrue(rule.getSimplifiedConditions(false).contains(
-				StateSpec.toRelationalPredicate("(not (height ?A ?))")));
+		assertEquals(simplifiedConditions.size(), 6);
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(thing ?V_0)")));
+		assertTrue(simplifiedConditions.contains(StateSpec
+				.toRelationalPredicate("(not (height ?A ?))")));
 	}
 
 	@Test

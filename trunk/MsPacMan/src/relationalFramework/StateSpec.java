@@ -192,13 +192,16 @@ public abstract class StateSpec {
 
 	/**
 	 * The constructor for a state specification.
+	 * 
+	 * @param initAll
 	 */
-	private final void initialise() {
+	private final void initialise(boolean initAll) {
 		try {
-			rete_ = new Rete();
-
-			environment_ = this.getClass().getPackage().getName();
-
+			if (initAll) {
+				rete_ = new Rete();
+				environment_ = this.getClass().getPackage().getName();
+				RLGGMerger.getInstance().resetRangeIndex();
+			}
 			numberPreds_ = new HashSet<String>();
 
 			// Initialise any deffunctions
@@ -228,8 +231,6 @@ public abstract class StateSpec {
 			queryNames_ = new HashMap<RuleQuery, String>();
 			immutableQueryNames_ = new HashMap<RuleQuery, String>();
 			queryCount_ = 0;
-
-			RLGGMerger.getInstance().resetRangeIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -801,7 +802,8 @@ public abstract class StateSpec {
 	/**
 	 * Removes any unneeded rule queries from the Rete network.
 	 * 
-	 * @param policy The current policy.
+	 * @param policy
+	 *            The current policy.
 	 */
 	public void cleanRuleQueries(ModularPolicy policy) {
 		Collection<RuleQuery> existingQueries = new HashSet<RuleQuery>(
@@ -818,11 +820,11 @@ public abstract class StateSpec {
 		} catch (JessException e) {
 			e.printStackTrace();
 		}
-		
-//
-//		Iterator i = rete_.listDefrules();
-//		while (i.hasNext())
-//			System.out.println(i.next());
+
+		//
+		// Iterator i = rete_.listDefrules();
+		// while (i.hasNext())
+		// System.out.println(i.next());
 	}
 
 	/**
@@ -1064,7 +1066,7 @@ public abstract class StateSpec {
 			instance_ = (StateSpec) Class.forName(
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
-			instance_.initialise();
+			instance_.initialise(true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1086,7 +1088,7 @@ public abstract class StateSpec {
 					classPrefix + StateSpec.class.getSimpleName())
 					.newInstance();
 			instance_.envParameter_ = goalArg;
-			instance_.initialise();
+			instance_.initialise(true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1113,10 +1115,10 @@ public abstract class StateSpec {
 		return getInstance().numberPreds_.contains(factName);
 	}
 
-	public static void reinitInstance() {
+	public static void reinitInstance(boolean reinitAll) {
 		try {
 			instance_.rete_.clear();
-			instance_.initialise();
+			instance_.initialise(reinitAll);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -1132,7 +1134,7 @@ public abstract class StateSpec {
 		try {
 			instance_.envParameter_ = goalString;
 			instance_.rete_.clear();
-			instance_.initialise();
+			instance_.initialise(true);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

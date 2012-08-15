@@ -4,7 +4,6 @@ import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
-import relationalFramework.StateSpec;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -638,7 +637,7 @@ public final class PolicyGenerator implements Serializable {
 			Slot rlggSlot = coveredRule.getSlot();
 			coveredRule.incrementStatesCovered();
 			if (coveredRule.isRecentlyModified()) {
-				StateSpec.getInstance().clearImmutableQueries();
+				// StateSpec.getInstance().clearImmutableQueries();
 				System.out.println(" [" + getGoalCondition()
 						+ "] COVERED RULE: " + coveredRule);
 				if (!ProgramArgument.DYNAMIC_SLOTS.booleanValue()) {
@@ -742,7 +741,8 @@ public final class PolicyGenerator implements Serializable {
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULES:
 			// Elites is equal to the (weighted) maximum slot size
-			population = Math.max(maxWeightedRuleCount, sumSlotMean) / rho;
+			population = Math.max(maxWeightedRuleCount / maxSlotMean,
+					sumSlotMean) / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULE_NUM_SLOTS:
 			// Population is equal to the maximum (weighted) slot size * the
@@ -924,7 +924,6 @@ public final class PolicyGenerator implements Serializable {
 	private Pair<Boolean, Double> useSlot(Slot slot, double threshold,
 			boolean deterministicGeneration,
 			SortedMap<Double, RelationalRule> policyOrdering) {
-		double random = RRLExperiment.random_.nextDouble();
 		double slotMean = slot.getSelectionProbability();
 
 		if (deterministicGeneration) {
@@ -938,7 +937,9 @@ public final class PolicyGenerator implements Serializable {
 			return new Pair<Boolean, Double>(slotMean >= threshold, threshold);
 		} else
 			return new Pair<Boolean, Double>(
-					random < slot.getSelectionProbability(), threshold);
+					RRLExperiment.random_.nextDouble() < slot
+							.getSelectionProbability(),
+					threshold);
 	}
 
 	/**
@@ -1068,63 +1069,92 @@ public final class PolicyGenerator implements Serializable {
 	 * Loads a generator file into memory, extracting the episode and greedy
 	 * representative policy for the state of the generator at the episode.
 	 * 
+	 * @param usePolicyRules
+	 *            If the printed policy should be used for testing.
 	 * @return True if the file was loaded and the episode-mapped details
 	 *         recorded.
 	 * @throws IOException
 	 *             Should something go awry...
 	 */
-	public boolean loadGreedyGenerator(File generatorFile) throws IOException {
+	public boolean loadGreedyGenerator(File generatorFile,
+			boolean usePolicyRules) throws IOException {
 		if (greedyPolicyMap_ == null)
 			greedyPolicyMap_ = new TreeMap<Integer, RelationalPolicy>();
-
-		SortedMap<Double, RelationalRule> ruleOrder = new TreeMap<Double, RelationalRule>();
-		double meanThreshold = 0.5;
 
 		FileReader fr = new FileReader(generatorFile);
 		BufferedReader br = new BufferedReader(fr);
 
+		SortedMap<Double, RelationalRule> ruleOrder = new TreeMap<Double, RelationalRule>();
+		double meanThreshold = 0.5;
 		String input = null;
 		boolean recordPolicy = false;
+		RelationalPolicy policy = null;
+		Pattern policyParser = Pattern.compile("Policy:$");
 		Pattern slotParser = Pattern
 				.compile("Slot \\(.+?\\[MU:(.+?);ORD:(.+?);.+\\{\\((.+?):\\d.+?$");
 		Pattern episodeParser = Pattern.compile("(\\d+)\\s\\d+\\.\\d+$");
 		while ((input = br.readLine()) != null) {
-			Matcher m = slotParser.matcher(input);
-			if (m.matches()) {
-				// Record the rule details
-				double slotMean = Double.parseDouble(m.group(1));
-				if (!recordPolicy) {
-					// First slot of the distribution
-					ruleOrder.clear();
-					meanThreshold = Math.min(0.5 + ORDER_CLASH_INCREMENT,
-							slotMean);
-				}
-				if (slotMean >= meanThreshold) {
-					double order = Double.parseDouble(m.group(2));
-					// Ensure the slot is placed in a unique order - no clashes.
-					while (ruleOrder.containsKey(order))
-						order += ORDER_CLASH_INCREMENT;
-
-					RelationalRule probableRule;
-					String ruleString = m.group(3);
-					probableRule = new RelationalRule(ruleString);
-					ruleOrder.put(order, probableRule);
-				}
-
-				recordPolicy = true;
-			} else {
-				m = episodeParser.matcher(input);
+			if (usePolicyRules) {
+				Matcher m = policyParser.matcher(input);
 				if (m.matches()) {
-					// Record the policy
-					int episode = Integer.parseInt(m.group(1));
-					RelationalPolicy policy = new RelationalPolicy();
-					for (Double orders : ruleOrder.keySet()) {
-						RelationalRule rule = ruleOrder.get(orders);
-						policy.addRule(rule);
+					recordPolicy = true;
+					policy = new RelationalPolicy();
+				} else if (recordPolicy) {
+					if (!input.isEmpty()) {
+						RelationalRule polRule = new RelationalRule(input);
+						policy.addRule(polRule);
+					} else {
+						recordPolicy = false;
 					}
-					greedyPolicyMap_.put(episode, policy);
+				} else {
+					m = episodeParser.matcher(input);
+					if (m.matches()) {
+						// Record the policy
+						int episode = Integer.parseInt(m.group(1));
+						greedyPolicyMap_.put(episode, policy);
 
-					recordPolicy = false;
+						policy = null;
+					}
+				}
+			} else {
+				Matcher m = slotParser.matcher(input);
+				if (m.matches()) {
+					// Record the rule details
+					double slotMean = Double.parseDouble(m.group(1));
+					if (!recordPolicy) {
+						// First slot of the distribution
+						ruleOrder.clear();
+						meanThreshold = Math.min(0.5 + ORDER_CLASH_INCREMENT,
+								slotMean);
+					}
+					if (slotMean >= meanThreshold) {
+						double order = Double.parseDouble(m.group(2));
+						// Ensure the slot is placed in a unique order - no
+						// clashes.
+						while (ruleOrder.containsKey(order))
+							order += ORDER_CLASH_INCREMENT;
+
+						RelationalRule probableRule;
+						String ruleString = m.group(3);
+						probableRule = new RelationalRule(ruleString);
+						ruleOrder.put(order, probableRule);
+					}
+
+					recordPolicy = true;
+				} else {
+					m = episodeParser.matcher(input);
+					if (m.matches()) {
+						// Record the policy
+						int episode = Integer.parseInt(m.group(1));
+						policy = new RelationalPolicy();
+						for (Double orders : ruleOrder.keySet()) {
+							RelationalRule rule = ruleOrder.get(orders);
+							policy.addRule(rule);
+						}
+						greedyPolicyMap_.put(episode, policy);
+
+						recordPolicy = false;
+					}
 				}
 			}
 		}
@@ -1406,7 +1436,7 @@ public final class PolicyGenerator implements Serializable {
 			// policy of the file.
 			if (ruleFile.getParent() != null
 					&& ruleFile.getParent().endsWith("temp")) {
-				loadGreedyGenerator(ruleFile);
+				loadGreedyGenerator(ruleFile, false);
 				RelationalPolicy bestPolicy = greedyPolicyMap_
 						.get(greedyPolicyMap_.lastKey());
 				greedyPolicyMap_.clear();

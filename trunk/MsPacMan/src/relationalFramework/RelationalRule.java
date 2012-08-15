@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.collections.BidiMap;
 
 import cerrla.LocalCrossEntropyDistribution;
+import cerrla.RLGGMerger;
 import cerrla.Slot;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.PolicyItem;
@@ -92,7 +93,7 @@ public class RelationalRule implements Serializable,
 	private RelationalPredicate ruleAction_;
 
 	/** The conditions of the rule. */
-	private Collection<RelationalPredicate> rawConditions_;
+	private List<RelationalPredicate> rawConditions_;
 
 	/** The conditions of the rule. */
 	private List<RelationalPredicate> simplifiedConditions_;
@@ -146,7 +147,7 @@ public class RelationalRule implements Serializable,
 	public RelationalRule(Collection<RelationalPredicate> conditions,
 			RelationalPredicate action, RelationalRule parent,
 			LocalCrossEntropyDistribution lced) {
-		rawConditions_ = new HashSet<RelationalPredicate>(conditions);
+		rawConditions_ = new ArrayList<RelationalPredicate>(conditions);
 		if (action != null)
 			ruleAction_ = new RelationalPredicate(action);
 		if (parent != null)
@@ -199,7 +200,7 @@ public class RelationalRule implements Serializable,
 	 */
 	public RelationalRule(RelationalRule baseRule, RelationalPredicate condition) {
 		lced_ = baseRule.lced_;
-		rawConditions_ = new HashSet<RelationalPredicate>(
+		rawConditions_ = new ArrayList<RelationalPredicate>(
 				baseRule.rawConditions_.size() + 1);
 		for (RelationalPredicate cond : baseRule.rawConditions_) {
 			rawConditions_.add(new RelationalPredicate(cond));
@@ -466,7 +467,7 @@ public class RelationalRule implements Serializable,
 	 *            An optional added condition for the raw conditions.
 	 */
 	public void expandConditions(RelationalPredicate condition) {
-//		condition = preProcessRawConds(condition);
+		condition = preProcessRawConds(condition);
 
 		unboundTypeMap_ = null;
 		simplifiedConditions_ = new ArrayList<RelationalPredicate>();
@@ -475,7 +476,7 @@ public class RelationalRule implements Serializable,
 			simplified = lced_.getLocalAgentObservations().simplifyRule(
 					rawConditions_, condition, ruleAction_, true);
 		else
-			simplified = new HashSet<RelationalPredicate>(rawConditions_);
+			simplified = new ArrayList<RelationalPredicate>(rawConditions_);
 		if (simplified == null)
 			return;
 		else if (condition != null)
@@ -502,13 +503,23 @@ public class RelationalRule implements Serializable,
 						.getRelationalArguments();
 				for (int i = 0; i < arguments.length; i++) {
 
-					if (StateSpec.isNumberType(simpCond.getArgTypes()[i])
-							&& arguments[i].isRangeVariable()) {
-						// Numerical argument - resolve range context
-						RangeContext rc = new RangeContext(i, simpCond,
-								ruleAction_);
-						arguments[i] = new RelationalArgument(arguments[i], rc);
-						simpCond.getRangeContexts().add(rc);
+					if (StateSpec.isNumberType(simpCond.getArgTypes()[i])) {
+						if (arguments[i].isAnonymous()) {
+							// Swap anon for range variable
+							arguments[i] = RLGGMerger.getInstance()
+									.createRangeVariable();
+						}
+
+						if (arguments[i].isRangeVariable()) {
+							// Numerical argument - resolve range context
+							RangeContext rc = new RangeContext(i, simpCond,
+									ruleAction_);
+							boolean isFree = arguments[i].isFreeVariable();
+							arguments[i] = new RelationalArgument(arguments[i],
+									rc);
+							arguments[i].setFreeVariable(isFree);
+							simpCond.getRangeContexts().add(rc);
+						}
 					} else {
 						// Adding variable terms
 						if (arguments[i].isVariable()
@@ -615,13 +626,30 @@ public class RelationalRule implements Serializable,
 	 *            An optional condition to swap anon terms for.
 	 */
 	private RelationalPredicate preProcessRawConds(RelationalPredicate condition) {
-		// Run through each raw condition, swapping anonymous for unbound.
-		int unboundIndex = 0;
-		for (RelationalPredicate rawCond : rawConditions_) {
-			unboundIndex = rawCond.replaceAnonymousWithUnbound(unboundIndex);
+		if (ruleAction_ == null)
+			return condition;
+				
+		
+		// Check free variables for ranges
+		for (RelationalPredicate cond : rawConditions_) {
+			for (RelationalArgument arg : cond.getActualArguments()) {
+				if (ruleAction_.containsArg(arg) && arg.isVariable())
+					arg.setFreeVariable(false);
+			}
 		}
-		if (condition != null)
-			condition.replaceAnonymousWithUnbound(unboundIndex);
+
+		if (condition != null) {
+			for (RelationalArgument arg : condition.getActualArguments()) {
+				if (ruleAction_.containsArg(arg) && arg.isVariable())
+					arg.setFreeVariable(false);
+			}
+		}
+		
+		RelationalArgument[] actionArgs = ruleAction_.getActualArguments();
+		for (RelationalArgument arg : actionArgs) {
+			if (arg.isVariable())
+				arg.setFreeVariable(false);
+		}
 
 		return condition;
 	}
@@ -676,7 +704,7 @@ public class RelationalRule implements Serializable,
 	public Collection<RelationalPredicate> getRawConditions(
 			boolean withoutInequals) {
 		if (withoutInequals) {
-			HashSet<RelationalPredicate> conds = new HashSet<RelationalPredicate>(
+			List<RelationalPredicate> conds = new ArrayList<RelationalPredicate>(
 					rawConditions_.size());
 
 			for (RelationalPredicate cond : rawConditions_) {
@@ -685,7 +713,7 @@ public class RelationalRule implements Serializable,
 			}
 			return conds;
 		}
-		return new HashSet<RelationalPredicate>(rawConditions_);
+		return new ArrayList<RelationalPredicate>(rawConditions_);
 	}
 
 	public Collection<GeneralGoalCondition>[] getGeneralisedConditions() {
@@ -955,7 +983,7 @@ public class RelationalRule implements Serializable,
 
 		// Reset the states seen, as the rule has changed.
 		hasSpawned_ = null;
-		rawConditions_ = new HashSet<RelationalPredicate>(conditions);
+		rawConditions_ = new ArrayList<RelationalPredicate>(conditions);
 		expandConditions(null);
 		findConstantsAndRanges();
 		return true;
@@ -1165,6 +1193,6 @@ public class RelationalRule implements Serializable,
 	@Override
 	public void getRuleQuery() {
 		// TODO Auto-generated method stub
-		
+
 	}
 }

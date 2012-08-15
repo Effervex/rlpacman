@@ -1047,9 +1047,21 @@ public class LocalAgentObservations extends SettlingScan implements
 				return;
 
 			specialisation.setQueryParams(rule.getQueryParameters());
-			if (condition.isNumerical()
+			if (condition.isNumerical() && !condition.isNegated()
 					&& !specialisation.getSimplifiedConditions(false).contains(
 							condition)) {
+				// If the numerical condition is already in the rule (with a
+				// different number ID)
+				int numberIndex = 0;
+				String[] condArgs = condition.getArgTypes();
+				for (numberIndex = 0; numberIndex < condArgs.length; numberIndex++)
+					if (StateSpec.isNumberType(condArgs[numberIndex]))
+						break;
+				RangeContext rc = new RangeContext(numberIndex, condition,
+						rule.getAction());
+				if (rule.getRangeContexts().contains(rc))
+					return;
+
 				// If a numerical condition was added, but simplified away, then
 				// split it and add the splits.
 				for (RelationalRule subrange : splitConditionsRanges(

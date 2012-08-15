@@ -17,13 +17,16 @@ import relationalFramework.agentObservations.RangeContext;
  */
 public class RelationalArgument implements Comparable<RelationalArgument>,
 		Serializable {
-	/** The pattern for finding ranges. */
+	/** The old pattern for finding ranges. */
 	private static Pattern DEPRECATED_RANGE_PATTERN = Pattern
 			.compile("(.+)&:\\(<= (.+?) \\1 (.+?)\\)");
+	/** The human-readable format for an explicit range. */
+	private static final Pattern HUMAN_RANGE_PATTERN = Pattern
+			.compile("\\((.+?) <= (.+?) <= (.+?)\\)");
 	/** The first character for variables. */
 	private static final char FIRST_CHAR = 'A';
 	/** The minimum possible number of chars for a range definition. */
-	private static final int MIN_RANGE = 17;
+	private static final int MIN_RANGE = 5;
 	/** The final character for variables. */
 	private static final char MODULO_LETTERS = 26;
 	private static Pattern RANGE_PATTERN = Pattern.compile("(.+)&:\\("
@@ -71,8 +74,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	 *            The string argument to parse. Could be anything.
 	 */
 	public RelationalArgument(String arg) {
-		// Cannot determine range.
-		// TODO Need to be able to divine range for loading modular rules.
 		rangeContext_ = null;
 
 		// Check for a numerical range
@@ -89,19 +90,33 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				argType_ = ArgumentType.NUMBER_RANGE;
 				freeVariable_ = false;
 				return;
-			} else {
-				m = DEPRECATED_RANGE_PATTERN.matcher(arg);
+			}
 
-				if (m.find()) {
-					stringArg_ = m.group(1);
-					rangeBounds_[0] = new RangeBound(m.group(2));
-					rangeFrac_[0] = 0;
-					rangeBounds_[1] = new RangeBound(m.group(3));
-					rangeFrac_[1] = 1;
-					argType_ = ArgumentType.NUMBER_RANGE;
-					freeVariable_ = false;
-					return;
-				}
+			// The slightly older range pattern
+			m = DEPRECATED_RANGE_PATTERN.matcher(arg);
+
+			if (m.find()) {
+				stringArg_ = m.group(1);
+				rangeBounds_[0] = new RangeBound(m.group(2));
+				rangeFrac_[0] = 0;
+				rangeBounds_[1] = new RangeBound(m.group(3));
+				rangeFrac_[1] = 1;
+				argType_ = ArgumentType.NUMBER_RANGE;
+				freeVariable_ = false;
+				return;
+			}
+
+			m = HUMAN_RANGE_PATTERN.matcher(arg);
+
+			if (m.find()) {
+				stringArg_ = m.group(2);
+				rangeBounds_[0] = new RangeBound(m.group(1));
+				rangeFrac_[0] = 0;
+				rangeBounds_[1] = new RangeBound(m.group(3));
+				rangeFrac_[1] = 1;
+				argType_ = ArgumentType.NUMBER_RANGE;
+				freeVariable_ = false;
+				return;
 			}
 		}
 
@@ -243,6 +258,17 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			if (result != 0)
 				return result;
 		}
+		
+		// If at least one is free
+		if (freeVariable_ || ra.freeVariable_) {
+			// If both are free, they are equal
+			if (freeVariable_ && ra.freeVariable_)
+				return 0;
+			else if (freeVariable_)
+				return 1;
+			else
+				return -1;
+		}
 
 		return stringArg_.compareTo(ra.stringArg_);
 	}
@@ -258,17 +284,23 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		RelationalArgument other = (RelationalArgument) obj;
 		if (argType_ != other.argType_)
 			return false;
+		if (freeVariable_ != other.freeVariable_)
+			return false;
 		if (!Arrays.equals(rangeBounds_, other.rangeBounds_))
 			return false;
 		if (!Arrays.equals(rangeFrac_, other.rangeFrac_))
 			return false;
-		if (stringArg_ == null) {
-			if (other.stringArg_ != null)
+		if (!freeVariable_) {
+			if (stringArg_ == null) {
+				if (other.stringArg_ != null)
+					return false;
+			} else if (!stringArg_.equals(other.stringArg_))
 				return false;
-		} else if (!stringArg_.equals(other.stringArg_))
-			return false;
+		}
 		return true;
 	}
+
+
 
 	public ArgumentType getArgumentType() {
 		return argType_;
@@ -321,11 +353,16 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((argType_ == null) ? 0 : argType_.ordinal());
+		result = prime * result
+				+ ((argType_ == null) ? 0 : argType_.hashCode());
 		result = prime * result + Arrays.hashCode(rangeBounds_);
 		result = prime * result + Arrays.hashCode(rangeFrac_);
-		result = prime * result
-				+ ((stringArg_ == null) ? 0 : stringArg_.hashCode());
+		if (freeVariable_) {
+			result = prime * result + 1231;
+		} else {
+			result = prime * result
+					+ ((stringArg_ == null) ? 0 : stringArg_.hashCode());
+		}
 		return result;
 	}
 

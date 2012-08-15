@@ -34,7 +34,7 @@ public class BlocksWorldStateSpecTest {
 		try {
 			spec_.getRete().eval("(assert (on a b))");
 			spec_.getRete().eval("(facts)");
-			StateSpec.reinitInstance();
+			StateSpec.reinitInstance(true);
 			spec_.getRete().eval("(facts)");
 		} catch (Exception e) {
 			fail("Exception occured.");
