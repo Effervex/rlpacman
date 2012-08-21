@@ -119,7 +119,9 @@ public class LocalAgentObservationsTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(clear a)"));
 		Collection<RelationalPredicate> results = sut_.simplifyRule(ruleConds,
 				null, null, false);
-		assertNull(results);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(clear a)")));
+		assertEquals(results.size(), 1);
 
 		// Equivalence condition removal
 		ruleConds.clear();
@@ -136,7 +138,9 @@ public class LocalAgentObservationsTest {
 		ruleConds.add(StateSpec.toRelationalPredicate("(above ?X ?)"));
 		results = sut_.simplifyRule(ruleConds,
 				StateSpec.toRelationalPredicate("(on ?X ?)"), null, false);
-		assertNull(results);
+		assertTrue(results.contains(StateSpec
+				.toRelationalPredicate("(above ?X ?)")));
+		assertEquals(results.size(), 1);
 
 		// Using an added condition (no simplification)
 		ruleConds.clear();
