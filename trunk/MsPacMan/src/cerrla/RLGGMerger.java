@@ -55,9 +55,12 @@ public class RLGGMerger {
 			Collection<RelationalPredicate> newState,
 			RelationalArgument[] oldTerms, BidiMap replacementMap) {
 		// Pre-unify and sort the state for more efficient unification
-		MergeCase initialCase = preUnifyAndSort(oldState, newState, oldTerms,
-				replacementMap);
-		boolean changed = initialCase.isChanged();
+		boolean changed = false;
+		MergeCase initialCase = new MergeCase(
+				new ArrayList<RelationalPredicate>(oldState), newState,
+				new ArrayList<MergedFact>(),
+				new HashSet<RelationalPredicate>(), oldTerms, replacementMap,
+				0, changed, rangeIndex_, 0);
 
 		int id = 1;
 		PriorityQueue<MergeCase> pendingUnifications = new PriorityQueue<MergeCase>();
@@ -419,6 +422,59 @@ public class RLGGMerger {
 		rangeIndex_ = 0;
 	}
 
+
+	public int newRlggUnification(Collection<RelationalPredicate> oldState,
+			Collection<RelationalPredicate> newState, BidiMap replacementMap,
+			RelationalArgument[] oldTerms) {
+		if (oldState.isEmpty() || newState.isEmpty())
+			return NO_CHANGE;
+
+		boolean changed = false;
+		Collection<RelationalPredicate> mergeState = new HashSet<RelationalPredicate>();
+		Collection<RelationalPredicate> remainFacts = new HashSet<RelationalPredicate>();
+		for (RelationalPredicate oldFact : oldState) {
+			// If numerical, do special stuff
+			if (oldFact.isNumerical()) {
+				Collection<MergedFact> merges = unifyFactToState(oldFact,
+						newState, replacementMap, oldTerms, true);
+				if (merges.isEmpty()) {
+					remainFacts.add(oldFact);
+					changed = true;
+				} else {
+					if (merges.size() > 1)
+						System.out
+								.println("WTF? More than one numerical merge?");
+					MergedFact mf = merges.iterator().next();
+					mergeState.add(mf.getResultFact());
+					newState.remove(mf.getUnityFact());
+					System.arraycopy(mf.getFactTerms(), 0, oldTerms, 0,
+							oldTerms.length);
+					changed |= !mf.getResultFact().equals(oldFact);
+				}
+			} else {
+				// Simple contains check
+				if (newState.contains(oldFact)) {
+					mergeState.add(oldFact);
+					newState.remove(oldFact);
+				} else {
+					remainFacts.add(oldFact);
+					changed = true;
+				}
+			}
+		}
+
+		if (mergeState.isEmpty())
+			return CANNOT_UNIFY;
+
+		oldState.clear();
+		oldState.addAll(mergeState);
+		newState.addAll(remainFacts);
+		if (changed)
+			return UNIFIED_CHANGE;
+		else
+			return NO_CHANGE;
+	}
+
 	/**
 	 * Unifies two states together, with the resultant unification in oldState
 	 * and any un-unified terms in newState. The oldTerms are also modified.
@@ -579,7 +635,7 @@ public class RLGGMerger {
 		return new RelationalArgument(RelationalArgument.RANGE_VARIABLE_PREFIX
 				+ rangeIndex_++);
 	}
-	
+
 	public void updateRangeIndex(int index) {
 		rangeIndex_ = index + 1;
 	}

@@ -618,6 +618,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		// collection of direct pointers to the arguments.
 		MultiMap<String, RelationalArgument> nonActionMap = MultiMap
 				.createListMultiMap();
+		Collection<RelationalPredicate> simpChanged = new HashSet<RelationalPredicate>();
 		for (RelationalPredicate cond : simplified) {
 			for (RelationalArgument arg : cond.getActualArguments()) {
 				if (arg.isNonActionVar()) {
@@ -643,7 +644,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 					}
 				}
 			}
+			simpChanged.add(cond);
 		}
+		simplified.clear();
+		simplified.addAll(simpChanged);
 	}
 
 	/**

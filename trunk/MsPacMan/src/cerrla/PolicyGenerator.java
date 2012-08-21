@@ -870,9 +870,10 @@ public final class PolicyGenerator implements Serializable {
 					double slotOrderVal = slotOrdering
 							+ RRLExperiment.random_.nextGaussian()
 							* slotOrderSD;
-					// double slotOrderVal = slotOrdering
-					// + RRLExperiment.random_.nextGaussian()
-					// * slotOrderSD;
+					// double random = (RRLExperiment.random_.nextDouble() - .5)
+					// * 2;
+					// double slotOrderVal = slotOrdering + random * slotOrderSD
+					// * 2;
 					// Ensure the slot is placed in a unique order - no clashes.
 					while (policyOrdering.containsKey(slotOrderVal))
 						slotOrderVal += ORDER_CLASH_INCREMENT;
