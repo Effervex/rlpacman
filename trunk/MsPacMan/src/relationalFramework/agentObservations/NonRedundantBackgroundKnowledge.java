@@ -1,6 +1,7 @@
 package relationalFramework.agentObservations;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -8,8 +9,13 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import jess.Fact;
+import jess.Rete;
+
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
+import relationalFramework.RelationalRule;
+import relationalFramework.StateSpec;
 import util.MultiMap;
 
 /**
@@ -35,11 +41,26 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	/** The rules mapped by the right side predicates (or either if equivalent). */
 	private MultiMap<String, BackgroundKnowledge> reversePredicateMap_;
 
+	/** The Rete algorithm for simplification. */
+	private Rete simplificationEngine_;
+
+	/**
+	 * If the simplification rules of the simplification engine should be
+	 * rebuilt.
+	 */
+	private boolean rebuildEngine_ = true;
+
 	public NonRedundantBackgroundKnowledge() {
 		currentKnowledge_ = MultiMap.createSortedSetMultiMap();
 		equivalencePostConds_ = new HashSet<String>();
 		predicateMap_ = MultiMap.createSortedSetMultiMap();
 		reversePredicateMap_ = MultiMap.createSortedSetMultiMap();
+		// try {
+		// simplificationEngine_ = new Rete();
+		// simplificationEngine_.reset();
+		// } catch (Exception e) {
+		// e.printStackTrace();
+		// }
 	}
 
 	/**
@@ -237,5 +258,54 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 
 	public MultiMap<String, BackgroundKnowledge> getReversePredicateMappedRules() {
 		return reversePredicateMap_;
+	}
+
+	public Collection<RelationalPredicate> simplify(
+			Collection<RelationalPredicate> conds) {
+		// If no simplification rules, then no simplification can be performed.
+		if (currentKnowledge_.isKeysEmpty())
+			return conds;
+
+		Collection<RelationalPredicate> simplified = new ArrayList<RelationalPredicate>();
+		try {
+			// If the engine needs to be rebuilt, rebuild it.
+			if (rebuildEngine_)
+				rebuildEngine();
+
+			// Assert the rules in constant form
+			for (RelationalPredicate cond : conds) {
+				simplificationEngine_.assertString(toConstantForm(cond));
+			}
+
+			simplificationEngine_.run();
+
+			Collection<Fact> facts = StateSpec
+					.extractFacts(simplificationEngine_);
+			for (Fact fact : facts) {
+				RelationalPredicate rebuiltCond = fromConstantForm(fact
+						.toString());
+				simplified.add(rebuiltCond);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return simplified;
+	}
+
+	private RelationalPredicate fromConstantForm(String string) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	private String toConstantForm(RelationalPredicate cond) {
+		String condStr = cond.toString();
+		// TODO Auto-generated method stub
+		// Need to deal with: FreeVars, Variables, Ranges, Constants, Negation
+		return condStr;
+	}
+
+	private void rebuildEngine() {
+		// TODO Auto-generated method stub
+
 	}
 }

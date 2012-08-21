@@ -778,9 +778,12 @@ public class LocalAgentObservations extends SettlingScan implements
 			RelationalPredicate condition, RelationalPredicate ruleAction,
 			boolean exitIfIllegalRule) {
 		Collection<RelationalPredicate> simplified = new HashSet<RelationalPredicate>();
-		RelationalArgument[] actionArgs = ruleAction.getRelationalArguments();
+		RelationalArgument[] actionArgs = null;
+		if (ruleAction != null)
+			actionArgs = ruleAction.getRelationalArguments();
 		for (RelationalPredicate cond : ruleConds) {
-			cond.setActionVariables(actionArgs);
+			if (ruleAction != null)
+				cond.setActionVariables(actionArgs);
 			simplified.add(cond);
 		}
 
