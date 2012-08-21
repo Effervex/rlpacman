@@ -5,6 +5,7 @@ import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -254,6 +255,9 @@ public class InvariantObservations implements Serializable {
 			Map<RelationalArgument, RelationalArgument> goalReplacements) {
 		boolean changed = false;
 
+		// TODO Match this to thesis code (replace numericals and just simply
+		// intersect and union).
+
 		// Generalise the action if necessary
 		RelationalArgument[] actionArgs = (oldAction != null) ? oldAction
 				.getRelationalArguments() : new RelationalArgument[0];
@@ -283,8 +287,11 @@ public class InvariantObservations implements Serializable {
 		// Run through each invariant fact
 		Collection<RelationalPredicate> variantActionConds = new HashSet<RelationalPredicate>(
 				actionConds);
-		int result = RLGGMerger.getInstance().rlggUnification(invariants,
+		// TODO Testing old vs. simple merge
+		RLGGMerger.getInstance().resetRangeIndex();
+		int result = RLGGMerger.getInstance().newRlggUnification(invariants,
 				variantActionConds, replacementMap, actionArgs);
+
 		if (result == RLGGMerger.UNIFIED_CHANGE)
 			changed = true;
 		else if (result == RLGGMerger.CANNOT_UNIFY) {
@@ -294,11 +301,11 @@ public class InvariantObservations implements Serializable {
 		}
 
 		// Note ranges
-//		for (RelationalPredicate invFact : invariants) {
-//			if (invFact.isNumerical()) {
-//				noteRanges(oldAction.getFactName(), invFact, actionRanges);
-//			}
-//		}
+		// for (RelationalPredicate invFact : invariants) {
+		// if (invFact.isNumerical()) {
+		// noteRanges(oldAction.getFactName(), invFact, actionRanges);
+		// }
+		// }
 
 		// Add any remaining action conds to the variants, merging any
 		// numerical ranges together
@@ -315,10 +322,10 @@ public class InvariantObservations implements Serializable {
 				if (!mergedFacts.isEmpty()) {
 					MergedFact unifiedFact = mergedFacts.iterator().next();
 					varFact = unifiedFact.getResultFact();
-//					if (oldAction != null) {
-//						noteRanges(oldAction.getFactName(), varFact,
-//								actionRanges);
-//					}
+					// if (oldAction != null) {
+					// noteRanges(oldAction.getFactName(), varFact,
+					// actionRanges);
+					// }
 					// If the range changed, update the variant value
 					if (!varFact.equals(unifiedFact.getUnityFact())) {
 						changed = true;

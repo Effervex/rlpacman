@@ -111,7 +111,10 @@ public enum ProgramArgument implements Serializable {
 			"If using/learning modules"),
 	WIDER_SPECIALISATION(false, "widerSpecialisation", null,
 			ParameterType.SPECIALISATION,
-			"If including non-action specialisation conditions");
+			"If including non-action specialisation conditions"),
+	USING_UNBOUND_VARS(false, "usingUnbound", null,
+			ParameterType.SPECIALISATION,
+			"If using unbound variables instead of anonymous variables.");
 
 	public static final File ARG_FILE = new File("cerrlaArgs.txt");
 	public static final int ELITES_SIZE_AV_RULES = 0;

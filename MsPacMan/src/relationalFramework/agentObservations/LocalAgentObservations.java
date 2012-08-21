@@ -155,7 +155,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	private boolean checkConditionTypes(
 			Collection<RelationalPredicate> ruleConds,
 			RelationalPredicate condition) {
-		Map<RelationalArgument, Collection<String>> typeArguments = new HashMap<RelationalArgument, Collection<String>>();
+		Map<String, Collection<String>> typeArguments = new HashMap<String, Collection<String>>();
 		RelationalArgument[] condArgs = condition.getRelationalArguments();
 		String[] condTypes = condition.getArgTypes();
 		for (int i = 0; i < condArgs.length; i++) {
@@ -163,11 +163,11 @@ public class LocalAgentObservations extends SettlingScan implements
 			if (condition.isNegated()
 					&& StateSpec.getInstance().isTypePredicate(
 							condition.getFactName())) {
-				typeArguments.put(condArgs[i], StateSpec.getInstance()
-						.getTypeParents(condTypes[i]));
+				typeArguments.put(condArgs[i].toString(), StateSpec
+						.getInstance().getTypeParents(condTypes[i]));
 			} else if (condArgs[i].isVariable()) {
-				typeArguments.put(condArgs[i], StateSpec.getInstance()
-						.getTypeLineage(condTypes[i]));
+				typeArguments.put(condArgs[i].toString(), StateSpec
+						.getInstance().getTypeLineage(condTypes[i]));
 			}
 		}
 
@@ -175,7 +175,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		Collection<RelationalPredicate> removedNegated = new ArrayList<RelationalPredicate>();
 		for (RelationalPredicate ruleCond : ruleConds) {
 			// Check the lineage against each fact.
-			RelationalArgument[] ruleArgs = ruleCond.getRelationalArguments();
+			String[] ruleArgs = ruleCond.getArguments();
 			String[] ruleTypes = ruleCond.getArgTypes();
 			for (int j = 0; j < ruleArgs.length; j++) {
 				if (typeArguments.containsKey(ruleArgs[j])) {
@@ -1047,7 +1047,8 @@ public class LocalAgentObservations extends SettlingScan implements
 				return;
 
 			specialisation.setQueryParams(rule.getQueryParameters());
-			if (condition.isNumerical() && !condition.isNegated()
+			if (condition.isNumerical()
+					&& !condition.isNegated()
 					&& !specialisation.getSimplifiedConditions(false).contains(
 							condition)) {
 				// If the numerical condition is already in the rule (with a
@@ -1112,20 +1113,24 @@ public class LocalAgentObservations extends SettlingScan implements
 			} else {
 				// Match the anon argument to the unbound types, wherever
 				// possible.
-				MultiMap<RelationalArgument, String> unboundTypes = MultiMap
-						.createSortedSetMultiMap();
-				// MultiMap<RelationalArgument, String> unboundTypes = rule
-				// .getUnboundTypeConditions();
+				MultiMap<String, String> unboundTypes = null;
+				if (!ProgramArgument.USING_UNBOUND_VARS.booleanValue()) {
+					unboundTypes = MultiMap.createSortedSetMultiMap();
+					createSpecialisation(condition, rule, specialisations);
+				} else {
+					unboundTypes = rule.getUnboundTypeConditions();
 
-				// Determine the anon type
-				Collection<RelationalPredicate> resultPreds = new HashSet<RelationalPredicate>();
-				RelationalArgument[] args = condition.getRelationalArguments();
-				recursivelyGroundAnons(args, 0, unboundTypes, condition,
-						resultPreds);
+					// Determine the anon type
+					Collection<RelationalPredicate> resultPreds = new ArrayList<RelationalPredicate>();
+					RelationalArgument[] args = condition
+							.getRelationalArguments();
+					recursivelyGroundAnons(args, 0, unboundTypes, condition,
+							resultPreds);
 
-				// Swap the grounded result preds in
-				for (RelationalPredicate result : resultPreds) {
-					createSpecialisation(result, rule, specialisations);
+					// Swap the grounded result preds in
+					for (RelationalPredicate result : resultPreds) {
+						createSpecialisation(result, rule, specialisations);
+					}
 				}
 			}
 			return specialisations;
@@ -1148,7 +1153,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		 *            predicates.
 		 */
 		private void recursivelyGroundAnons(RelationalArgument[] args, int i,
-				MultiMap<RelationalArgument, String> unboundTypes,
+				MultiMap<String, String> unboundTypes,
 				RelationalPredicate anonVariable,
 				Collection<RelationalPredicate> resultPreds) {
 			// Base case, final index reached
@@ -1173,9 +1178,9 @@ public class LocalAgentObservations extends SettlingScan implements
 						.getTypeLineage(anonVariable.getArgTypes()[i]);
 				// For every unbound argument, check that the types are in the
 				// lineage.
-				for (RelationalArgument unboundArg : unboundTypes.keySet()) {
+				for (String unboundArg : unboundTypes.keySet()) {
 					if (lineage.containsAll(unboundTypes.get(unboundArg))) {
-						args[i] = unboundArg.clone();
+						args[i] = new RelationalArgument(unboundArg);
 						recursivelyGroundAnons(args, i + 1, unboundTypes,
 								anonVariable, resultPreds);
 						args[i] = RelationalArgument.ANONYMOUS;
