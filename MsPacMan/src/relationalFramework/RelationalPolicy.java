@@ -117,11 +117,16 @@ public class RelationalPolicy implements Serializable {
 			do {
 				// Find the arguments.
 				String[] arguments = rule.getAction().getArguments();
-				for (int i = 0; i < arguments.length; i++) {
-					// If the action is variable, use the replacement
-					if (arguments[i].charAt(0) == '?')
-						arguments[i] = results.getSymbol(arguments[i]
-								.substring(1));
+				try {
+					for (int i = 0; i < arguments.length; i++) {
+						// If the action is variable, use the replacement
+						if (arguments[i].charAt(0) == '?')
+							arguments[i] = results.getSymbol(arguments[i]
+									.substring(1));
+					}
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
 
 				// Check this is a valid action

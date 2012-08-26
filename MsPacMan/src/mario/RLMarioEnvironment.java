@@ -19,6 +19,7 @@ import ch.idsia.tools.MarioAIOptions;
 
 public class RLMarioEnvironment extends RRLEnvironment {
 	private static final boolean[] NO_ACTION = new boolean[Environment.numberOfKeys];
+	private static final boolean[] HOLD_ACTION = {false, false, false, false, true, false};
 	private static final int TIMEOUT_THRESHOLD = 30;
 	private MarioAIOptions cmdLineOptions_;
 	private MarioEnvironment environment_;

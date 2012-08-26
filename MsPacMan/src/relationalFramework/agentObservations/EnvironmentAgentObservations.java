@@ -592,7 +592,8 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		int simplResult = 0;
 		do {
 			// Update the non action variable bindings
-			updateNonActionBindings(simplified);
+			if (ProgramArgument.USING_UNBOUND_VARS.booleanValue())
+				updateNonActionBindings(simplified);
 
 			// Simplify
 			simplResult = conditionObservations_.simplifyRule(simplified,
@@ -1468,7 +1469,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		/**
 		 * Simplifies a rule using the observed condition associations.
 		 * 
-		 * @param simplified
+		 * @param conds
 		 *            The to-be-simplified set of conditions.
 		 * @param exitIfIllegal
 		 *            If the conditions are to be tested for conflicting
@@ -1480,67 +1481,81 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * @return 1 if the rule is simplified/altered, 0 if no change, -1 if
 		 *         rule conditions are illegal.
 		 */
-		public int simplifyRule(Collection<RelationalPredicate> simplified,
+		public int simplifyRule(Collection<RelationalPredicate> conds,
 				boolean exitIfIllegal, boolean onlyEquivalencies,
 				Collection<RelationalPredicate> localConditionInvariants) {
 			boolean changedOverall = false;
+			// Simplify using the invariants first
+			// changedOverall = removeInvariants(conds,
+			// localConditionInvariants);
+
+			Collection<RelationalPredicate> simplified = inferredRules_
+					.simplify(conds);
+			if (simplified == null || simplified.isEmpty())
+				return -1;
+
+			if (!conds.containsAll(simplified)
+					|| conds.size() != simplified.size())
+				changedOverall = true;
+			conds.clear();
+			conds.addAll(simplified);
+
 			// Note which facts have already been tested, so changes don't
 			// restart the process.
-			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>();
-			boolean changedThisIter = true;
-
-			// Simplify using the invariants first
-			changedOverall |= removeInvariants(simplified,
-					localConditionInvariants);
-
-			// Check each fact for simplifications, and check new facts when
-			// they're added
-			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
-					.getPredicateMappedRules();
-			// TODO Need a smarter method of selecting which simplification
-			// rules to use.
-			while (changedThisIter) {
-				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
-				changedThisIter = false;
-				// Iterate through the facts in the conditions
-				for (RelationalPredicate fact : new TreeSet<RelationalPredicate>(
-						simplified)) {
-					// Only test untested facts, facts still present in
-					// simplified and facts associated with rules.
-					if (!testedFacts.contains(fact)
-							&& simplified.contains(fact)
-							&& mappedRules.containsKey(fact.getFactName())) {
-						// Test against every background knowledge regarding
-						// this fact pred.
-						for (BackgroundKnowledge bckKnow : mappedRules.get(fact
-								.getFactName())) {
-							// If the knowledge hasn't been tested and is an
-							// equivalence if only testing equivalences
-							if (!testedBackground.contains(bckKnow)
-									&& (!onlyEquivalencies || bckKnow
-											.isEquivalence())) {
-								// If this rule is an illegal rule
-								if (bckKnow.checkIllegalRule(simplified,
-										!exitIfIllegal)) {
-									if (exitIfIllegal)
-										return -1;
-									changedThisIter = true;
-									testedBackground.clear();
-								}
-
-								// If the simplification process changes things
-								if (bckKnow.simplify(simplified)) {
-									changedThisIter = true;
-									testedBackground.clear();
-								} else
-									testedBackground.add(bckKnow);
-							}
-						}
-						testedFacts.add(fact);
-					}
-				}
-				changedOverall |= changedThisIter;
-			}
+//			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>();
+//			boolean changedThisIter = true;
+//
+//			// Simplify using the invariants first
+//			// changedOverall |= removeInvariants(conds,
+//			// localConditionInvariants);
+//
+//			// Check each fact for simplifications, and check new facts when
+//			// they're added
+//			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
+//					.getPredicateMappedRules();
+//			// TODO Need a smarter method of selecting which simplification
+//			// rules to use.
+//			while (changedThisIter) {
+//				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
+//				changedThisIter = false;
+//				// Iterate through the facts in the conditions
+//				for (RelationalPredicate fact : new TreeSet<RelationalPredicate>(
+//						conds)) {
+//					// Only test untested facts, facts still present in
+//					// simplified and facts associated with rules.
+//					if (!testedFacts.contains(fact) && conds.contains(fact)
+//							&& mappedRules.containsKey(fact.getFactName())) {
+//						// Test against every background knowledge regarding
+//						// this fact pred.
+//						for (BackgroundKnowledge bckKnow : mappedRules.get(fact
+//								.getFactName())) {
+//							// If the knowledge hasn't been tested and is an
+//							// equivalence if only testing equivalences
+//							if (!testedBackground.contains(bckKnow)
+//									&& (!onlyEquivalencies || bckKnow
+//											.isEquivalence())) {
+//								// If this rule is an illegal rule
+//								if (bckKnow.checkIllegalRule(conds,
+//										!exitIfIllegal)) {
+//									if (exitIfIllegal)
+//										return -1;
+//									changedThisIter = true;
+//									testedBackground.clear();
+//								}
+//
+//								// If the simplification process changes things
+//								if (bckKnow.simplify(conds)) {
+//									changedThisIter = true;
+//									testedBackground.clear();
+//								} else
+//									testedBackground.add(bckKnow);
+//							}
+//						}
+//						testedFacts.add(fact);
+//					}
+//				}
+//				changedOverall |= changedThisIter;
+//			}
 
 			return (changedOverall) ? 1 : 0;
 		}

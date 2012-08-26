@@ -716,10 +716,12 @@ public class RLMarioMovement {
 				actionArray[oppDirection_] = ACTION_OFF;
 			} else if (currentX < endX) {
 				// Between nearEnd and end
-				actionArray[direction_] = ACTION_OFF;
+				actionArray[Mario.KEY_SPEED] = ACTION_OFF;
+				actionArray[direction_] = ACTION_ON;
 				actionArray[oppDirection_] = ACTION_OFF;
 			} else if (currentX < farEndX) {
 				// Between end and farEnd
+				actionArray[Mario.KEY_SPEED] = ACTION_OFF;
 				actionArray[direction_] = ACTION_OFF;
 				actionArray[oppDirection_] = ACTION_ON;
 			} else {
@@ -1229,10 +1231,6 @@ public class RLMarioMovement {
 			actionArray = pickup(startPos[0], startPos[1], marioPos[0],
 					marioPos[1], x, y, bigMario);
 		}
-
-		// TODO Mario continues to hold shell as long as possible?
-		if (carrying && !action.getFactName().equals("shootShell"))
-			actionArray[Mario.KEY_SPEED] = ACTION_ON;
 		return actionArray;
 	}
 
@@ -1319,6 +1317,10 @@ public class RLMarioMovement {
 		int[] partialAction = new int[Environment.numberOfKeys];
 		partialAction[Environment.MARIO_KEY_DOWN] = ACTION_OFF;
 		partialAction[5] = ACTION_OFF;
+
+		if (carrying)
+			partialAction[Mario.KEY_SPEED] = ACTION_ON;
+
 		for (Collection<FiredAction> firedActions : actions.getActions()) {
 			double bestWeight = Integer.MIN_VALUE;
 
@@ -1358,7 +1360,8 @@ public class RLMarioMovement {
 				boolean resolvedAction = true;
 				// Apply it to the boolean array
 				for (int i = 0; i < partialAction.length; i++) {
-					if (partialAction[i] == 0) {
+					if (partialAction[i] == 0
+							|| bestAction.getFactName().equals("shootShell")) {
 						if (randomSelected[i] != 0) {
 							partialAction[i] = randomSelected[i];
 							// Something changed, trigger rule

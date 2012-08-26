@@ -332,6 +332,7 @@ public class CarcassonneRelationalWrapper implements GameEventListener,
 					.getAdjacentAndDiagonalTiles(position).size();
 			rete.assertString("(numSurroundingTiles " + loc + " "
 					+ numAdjacentAndDiagonal + ")");
+			assertedPositions_.add(position);
 		}
 
 		return loc;

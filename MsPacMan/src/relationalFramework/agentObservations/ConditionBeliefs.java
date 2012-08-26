@@ -636,7 +636,7 @@ public class ConditionBeliefs implements Serializable {
 					// isn't already realised by the type itself
 					if (isUsefulRelation(alwaysTrue, true, typeBeliefs,
 							typeVarReplacements)
-							&& shouldCreateRelation(cbFact_, alwaysTrue))
+							/*&& shouldCreateRelation(cbFact_, alwaysTrue)*/)
 						createRelation(type, alwaysTrue, true,
 								conditionBeliefs, negatedConditionBeliefs,
 								currentKnowledge);

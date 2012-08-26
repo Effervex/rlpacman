@@ -354,7 +354,7 @@ public class CERRLA implements RRLAgent {
 
 			try {
 				mainGoalCECortex_.getPolicyGenerator().loadGreedyGenerator(
-						genFile, true);
+						genFile, false);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
