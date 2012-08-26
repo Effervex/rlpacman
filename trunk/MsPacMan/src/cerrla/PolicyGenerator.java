@@ -741,8 +741,10 @@ public final class PolicyGenerator implements Serializable {
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULES:
 			// Elites is equal to the (weighted) maximum slot size
-			population = Math.max(maxWeightedRuleCount / maxSlotMean,
+			population = Math.max(maxWeightedRuleCount,
 					sumSlotMean) / rho;
+//			population = Math.max(maxWeightedRuleCount / maxSlotMean,
+//					sumSlotMean) / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULE_NUM_SLOTS:
 			// Population is equal to the maximum (weighted) slot size * the

@@ -9,12 +9,19 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import jess.Fact;
-import jess.Rete;
+import org.apache.commons.collections.BidiMap;
+import org.apache.commons.collections.bidimap.DualHashBidiMap;
 
+import cerrla.RLGGMerger;
+
+import jess.Fact;
+import jess.QueryResult;
+import jess.Rete;
+import jess.ValueVector;
+
+import relationalFramework.ArgumentType;
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import util.MultiMap;
 
@@ -25,6 +32,16 @@ import util.MultiMap;
  */
 public class NonRedundantBackgroundKnowledge implements Serializable {
 	private static final long serialVersionUID = -7845690550224825015L;
+
+	private static final String NEG_PREFIX = "neg_";
+
+	private static final String ID_PREFIX = "id";
+
+	private static final String FREE_SYMBOL = "free";
+
+	private static final String ILLEGAL_FACT = "(illegal)";
+
+	private static final String ILLEGAL_QUERY = "illegalQuery";
 
 	/**
 	 * The background knowledge rules ordered by what they simplify (in String
@@ -42,7 +59,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	private MultiMap<String, BackgroundKnowledge> reversePredicateMap_;
 
 	/** The Rete algorithm for simplification. */
-	private Rete simplificationEngine_;
+	private transient Rete simplificationEngine_;
 
 	/**
 	 * If the simplification rules of the simplification engine should be
@@ -55,12 +72,6 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 		equivalencePostConds_ = new HashSet<String>();
 		predicateMap_ = MultiMap.createSortedSetMultiMap();
 		reversePredicateMap_ = MultiMap.createSortedSetMultiMap();
-		// try {
-		// simplificationEngine_ = new Rete();
-		// simplificationEngine_.reset();
-		// } catch (Exception e) {
-		// e.printStackTrace();
-		// }
 	}
 
 	/**
@@ -203,6 +214,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	private void removeRules(String removeKey) {
 		Collection<BackgroundKnowledge> removedRules = currentKnowledge_
 				.remove(removeKey);
+		rebuildEngine_ = true;
 		for (BackgroundKnowledge removed : removedRules) {
 			for (RelationalPredicate fact : removed.getPreferredFacts())
 				predicateMap_.get(fact.getFactName()).remove(removed);
@@ -229,6 +241,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 			SortedSet<RelationalPredicate> preferredFacts,
 			SortedSet<RelationalPredicate> nonPreferredFacts, String factString) {
 		currentKnowledge_.put(factString, bckKnow);
+		rebuildEngine_ = true;
 		if (bckKnow.isEquivalence())
 			equivalencePostConds_.add(factString);
 		for (RelationalPredicate fact : preferredFacts) {
@@ -265,26 +278,47 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 		// If no simplification rules, then no simplification can be performed.
 		if (currentKnowledge_.isKeysEmpty())
 			return conds;
+		if (simplificationEngine_ == null) {
+			try {
+				simplificationEngine_ = new Rete();
+				simplificationEngine_.reset();
+				rebuildEngine_ = true;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 
-		Collection<RelationalPredicate> simplified = new ArrayList<RelationalPredicate>();
+		Collection<RelationalPredicate> simplified = new HashSet<RelationalPredicate>();
 		try {
 			// If the engine needs to be rebuilt, rebuild it.
 			if (rebuildEngine_)
 				rebuildEngine();
+			simplificationEngine_.reset();
 
 			// Assert the rules in constant form
+			BidiMap variableMap = new DualHashBidiMap();
 			for (RelationalPredicate cond : conds) {
-				simplificationEngine_.assertString(toConstantForm(cond));
+				simplificationEngine_.assertString(toConstantFormFull(cond,
+						variableMap));
 			}
 
+			// simplificationEngine_.eval("(facts)");
 			simplificationEngine_.run();
+			// simplificationEngine_.eval("(facts)");
+
+			// Check for illegal state
+			QueryResult result = simplificationEngine_.runQueryStar(
+					ILLEGAL_QUERY, new ValueVector());
+			if (result.next())
+				return null;
 
 			Collection<Fact> facts = StateSpec
 					.extractFacts(simplificationEngine_);
 			for (Fact fact : facts) {
-				RelationalPredicate rebuiltCond = fromConstantForm(fact
-						.toString());
-				simplified.add(rebuiltCond);
+				RelationalPredicate rebuiltCond = fromConstantForm(
+						fact.toString(), variableMap);
+				if (rebuiltCond != null)
+					simplified.add(rebuiltCond);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -292,20 +326,268 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 		return simplified;
 	}
 
-	private RelationalPredicate fromConstantForm(String string) {
-		// TODO Auto-generated method stub
-		return null;
+	/**
+	 * Converts a constant-form variable string to a relational predicate.
+	 * 
+	 * @param stringFact
+	 *            The string form predicate.
+	 * @param variableMap
+	 *            The replacement map used for creating the string.
+	 * @return An equivalent {@link RelationalPredicate} of stringFact.
+	 */
+	public RelationalPredicate fromConstantForm(String stringFact,
+			BidiMap variableMap) {
+		String[] split = StateSpec.splitFact(stringFact);
+		if (split[0].equals("initial-fact"))
+			return null;
+
+		boolean isNegated = false;
+		if (split[0].startsWith(NEG_PREFIX)) {
+			isNegated = true;
+			split[0] = split[0].substring(NEG_PREFIX.length());
+		}
+
+		RelationalPredicate pred = StateSpec.getInstance().getPredicateByName(
+				split[0]);
+		RelationalArgument[] args = new RelationalArgument[split.length - 1];
+		for (int i = 1; i < split.length; i++) {
+			if (variableMap.containsValue(split[i]))
+				args[i - 1] = (RelationalArgument) variableMap.getKey(split[i]);
+			else if (split[i].equals(FREE_SYMBOL)) {
+				if (!isNegated
+						&& StateSpec.isNumberType(pred.getArgTypes()[i - 1])) {
+					args[i - 1] = RLGGMerger.getInstance()
+							.createRangeVariable();
+					args[i - 1].setFreeVariable(true);
+				} else
+					args[i - 1] = RelationalArgument.ANONYMOUS;
+			} else
+				args[i - 1] = new RelationalArgument(split[i]);
+		}
+		return new RelationalPredicate(pred, args, isNegated);
 	}
 
-	private String toConstantForm(RelationalPredicate cond) {
-		String condStr = cond.toString();
-		// TODO Auto-generated method stub
-		// Need to deal with: FreeVars, Variables, Ranges, Constants, Negation
-		return condStr;
+	/**
+	 * Converts a {@link RelationalPredicate} condition to a constant-form
+	 * variable string. Also assigns mappings between {@link RelationalArgument}
+	 * s and string IDs.
+	 * 
+	 * @param cond
+	 *            The predicate being converted.
+	 * @param variableMap
+	 *            the map to fill with mappings for changing it back.
+	 * @return An equivalent String of cond.
+	 */
+	public String toConstantFormFull(RelationalPredicate cond,
+			BidiMap variableMap) {
+		if (variableMap.containsKey(cond))
+			return (String) variableMap.get(cond);
+
+		StringBuffer condStr = new StringBuffer("(");
+		if (cond.isNegated())
+			condStr.append(NEG_PREFIX);
+		condStr.append(cond.getFactName());
+		for (RelationalArgument arg : cond.getRelationalArguments()) {
+			if (variableMap.containsKey(arg))
+				condStr.append(" " + variableMap.get(arg));
+			else if (arg.isFreeVariable())
+				condStr.append(" " + FREE_SYMBOL);
+			else {
+				String id = ID_PREFIX + variableMap.size();
+				variableMap.put(arg, id);
+				condStr.append(" " + id);
+			}
+		}
+
+		condStr.append(")");
+		String result = condStr.toString();
+		return result;
 	}
 
-	private void rebuildEngine() {
-		// TODO Auto-generated method stub
+	/**
+	 * Converts a {@link RelationalPredicate} to constant form, but retains the
+	 * variables.
+	 * 
+	 * @param cond
+	 *            The predicate being converted.
+	 * @param variables
+	 *            The existing variables in the rule to create test for.
+	 * @return An equivalent string containing variables of cond.
+	 */
+	public String toConstantFormVariable(RelationalPredicate cond,
+			Collection<RelationalArgument> variables) {
+		StringBuffer condStr = new StringBuffer("(");
+		if (cond.isNegated())
+			condStr.append(NEG_PREFIX);
+		condStr.append(cond.getFactName());
+		for (RelationalArgument arg : cond.getRelationalArguments()) {
+			if (arg.isFreeVariable())
+				condStr.append(" " + FREE_SYMBOL);
+			else if (arg.getArgumentType() == ArgumentType.NUMBER_CONST)
+				condStr.append(" " + arg);
+			else {
+				// Ensure each variable is inequal to free and other variables
+				StringBuffer inequality = new StringBuffer();
+				if (!variables.contains(arg)) {
+					inequality.append("&:(<> " + arg + " free");
+					for (RelationalArgument otherArg : variables)
+						inequality.append(" " + otherArg);
+					inequality.append(")");
+				}
 
+				condStr.append(" " + arg + inequality);
+				variables.add(arg);
+			}
+		}
+
+		condStr.append(")");
+		String result = condStr.toString();
+		return result;
+	}
+
+	/**
+	 * Rebuilds the Rete network consisting of all the simplification rules.
+	 * 
+	 * @throws Exception
+	 *             Should something go awry...
+	 */
+	private void rebuildEngine() throws Exception {
+		simplificationEngine_.clear();
+
+		// Assert every rule
+		int id = 0;
+		for (BackgroundKnowledge bckKnow : currentKnowledge_.values()) {
+			Collection<RelationalPredicate> preferred = bckKnow
+					.getPreferredFacts();
+			Collection<RelationalPredicate> nonPreferred = bckKnow
+					.getNonPreferredFacts();
+
+			// First assert illegal rule
+			String illegalRule = composeIllegalRule(id++, preferred,
+					nonPreferred);
+			simplificationEngine_.eval(illegalRule);
+
+			// Then assert the rule
+			String redundantRule = null;
+			if (bckKnow.isEquivalence())
+				redundantRule = composeEquivalenceRule(id++, preferred,
+						nonPreferred);
+			else
+				redundantRule = composeImplicationRule(id++, preferred,
+						nonPreferred);
+			simplificationEngine_.eval(redundantRule);
+		}
+
+		// Build the illegal query
+		String illegalQuery = "(defquery " + ILLEGAL_QUERY + " " + ILLEGAL_FACT
+				+ ")";
+		simplificationEngine_.eval(illegalQuery);
+
+		rebuildEngine_ = false;
+	}
+
+	/**
+	 * Define the implication rule given the preferred and non-preferred facts.
+	 * 
+	 * @param id
+	 *            The id counter for rule names.
+	 * @param preferred
+	 *            The preferred fact(s).
+	 * @param nonPreferred
+	 *            The non-preferred fact(s).
+	 * @return A JESS implication rule definition string.
+	 */
+	private String composeImplicationRule(int id,
+			Collection<RelationalPredicate> preferred,
+			Collection<RelationalPredicate> nonPreferred) {
+		StringBuffer buffer = new StringBuffer("(defrule implication" + id
+				+ " (declare (salience 1)) ");
+		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
+		for (RelationalPredicate pred : preferred)
+			buffer.append(toConstantFormVariable(pred, variables) + " ");
+		// Non-preferred
+		int numNon = 0;
+		for (RelationalPredicate pred : nonPreferred)
+			buffer.append("?Y" + numNon++ + " <- "
+					+ toConstantFormVariable(pred, variables));
+
+		buffer.append(" => (retract");
+		for (int i = 0; i < numNon; i++)
+			buffer.append(" ?Y" + i);
+		buffer.append("))");
+		return buffer.toString();
+	}
+
+	/**
+	 * Define the equivalence rule given the preferred and non-preferred facts.
+	 * 
+	 * @param id
+	 *            The id counter for rule names.
+	 * @param preferred
+	 *            The preferred fact(s).
+	 * @param nonPreferred
+	 *            The non-preferred fact(s).
+	 * @return A JESS equivalence rule definition string.
+	 */
+	private String composeEquivalenceRule(int id,
+			Collection<RelationalPredicate> preferred,
+			Collection<RelationalPredicate> nonPreferred) {
+		StringBuffer buffer = new StringBuffer("(defrule equivalence" + id
+				+ " (declare (salience 2)) ");
+		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
+		// Non-preferred
+		int numNon = 0;
+		for (RelationalPredicate pred : nonPreferred)
+			buffer.append("?Y" + numNon++ + " <- "
+					+ toConstantFormVariable(pred, variables) + " ");
+
+		buffer.append("=> (retract");
+		for (int i = 0; i < numNon; i++)
+			buffer.append(" ?Y" + i);
+		buffer.append(") (assert");
+		// Preferred facts
+		for (RelationalPredicate pred : preferred)
+			buffer.append(" " + toConstantFormVariable(pred, variables));
+		buffer.append("))");
+		return buffer.toString();
+	}
+
+	/**
+	 * Define an illegal state rule given the preferred and non-preferred facts.
+	 * 
+	 * @param id
+	 *            The id counter for rule names.
+	 * @param preferred
+	 *            The preferred fact(s).
+	 * @param nonPreferred
+	 *            The non-preferred fact(s).
+	 * @return A JESS illegal state rule definition string.
+	 */
+	public String composeIllegalRule(int id,
+			Collection<RelationalPredicate> preferred,
+			Collection<RelationalPredicate> nonPreferred) {
+		StringBuffer buffer = new StringBuffer("(defrule illegal" + id + " (declare (salience 3)) ");
+		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
+		for (RelationalPredicate pred : preferred)
+			buffer.append(toConstantFormVariable(pred, variables) + " ");
+
+		// Negated non-preferred
+		if (nonPreferred.size() > 1)
+			buffer.append("(or ");
+		boolean first = true;
+		for (RelationalPredicate pred : nonPreferred) {
+			// Negate the predicate
+			if (!first && nonPreferred.size() > 1)
+				buffer.append(" ");
+			pred.swapNegated();
+			buffer.append(toConstantFormVariable(pred, variables));
+			pred.swapNegated();
+			first = false;
+		}
+		if (nonPreferred.size() > 1)
+			buffer.append(")");
+
+		buffer.append(" => (assert " + ILLEGAL_FACT + "))");
+		return buffer.toString();
 	}
 }
