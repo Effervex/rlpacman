@@ -230,8 +230,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 							termFact);
 					int unboundOffset = replacementMap.size() - replBefore;
 					actionCond.replaceArguments(replacementMap, false, true);
-					// TODO actionCond.flexibleReplaceArguments(replacementMap,
-					// unboundOffset);
 					actionConds.add(actionCond);
 
 
@@ -724,21 +722,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	}
 
 	/**
-	 * Gets the maximal bounds of a numerical range using a specific range
-	 * context, if such a range exists.
-	 * 
-	 * @param rangeContext
-	 *            The context of the range being selected.
-	 * @return The maximal bounds of the range.
-	 */
-	@Deprecated
-	public void addDeprecatedRanges(Map<RangeContext, double[]> newRangeContexts) {
-		for (ActionBasedObservations abo : actionBasedObservations_.values()) {
-			newRangeContexts.putAll(abo.actionRanges_);
-		}
-	}
-
-	/**
 	 * An internal class to note the action-based observations.
 	 * 
 	 * @author Sam Sarjant
@@ -751,13 +734,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		 * constants if the action always takes a constant.
 		 */
 		private RelationalPredicate action_;
-
-		/**
-		 * Mapped by pair: fact name and range variable, observed maximal ranges
-		 * for the conditions seen in the action.
-		 */
-		@Deprecated
-		private Map<RangeContext, double[]> actionRanges_;
 
 		/** The conditions observed to always be true for the action. */
 		private Collection<RelationalPredicate> invariantActionConditions_;
@@ -1314,42 +1290,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		/**
-		 * Removes all non-type invariants from the conditions.
-		 * 
-		 * @param conditions
-		 *            The conditions to remove invariants from.
-		 * @param localConditionInvariants
-		 *            The optional local condition invariants.
-		 * @return If invariants were removed.
-		 */
-		private boolean removeInvariants(
-				Collection<RelationalPredicate> conditions,
-				Collection<RelationalPredicate> localConditionInvariants) {
-			boolean changed = false;
-			for (RelationalPredicate invariant : invariants_
-					.getSpecificInvariants()) {
-				// Only remove non-type invariants, as type invariants are
-				// either needed, or will be added back anyway.
-				if (!StateSpec.getInstance().isTypePredicate(
-						invariant.getFactName())) {
-					changed |= conditions.remove(invariant);
-				}
-			}
-			// Also remove local invariants
-			if (localConditionInvariants != null) {
-				for (RelationalPredicate invariant : localConditionInvariants) {
-					// Only remove non-type invariants, as type invariants are
-					// either needed, or will be added back anyway.
-					if (!StateSpec.getInstance().isTypePredicate(
-							invariant.getFactName())) {
-						changed |= conditions.remove(invariant);
-					}
-				}
-			}
-			return changed;
-		}
-
-		/**
 		 * Saves the condition beliefs to a file.
 		 * 
 		 * @param environmentDir
@@ -1485,9 +1425,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				boolean exitIfIllegal, boolean onlyEquivalencies,
 				Collection<RelationalPredicate> localConditionInvariants) {
 			boolean changedOverall = false;
-			// Simplify using the invariants first
-			// changedOverall = removeInvariants(conds,
-			// localConditionInvariants);
 
 			Collection<RelationalPredicate> simplified = inferredRules_
 					.simplify(conds);
@@ -1499,63 +1436,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				changedOverall = true;
 			conds.clear();
 			conds.addAll(simplified);
-
-			// Note which facts have already been tested, so changes don't
-			// restart the process.
-//			SortedSet<RelationalPredicate> testedFacts = new TreeSet<RelationalPredicate>();
-//			boolean changedThisIter = true;
-//
-//			// Simplify using the invariants first
-//			// changedOverall |= removeInvariants(conds,
-//			// localConditionInvariants);
-//
-//			// Check each fact for simplifications, and check new facts when
-//			// they're added
-//			MultiMap<String, BackgroundKnowledge> mappedRules = inferredRules_
-//					.getPredicateMappedRules();
-//			// TODO Need a smarter method of selecting which simplification
-//			// rules to use.
-//			while (changedThisIter) {
-//				SortedSet<BackgroundKnowledge> testedBackground = new TreeSet<BackgroundKnowledge>();
-//				changedThisIter = false;
-//				// Iterate through the facts in the conditions
-//				for (RelationalPredicate fact : new TreeSet<RelationalPredicate>(
-//						conds)) {
-//					// Only test untested facts, facts still present in
-//					// simplified and facts associated with rules.
-//					if (!testedFacts.contains(fact) && conds.contains(fact)
-//							&& mappedRules.containsKey(fact.getFactName())) {
-//						// Test against every background knowledge regarding
-//						// this fact pred.
-//						for (BackgroundKnowledge bckKnow : mappedRules.get(fact
-//								.getFactName())) {
-//							// If the knowledge hasn't been tested and is an
-//							// equivalence if only testing equivalences
-//							if (!testedBackground.contains(bckKnow)
-//									&& (!onlyEquivalencies || bckKnow
-//											.isEquivalence())) {
-//								// If this rule is an illegal rule
-//								if (bckKnow.checkIllegalRule(conds,
-//										!exitIfIllegal)) {
-//									if (exitIfIllegal)
-//										return -1;
-//									changedThisIter = true;
-//									testedBackground.clear();
-//								}
-//
-//								// If the simplification process changes things
-//								if (bckKnow.simplify(conds)) {
-//									changedThisIter = true;
-//									testedBackground.clear();
-//								} else
-//									testedBackground.add(bckKnow);
-//							}
-//						}
-//						testedFacts.add(fact);
-//					}
-//				}
-//				changedOverall |= changedThisIter;
-//			}
 
 			return (changedOverall) ? 1 : 0;
 		}

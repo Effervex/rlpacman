@@ -258,7 +258,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 			if (result != 0)
 				return result;
 		}
-		
+
 		// If at least one is free
 		if (freeVariable_ || ra.freeVariable_) {
 			// If both are free, they are equal
@@ -307,6 +307,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	}
 
 	public double[] getExplicitRange() {
+		if (rangeBounds_[0] == null || rangeBounds_[1] == null)
+			return null;
 		double[] explicitRange = { rangeBounds_[0].getValue(null),
 				rangeBounds_[1].getValue(null) };
 		return explicitRange;
@@ -353,8 +355,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result
-				+ ((argType_ == null) ? 0 : argType_.hashCode());
+		result = prime * result + argType_.toString().hashCode();
 		result = prime * result + Arrays.hashCode(rangeBounds_);
 		result = prime * result + Arrays.hashCode(rangeFrac_);
 		if (freeVariable_) {

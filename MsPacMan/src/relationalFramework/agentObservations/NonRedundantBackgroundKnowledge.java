@@ -482,6 +482,7 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 		String illegalQuery = "(defquery " + ILLEGAL_QUERY + " " + ILLEGAL_FACT
 				+ ")";
 		simplificationEngine_.eval(illegalQuery);
+		// simplificationEngine_.eval("(watch all)");
 
 		rebuildEngine_ = false;
 	}
@@ -500,22 +501,30 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	private String composeImplicationRule(int id,
 			Collection<RelationalPredicate> preferred,
 			Collection<RelationalPredicate> nonPreferred) {
-		StringBuffer buffer = new StringBuffer("(defrule implication" + id
-				+ " (declare (salience 1)) ");
+		StringBuffer ruleName = new StringBuffer();
+		StringBuffer buffer = new StringBuffer();
 		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
-		for (RelationalPredicate pred : preferred)
-			buffer.append(toConstantFormVariable(pred, variables) + " ");
+		for (RelationalPredicate pred : preferred) {
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append(constPred + " ");
+			ruleName.append(shortenPredName(constPred));
+		}
+
+		ruleName.append("IMP");
+
 		// Non-preferred
 		int numNon = 0;
-		for (RelationalPredicate pred : nonPreferred)
-			buffer.append("?Y" + numNon++ + " <- "
-					+ toConstantFormVariable(pred, variables));
+		for (RelationalPredicate pred : nonPreferred) {
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append("?Y" + numNon++ + " <- " + constPred);
+			ruleName.append(shortenPredName(constPred));
+		}
 
 		buffer.append(" => (retract");
 		for (int i = 0; i < numNon; i++)
 			buffer.append(" ?Y" + i);
 		buffer.append("))");
-		return buffer.toString();
+		return "(defrule " + ruleName + " (declare (salience 1)) " + buffer;
 	}
 
 	/**
@@ -532,24 +541,31 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	private String composeEquivalenceRule(int id,
 			Collection<RelationalPredicate> preferred,
 			Collection<RelationalPredicate> nonPreferred) {
-		StringBuffer buffer = new StringBuffer("(defrule equivalence" + id
-				+ " (declare (salience 2)) ");
+		StringBuffer suffix = new StringBuffer();
+		StringBuffer prefix = new StringBuffer();
+		StringBuffer buffer = new StringBuffer();
 		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
 		// Non-preferred
 		int numNon = 0;
-		for (RelationalPredicate pred : nonPreferred)
-			buffer.append("?Y" + numNon++ + " <- "
-					+ toConstantFormVariable(pred, variables) + " ");
+		for (RelationalPredicate pred : nonPreferred) {
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append("?Y" + numNon++ + " <- " + constPred + " ");
+			suffix.append(shortenPredName(constPred));
+		}
 
 		buffer.append("=> (retract");
 		for (int i = 0; i < numNon; i++)
 			buffer.append(" ?Y" + i);
 		buffer.append(") (assert");
 		// Preferred facts
-		for (RelationalPredicate pred : preferred)
-			buffer.append(" " + toConstantFormVariable(pred, variables));
+		for (RelationalPredicate pred : preferred) {
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append(" " + constPred);
+			prefix.append(shortenPredName(constPred));
+		}
 		buffer.append("))");
-		return buffer.toString();
+		return "(defrule " + prefix + "EQV" + suffix
+				+ " (declare (salience 2)) " + buffer;
 	}
 
 	/**
@@ -566,10 +582,16 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 	public String composeIllegalRule(int id,
 			Collection<RelationalPredicate> preferred,
 			Collection<RelationalPredicate> nonPreferred) {
-		StringBuffer buffer = new StringBuffer("(defrule illegal" + id + " (declare (salience 3)) ");
+		StringBuffer ruleName = new StringBuffer();
+		StringBuffer buffer = new StringBuffer();
 		Collection<RelationalArgument> variables = new HashSet<RelationalArgument>();
-		for (RelationalPredicate pred : preferred)
-			buffer.append(toConstantFormVariable(pred, variables) + " ");
+		for (RelationalPredicate pred : preferred) {
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append(constPred + " ");
+			ruleName.append(shortenPredName(constPred));
+		}
+
+		ruleName.append("ILL");
 
 		// Negated non-preferred
 		if (nonPreferred.size() > 1)
@@ -580,7 +602,9 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 			if (!first && nonPreferred.size() > 1)
 				buffer.append(" ");
 			pred.swapNegated();
-			buffer.append(toConstantFormVariable(pred, variables));
+			String constPred = toConstantFormVariable(pred, variables);
+			buffer.append(constPred);
+			ruleName.append(shortenPredName(constPred));
 			pred.swapNegated();
 			first = false;
 		}
@@ -588,6 +612,10 @@ public class NonRedundantBackgroundKnowledge implements Serializable {
 			buffer.append(")");
 
 		buffer.append(" => (assert " + ILLEGAL_FACT + "))");
-		return buffer.toString();
+		return "(defrule " + ruleName + " (declare (salience 3)) " + buffer;
+	}
+
+	protected String shortenPredName(String constPred) {
+		return constPred.replaceAll("(\\&:\\(.+?\\))|[() ]", "");
 	}
 }

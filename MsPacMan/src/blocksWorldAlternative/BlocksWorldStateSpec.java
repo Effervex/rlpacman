@@ -1,33 +1,25 @@
-package blocksWorld;
+package blocksWorldAlternative;
 
 import relationalFramework.NumberEnum;
-import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.BackgroundKnowledge;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import relationalFramework.agentObservations.BackgroundKnowledge;
 
-public class BlocksWorldStateSpec extends StateSpec {
+public class BlocksWorldStateSpec extends blocksWorld.BlocksWorldStateSpec {
 
 	@Override
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> actionPreconditions = new HashMap<String, String>();
 
-		actionPreconditions.put("move",
-				"(clear ?A) (block ?A) (clear ?B &:(neq ?A ?B)) "
-						+ "(not (on ?A ?B))");
+		actionPreconditions.put("move", "(clear ?A) (clear ?B &:(neq ?A ?B))");
+		actionPreconditions.put("moveFloor", "(clear ?A) (on ?A ?)");
 
 		return actionPreconditions;
-	}
-
-	@Override
-	protected int initialiseActionsPerStep() {
-		return 1;
 	}
 
 	@Override
@@ -37,8 +29,13 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Move action
 		String[] structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		actions.add(new RelationalPredicate("move", structure, false));
+
+		// MoveFloor action
+		structure = new String[1];
+		structure[0] = "block";
+		actions.add(new RelationalPredicate("moveFloor", structure, false));
 
 		return actions;
 	}
@@ -49,6 +46,12 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// Block to block movement
 		actionRules.add("?action <- (move ?A ?B) ?oldOn <- (on ?A ?C)"
 				+ " => (assert (on ?A ?B)) (retract ?oldOn ?action)");
+		// Floor block to block movement
+		actionRules.add("?action <- (move ?A ?B) ?oldOnFl <- (onFloor ?A)"
+				+ " => (assert (on ?A ?B)) (retract ?oldOnFl ?action)");
+		// Move floor movement
+		actionRules.add("?action <- (moveFloor ?A) ?oldOn <- (on ?A ?C)"
+				+ " => (assert (onFloor ?A)) (retract ?oldOn ?action)");
 		return actionRules;
 	}
 
@@ -64,6 +67,10 @@ public class BlocksWorldStateSpec extends StateSpec {
 		bkMap.put("aboveRule1", new BackgroundKnowledge(
 				"(on ?A ?B) => (assert (above ?A ?B))", true));
 
+		// Blocks on floor is at height a
+		bkMap.put("floorTruthB", new BackgroundKnowledge(
+				"(onFloor ?A) => (assert (height ?A 1))", true));
+
 		// On(X,Y) & Above(Y,Z) -> Above(X,Z)
 		bkMap.put("aboveRule2", new BackgroundKnowledge(
 				"(on ?A ?B) (above ?B ?C) => (assert (above ?A ?C))", true));
@@ -75,7 +82,7 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 		// Highest rule
 		bkMap.put("highestRule", new BackgroundKnowledge(
-				"(height ?A ?N) (forall (thing ?B) (height ?B ?M&:(<= ?M ?N)))"
+				"(height ?A ?N) (forall (block ?B) (height ?B ?M&:(<= ?M ?N)))"
 						+ " => (assert (highest ?A))", true));
 
 		return bkMap;
@@ -83,63 +90,22 @@ public class BlocksWorldStateSpec extends StateSpec {
 
 	@Override
 	protected String[] initialiseGoalState() {
-		if (envParameter_ == null)
-			envParameter_ = "onab";
-
-		String[] result = new String[2];
-		// On(a,b) goal
-		if (envParameter_.equals("onab") || envParameter_.equals("on$A$B")) {
-			result[0] = "on$A$B";
-			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
-					+ RelationalArgument.createGoalTerm(1) + ") (block "
-					+ RelationalArgument.createGoalTerm(0) + ") (block "
-					+ RelationalArgument.createGoalTerm(1) + ")";
-			return result;
-		}
-
-		// On(a,b,c) goal
-		if (envParameter_.equals("onabc") || envParameter_.equals("on$A$Bon$B$C")) {
-			result[0] = "on$A$Bon$B$C";
-			result[1] = "(on " + RelationalArgument.createGoalTerm(0) + " "
-					+ RelationalArgument.createGoalTerm(1) + ") (on "
-					+ RelationalArgument.createGoalTerm(1) + " "
-					+ RelationalArgument.createGoalTerm(2) + ") (block "
-					+ RelationalArgument.createGoalTerm(0) + ") (block "
-					+ RelationalArgument.createGoalTerm(1) + ") (block "
-					+ RelationalArgument.createGoalTerm(2) + ")";
-			return result;
-		}
+		String[] result = super.initialiseGoalState();
 
 		// Unstack goal
 		if (envParameter_.equals("unstack")) {
 			result[0] = "unstack";
-			result[1] = "(forall (block ?A) (clear ?A))";
+			result[1] = "(not (on ?A ?B))";
 			return result;
 		}
 
 		// Stack goal
 		if (envParameter_.equals("stack")) {
 			result[0] = "stack";
-			result[1] = "(floor ?B) (on ?A ?B) (not (on ?C&:(<> ?C ?A) ?B))";
+			result[1] = "(onFloor ?A) (not (onFloor ?C&:(<> ?C ?A)))";
 			return result;
 		}
-
-		// Clear goal
-		if (envParameter_.equals("clearA") || envParameter_.equals("clear$A")) {
-			result[0] = "clear$A";
-			result[1] = "(clear " + RelationalArgument.createGoalTerm(0)
-					+ ") (block " + RelationalArgument.createGoalTerm(0) + ")";
-			return result;
-		}
-
-		if (envParameter_.equals("highestA")
-				|| envParameter_.equals("highest$A")) {
-			result[0] = "highest$A";
-			result[1] = "(highest " + RelationalArgument.createGoalTerm(0)
-					+ ")";
-			return result;
-		}
-		return null;
+		return result;
 	}
 
 	@Override
@@ -149,23 +115,28 @@ public class BlocksWorldStateSpec extends StateSpec {
 		// On predicate
 		String[] structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		predicates.add(new RelationalPredicate("on", structure, false));
+
+		// OnFloor predicate
+		structure = new String[1];
+		structure[0] = "block";
+		predicates.add(new RelationalPredicate("onFloor", structure, false));
 
 		// Clear predicate
 		structure = new String[1];
-		structure[0] = "thing";
+		structure[0] = "block";
 		predicates.add(new RelationalPredicate("clear", structure, false));
 
 		// Above predicate
 		structure = new String[2];
 		structure[0] = "block";
-		structure[1] = "thing";
+		structure[1] = "block";
 		predicates.add(new RelationalPredicate("above", structure, false));
 
 		// Height predicate
 		structure = new String[2];
-		structure[0] = "thing";
+		structure[0] = "block";
 		structure[1] = NumberEnum.Integer.toString();
 		predicates.add(new RelationalPredicate("height", structure, true));
 
@@ -181,20 +152,13 @@ public class BlocksWorldStateSpec extends StateSpec {
 	protected Map<String, String> initialiseTypePredicateTemplates() {
 		Map<String, String> typePreds = new HashMap<String, String>();
 
-		typePreds.put("thing", null);
-		typePreds.put("block", "thing");
-		typePreds.put("floor", "thing");
+		typePreds.put("block", null);
 
 		return typePreds;
 	}
 
 	@Override
 	protected Collection<String> initialiseConstantFacts() {
-		Collection<String> constants = new ArrayList<String>();
-		// The floor is constant.
-		constants.add("(floor floor)");
-		constants.add("(clear floor)");
-		constants.add("(height floor 0)");
-		return constants;
+		return null;
 	}
 }

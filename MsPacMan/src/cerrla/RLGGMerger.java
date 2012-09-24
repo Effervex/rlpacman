@@ -603,6 +603,13 @@ public class RLGGMerger {
 		// Expand the range if need be.
 		double[] baseBounds = baseValue.getExplicitRange();
 		double[] unityBounds = unifiedValue.getExplicitRange();
+		if (baseBounds == null) {
+			if (unityBounds == null)
+				return RelationalArgument.ANONYMOUS;
+			else
+				unifiedValue.clone();
+		} else if (unityBounds == null)
+			return baseValue.clone();
 		double min = Math.min(baseBounds[0], unityBounds[0]);
 		double max = Math.max(baseBounds[1], unityBounds[1]);
 

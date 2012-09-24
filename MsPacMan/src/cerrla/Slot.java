@@ -108,6 +108,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 				+ ((fixedRule_ == null) ? 0 : fixedRule_.hashCode());
 		result = prime * result
 				+ ((seedRule_ == null) ? 0 : seedRule_.hashCode());
+
 		slotHash_ = result;
 	}
 
@@ -215,6 +216,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	private int determineEvaluationThreshold() {
 		return (int) (size() * ProgramArgument.CONFIDENCE_INTERVAL
 				.doubleValue());
+//		return (int) (size() * slotLevel_);
 	}
 
 	@Override
@@ -629,7 +631,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public boolean isUpdating() {
 		int threshold = determineEvaluationThreshold();
-		if (ProgramArgument.ONLINE_UPDATES.booleanValue()) {
+		if (ProgramArgument.POPULATION_UPDATES.booleanValue()) {
 			if (numSamples_ % threshold == 0 && numSamples_ > 0) {
 				numSamples_ = 0;
 				return true;

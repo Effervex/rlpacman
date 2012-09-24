@@ -1,4 +1,4 @@
-package rlPacManGeneral;
+package rlPacMan;
 
 /**
  * A small class representing an integer distance and the direction to take to

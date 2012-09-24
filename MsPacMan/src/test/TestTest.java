@@ -34,7 +34,7 @@ import org.apache.commons.math.distribution.PoissonDistribution;
 import org.apache.commons.math.distribution.PoissonDistributionImpl;
 import org.junit.Test;
 
-import blocksWorldMove.BlocksWorldEnvironment;
+import blocksWorld.BlocksWorldEnvironment;
 
 import util.ArgumentComparator;
 import util.ProbabilityDistribution;

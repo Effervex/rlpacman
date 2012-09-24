@@ -1,4 +1,4 @@
-package relationalFramework.agentObservations;
+package test;
 
 import static org.junit.Assert.*;
 
@@ -14,6 +14,7 @@ import org.junit.Test;
 import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
+import relationalFramework.agentObservations.NonRedundantBackgroundKnowledge;
 
 public class NonRedundantBackgroundKnowledgeTest {
 	private NonRedundantBackgroundKnowledge sut_;

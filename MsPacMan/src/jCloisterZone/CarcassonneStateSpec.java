@@ -8,7 +8,6 @@ import java.util.Map;
 import com.jcloisterzone.board.Rotation;
 
 import relationalFramework.NumberEnum;
-import relationalFramework.RelationalPolicy;
 import relationalFramework.StateSpec;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -97,13 +96,6 @@ public class CarcassonneStateSpec extends StateSpec {
 		}
 		String[] result = { envParameter_, "(tilesLeft -1)" };
 		return result;
-	}
-
-	@Override
-	protected RelationalPolicy initialiseHandCodedPolicy() {
-		RelationalPolicy goodPolicy = new RelationalPolicy();
-
-		return goodPolicy;
 	}
 
 	@Override

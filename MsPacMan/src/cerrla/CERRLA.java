@@ -10,8 +10,6 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import com.sun.corba.se.spi.orbutil.fsm.State;
-
 import cerrla.LocalCrossEntropyDistribution.AlgorithmState;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
@@ -41,8 +39,8 @@ public class CERRLA implements RRLAgent {
 	/** The current modular policy being tested per agent. */
 	private Map<String, ModularPolicy> agentPolicy_;
 
-	/** A map of agents that have started the episode (for mid-episode starts). */
-	private Collection<String> startedAgents_;
+	/** The current run index. */
+	private int currentRunIndex_;
 
 	/** The set of learned behaviours the agent is maintaining concurrently. */
 	private Map<GoalCondition, ModularBehaviour> goalMappedGenerators_;
@@ -50,11 +48,11 @@ public class CERRLA implements RRLAgent {
 	/** The CEDistribution for the environment goal. */
 	private LocalCrossEntropyDistribution mainGoalCECortex_;
 
-	/** The current run index. */
-	private int currentRunIndex_;
-
 	/** The current online testing iteration. */
 	private int onlineTestingIter_;
+
+	/** A map of agents that have started the episode (for mid-episode starts). */
+	private Collection<String> startedAgents_;
 
 	/**
 	 * 
@@ -320,6 +318,11 @@ public class CERRLA implements RRLAgent {
 	}
 
 	@Override
+	public int getNumEpisodes() {
+		return mainGoalCECortex_.getCurrentEpisode();
+	}
+
+	@Override
 	public void initialise(int run) {
 		currentRunIndex_ = run;
 		goalMappedGenerators_ = new HashMap<GoalCondition, ModularBehaviour>();
@@ -354,7 +357,7 @@ public class CERRLA implements RRLAgent {
 
 			try {
 				mainGoalCECortex_.getPolicyGenerator().loadGreedyGenerator(
-						genFile, false);
+						genFile, ProgramArgument.TEST_BEST_POLICY.booleanValue());
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -364,6 +367,15 @@ public class CERRLA implements RRLAgent {
 	@Override
 	public boolean isLearningComplete() {
 		return mainGoalCECortex_.isLearningComplete();
+	}
+
+	@Override
+	public void setSpecialisations(boolean b) {
+		for (ModularBehaviour modB : goalMappedGenerators_
+				.values()) {
+			if (modB instanceof LocalCrossEntropyDistribution)
+				((LocalCrossEntropyDistribution) modB).setSpecialisation(b);
+		}
 	}
 
 	@Override
@@ -447,19 +459,5 @@ public class CERRLA implements RRLAgent {
 
 		// Evaluate the policy.
 		return evaluatePolicy(observations);
-	}
-
-	@Override
-	public int getNumEpisodes() {
-		return mainGoalCECortex_.getCurrentEpisode();
-	}
-
-	@Override
-	public void setSpecialisations(boolean b) {
-		for (ModularBehaviour modB : goalMappedGenerators_
-				.values()) {
-			if (modB instanceof LocalCrossEntropyDistribution)
-				((LocalCrossEntropyDistribution) modB).setSpecialisation(b);
-		}
 	}
 }

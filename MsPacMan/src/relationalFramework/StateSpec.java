@@ -103,9 +103,6 @@ public abstract class StateSpec {
 	 */
 	private RelationalPredicate goalStringFactDef_;
 
-	/** The hand coded policy for the goal. */
-	private RelationalPolicy handCodedPolicy_;
-
 	/** Internal predicates used by the environment. */
 	private Map<String, RelationalPredicate> internalPredicates_;
 
@@ -224,9 +221,6 @@ public abstract class StateSpec {
 
 			// Initialise the goal state rules
 			initialiseGoalRules();
-
-			// Initialise the optimal policy
-			handCodedPolicy_ = initialiseHandCodedPolicy();
 
 			queryNames_ = new HashMap<RuleQuery, String>();
 			immutableQueryNames_ = new HashMap<RuleQuery, String>();
@@ -525,16 +519,6 @@ public abstract class StateSpec {
 	protected abstract String[] initialiseGoalState();
 
 	/**
-	 * Initialises the optimal policy for the goal.
-	 * 
-	 * @param factory
-	 *            The factory for creating rules.
-	 * 
-	 * @return The policy that solves the goal in optimal time.
-	 */
-	protected abstract RelationalPolicy initialiseHandCodedPolicy();
-
-	/**
 	 * Initialises the state predicates.
 	 * 
 	 * @return The list of guided predicate names.
@@ -709,15 +693,6 @@ public abstract class StateSpec {
 
 	public String getGoalState() {
 		return goalState_;
-	}
-
-	/**
-	 * Gets the optimal policy for the problem. Or at least gets a good policy.
-	 * 
-	 * @return The policy that is optimal.
-	 */
-	public RelationalPolicy getHandCodedPolicy() {
-		return handCodedPolicy_;
 	}
 
 	public int getNumReturnedActions() {

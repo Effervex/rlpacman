@@ -1,6 +1,6 @@
 package msPacManVsGhosts;
 
-import rlPacManGeneral.PacManStateSpec;
+import rlPacMan.PacManStateSpec;
 
 /**
  * The state specifications for the PacMan domain.
