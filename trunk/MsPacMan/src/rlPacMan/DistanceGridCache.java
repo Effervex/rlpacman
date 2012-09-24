@@ -1,4 +1,4 @@
-package rlPacManGeneral;
+package rlPacMan;
 
 import java.awt.Color;
 import java.awt.Point;

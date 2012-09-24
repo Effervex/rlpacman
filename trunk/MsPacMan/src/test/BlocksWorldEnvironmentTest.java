@@ -9,8 +9,8 @@ import org.junit.*;
 import relationalFramework.StateSpec;
 import rrlFramework.RRLExperiment;
 
-import blocksWorldMove.BlocksState;
-import blocksWorldMove.BlocksWorldEnvironment;
+import blocksWorld.BlocksState;
+import blocksWorld.BlocksWorldEnvironment;
 
 public class BlocksWorldEnvironmentTest {
 

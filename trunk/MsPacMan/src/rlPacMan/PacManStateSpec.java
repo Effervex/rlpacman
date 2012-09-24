@@ -1,12 +1,8 @@
 package rlPacMan;
 
 import relationalFramework.NumberEnum;
-import relationalFramework.RelationalPolicy;
 import relationalFramework.RelationalPredicate;
-import relationalFramework.RelationalRule;
-import rlPacManGeneral.DistanceDir;
-import rlPacManGeneral.PacManState;
-import rlPacManGeneral.WeightedDirection;
+import relationalFramework.StateSpec;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,31 +12,29 @@ import java.util.Map;
 
 import msPacMan.Ghost;
 
+
+import relationalFramework.agentObservations.BackgroundKnowledge;
+
 /**
  * The state specifications for the PacMan domain.
  * 
  * @author Sam Sarjant
  */
-public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
+public class PacManStateSpec extends StateSpec {
 	@Override
 	protected Map<String, String> initialiseActionPreconditions() {
 		Map<String, String> preconds = new HashMap<String, String>();
 		// Basic preconditions for actions
-		preconds.put("toDot", "(dot ?A) (distance ?A ?B)");
-		preconds.put("toPowerDot",
-				"(powerDot ?A) (distance ?A ?B)");
-		preconds.put("fromPowerDot",
-				"(powerDot ?A) (distance ?A ?B)");
-		preconds.put("toFruit", "(fruit ?A) (distance ?A ?B)");
-		preconds.put("toGhost", "(ghost ?A) (distance ?A ?B)");
-		preconds.put("fromGhost", "(ghost ?A) (distance ?A ?B)");
-		preconds.put("toGhostCentre",
-				"(ghostCentre ?A) (distance ?A ?B)");
-		preconds.put("fromGhostCentre",
-				"(ghostCentre ?A) (distance ?A ?B)");
+		preconds.put("moveTo", "(thing ?A) (distance ?A ?B)");
+		preconds.put("moveFrom", "(thing ?A) (distance ?A ?B)");
 		preconds.put("toJunction", "(junction ?A) (junctionSafety ?A ?B)");
 
 		return preconds;
+	}
+
+	@Override
+	protected int initialiseActionsPerStep() {
+		return -1;
 	}
 
 	@Override
@@ -49,124 +43,140 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 
 		// Actions have a type and a distance
 		String[] structure = new String[2];
-		structure[0] = "dot";
+		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toDot", structure, false));
+		actions.add(new RelationalPredicate("moveTo", structure, false));
 
 		structure = new String[2];
-		structure[0] = "powerDot";
+		structure[0] = "thing";
 		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toPowerDot", structure, false));
-
-		structure = new String[2];
-		structure[0] = "powerDot";
-		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("fromPowerDot", structure, false));
-
-		structure = new String[2];
-		structure[0] = "fruit";
-		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toFruit", structure, false));
-
-		structure = new String[2];
-		structure[0] = "ghost";
-		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("toGhost", structure, false));
-
-		structure = new String[2];
-		structure[0] = "ghost";
-		structure[1] = NumberEnum.Integer.toString();
-		actions.add(new RelationalPredicate("fromGhost", structure, false));
-
-		structure = new String[2];
-		structure[0] = "ghostCentre";
-		structure[1] = NumberEnum.Double.toString();
-		actions.add(new RelationalPredicate("toGhostCentre", structure, false));
-
-		structure = new String[2];
-		structure[0] = "ghostCentre";
-		structure[1] = NumberEnum.Double.toString();
-		actions.add(new RelationalPredicate("fromGhostCentre", structure, false));
+		actions.add(new RelationalPredicate("moveFrom", structure, false));
 
 		structure = new String[2];
 		structure[0] = "junction";
 		structure[1] = NumberEnum.Integer.toString();
 		actions.add(new RelationalPredicate("toJunction", structure, false));
 
-		// TODO Add ghost density
-
 		return actions;
 	}
 
 	@Override
-	protected RelationalPolicy initialiseHandCodedPolicy() {
-		RelationalPolicy goodPolicy = new RelationalPolicy();
+	protected Map<String, BackgroundKnowledge> initialiseBackgroundKnowledge() {
+		Map<String, BackgroundKnowledge> bckKnowledge = new HashMap<String, BackgroundKnowledge>();
 
-		// Defining a good policy
-		ArrayList<String> rules = new ArrayList<String>();
+		return bckKnowledge;
+	}
 
-		if (envParameter_ != null && envParameter_.equals("noDots")) {
-			// Good policy for no dots play
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (fromGhost ?Ghost ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-					+ "(edible ?Ghost) (not (blinking ?Ghost)) "
-					+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
-			rules.add("(not (edible ?Ghost)) "
-					+ "(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-					+ "(distance ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
-					+ "(ghost ?Ghost) "
-					+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
-			rules.add("(distance ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 2)) "
-					+ "(distance ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
-					+ "(edible ?Ghost) (powerDot ?PowerDot) "
-					+ "=> (fromPowerDot ?PowerDot ?Dist0)");
-			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-					+ "(fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
-			rules.add("(distance ?PDot ?Dist0&:(betweenRange ?Dist0 2 99)) "
-					+ "(powerDot ?PDot) " + "=> (toPowerDot ?PDot ?Dist0)");
-		} else if (envParameter_ != null && envParameter_.equals("noPowerDots")) {
-			// Good policy for no power dot play
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-					+ "(ghost ?Ghost) => (fromGhost ?Ghost ?Dist0)");
-			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-					+ "(fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
-			rules.add("(distance ?Dot ?Dist0) "
-					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
-		} else {
-			// Good policy for regular play
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 5)) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (fromGhost ?Ghost ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (fromGhost ?Ghost ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 15)) "
-					+ "(edible ?Ghost) (not (blinking ?Ghost)) "
-					+ "(ghost ?Ghost) => (toGhost ?Ghost ?Dist0)");
-			rules.add("(not (edible ?Ghost)) "
-					+ "(distance ?Ghost ?Dist0&:(betweenRange ?Dist0 0 10)) "
-					+ "(distance ?PowerDot ?Dist1&:(betweenRange ?Dist1 0 10)) "
-					+ "(ghost ?Ghost) "
-					+ "(powerDot ?PowerDot) => (toPowerDot ?PowerDot ?Dist1)");
-			rules.add("(distance ?PowerDot ?Dist0&:(betweenRange ?Dist0 0 3)) "
-					+ "(distance ?Ghost ?Dist1&:(betweenRange ?Dist1 0 15)) "
-					+ "(edible ?Ghost) (powerDot ?PowerDot) "
-					+ "=> (fromPowerDot ?PowerDot ?Dist0)");
-			rules.add("(distance ?Fruit ?Dist0&:(betweenRange ?Dist0 0 20)) "
-					+ "(fruit ?Fruit) => (toFruit ?Fruit ?Dist0)");
-			rules.add("(distance ?Dot ?Dist0) "
-					+ "(dot ?Dot) => (toDot ?Dot ?Dist0)");
-			rules.add("(distance ?Ghost ?Dist0) "
-					+ "(not (edible ?Ghost)) (ghost ?Ghost) "
-					+ "=> (fromGhost ?Ghost ?Dist0)");
+	@Override
+	protected String[] initialiseGoalState() {
+		if (envParameter_ == null)
+			envParameter_ = "10000";
+
+		String[] result = new String[2];
+		if (envParameter_.equals("lvl10")
+				|| envParameter_.equals("10levels")) {
+			// Actual goal condition
+			result[0] = "10levels";
+			result[1] = "(level 11)";
+			return result;
+		}
+		
+		if (envParameter_.equals("10000")
+				|| envParameter_.equals("10000points")) {
+			// Score maximisation
+			result[0] = "10000points";
+			result[1] = "(score ?B&:(>= ?B 10000))";
+			return result;
+		}
+		
+		if (envParameter_.equals("levelMax")
+				|| envParameter_.equals("oneLevel")
+				|| envParameter_.equals("1Level")) {
+			// Score maximisation over a single level
+			result[0] = "1level";
+			result[1] = "(level 2)";
+			return result;
+		}
+		
+		if (envParameter_.equals("survival")
+				|| envParameter_.equals("survive")) {
+			// Score maximisation over a single life
+			result[0] = "survive";
+			result[1] = "(level 11)";
+			return result;
+		}
+		
+		if (envParameter_.equals("edible")) {
+			result[0] = "edible";
+			result[1] = "(edible ?)";
+			return result;
 		}
 
-		for (String rule : rules)
-			goodPolicy.addRule(new RelationalRule(rule));
+		// Score maximisation by default
+		return null;
+	}
+	
+	@Override
+	protected Collection<RelationalPredicate> initialisePredicateTemplates() {
+		Collection<RelationalPredicate> predicates = new ArrayList<RelationalPredicate>();
 
-		return goodPolicy;
+		// Score
+		String[] structure = new String[1];
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("score", structure, false));
+
+		// High Score
+		structure = new String[1];
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("highScore", structure, false));
+
+		// Lives
+		structure = new String[1];
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("lives", structure, false));
+
+		// Level
+		structure = new String[1];
+		structure[0] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("level", structure, false));
+
+		// Edible
+		structure = new String[1];
+		structure[0] = "ghost";
+		predicates.add(new RelationalPredicate("edible", structure, false));
+
+		// Blinking
+		structure = new String[1];
+		structure[0] = "ghost";
+		predicates.add(new RelationalPredicate("blinking", structure, false));
+
+		// Distance Metric
+		structure = new String[2];
+		structure[0] = "thing";
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("distance", structure, false));
+
+		structure = new String[2];
+		structure[0] = "junction";
+		structure[1] = NumberEnum.Integer.toString();
+		predicates.add(new RelationalPredicate("junctionSafety", structure, false));
+
+		return predicates;
+	}
+
+	@Override
+	protected Map<String, String> initialiseTypePredicateTemplates() {
+		Map<String, String> typeMap = new HashMap<String, String>();
+
+		typeMap.put("thing", null);
+		typeMap.put("dot", "thing");
+		typeMap.put("powerDot", "thing");
+		typeMap.put("ghost", "thing");
+		typeMap.put("fruit", "thing");
+		typeMap.put("ghostCentre", "thing");
+		typeMap.put("junction", null);
+
+		return typeMap;
 	}
 
 	/**
@@ -176,71 +186,49 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 	 *            The action to apply.
 	 * @return A Byte direction to move towards/from.
 	 */
-	@Override
-	public WeightedDirection applyAction(RelationalPredicate action,
-			PacManState state) {
+	public WeightedDirection applyAction(RelationalPredicate action, PacManState state) {
 		String[] arguments = action.getArguments();
 		double weight = determineWeight(Integer.parseInt(arguments[1]));
 
-		// Move towards static points (dots, powerdots, junctions)
-		if ((action.getFactName().equals("toDot"))
-				|| (action.getFactName().equals("toPowerDot"))
-				|| (action.getFactName().equals("fromPowerDot"))
-				|| (action.getFactName().equals("toGhostCentre"))
-				|| (action.getFactName().equals("fromGhostCentre"))) {
-			// To Dot, to/from powerdot
+		// First parse the location of the object
+		int x = 0;
+		int y = 0;
+		if (arguments[0].equals("fruit")) {
+			x = state.getFruit().m_locX;
+			y = state.getFruit().m_locY;
+		} else if (arguments[0].equals("blinky")) {
+			x = state.getGhosts()[Ghost.BLINKY].m_locX;
+			y = state.getGhosts()[Ghost.BLINKY].m_locY;
+		} else if (arguments[0].equals("inky")) {
+			x = state.getGhosts()[Ghost.INKY].m_locX;
+			y = state.getGhosts()[Ghost.INKY].m_locY;
+		} else if (arguments[0].equals("pinky")) {
+			x = state.getGhosts()[Ghost.PINKY].m_locX;
+			y = state.getGhosts()[Ghost.PINKY].m_locY;
+		} else if (arguments[0].equals("clyde")) {
+			x = state.getGhosts()[Ghost.CLYDE].m_locX;
+			y = state.getGhosts()[Ghost.CLYDE].m_locY;
+		} else {
 			String[] coords = arguments[0].split("_");
-			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
-					.parseInt(coords[1])][Integer.parseInt(coords[2])];
-			if (distanceGrid == null)
-				return null;
-			byte path = distanceGrid.getDirection();
-			if ((action.getFactName().equals("fromPowerDot"))
-					|| (action.getFactName().equals("fromGhostCentre")))
-				path *= -1;
+			x = Integer.parseInt(coords[1]);
+			y = Integer.parseInt(coords[2]);
+		}
+
+		DistanceDir distanceGrid = state.getDistanceGrid()[x][y];
+		if (distanceGrid == null)
+			return null;
+		byte path = distanceGrid.getDirection();
+		if (action.getFactName().equals("moveTo"))
 			return new WeightedDirection(path, weight);
-
-		} else if (action.getFactName().equals("toFruit")) {
-			// To fruit
-			DistanceDir distanceGrid = state.getDistanceGrid()[state.getFruit().m_locX][state
-					.getFruit().m_locY];
-			if (distanceGrid == null)
-				return null;
-			return new WeightedDirection(distanceGrid.getDirection(), weight);
-
-		} else if (action.getFactName().equals("toJunction")) {
-			String[] coords = arguments[0].split("_");
-
+		else if (action.getFactName().equals("moveFrom"))
+			return new WeightedDirection((byte) (-path), weight);
+		else if (action.getFactName().equals("toJunction")) {
 			// Junction value
 			int juncVal = Integer.parseInt(arguments[1]);
-			// If the junction has safety 0, there is neither weight towards,
-			// nor from it.
-			DistanceDir distanceGrid = state.getDistanceGrid()[Integer
-					.parseInt(coords[1])][Integer.parseInt(coords[2])];
+
 			return new WeightedDirection(distanceGrid.getDirection(), juncVal);
-
-		} else if ((action.getFactName().equals("toGhost"))
-				|| (action.getFactName().equals("fromGhost"))) {
-			int ghostIndex = 0;
-			if (arguments[0].equals("blinky"))
-				ghostIndex = Ghost.BLINKY;
-			else if (arguments[0].equals("pinky"))
-				ghostIndex = Ghost.PINKY;
-			else if (arguments[0].equals("inky"))
-				ghostIndex = Ghost.INKY;
-			else if (arguments[0].equals("clyde"))
-				ghostIndex = Ghost.CLYDE;
-
-			DistanceDir distanceGrid = state.getDistanceGrid()[state
-					.getGhosts()[ghostIndex].m_locX][state.getGhosts()[ghostIndex].m_locY];
-			if (distanceGrid == null)
-				return null;
-			byte path = distanceGrid.getDirection();
-			if (action.getFactName().equals("toGhost"))
-				return new WeightedDirection(path, weight);
-			else
-				return new WeightedDirection((byte) -path, weight);
 		}
+
 		return null;
 	}
 
@@ -259,5 +247,10 @@ public class PacManStateSpec extends rlPacManGeneral.PacManStateSpec {
 			distance = -1;
 
 		return 1.0 / distance;
+	}
+
+	@Override
+	protected Collection<String> initialiseConstantFacts() {
+		return null;
 	}
 }

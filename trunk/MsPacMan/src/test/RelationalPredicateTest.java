@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.Assert.*;
 
+import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
@@ -85,5 +86,16 @@ public class RelationalPredicateTest {
 		assertFalse(rp1.equals(rp2));
 		assertFalse(rp1.hashCode() == rp2.hashCode());
 		assertFalse(rp1.compareTo(rp2) == 0);
+	}
+
+	@Test
+	public void testLoadRelPred() {
+		RelationalPredicate pred = StateSpec
+				.toRelationalPredicate("(not (height ?X ?#_2))");
+		RelationalArgument[] args = pred.getRelationalArguments();
+		assertTrue(args[0].equals(new RelationalArgument("?X")));
+		assertTrue(args[1].equals(new RelationalArgument("?#_2")));
+		double[] range = args[1].getExplicitRange();
+		assertNull(range);
 	}
 }

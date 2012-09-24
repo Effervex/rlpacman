@@ -1,4 +1,4 @@
-package blocksWorldMove;
+package blocksWorld;
 
 import java.awt.Point;
 import java.util.Arrays;
@@ -14,11 +14,22 @@ public class BlocksState {
 	private Integer[] intState_;
 	public int length;
 
+	/**
+	 * Creates a new block state from an integer representation.
+	 * 
+	 * @param state
+	 *            The integer representation of the state.
+	 */
 	public BlocksState(Integer[] state) {
 		intState_ = state;
 		length = state.length;
 	}
 
+	/**
+	 * Gets the integer representation of the state.
+	 * 
+	 * @return The state in integer form.
+	 */
 	public Integer[] getState() {
 		return intState_;
 	}
@@ -51,6 +62,10 @@ public class BlocksState {
 		return new BlocksState(cloneState);
 	}
 
+	/**
+	 * Prints the state in an ASCII graphical format, using characters 'a' to
+	 * 'z' for the blocks.
+	 */
 	@Override
 	public String toString() {
 		// The last column of the blocksChars denotes if there is a block in
@@ -60,7 +75,7 @@ public class BlocksState {
 		int column = 0;
 		int i = 0;
 		while (posMap.size() < length) {
-			column = recursiveBuild(i, intState_, column, posMap, blocksChars);
+			column = recursiveBuildString(i, intState_, column, posMap, blocksChars);
 			i++;
 		}
 
@@ -84,7 +99,7 @@ public class BlocksState {
 	}
 
 	/**
-	 * Builds the blocks state recursively.
+	 * Builds the blocks state String recursively.
 	 * 
 	 * @param currBlock
 	 *            The current block index.
@@ -99,7 +114,7 @@ public class BlocksState {
 	 *            a row has any blocks in it.
 	 * @return The new value of column (same or + 1).
 	 */
-	protected int recursiveBuild(int currBlock, Integer[] blocks, int column,
+	protected int recursiveBuildString(int currBlock, Integer[] blocks, int column,
 			Map<Integer, Point> posMap, char[][] blocksChars) {
 		if (!posMap.containsKey(currBlock)) {
 			if (blocks[currBlock] == 0) {
@@ -109,7 +124,7 @@ public class BlocksState {
 				column++;
 			} else {
 				int underBlock = blocks[currBlock] - 1;
-				column = recursiveBuild(underBlock, blocks, column, posMap,
+				column = recursiveBuildString(underBlock, blocks, column, posMap,
 						blocksChars);
 				Point pos = new Point(posMap.get(underBlock));
 				pos.y++;

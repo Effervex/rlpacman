@@ -106,6 +106,8 @@ public class RLMarioEnvironment extends RRLEnvironment {
 	protected void startState() {
 		cmdLineOptions_.setLevelRandSeed(RRLExperiment.random_.nextInt());
 		cmdLineOptions_.setLevelDifficulty(levelDifficulty_);
+//		cmdLineOptions_.setLevelLength(128);
+//		cmdLineOptions_.setTimeLimit(100);
 		environment_.reset(cmdLineOptions_);
 		if (!experimentMode_ && !GlobalOptions.isScale2x)
 			GlobalOptions.changeScale2x();

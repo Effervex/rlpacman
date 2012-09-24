@@ -1,4 +1,4 @@
-package rlPacManGeneral;
+package rlPacManAlternative;
 
 import java.awt.event.KeyEvent;
 

@@ -11,8 +11,6 @@ import ch.idsia.benchmark.mario.engine.LevelScene;
 import ch.idsia.benchmark.mario.environments.MarioEnvironment;
 
 import relationalFramework.NumberEnum;
-import relationalFramework.RelationalPolicy;
-import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.agentObservations.BackgroundKnowledge;
@@ -151,42 +149,6 @@ public class RLMarioStateSpec extends StateSpec {
 		String[] result = { envParameter_,
 				"(distance goal 0)" };
 		return result;
-	}
-
-	@Override
-	protected RelationalPolicy initialiseHandCodedPolicy() {
-		RelationalPolicy goodPolicy = new RelationalPolicy();
-
-		// Defining a good policy (basic at the moment)
-		ArrayList<String> rules = new ArrayList<String>();
-
-		// Jump pit
-		rules.add("(pit ?A) (distance ?A ?B&:(> ?B 0))"
-				+ " (width ?A ?C) => (jumpOver ?A ?B ?C)");
-		// Shoot enemies
-		rules.add("(blastable ?A) (distance ?A ?B&:(betweenRange ?B -32 100))"
-				+ " (heightDiff ?A ?C&:(betweenRange ?C -10 32))"
-				+ " (marioPower fire) => (shootFireball ?A ?B fire)");
-		// Pickup shell
-		rules.add("(passive ?A) (distance ?A ?B) (carrying ?A) (shell ?A)"
-				+ "=> (pickup ?A ?B)");
-		// Shoot shell
-		rules.add("(enemy ?A) (distance ?A ?B&:(betweenRange ?B -32 64))"
-				+ " => (shootShell ?A ?B fire)");
-		// Stomp enemies
-		rules.add("(canJumpOn ?A) (squashable ?A) (distance ?A ?B&:(betweenRange ?B -32 64))"
-				+ " (heightDiff ?A ?C&:(< ?C 32)) => (jumpOnto ?A ?B)");
-		// Collect powerups
-		rules.add("(canJumpOn ?A) (powerup ?A) (distance ?A ?B) => (jumpOnto ?A ?B)");
-		// Search bricks
-		rules.add("(brick ?A) (heightDiff ?A ?B) => (search ?A ?B)");
-		// To the goal
-		rules.add("(flag ?A) (distance ?A ?B) => (moveTo ?A ?B)");
-
-		for (String rule : rules)
-			goodPolicy.addRule(new RelationalRule(rule));
-
-		return goodPolicy;
 	}
 
 	@Override

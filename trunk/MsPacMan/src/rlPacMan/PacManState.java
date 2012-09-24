@@ -1,4 +1,4 @@
-package rlPacManGeneral;
+package rlPacMan;
 
 import relationalFramework.State;
 import msPacMan.Fruit;

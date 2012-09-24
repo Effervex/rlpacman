@@ -21,7 +21,7 @@ public enum ProgramArgument implements Serializable {
 	BETA(0.01, "beta", null, ParameterType.CONVERGENCE,
 			"If KL sum updates are less than Beta * Alpha"),
 	BOUNDED_ELITES(true, "boundedElites", null, ParameterType.UPDATING,
-			"If the minimum number of elites = |D_S|."),
+			"If the minimum number of elites = Max KL weighted rules."),
 	CONFIDENCE_INTERVAL(3.0, "confidenceInterval", "-C",
 			ParameterType.SAMPLING, "The amount of confidence for sampling "
 					+ "every element at least once."),
@@ -63,8 +63,6 @@ public enum ProgramArgument implements Serializable {
 			"If KL sum updates remain below Beta for this many updates"),
 	ONLINE_GREEDY_TESTING(false, "onlineTesting", null,
 			ParameterType.EVALUATION, "If greedy testing in an online fashion."),
-	ONLINE_UPDATES(false, "onlineUpdates", null, ParameterType.UPDATING,
-			"If updates are performed in an online fashion, or population-based."),
 	ONLY_GOAL_RULES(false, "onlyGoalRules", "-goalRules",
 			ParameterType.SPECIALISATION,
 			"If the agent should only create rules with the goal condition in it"),
@@ -78,6 +76,9 @@ public enum ProgramArgument implements Serializable {
 			"Size of average performance sliding window"),
 	POLICY_REPEATS(3, "policyRepeats", null, ParameterType.EVALUATION,
 			"Number of times policy is repeated"),
+	POPULATION_UPDATES(false, "populationUpdates", null,
+			ParameterType.UPDATING,
+			"If updates are performed in an online fashion, or population-based."),
 	RESET_ELITES(false, "resetElites", null, ParameterType.UPDATING,
 			"If the entire elites are reset when a new slot is created."),
 	RESET_SLOT_COUNT(false, "resetSlotCount", null, ParameterType.UPDATING,
@@ -101,6 +102,9 @@ public enum ProgramArgument implements Serializable {
 			"If the slots should be split at the beginning of learning"),
 	SYSTEM_OUTPUT(true, "systemOutput", "-sysOut", ParameterType.EVALUATION,
 			"If the console should output data during execution."),
+	TEST_BEST_POLICY(true, "testBestPolicy", null, ParameterType.EVALUATION,
+			"If the best elite policy should be used for testing,"
+					+ " else uses greedy generator."),
 	TEST_ITERATIONS(100, "testIterations", null, ParameterType.EVALUATION,
 			"Number of iterations to test the final testing for"),
 	TESTING(false, "test", "-t", ParameterType.EVALUATION,
@@ -109,12 +113,12 @@ public enum ProgramArgument implements Serializable {
 			ParameterType.SAMPLING, "If using/learning general modules"),
 	USE_MODULES(false, "useModules", null, ParameterType.SAMPLING,
 			"If using/learning modules"),
-	WIDER_SPECIALISATION(false, "widerSpecialisation", null,
-			ParameterType.SPECIALISATION,
-			"If including non-action specialisation conditions"),
 	USING_UNBOUND_VARS(false, "usingUnbound", null,
 			ParameterType.SPECIALISATION,
-			"If using unbound variables instead of anonymous variables.");
+			"If using unbound variables instead of anonymous variables."),
+	WIDER_SPECIALISATION(false, "widerSpecialisation", null,
+			ParameterType.SPECIALISATION,
+			"If including non-action specialisation conditions");
 
 	public static final File ARG_FILE = new File("cerrlaArgs.txt");
 	public static final int ELITES_SIZE_AV_RULES = 0;

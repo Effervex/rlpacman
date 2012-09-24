@@ -730,6 +730,10 @@ public final class PolicyGenerator implements Serializable {
 
 		double population = 1;
 		double rho = ProgramArgument.RHO.doubleValue();
+
+		double minPopulation = Math.max(maxWeightedRuleCount, sumSlotMean)
+				/ rho;
+
 		switch (ProgramArgument.ELITES_FUNCTION.intValue()) {
 		case ProgramArgument.ELITES_SIZE_SUM_SLOTS:
 			// Elites is equal to the sum of the slot means
@@ -741,10 +745,9 @@ public final class PolicyGenerator implements Serializable {
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULES:
 			// Elites is equal to the (weighted) maximum slot size
-			population = Math.max(maxWeightedRuleCount,
-					sumSlotMean) / rho;
-//			population = Math.max(maxWeightedRuleCount / maxSlotMean,
-//					sumSlotMean) / rho;
+			population = minPopulation;
+			// population = Math.max(maxWeightedRuleCount / maxSlotMean,
+			// sumSlotMean) / rho;
 			break;
 		case ProgramArgument.ELITES_SIZE_MAX_RULE_NUM_SLOTS:
 			// Population is equal to the maximum (weighted) slot size * the
@@ -762,37 +765,10 @@ public final class PolicyGenerator implements Serializable {
 
 		population *= ProgramArgument.ELITES_MULTIPLE.doubleValue();
 
-		// values_[MAX_KL][iter_] = maxWeightedRuleCount;
-		// values_[SUM_KL][iter_] = sumWeightedRuleCount;
-		// values_[SUM_MU][iter_] = sumSlotMean;
-		// values_[SIZE_D_S][iter_] = slotGenerator_.size();
-		// iter_++;
-		// if (iter_ >= REPS) {
-		// try {
-		// File file = new File("distributionDebug.csv");
-		// FileWriter fw = new FileWriter(file);
-		// BufferedWriter bw = new BufferedWriter(fw);
-		// bw.write("MaxKL,SumKL,SumMu,SizeDS,\n");
-		// for (int i = 0; i < REPS; i++) {
-		// for (int j = 0; j <= SIZE_D_S; j++)
-		// bw.write(values_[j][i] + ",");
-		// bw.write("\n");
-		// }
-		//
-		// bw.close();
-		// fw.close();
-		// } catch (Exception e) {
-		// e.printStackTrace();
-		// }
-		// System.exit(1);
-		// }
-
-		// Min elites
-		// population = Math.max(sumSlotMean / rho, population);
-
 		// Check elite bounding
-		return checkPopulationBounding(population, maxWeightedRuleCount,
-				sumSlotMean);
+		if (ProgramArgument.BOUNDED_ELITES.booleanValue())
+			population = Math.max(minPopulation, population);
+		return (int) Math.ceil(population);
 	}
 
 	/**
@@ -1439,7 +1415,8 @@ public final class PolicyGenerator implements Serializable {
 			// policy of the file.
 			if (ruleFile.getParent() != null
 					&& ruleFile.getParent().endsWith("temp")) {
-				loadGreedyGenerator(ruleFile, false);
+//				loadGreedyGenerator(ruleFile, false);
+				loadGreedyGenerator(ruleFile, true);
 				RelationalPolicy bestPolicy = greedyPolicyMap_
 						.get(greedyPolicyMap_.lastKey());
 				greedyPolicyMap_.clear();
@@ -1568,7 +1545,7 @@ public final class PolicyGenerator implements Serializable {
 			// them.
 			if (slot.isUpdating()) {
 				// Update the slot
-				if (ProgramArgument.ONLINE_UPDATES.booleanValue())
+				if (ProgramArgument.POPULATION_UPDATES.booleanValue())
 					slot.updateProbabilities(ed, alpha, population,
 							numEliteSamples);
 				else

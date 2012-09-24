@@ -7,7 +7,7 @@ import org.apache.commons.collections.BidiMap;
 
 
 /**
- * A unified fact is the resulting information from a successful unification.
+ * A merged fact is the resulting information from a successful unification.
  * 
  * @author Sam Sarjant
  */

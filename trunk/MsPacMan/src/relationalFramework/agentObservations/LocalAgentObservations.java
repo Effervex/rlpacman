@@ -884,13 +884,6 @@ public class LocalAgentObservations extends SettlingScan implements
 							lao.localGoal_.setAsMainGoal();
 						addLAO(lao);
 
-						// Might need to deal with deprecated range contexts
-						if (lao.rangeContexts_ == null) {
-							lao.rangeContexts_ = new HashMap<RangeContext, double[]>();
-							EnvironmentAgentObservations.getInstance()
-									.addDeprecatedRanges(lao.rangeContexts_);
-						}
-
 						return lao;
 					}
 				}
@@ -1022,7 +1015,7 @@ public class LocalAgentObservations extends SettlingScan implements
 			RelationalPredicate mutantFact = new RelationalPredicate(condition,
 					mutantArgs);
 			Collection<RelationalPredicate> cloneConds = baseRule
-					.getRawConditions(false);
+					.getRawConditions(true);
 			cloneConds.remove(condition);
 			cloneConds.add(mutantFact);
 
