@@ -1,21 +1,33 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/agentObservations/InvariantObservations.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework.agentObservations;
 
-import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.StateSpec;
 
 import java.io.Serializable;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.TreeSet;
-
-import org.apache.commons.collections.BidiMap;
-import org.apache.commons.collections.bidimap.DualHashBidiMap;
-
-import cerrla.RLGGMerger;
-import cerrla.MergedFact;
 
 /**
  * A class for noting the perceived invariant observations the agent observes.
@@ -110,30 +122,6 @@ public class InvariantObservations implements Serializable {
 		if (result)
 			expandedSpecificInvariants_ = null;
 		return result;
-
-		// // Run through each fact, only noting it down if the replacement
-		// applies
-		// // to it.
-		// Collection<RelationalPredicate> goalFacts = new
-		// TreeSet<RelationalPredicate>();
-		// for (RelationalPredicate stateFact : stateFacts) {
-		// RelationalPredicate checkFact = new RelationalPredicate(stateFact);
-		// if (checkFact.replaceArguments(goalReplacements, false, false)) {
-		// RelationalPredicate replFact = new RelationalPredicate(
-		// stateFact);
-		// replFact.replaceArguments(goalReplacements, true, false);
-		// if (counter_ == 1)
-		// specificInvariants_.add(replFact);
-		// goalFacts.add(replFact);
-		// }
-		// }
-		//
-		// if (counter_ == 1)
-		// return true;
-		// boolean result = specificInvariants_.retainAll(goalFacts);
-		// if (result)
-		// expandedSpecificInvariants_ = null;
-		// return result;
 	}
 
 	@Override
@@ -228,116 +216,37 @@ public class InvariantObservations implements Serializable {
 	 * Intersects the action conditions sets, handling numerical values as a
 	 * special case.
 	 * 
-	 * @param newAction
-	 *            The action currently being used for intersection. Possibly
-	 *            null (doesn't matter).
-	 * @param oldAction
-	 *            The old unified action to be modified. Possibly null (doesn't
-	 *            matter).
 	 * @param actionConds
 	 *            The action conditions being added.
 	 * @param invariants
 	 *            Invariant action conditions. Can only get smaller.
 	 * @param variants
 	 *            Variant action conditions. Can only get bigger.
-	 * @param actionRanges
-	 *            The observed ranges for various conditions.
-	 * @param goalReplacements
-	 *            The (possibly null) replacements for the goal variables.
+	 * 
 	 * @return True if the action conditions changed, false otherwise.
 	 */
 	public static boolean intersectActionConditions(
-			RelationalPredicate newAction, RelationalPredicate oldAction,
 			Collection<RelationalPredicate> actionConds,
 			Collection<RelationalPredicate> invariants,
-			Collection<RelationalPredicate> variants,
-			Map<RangeContext, double[]> actionRanges,
-			Map<RelationalArgument, RelationalArgument> goalReplacements) {
+			Collection<RelationalPredicate> variants) {
 		boolean changed = false;
-
-		// TODO Match this to thesis code (replace numericals and just simply
-		// intersect and union).
-
-		// Generalise the action if necessary
-		RelationalArgument[] actionArgs = (oldAction != null) ? oldAction
-				.getRelationalArguments() : new RelationalArgument[0];
-		BidiMap replacementMap = new DualHashBidiMap();
-		// Add the goal replacements
-		if (goalReplacements != null) {
-			for (RelationalArgument goalArg : goalReplacements.values())
-				replacementMap.put(goalArg, goalArg);
-		}
-
-		for (int i = 0; i < actionArgs.length; i++) {
-			RelationalArgument argument = actionArgs[i];
-			RelationalArgument variableArg = RelationalArgument
-					.createVariableTermArg(i);
-			replacementMap.put(variableArg, variableArg);
-
-			// If the action isn't variable, but doesn't match with the
-			// current action, generalise it.
-			if (!argument.isVariable()
-					&& !argument.isNumber()
-					&& (!argument.equals(newAction.getRelationalArguments()[i]))) {
-				actionArgs[i] = variableArg;
+		
+		Collection<RelationalPredicate> mergeState = new HashSet<RelationalPredicate>();
+		Collection<RelationalPredicate> remainFacts = new HashSet<RelationalPredicate>();
+		for (RelationalPredicate oldFact : invariants) {
+			// Simple contains check
+			if (actionConds.contains(oldFact)) {
+				mergeState.add(oldFact);
+				actionConds.remove(oldFact);
+			} else {
+				remainFacts.add(oldFact);
 				changed = true;
 			}
 		}
 
-		// Run through each invariant fact
-		Collection<RelationalPredicate> variantActionConds = new HashSet<RelationalPredicate>(
-				actionConds);
-		// TODO Testing old vs. simple merge
-		RLGGMerger.getInstance().resetRangeIndex();
-		int result = RLGGMerger.getInstance().newRlggUnification(invariants,
-				variantActionConds, replacementMap, actionArgs);
-
-		if (result == RLGGMerger.UNIFIED_CHANGE)
-			changed = true;
-		else if (result == RLGGMerger.CANNOT_UNIFY) {
-			// No invariants can be unified, they are all variants
-			variantActionConds.addAll(invariants);
-			invariants.clear();
-		}
-
-		// Note ranges
-		// for (RelationalPredicate invFact : invariants) {
-		// if (invFact.isNumerical()) {
-		// noteRanges(oldAction.getFactName(), invFact, actionRanges);
-		// }
-		// }
-
-		// Add any remaining action conds to the variants, merging any
-		// numerical ranges together
-		for (RelationalPredicate varFact : variantActionConds) {
-			// Anonymise the fact and add it
-			varFact.replaceUnboundWithAnonymous();
-			if (varFact.isNumerical()) {
-				// If numerical, attempt to unify
-				Collection<MergedFact> mergedFacts = RLGGMerger.getInstance()
-						.unifyFactToState(varFact, variants,
-								new DualHashBidiMap(),
-								new RelationalArgument[0], false);
-				// Should only merge with one fact (if at all)
-				if (!mergedFacts.isEmpty()) {
-					MergedFact unifiedFact = mergedFacts.iterator().next();
-					varFact = unifiedFact.getResultFact();
-					// if (oldAction != null) {
-					// noteRanges(oldAction.getFactName(), varFact,
-					// actionRanges);
-					// }
-					// If the range changed, update the variant value
-					if (!varFact.equals(unifiedFact.getUnityFact())) {
-						changed = true;
-						variants.remove(unifiedFact.getUnityFact());
-					}
-				}
-			}
-			changed |= variants.add(varFact);
-		}
-
-		if (changed && oldAction != null)
-			oldAction.setArguments(actionArgs);
+		invariants.clear();
+		invariants.addAll(mergeState);
+		variants.addAll(remainFacts);
 		return changed;
 	}
 

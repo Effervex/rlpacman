@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/agentObservations/EnvironmentAgentObservations.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework.agentObservations;
 
 import relationalFramework.RelationalArgument;
@@ -26,7 +47,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import cerrla.ProgramArgument;
-import cerrla.RLGGMerger;
 import cerrla.modular.GeneralGoalCondition;
 import jess.Fact;
 import jess.QueryResult;
@@ -34,6 +54,7 @@ import jess.Rete;
 import jess.ValueVector;
 import util.ConditionComparator;
 import util.MultiMap;
+import util.Pair;
 
 /**
  * A class for containing all environmental observations the agent makes while
@@ -192,7 +213,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 	public Collection<RelationalPredicate> gatherActionFacts(
 			Collection<Fact> stateFacts, RelationalPredicate action,
 			Map<RelationalArgument, RelationalArgument> goalReplacements,
-			Map<RangeContext, double[]> actionRanges) {
+			Map<RangeContext, Pair<RelationalArgument, double[]>> actionRanges) {
 		// If the state has been scanned, then the actions do not need to be
 		// rescanned.
 		boolean needToScan = (lastScannedState_ == null || !lastScannedState_
@@ -256,9 +277,6 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				resetInactivity();
 			}
 		}
-
-		// Note the action ranges
-		abo.noteRanges(actionRanges);
 
 		return goalActionConds;
 	}
@@ -790,8 +808,10 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		private boolean addActionConditions(
 				Collection<RelationalPredicate> actionConds,
 				RelationalPredicate action,
-				Map<RangeContext, double[]> actionRanges) {
+				Map<RangeContext, Pair<RelationalArgument, double[]>> actionRanges) {
 			boolean changed = false;
+
+			actionConds = noteNumericalValues(actionConds, actionRanges, action);
 
 			// If this is the first action condition, then all the actions are
 			// considered invariant.
@@ -804,12 +824,12 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 				return true;
 			}
 
+			// Intersect the invariant observations to learn the RLGG
+			changed = InvariantObservations.intersectActionConditions(
+					actionConds, invariantActionConditions_,
+					variantActionConditions_);
 
-			// Sort the invariant and variant conditions, making a special case
-			// for numerical conditions.
-			changed = InvariantObservations.intersectActionConditions(action,
-					action_, actionConds, invariantActionConditions_,
-					variantActionConditions_, actionRanges, null);
+			action_ = mergeTerms(action_, action);
 
 			if (changed) {
 				specialisationConditions_ = null;
@@ -820,55 +840,103 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 		}
 
 		/**
-		 * Notes all the ranges from the observations.
+		 * Merges the terms of two action predicates, substituting constants for
+		 * variables when they differ.
 		 * 
-		 * @param actionRanges
-		 *            The map of facts, mapped by factName-range variable.
+		 * @param action
+		 *            The old action.
+		 * @param newAction
+		 *            The new action to merge arguments with.
+		 * @return The possibly modified (generalised) old action.
 		 */
-		private void noteRanges(Map<RangeContext, double[]> actionRanges) {
-			for (RelationalPredicate pred : invariantActionConditions_) {
-				if (pred.isNumerical())
-					noteRange(pred, actionRanges);
+		private RelationalPredicate mergeTerms(RelationalPredicate action,
+				RelationalPredicate newAction) {
+			boolean changed = false;
+
+			RelationalArgument[] oldArgs = action.getRelationalArguments();
+			RelationalArgument[] newArgs = newAction.getRelationalArguments();
+			for (int i = 0; i < newArgs.length; i++) {
+				if (oldArgs[i].isConstant() && !oldArgs[i].equals(newArgs[i])) {
+					oldArgs[i] = RelationalArgument.createVariableTermArg(i);
+					changed = true;
+				}
 			}
-			for (RelationalPredicate pred : variantActionConditions_) {
-				if (pred.isNumerical())
-					noteRange(pred, actionRanges);
-			}
+
+			if (changed)
+				return new RelationalPredicate(action, oldArgs);
+			return action;
 		}
 
 		/**
-		 * Notes a single range from a fact.
+		 * Notes the numerical values in the action conditions and replaces them
+		 * with a numerical range variable.
 		 * 
-		 * @param numberFact
-		 *            The fact with the number range.
+		 * @param actionConds
+		 *            The current action conditions.
 		 * @param actionRanges
-		 *            The action ranges to note the range under.
+		 *            The existing noted action ranges.
+		 * @param action
+		 *            The current action that may require a variable swap.
+		 * @return The modified action conditions.
 		 */
-		private void noteRange(RelationalPredicate numberFact,
-				Map<RangeContext, double[]> actionRanges) {
+		private Collection<RelationalPredicate> noteNumericalValues(
+				Collection<RelationalPredicate> actionConds,
+				Map<RangeContext, Pair<RelationalArgument, double[]>> actionRanges,
+				RelationalPredicate action) {
+			Collection<RelationalPredicate> modifiedTerms = new ArrayList<RelationalPredicate>(
+					actionConds.size());
+			// Check each condition
+			for (RelationalPredicate cond : actionConds) {
+				if (cond.isNumerical()) {
+					RelationalArgument[] condArgs = cond
+							.getRelationalArguments();
+					for (int i = 0; i < condArgs.length; i++) {
+						if (condArgs[i].isNumber()) {
+							double num = Double.parseDouble(condArgs[i]
+									.getStringArg());
+							RangeContext rc = new RangeContext(i, cond,
+									action.getFactName());
+							if (actionRanges.containsKey(rc)) {
+								Pair<RelationalArgument, double[]> rangeDetails = actionRanges
+										.get(rc);
+								double[] range = rangeDetails.objB_;
+								range[0] = Math.min(range[0], num);
+								range[1] = Math.max(range[1], num);
+								condArgs[i] = rangeDetails.objA_;
+							} else {
+								condArgs[i] = RelationalArgument
+										.createRangeVariable();
+								Pair<RelationalArgument, double[]> rangeDetails = new Pair<RelationalArgument, double[]>(
+										condArgs[i], new double[] { num, num });
+								actionRanges.put(rc, rangeDetails);
+							}
 
-			RelationalArgument[] factArgs = numberFact.getRelationalArguments();
-			for (int i = 0; i < factArgs.length; i++) {
-				// Only note ranges
-				if (factArgs[i].isRange(false)) {
-					RangeContext context = new RangeContext(i, numberFact,
-							action_.getFactName());
-					double[] range = actionRanges.get(context);
-					double[] explicitRange = factArgs[i].getExplicitRange();
-					if (range == null) {
-						range = new double[2];
-						System.arraycopy(explicitRange, 0, range, 0, 2);
-						actionRanges.put(context, range);
-					} else {
-						// Expand the range.
-						if (explicitRange[0] < range[0])
-							range[0] = explicitRange[0];
-						if (explicitRange[1] > range[1]) {
-							range[1] = explicitRange[1];
+							// Swap the action argument if necessary.
+							if (action.isNumerical()) {
+								RelationalArgument[] actionArgs = action
+										.getRelationalArguments();
+								boolean changed = false;
+								for (int j = 0; j < actionArgs.length; j++) {
+									if (actionArgs[j].isNumber()
+											&& !actionArgs[j].isRangeVariable()
+											&& Double.parseDouble(actionArgs[j]
+													.getStringArg()) == num) {
+										actionArgs[j] = condArgs[i];
+										changed = true;
+									}
+								}
+
+								if (changed)
+									action.setArguments(actionArgs);
+							}
 						}
 					}
-				}
+
+					modifiedTerms.add(new RelationalPredicate(cond, condArgs));
+				} else
+					modifiedTerms.add(cond);
 			}
+			return modifiedTerms;
 		}
 
 		@Override
@@ -1199,8 +1267,7 @@ public final class EnvironmentAgentObservations extends SettlingScan implements
 								conditionRanges_.put(context, range);
 							} else {
 								// Unify existing range
-								RLGGMerger.getInstance().unifyRange(range,
-										baseVal);
+								RelationalArgument.unifyRange(range, baseVal);
 							}
 						}
 					}

@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/RelationalRule.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework;
 
 import relationalFramework.RelationalPredicate;
@@ -25,7 +46,6 @@ import org.apache.commons.collections.BidiMap;
 
 import cerrla.LocalCrossEntropyDistribution;
 import cerrla.ProgramArgument;
-import cerrla.RLGGMerger;
 import cerrla.Slot;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.PolicyItem;
@@ -209,6 +229,7 @@ public class RelationalRule implements Serializable,
 		ruleAction_ = new RelationalPredicate(baseRule.getAction());
 		slot_ = null;
 		setMutant(baseRule);
+		rangeContexts_ = baseRule.rangeContexts_;
 
 		expandConditions(condition);
 		findConstantsAndRanges();
@@ -355,7 +376,8 @@ public class RelationalRule implements Serializable,
 						|| actionArgs[i].isRangeVariable())
 					normalisationMap.put(actionArgs[i].toString(),
 							actionArgs[i]);
-				else if (!normalisationMap.containsKey(actionArgs[i].toString()))
+				else if (!normalisationMap
+						.containsKey(actionArgs[i].toString()))
 					normalisationMap.put(actionArgs[i].toString(),
 							RelationalArgument.createVariableTermArg(i));
 			}
@@ -508,7 +530,7 @@ public class RelationalRule implements Serializable,
 					if (StateSpec.isNumberType(simpCond.getArgTypes()[i])) {
 						if (arguments[i].isAnonymous()) {
 							// Swap anon for range variable
-							arguments[i] = RLGGMerger.getInstance()
+							arguments[i] = RelationalArgument
 									.createRangeVariable();
 						}
 
@@ -527,21 +549,24 @@ public class RelationalRule implements Serializable,
 									.put(arguments[i].toString(),
 											RelationalArgument
 													.createUnboundVariable(normalisedIndex[0]++));
-							arguments[i] = normalisationMap.get(arguments[i].toString());
+							arguments[i] = normalisationMap.get(arguments[i]
+									.toString());
 						} else if (arguments[i].isBoundVariable()) {
 							// Normalise bound variables.
 							normalisationMap
 									.put(arguments[i].toString(),
 											RelationalArgument
 													.createBoundVariable(normalisedIndex[0]++));
-							arguments[i] = normalisationMap.get(arguments[i].toString());
+							arguments[i] = normalisationMap.get(arguments[i]
+									.toString());
 						}
 					} else {
 						// Adding variable terms
 						if (arguments[i].isVariable()
 								&& normalisationMap != null) {
 							// Normalise the variable terms
-							if (!normalisationMap.containsKey(arguments[i].toString())) {
+							if (!normalisationMap.containsKey(arguments[i]
+									.toString())) {
 								if (arguments[i].isGoalVariable())
 									// Maintain goal conditions.
 									normalisationMap.put(
@@ -566,7 +591,8 @@ public class RelationalRule implements Serializable,
 															.createVariableTermArg(normalisedIndex[1]++));
 								}
 							}
-							arguments[i] = normalisationMap.get(arguments[i].toString());
+							arguments[i] = normalisationMap.get(arguments[i]
+									.toString());
 
 							// Note the free variables.
 							if (arguments[i].isFreeVariable()
@@ -1193,11 +1219,5 @@ public class RelationalRule implements Serializable,
 
 	public boolean isLegal() {
 		return !simplifiedConditions_.isEmpty();
-	}
-
-	@Override
-	public void getRuleQuery() {
-		// TODO Auto-generated method stub
-
 	}
 }

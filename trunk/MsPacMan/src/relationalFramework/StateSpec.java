@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/StateSpec.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework;
 
 import relationalFramework.RelationalPredicate;
@@ -18,7 +39,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
-import cerrla.RLGGMerger;
 import cerrla.modular.ModularPolicy;
 import cerrla.modular.ModularSubGoal;
 import cerrla.modular.PolicyItem;
@@ -197,7 +217,7 @@ public abstract class StateSpec {
 			if (initAll) {
 				rete_ = new Rete();
 				environment_ = this.getClass().getPackage().getName();
-				RLGGMerger.getInstance().resetRangeIndex();
+				RelationalArgument.resetRangeIndex();
 			}
 			numberPreds_ = new HashSet<String>();
 
@@ -387,63 +407,6 @@ public abstract class StateSpec {
 			}
 		}
 	}
-
-	// /**
-	// * Forms the non-goals by negating the non-type conditions required for
-	// the
-	// * goal to be met.
-	// *
-	// * @param goalState
-	// * The goal state.
-	// * @return A negated goal state (except for the type preds).
-	// */
-	// private String formNonGoal(String goalState) throws Exception {
-	// RelationalRule nonGoalRule = new RelationalRule(goalState_);
-	// SortedSet<RelationalPredicate> conds = nonGoalRule.getConditions(false);
-	//
-	// // Split the conds up into 2 sets: types and normal
-	// Collection<RelationalPredicate> types = new TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// Collection<RelationalPredicate> normal = new
-	// TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// Collection<RelationalPredicate> inequalities = new
-	// TreeSet<RelationalPredicate>(
-	// conds.comparator());
-	// for (RelationalPredicate cond : conds) {
-	// if (isTypePredicate(cond.getFactName()))
-	// types.add(cond);
-	// else if (cond.getFactName().equals("test"))
-	// inequalities.add(cond);
-	// else
-	// normal.add(cond);
-	// }
-	// // If there are no normal conds, negate the types instead (otherwise
-	// // there would be an infinite number of goals)
-	// if (normal.isEmpty()) {
-	// throw new Exception("Goal is only type conditions! Cannot negate.");
-	// }
-	//
-	// // Build the string
-	// StringBuffer nonGoalStr = new StringBuffer();
-	// // Types first
-	// for (RelationalPredicate type : types)
-	// nonGoalStr.append(type + " ");
-	// // Then Inequalities
-	// for (RelationalPredicate ineq : inequalities)
-	// nonGoalStr.append(ineq + " ");
-	// // Then normals
-	// nonGoalStr.append("(not");
-	// if (normal.size() > 1)
-	// nonGoalStr.append(" (and");
-	// for (RelationalPredicate norm : normal)
-	// nonGoalStr.append(" " + norm);
-	// nonGoalStr.append(")");
-	// if (normal.size() > 1)
-	// nonGoalStr.append(")");
-	//
-	// return nonGoalStr.toString();
-	// }
 
 	/**
 	 * Recurse through the parent types.
@@ -1226,8 +1189,6 @@ public abstract class StateSpec {
 	}
 
 	private class RuleQuery {
-		private static final int MAX_QUERIES = 750;
-
 		/** The list of query parameters this rule takes. */
 		private final List<RelationalArgument> queryParams_;
 
@@ -1314,15 +1275,6 @@ public abstract class StateSpec {
 		 */
 		public String makeQuery() {
 			try {
-				// Wipe the queries if there're too many
-				// if (queryCount_ >= MAX_QUERIES) {
-				// for (int i = 0; i < queryCount_; i++) {
-				// rete_.unDefrule(POLICY_QUERY_PREFIX + i);
-				// }
-				// queryNames_.clear();
-				// queryCount_ = 0;
-				// }
-
 				queryName_ = POLICY_QUERY_PREFIX + queryCount_++;
 				// If the rule has parameters, declare them as variables.
 				if ((queryParams_ != null && !queryParams_.isEmpty())

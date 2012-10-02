@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/FiredAction.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework;
 
 import relationalFramework.FiredAction;
@@ -73,13 +94,11 @@ public class FiredAction implements Comparable<FiredAction> {
 	 */
 	public String getActionString() {
 		RelationalPredicate action = firingRule_.getAction();
-		StringBuffer buffer = new StringBuffer(action.getFactName());
 		Slot ruleSlot = firingRule_.getSlot();
-		if (ruleSlot == null || ruleSlot.getSlotSplitFacts().isEmpty())
-			buffer.append("()");
-		else
-			buffer.append(ruleSlot.getSlotSplitFacts().iterator().next());
-		return buffer.toString();
+		if (ruleSlot == null || ruleSlot.getSlotSplitFacts().isEmpty()) {
+			return firingRule_.toNiceString();
+		} else
+			return action.getFactName() + ruleSlot.getSlotSplitFacts().iterator().next();
 	}
 
 	public RelationalPredicate getAction() {

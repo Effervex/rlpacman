@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/test/RelationalRuleTest.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package test;
 
 import static org.junit.Assert.*;
@@ -7,7 +28,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 
-import relationalFramework.RelationalArgument;
 import relationalFramework.RelationalPredicate;
 import relationalFramework.RelationalRule;
 import relationalFramework.StateSpec;
@@ -24,7 +44,7 @@ public class RelationalRuleTest {
 
 	@Before
 	public void setUp() throws Exception {
-		StateSpec.initInstance("blocksWorldMove.BlocksWorld", "onab");
+		StateSpec.initInstance("blocksWorld.BlocksWorld", "onab");
 		lced_ = new LocalCrossEntropyDistribution(
 				GoalCondition.parseGoalCondition("on$A$B"));
 	}
@@ -50,7 +70,7 @@ public class RelationalRuleTest {
 		assertTrue(simplifiedConditions.contains(StateSpec
 				.toRelationalPredicate("(test (<> ?B ?A ?G_0 ?G_1))")));
 
-		StateSpec.initInstance("jCloisterZone.Carcassonne", "onab");
+		StateSpec.initInstance("jCloisterZone.Carcassonne", "SinglePlayer");
 		lced_ = new LocalCrossEntropyDistribution(
 				GoalCondition.parseGoalCondition("SinglePlayer"));
 		rule = new RelationalRule(
@@ -215,7 +235,7 @@ public class RelationalRuleTest {
 		assertFalse(simpConds.toString(), simpConds.contains(StateSpec
 				.toRelationalPredicate("(above ?G_1 ?B)")));
 		assertEquals(simpConds.toString(), simpConds.size(), 3);
-		
+
 		// Floor rule (more complex)
 		rule = new RelationalRule(
 				"(clear ?A) (clear ?B) (block ?A) (thing ?A) (thing ?B) "
@@ -264,5 +284,41 @@ public class RelationalRuleTest {
 				.toRelationalPredicate("(not (on ?A ?))")));
 		assertTrue(conds.contains(StateSpec
 				.toRelationalPredicate("(not (on ?B ?))")));
+	}
+
+	@Test
+	public void testRuleSpecialisation() {
+		RelationalRule rule = new RelationalRule(
+				"(clear ?A) (clear ?B) => (move ?A ?B)", lced_);
+		RelationalRule spec = new RelationalRule(rule,
+				StateSpec.toRelationalPredicate("(not (clear ?A))"));
+		assertFalse(spec.isLegal());
+
+		spec = new RelationalRule(rule,
+				StateSpec.toRelationalPredicate("(highest ?A)"));
+		assertNotNull(spec);
+		List<RelationalPredicate> specConds = spec
+				.getSimplifiedConditions(true);
+		assertTrue(specConds.contains(StateSpec
+				.toRelationalPredicate("(clear ?B)")));
+		assertTrue(specConds.contains(StateSpec
+				.toRelationalPredicate("(highest ?A)")));
+		assertFalse(specConds.contains(StateSpec
+				.toRelationalPredicate("(clear ?A)")));
+
+		StateSpec.initInstance("jCloisterZone.Carcassonne", "SinglePlayer");
+		lced_ = new LocalCrossEntropyDistribution(
+				GoalCondition.parseGoalCondition("SinglePlayer"));
+		rule = new RelationalRule(
+				"(worth ?C (4.0 <= ?#_5 <= 12.0)) => (placeTile ?A ?B ?C ?D)",
+				lced_);
+		spec = new RelationalRule(rule,
+				StateSpec.toRelationalPredicate("(not (worth ?C ?))"));
+		assertFalse(spec.isLegal());
+		
+		spec = new RelationalRule(rule,
+				StateSpec.toRelationalPredicate("(worth ?C ?)"));
+		assertTrue(spec.isLegal());
+		assertEquals(spec, rule);
 	}
 }

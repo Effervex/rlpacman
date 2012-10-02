@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/rlPacMan/DistanceGridCache.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package rlPacMan;
 
 import java.awt.Color;
@@ -64,11 +85,11 @@ public class DistanceGridCache {
 				while ((iter == null) || (iter.hasNext())) {
 					// Initialise a new distance grid.
 					Map<Byte, DistanceDir[][]> distanceGrids = new HashMap<Byte, DistanceDir[][]>();
-					//for (byte b = 0; b < PacManLowAction.values().length; b++) {
+					// for (byte b = 0; b < PacManLowAction.values().length;
+					// b++) {
 					for (byte b = 0; b < 1; b++) {
 						distanceGrids
-								.put(
-										b,
+								.put(b,
 										new DistanceDir[model.m_gameSizeX][model.m_gameSizeY]);
 					}
 					SortedSet<Junction> closeJunctions = null;
@@ -128,7 +149,7 @@ public class DistanceGridCache {
 		Point playerLoc = new Point(originX, originY);
 
 		// Check every direction
-		//for (byte dir = 0; dir < PacManLowAction.values().length; dir++) {
+		// for (byte dir = 0; dir < PacManLowAction.values().length; dir++) {
 		for (byte dir = 0; dir < 1; dir++) {
 			DistanceDir[][] distanceGrid = distanceGrids.get(dir);
 
@@ -191,8 +212,6 @@ public class DistanceGridCache {
 					}
 				}
 			}
-
-//			printDistanceGrid(distanceGrid);
 		}
 
 		return closeJunctions;
@@ -337,9 +356,7 @@ public class DistanceGridCache {
 					dirs.add(new Junction(loc, actionDirs[i], distance,
 							actionDirs[i]));
 				else
-					dirs
-							.add(new Junction(loc, actionDirs[i], distance,
-									origDir));
+					dirs.add(new Junction(loc, actionDirs[i], distance, origDir));
 			}
 		}
 
@@ -398,25 +415,10 @@ public class DistanceGridCache {
 					buffer.append("  ");
 				else {
 					String val = distanceGrid[x][y].getDistance() + "";
-//					switch (distanceGrid[x][y].getDirection()) {
-//					case Thing.UP:
-//						val = "U";
-//						break;
-//					case Thing.DOWN:
-//						val = "D";
-//						break;
-//					case Thing.LEFT:
-//						val = "L";
-//						break;
-//					case Thing.RIGHT:
-//						val = "R";
-//						break;
-//					}
-//					buffer.append(" " + val);
-					 if (distanceGrid[x][y].getDistance() < 10)
-					 buffer.append(" " + val);
-					 else
-					 buffer.append(val);
+					if (distanceGrid[x][y].getDistance() < 10)
+						buffer.append(" " + val);
+					else
+						buffer.append(val);
 				}
 				buffer.append(" ");
 			}

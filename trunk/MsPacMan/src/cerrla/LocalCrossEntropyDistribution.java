@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/cerrla/LocalCrossEntropyDistribution.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package cerrla;
 
 import java.io.File;
@@ -43,16 +64,20 @@ import util.MultiMap;
 
 /**
  * A localised-to-goal class containing the agent's behaviour, the current goal,
- * and performance observations relating to this behaviour.
+ * and performance observations relating to this behaviour. This class is
+ * essentially the core of CERRLA.
  * 
  * @author Sam Sarjant
  */
-public class LocalCrossEntropyDistribution implements Serializable, ModularBehaviour {
+public class LocalCrossEntropyDistribution implements Serializable,
+		ModularBehaviour {
 
 	/** The collection of non existant modules. */
 	private static final Collection<String> nonExistantModule_ = new HashSet<String>();
 
 	private static final long serialVersionUID = 6883881456264179505L;
+
+	public static final String MODULAR_SUFFIX = ".mod";
 
 	/** The relative directory in which modules are stored. */
 	public static final String MODULE_DIR = "modules";
@@ -60,14 +85,11 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	/** The suffix for module files. */
 	public static final String SERIALISED_SUFFIX = ".ser";
 
-	public static final String MODULAR_SUFFIX = ".mod";
+	/** Best policy to be tested */
+	private ModularPolicy bestPolicy_;
 
-	public enum AlgorithmState {
-		TRAINING, TESTING, BEST_POLICY;
-	}
-
-	/** The state of the algorithm. */
-	private transient AlgorithmState state_ = AlgorithmState.TRAINING;
+	/** The current best policy testing episode. */
+	private transient int bestPolicyEpisode_ = -1;
 
 	/** The current episode as evidenced by this generator. */
 	private int currentEpisode_;
@@ -78,14 +100,14 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	/** If this generator is currently frozen (not learning). */
 	private transient boolean frozen_;
 
-	/** If this generator is not specialising new rules. */
-	private transient boolean isSpecialising_;
-
 	/** The goal condition for this cross-entropy behaviour. */
 	private final GoalCondition goalCondition_;
 
 	/** The created goal rule for checking if the internal goal is achieved. */
 	private transient RelationalRule goalRule_;
+
+	/** If this generator is not specialising new rules. */
+	private transient boolean isSpecialising_;
 
 	/** The localised agent observations for this goal. */
 	private transient LocalAgentObservations localAgentObservations_;
@@ -105,29 +127,26 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	/** The distributions of rules. */
 	private final PolicyGenerator policyGenerator_;
 
-	/** The population value. */
-	private int population_ = Integer.MAX_VALUE;
-
-	/** A map of sub-goal distributions and the last time they were encountered. */
-	private transient Map<LocalCrossEntropyDistribution, Integer> relevantSubDistEpisodeMap_;
-
-	/** The current testing episode. */
-	private transient int testEpisode_;
-
-	/** The current best policy testing episode. */
-	private transient int bestPolicyEpisode_ = -1;
-
-	/** A stack of policies that have not been tested fully. */
-	private transient Queue<ModularPolicy> undertestedPolicies_;
-
 	/**
 	 * The ID counter for making each policy unique, even if it has the same
 	 * rules.
 	 */
 	private transient int policyIDCounter_;
 
-	/** Best policy to be tested */
-	private ModularPolicy bestPolicy_;
+	/** The population value. */
+	private int population_ = Integer.MAX_VALUE;
+
+	/** A map of sub-goal distributions and the last time they were encountered. */
+	private transient Map<LocalCrossEntropyDistribution, Integer> relevantSubDistEpisodeMap_;
+
+	/** The state of the algorithm. */
+	private transient AlgorithmState state_ = AlgorithmState.TRAINING;
+
+	/** The current testing episode. */
+	private transient int testEpisode_;
+
+	/** A stack of policies that have not been tested fully. */
+	private transient Queue<ModularPolicy> undertestedPolicies_;
 
 	/**
 	 * Create new sub-goal behaviour using information from another
@@ -188,6 +207,37 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 		}
 
 		setState(AlgorithmState.TRAINING);
+	}
+
+	/**
+	 * If the sample being recorded is a valid sample (consists of current
+	 * rules).
+	 * 
+	 * @param sample
+	 *            The sample being recorded.
+	 * @return True if the sample contains only valid rules, false if it
+	 *         contains old, invalid rules.
+	 */
+	private boolean isValidSample(ModularPolicy sample, boolean checkFired) {
+		// If no rules fired, this sample is invalid.
+		if (checkFired && sample.getFiringRules().isEmpty())
+			return false;
+		// Check each rule for validity
+		for (PolicyItem pi : sample.getRules()) {
+			if (pi instanceof RelationalRule) {
+				// Check that the rule is valid within this distribution
+				if (!policyGenerator_.isRuleExists((RelationalRule) pi))
+					return false;
+			} else if (pi instanceof ModularSubGoal) {
+				ModularPolicy innerModPol = ((ModularSubGoal) pi)
+						.getModularPolicy();
+				if (innerModPol != null
+						&& !innerModPol.getLocalCEDistribution().isValidSample(
+								innerModPol, false))
+					return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -342,6 +392,11 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 			elites.clear();
 	}
 
+	public void cleanup() {
+		if (!ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue())
+			localAgentObservations_.cleanup();
+	}
+
 	/**
 	 * (Potentially) covers the current state depending on whether the agent
 	 * believes covering the state will get it more information.
@@ -426,41 +481,6 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	}
 
 	/**
-	 * Gets the best (or majority, if equally valued) elite sample from the
-	 * current elite samples.
-	 * 
-	 * @return The best elite sample or null if empty.
-	 */
-	public ModularPolicy getBestElite() {
-		if (elites_.isEmpty())
-			return null;
-
-		Map<ModularPolicy, Integer> policyCount = new HashMap<ModularPolicy, Integer>();
-		double bestValue = elites_.first().getValue();
-		ModularPolicy bestPol = null;
-		int largestCount = 0;
-		for (PolicyValue pv : elites_) {
-			if (pv.getValue() == bestValue) {
-				Integer count = policyCount.get(pv.getPolicy());
-				if (count == null)
-					count = 0;
-				count++;
-				policyCount.put(pv.getPolicy(), count);
-
-				if (count > largestCount) {
-					largestCount = count;
-					bestPol = pv.getPolicy();
-				}
-			} else
-				break;
-		}
-
-		bestPol = new ModularPolicy(bestPol);
-		bestPol.clearChildren();
-		return bestPol;
-	}
-
-	/**
 	 * Generates a policy from the current distribution.
 	 * 
 	 * @param existingSubGoals
@@ -480,7 +500,12 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 				SortedMap<Integer, RelationalPolicy> nextKey = greedyPolicies
 						.tailMap(currentEpisode_ + 1);
 
-				if (nextKey == null || nextKey.isEmpty()) {
+				if (ProgramArgument.TESTING.booleanValue()) {
+					currentEpisode_ = greedyPolicies.lastKey();
+					bestPolicy_ = new ModularPolicy(
+							greedyPolicies.get(currentEpisode_), this);
+					testEpisode_ = 0;
+				} else if (nextKey == null || nextKey.isEmpty()) {
 					// End of testing. Exit.
 					bestPolicyEpisode_ = ProgramArgument.TEST_ITERATIONS
 							.intValue();
@@ -489,7 +514,6 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 					currentEpisode_ = nextKey.firstKey();
 					bestPolicy_ = new ModularPolicy(
 							greedyPolicies.get(currentEpisode_), this);
-					// TODO Check if this has already been evaluated (if so, just use that value).
 					testEpisode_ = 0;
 				}
 			}
@@ -535,6 +559,50 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 		return newModPol;
 	}
 
+	/**
+	 * Generates a unique policy ID (at least local to this unserialised run).
+	 * 
+	 * @return A String with a unique policy ID.
+	 */
+	public String generateUniquePolicyID() {
+		return goalCondition_.toString() + "_" + policyIDCounter_++;
+	}
+
+	/**
+	 * Gets the best (or majority, if equally valued) elite sample from the
+	 * current elite samples.
+	 * 
+	 * @return The best elite sample or null if empty.
+	 */
+	public ModularPolicy getBestElite() {
+		if (elites_.isEmpty())
+			return null;
+
+		Map<ModularPolicy, Integer> policyCount = new HashMap<ModularPolicy, Integer>();
+		double bestValue = elites_.first().getValue();
+		ModularPolicy bestPol = null;
+		int largestCount = 0;
+		for (PolicyValue pv : elites_) {
+			if (pv.getValue() == bestValue) {
+				Integer count = policyCount.get(pv.getPolicy());
+				if (count == null)
+					count = 0;
+				count++;
+				policyCount.put(pv.getPolicy(), count);
+
+				if (count > largestCount) {
+					largestCount = count;
+					bestPol = pv.getPolicy();
+				}
+			} else
+				break;
+		}
+
+		bestPol = new ModularPolicy(bestPol);
+		bestPol.clearChildren();
+		return bestPol;
+	}
+
 	public int getCurrentEpisode() {
 		return currentEpisode_;
 	}
@@ -552,6 +620,22 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	}
 
 	/**
+	 * Gets the number of policy repeats policies should be performing.
+	 * 
+	 * @return The number of times a policy should be tested.
+	 */
+	public int getPolicyRepeats() {
+		// If frozen, only once
+		if (frozen_)
+			return 1;
+
+		// If modular policy, test twice as long
+		if (!goalCondition_.isMainGoal())
+			return ProgramArgument.POLICY_REPEATS.intValue() * 2;
+		return ProgramArgument.POLICY_REPEATS.intValue();
+	}
+
+	/**
 	 * Gets a collection of goal conditions that represent potential modules for
 	 * the rules contained within this CE cortex.
 	 * 
@@ -559,6 +643,10 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	 */
 	public Collection<GoalCondition> getPotentialModuleGoals() {
 		return localAgentObservations_.getObservedSubGoals();
+	}
+
+	public AlgorithmState getState() {
+		return state_;
 	}
 
 	/**
@@ -613,6 +701,10 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 				&& testEpisode_ >= ProgramArgument.TEST_ITERATIONS.intValue()
 				&& bestPolicyEpisode_ >= ProgramArgument.TEST_ITERATIONS
 						.intValue();
+	}
+
+	public boolean isSpecialising() {
+		return isSpecialising_;
 	}
 
 	/**
@@ -739,6 +831,67 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	}
 
 	/**
+	 * Serialises this generator to file.
+	 * 
+	 * @param serFile
+	 *            The file to serialise to.
+	 * @param saveEnvAgentObservations
+	 *            If the environment's agent observations should be saved also.
+	 * @param run
+	 *            The current experiment run.
+	 */
+	public void saveCEDistribution(File serFile,
+			boolean saveEnvAgentObservations, int run) {
+		try {
+			// Write the main behaviour to temp and module
+			if (goalCondition_.isMainGoal()) {
+				FileOutputStream fos = new FileOutputStream(serFile);
+				ObjectOutputStream oos = new ObjectOutputStream(fos);
+				oos.writeObject(this);
+				oos.close();
+			}
+
+			// Also note Local Agent Observations (as they are transient)
+			localAgentObservations_
+					.saveLocalObservations(saveEnvAgentObservations);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * Saves the best behaviour to a text file as a static module.
+	 * 
+	 * @param run
+	 *            The run this module is saved for.
+	 */
+	public void saveModule(int run) {
+		// Don't save the main goal as a module.
+		if (goalCondition_.isMainGoal() || !isConverged())
+			return;
+
+		try {
+			File modFolder = getModFolder(goalCondition_.toString(), run);
+			File genFile = new File(modFolder, goalCondition_
+					+ SERIALISED_SUFFIX);
+			genFile.createNewFile();
+
+			saveCEDistribution(genFile, false, run);
+
+			File modFile = new File(modFolder, goalCondition_ + MODULAR_SUFFIX);
+			modFile.createNewFile();
+
+			policyGenerator_.saveModule(modFile);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void setSpecialisation(boolean b) {
+		isSpecialising_ = b;
+	}
+
+	/**
 	 * Sets the state of this generator and all others.
 	 * 
 	 * @param state
@@ -774,106 +927,6 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 				performance_.freeze(false);
 			}
 			break;
-		}
-	}
-
-	/**
-	 * If the sample being recorded is a valid sample (consists of current
-	 * rules).
-	 * 
-	 * @param sample
-	 *            The sample being recorded.
-	 * @return True if the sample contains only valid rules, false if it
-	 *         contains old, invalid rules.
-	 */
-	private boolean isValidSample(ModularPolicy sample, boolean checkFired) {
-		// If no rules fired, this sample is invalid.
-		if (checkFired && sample.getFiringRules().isEmpty())
-			return false;
-		// Check each rule for validity
-		for (PolicyItem pi : sample.getRules()) {
-			if (pi instanceof RelationalRule) {
-				// Check that the rule is valid within this distribution
-				if (!policyGenerator_.isRuleExists((RelationalRule) pi))
-					return false;
-			} else if (pi instanceof ModularSubGoal) {
-				ModularPolicy innerModPol = ((ModularSubGoal) pi)
-						.getModularPolicy();
-				if (innerModPol != null
-						&& !innerModPol.getLocalCEDistribution().isValidSample(
-								innerModPol, false))
-					return false;
-			}
-		}
-		return true;
-	}
-
-	/**
-	 * Serialises this generator to file.
-	 * 
-	 * @param serFile
-	 *            The file to serialise to.
-	 * @param saveEnvAgentObservations
-	 *            If the environment's agent observations should be saved also.
-	 * @param run
-	 *            The current experiment run.
-	 */
-	public void saveCEDistribution(File serFile,
-			boolean saveEnvAgentObservations, int run) {
-		try {
-			// Write the main behaviour to temp and module
-			if (goalCondition_.isMainGoal()) {
-				FileOutputStream fos = new FileOutputStream(serFile);
-				ObjectOutputStream oos = new ObjectOutputStream(fos);
-				oos.writeObject(this);
-				oos.close();
-			}
-
-			// Write serialised to module
-			// File moduleFolder = getModFolder(goalCondition_.toString(), run);
-			// serFile = new File(moduleFolder, goalCondition_.toString()
-			// + LocalCrossEntropyDistribution.SERIALISED_SUFFIX);
-			// serFile.createNewFile();
-			//
-			// FileOutputStream fos = new FileOutputStream(serFile);
-			// ObjectOutputStream oos = new ObjectOutputStream(fos);
-			// oos.writeObject(this);
-			// oos.close();
-
-
-			// Also note Local Agent Observations (as they are transient)
-			localAgentObservations_
-					.saveLocalObservations(saveEnvAgentObservations);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-
-	/**
-	 * Saves the best behaviour to a text file as a static module.
-	 * 
-	 * @param run
-	 *            The run this module is saved for.
-	 */
-	public void saveModule(int run) {
-		// Don't save the main goal as a module.
-		if (goalCondition_.isMainGoal() || !isConverged())
-			return;
-
-		try {
-			File modFolder = getModFolder(goalCondition_.toString(), run);
-			File genFile = new File(modFolder, goalCondition_
-					+ SERIALISED_SUFFIX);
-			genFile.createNewFile();
-
-			saveCEDistribution(genFile, false, run);
-
-			File modFile = new File(modFolder, goalCondition_ + MODULAR_SUFFIX);
-			modFile.createNewFile();
-
-			policyGenerator_.saveModule(modFile);
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -924,28 +977,6 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	}
 
 	/**
-	 * Loads a module from the module directory.
-	 * 
-	 * @param environmentPrefix
-	 *            The environment prefix.
-	 * @param moduleName
-	 *            The name of the module.
-	 * 
-	 * @return The loaded distribution, or null.
-	 */
-	public static LocalCrossEntropyDistribution loadModule(
-			String environmentPrefix, GoalCondition moduleGoal) {
-		String moduleName = moduleGoal.toString();
-		if (nonExistantModule_.contains(moduleName))
-			return null;
-
-		if (!ProgramArgument.SAVE_EXPERIMENT_FILES.booleanValue())
-			return loadDistribution(new File(getModFolder(moduleName, 0),
-					moduleName + SERIALISED_SUFFIX));
-		return null;
-	}
-
-	/**
 	 * Loads a serialised {@link LocalCrossEntropyDistribution} from file (if it
 	 * exists).
 	 * 
@@ -981,44 +1012,28 @@ public class LocalCrossEntropyDistribution implements Serializable, ModularBehav
 	}
 
 	/**
-	 * Generates a unique policy ID (at least local to this unserialised run).
+	 * Loads a module from the module directory.
 	 * 
-	 * @return A String with a unique policy ID.
-	 */
-	public String generateUniquePolicyID() {
-		return goalCondition_.toString() + "_" + policyIDCounter_++;
-	}
-
-	public void setSpecialisation(boolean b) {
-		isSpecialising_ = b;
-	}
-
-	public boolean isSpecialising() {
-		return isSpecialising_;
-	}
-
-	public AlgorithmState getState() {
-		return state_;
-	}
-
-	public void cleanup() {
-		if (!ProgramArgument.LOAD_AGENT_OBSERVATIONS.booleanValue())
-			localAgentObservations_.cleanup();
-	}
-
-	/**
-	 * Gets the number of policy repeats policies should be performing.
+	 * @param environmentPrefix
+	 *            The environment prefix.
+	 * @param moduleName
+	 *            The name of the module.
 	 * 
-	 * @return The number of times a policy should be tested.
+	 * @return The loaded distribution, or null.
 	 */
-	public int getPolicyRepeats() {
-		// If frozen, only once
-		if (frozen_)
-			return 1;
+	public static LocalCrossEntropyDistribution loadModule(
+			String environmentPrefix, GoalCondition moduleGoal) {
+		String moduleName = moduleGoal.toString();
+		if (nonExistantModule_.contains(moduleName))
+			return null;
 
-		// If modular policy, test twice as long
-		if (!goalCondition_.isMainGoal())
-			return ProgramArgument.POLICY_REPEATS.intValue() * 2;
-		return ProgramArgument.POLICY_REPEATS.intValue();
+		if (!ProgramArgument.SAVE_EXPERIMENT_FILES.booleanValue())
+			return loadDistribution(new File(getModFolder(moduleName, 0),
+					moduleName + SERIALISED_SUFFIX));
+		return null;
+	}
+
+	public enum AlgorithmState {
+		BEST_POLICY, TESTING, TRAINING;
 	}
 }
