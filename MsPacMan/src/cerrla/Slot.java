@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/cerrla/Slot.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package cerrla;
 
 import relationalFramework.RelationalPredicate;
@@ -12,8 +33,8 @@ import java.util.TreeSet;
 import util.ProbabilityDistribution;
 
 /**
- * An inner class forming the slot of the policy generator. Contains the rules
- * within and any other pertinent information.
+ * A distribution of rules with some additional parameters for use in creating
+ * policies.
  * 
  * @author Samuel J. Sarjant
  */
@@ -216,7 +237,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 	private int determineEvaluationThreshold() {
 		return (int) (size() * ProgramArgument.CONFIDENCE_INTERVAL
 				.doubleValue());
-//		return (int) (size() * slotLevel_);
 	}
 
 	@Override
@@ -255,8 +275,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 	public void freeze(boolean freeze) {
 		if (freeze) {
 			backupGenerator_ = ruleGenerator_;
-
-			// ruleGenerator_ = ruleGenerator_.bindProbs(false);
 		} else {
 			ruleGenerator_ = backupGenerator_;
 		}
@@ -333,9 +351,7 @@ public class Slot implements Serializable, Comparable<Slot> {
 			slotFillLevel = 2 * slotMean_;
 		else
 			slotFillLevel = 2 * (1 - slotMean_);
-		// slotFillLevel = (1.0 * klSize() - 1) / size();
-		// slotFillLevel = Math.max(slotFillLevel, 0);
-		// slotFillLevel = Math.min(slotFillLevel, 1);
+		
 		return ProgramArgument.INITIAL_ORDERING_SD.doubleValue()
 				* slotFillLevel;
 	}
@@ -432,7 +448,8 @@ public class Slot implements Serializable, Comparable<Slot> {
 			return false;
 
 		double threshold = Math.min(1.0 / (slotLevel_ + 1), slotMean_);
-		threshold = Math.min(threshold, ProgramArgument.SLOT_THRESHOLD.doubleValue());
+		threshold = Math.min(threshold,
+				ProgramArgument.SLOT_THRESHOLD.doubleValue());
 		if (threshold == -1)
 			threshold = 1 - 1.0 / size();
 		threshold = Math.max(threshold * size(), 1);
@@ -565,15 +582,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 		if (ed == null || alpha == 0)
 			return updateDelta_;
 
-		// double factor = 1;
-		// if (numUpdates_ < population) {
-		// factor = 1.0 * numUpdates_ / population;
-		// alpha = alpha * factor;
-		// }
-		//
-		// if (alpha == 0)
-		// return updateDelta_;
-
 		// Update the slot values
 		// double slotMean = Math.min(ed.getSlotCount(this) / minimumElites, 1);
 		double actualSlotMean = ed.getSlotNumeracyMean(this);
@@ -587,8 +595,6 @@ public class Slot implements Serializable, Comparable<Slot> {
 							ed.getSlotRuleCounts(this), alpha);
 		}
 
-		// return updateDelta_ / factor;
-		// updateDelta_ /= 2;
 		return updateDelta_;
 	}
 
@@ -607,17 +613,10 @@ public class Slot implements Serializable, Comparable<Slot> {
 	 */
 	public double updateSlotValues(Double ordering, double mean, double alpha) {
 		double absDiff = 0;
-		if (ordering != null) {
-			// double diff = ordering_;
+		if (ordering != null)
 			ordering_ = ordering * alpha + (1 - alpha) * ordering_;
-			// diff -= ordering_;
-			// absDiff += Math.abs(diff) / alpha;
-		}
+		
 		double diff = slotMean_;
-		// if (mean > 0)
-		// slotMean_ = alpha * mean + (1 - alpha * mean) * slotMean_;
-		// else
-		// slotMean_ = (1 - alpha) * slotMean_;
 		slotMean_ = alpha * mean + (1 - alpha) * slotMean_;
 		diff -= slotMean_;
 		absDiff += Math.abs(diff) / alpha;

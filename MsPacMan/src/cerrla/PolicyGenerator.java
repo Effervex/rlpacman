@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/cerrla/PolicyGenerator.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package cerrla;
 
 import relationalFramework.RelationalArgument;
@@ -32,7 +53,6 @@ import java.util.regex.Pattern;
 
 import cerrla.modular.GoalCondition;
 import cerrla.modular.ModularPolicy;
-import cerrla.modular.ModularSubGoal;
 import cerrla.modular.PolicyItem;
 
 import relationalFramework.agentObservations.LocalAgentObservations.RuleMutation;
@@ -137,28 +157,6 @@ public final class PolicyGenerator implements Serializable {
 		parentLearner_ = parentLearner;
 
 		resetGenerator();
-	}
-
-	/**
-	 * Simple method that just sets the minimum number of elites to the bounded
-	 * value if using bounds.
-	 * 
-	 * @param population
-	 *            The current population.
-	 * @param maxWeightedRuleCount
-	 *            The maximum weighted (by the mean) KL(S) of a slot.
-	 * @param sumSlotMean
-	 *            The sum of all slot means (no bigger than |D_S|)
-	 * @return The changed number of elites (if necessary).
-	 */
-	private int checkPopulationBounding(double population,
-			double maxWeightedRuleCount, double sumSlotMean) {
-		if (ProgramArgument.BOUNDED_ELITES.booleanValue()) {
-			double minPopulation = Math.max(maxWeightedRuleCount, sumSlotMean)
-					/ ProgramArgument.RHO.doubleValue();
-			population = Math.max(minPopulation, population);
-		}
-		return (int) Math.ceil(population);
 	}
 
 	/**
@@ -384,23 +382,9 @@ public final class PolicyGenerator implements Serializable {
 		for (PolicyItem reo : policy.getRules()) {
 			// If reo is another policy, get/create the corresponding rule
 			// in this generator.
-			if (reo instanceof ModularSubGoal) {
-				// TODO Not counting modular policies unless the module is
-				// converged
-				ModularPolicy modPol = ((ModularSubGoal) reo)
-						.getModularPolicy();
-				// Adding modular rules to the main policy only if the sub goal
-				// is converged.
-				// if (modPol.getLocalCEDistribution().isConverged())
-				// recurseCountPolicyRules(modPol, weight, meanNotedSlots, ed,
-				// slotMean, orderedFiredSlots);
-			} else if (firingRules.contains(reo)) {
+			if (firingRules.contains(reo)) {
 				RelationalRule rule = ((RelationalRule) reo);
 				// May have to get/create new rule
-				// TODO Unsure about this...
-				// if (!mainPolicy)
-				// rule = getCreateCorrespondingRule(rule,
-				// policy.getModularReplacementMap());
 
 				Slot ruleSlot = rule.getSlot();
 				// Slot counts
@@ -434,37 +418,6 @@ public final class PolicyGenerator implements Serializable {
 				index++;
 			}
 		}
-	}
-
-	/**
-	 * Recurse through a multimap tree.
-	 * 
-	 * @param rule
-	 *            The current rule.
-	 * @param mutationTree
-	 *            The mutation tree to traverse
-	 * @param buf
-	 *            The writer to write out to.
-	 */
-	private void recurseMutationTree(
-			Pair<RelationalRule, Integer> rule,
-			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> mutationTree,
-			BufferedWriter buf) throws Exception {
-		for (int i = rule.objA_.getAncestryCount() - 1; i >= 0; i--) {
-			if (i == 0)
-				buf.append("|-");
-			else
-				buf.append(" ");
-		}
-		buf.append(rule.objA_.toNiceString() + ":" + rule.objB_ + "\n");
-
-		// Recurse through the rules
-		Collection<Pair<RelationalRule, Integer>> children = mutationTree
-				.get(rule.objA_);
-		if (children != null)
-			for (Pair<RelationalRule, Integer> childRule : mutationTree
-					.get(rule.objA_))
-				recurseMutationTree(childRule, mutationTree, buf);
 	}
 
 	/**
@@ -848,10 +801,6 @@ public final class PolicyGenerator implements Serializable {
 					double slotOrderVal = slotOrdering
 							+ RRLExperiment.random_.nextGaussian()
 							* slotOrderSD;
-					// double random = (RRLExperiment.random_.nextDouble() - .5)
-					// * 2;
-					// double slotOrderVal = slotOrdering + random * slotOrderSD
-					// * 2;
 					// Ensure the slot is placed in a unique order - no clashes.
 					while (policyOrdering.containsKey(slotOrderVal))
 						slotOrderVal += ORDER_CLASH_INCREMENT;
@@ -1328,65 +1277,6 @@ public final class PolicyGenerator implements Serializable {
 	}
 
 	/**
-	 * Saves a trace of the mutations to file.
-	 * 
-	 * @param buf
-	 *            The buffer to save to.
-	 */
-	public void saveMutationTree(BufferedWriter buf) throws Exception {
-		Map<String, MultiMap<RelationalRule, Pair<RelationalRule, Integer>>> actionRules = new HashMap<String, MultiMap<RelationalRule, Pair<RelationalRule, Integer>>>();
-		MultiMap<String, Pair<RelationalRule, Integer>> parentlessRules = MultiMap
-				.createSortedSetMultiMap(MutationEpisodeComparator
-						.getInstance());
-		// Write an episodic list of mutations
-		buf.append("Per episode mutations\n");
-		for (Double episode : mutationTree_.keySet()) {
-			int episodeInt = episode.intValue();
-			buf.append(episodeInt + ":");
-			RelationalRule rule = mutationTree_.get(episode);
-			for (int i = rule.getAncestryCount() - 1; i >= 0; i--) {
-				if (i == 0)
-					buf.append("|-");
-				else
-					buf.append(" ");
-			}
-			buf.append(rule.toNiceString() + "\n");
-
-			// Noting the rules
-			MultiMap<RelationalRule, Pair<RelationalRule, Integer>> rules = actionRules
-					.get(rule.getActionPredicate());
-			// Initialise the multimap
-			if (rules == null) {
-				rules = MultiMap
-						.createSortedSetMultiMap(MutationEpisodeComparator
-								.getInstance());
-				actionRules.put(rule.getActionPredicate(), rules);
-			}
-
-			// Add the rule to the multimap, with the parent rule as the key
-			Pair<RelationalRule, Integer> pair = new Pair<RelationalRule, Integer>(
-					rule, episodeInt);
-			if (!rule.isWithoutParents()) {
-				rules.put(rule.getParentRules().iterator().next(), pair);
-			} else {
-				// If the rule has no parents, use it as a base rule
-				parentlessRules.put(rule.getActionPredicate(), pair);
-			}
-		}
-		buf.append("\n");
-
-		// Output each action mutation tree
-		// TODO Seems there's a bug here which causes an infinite loop.
-		for (String action : actionRules.keySet()) {
-			buf.append("Per action (" + action + ")\n");
-			for (Pair<RelationalRule, Integer> rule : parentlessRules
-					.get(action)) {
-				recurseMutationTree(rule, actionRules.get(action), buf);
-			}
-		}
-	}
-
-	/**
 	 * Saves the representative policy from this generator as a module.
 	 * 
 	 * @param modFile
@@ -1415,7 +1305,7 @@ public final class PolicyGenerator implements Serializable {
 			// policy of the file.
 			if (ruleFile.getParent() != null
 					&& ruleFile.getParent().endsWith("temp")) {
-//				loadGreedyGenerator(ruleFile, false);
+				// loadGreedyGenerator(ruleFile, false);
 				loadGreedyGenerator(ruleFile, true);
 				RelationalPolicy bestPolicy = greedyPolicyMap_
 						.get(greedyPolicyMap_.lastKey());
@@ -1484,9 +1374,7 @@ public final class PolicyGenerator implements Serializable {
 			// lower
 			Slot existingSlot = slotGenerator_.findMatch(newSlot);
 			existingSlot.updateLevel(newSlotLevel);
-			// existingSlot.setSelectionProb(Math.max(
-			// existingSlot.getSelectionProbability(),
-			// ProgramArgument.INITIAL_SLOT_MEAN.doubleValue()));
+			
 			// Move the rule's slot to the existing slot for
 			// further update operations.
 			splitRule.setSlot(existingSlot);
@@ -1605,6 +1493,7 @@ public final class PolicyGenerator implements Serializable {
 					(gamma - negVal.getValue()) / denominator, 1);
 
 			// Negative update each rule
+			Collection<Slot> affectedSlots = new HashSet<Slot>();
 			for (RelationalRule gr : negVal.getPolicy().getFiringRules()) {
 				Slot slot = gr.getSlot();
 				if (slot != null) {
@@ -1615,10 +1504,13 @@ public final class PolicyGenerator implements Serializable {
 					// If the slot is ready for updates.
 					if (negAlpha != 0) {
 						slot.getGenerator().updateElement(gr, 1, 0, negAlpha);
-						slot.getGenerator().normaliseProbs();
+						affectedSlots.add(slot);
 					}
 				}
 			}
+
+			for (Slot slot : affectedSlots)
+				slot.getGenerator().normaliseProbs();
 		}
 	}
 }

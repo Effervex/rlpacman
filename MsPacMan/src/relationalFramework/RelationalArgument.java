@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/RelationalArgument.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework;
 
 import java.io.Serializable;
@@ -20,11 +41,11 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	/** The old pattern for finding ranges. */
 	private static Pattern DEPRECATED_RANGE_PATTERN = Pattern
 			.compile("(.+)&:\\(<= (.+?) \\1 (.+?)\\)");
+	/** The first character for variables. */
+	private static final char FIRST_CHAR = 'A';
 	/** The human-readable format for an explicit range. */
 	private static final Pattern HUMAN_RANGE_PATTERN = Pattern
 			.compile("\\((.+?) <= (.+?) <= (.+?)\\)");
-	/** The first character for variables. */
-	private static final char FIRST_CHAR = 'A';
 	/** The minimum possible number of chars for a range definition. */
 	private static final int MIN_RANGE = 5;
 	/** The final character for variables. */
@@ -32,8 +53,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	private static Pattern RANGE_PATTERN = Pattern.compile("(.+)&:\\("
 			+ StateSpec.RANGE_TEST
 			+ " (.+) ([\\d.E-]+) \\1 (.+) ([\\d.E-]+)\\)");
-	private static final long serialVersionUID = -7883241266827157231L;
+	/** The incrementing unique index of ranged values. */
+	private static int rangeIndex_;
 
+	private static final long serialVersionUID = -7883241266827157231L;
 	/** The starting character for variables. */
 	private static final char STARTING_CHAR = 'A';
 	/** Variable extension for non-action variables.. */
@@ -47,6 +70,7 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	public static final String RANGE_VARIABLE_PREFIX = "?#_";
 	/** Defines the arg type. */
 	private ArgumentType argType_;
+
 	/**
 	 * If this arg is a free (lonesome) variable. Only true if non-action
 	 * variable.
@@ -66,6 +90,12 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 	/** The argument represented by this arg. */
 	private String stringArg_;
+
+	public RelationalArgument(RelationalArgument otherArg, RangeContext context) {
+		this(otherArg.stringArg_, otherArg.rangeBounds_[0],
+				otherArg.rangeFrac_[0], otherArg.rangeBounds_[1],
+				otherArg.rangeFrac_[1], context);
+	}
 
 	/**
 	 * The constructor. This deconstructs ranges into their components.
@@ -211,12 +241,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		argType_ = ArgumentType.NUMBER_RANGE;
 	}
 
-	public RelationalArgument(RelationalArgument otherArg, RangeContext context) {
-		this(otherArg.stringArg_, otherArg.rangeBounds_[0],
-				otherArg.rangeFrac_[0], otherArg.rangeBounds_[1],
-				otherArg.rangeFrac_[1], context);
-	}
-
 	/**
 	 * Creates a perfect duplicate of this arg.
 	 * 
@@ -273,6 +297,8 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return stringArg_.compareTo(ra.stringArg_);
 	}
 
+
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -299,8 +325,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		}
 		return true;
 	}
-
-
 
 	public ArgumentType getArgumentType() {
 		return argType_;
@@ -400,6 +424,10 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 		return argType_ == ArgumentType.GOAL_VARIABLE;
 	}
 
+	public boolean isNonActionVar() {
+		return argType_ == ArgumentType.NON_ACTION;
+	}
+
 	public boolean isNumber() {
 		return argType_ == ArgumentType.NUMBER_RANGE
 				|| argType_ == ArgumentType.NUMBER_CONST;
@@ -424,10 +452,6 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 				|| argType_ == ArgumentType.ANON)
 			return true;
 		return false;
-	}
-
-	public boolean isNonActionVar() {
-		return argType_ == ArgumentType.NON_ACTION;
 	}
 
 	public boolean isVariable() {
@@ -516,6 +540,16 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 	}
 
 	/**
+	 * Creates a new range argument.
+	 * 
+	 * @return A unique range argument.
+	 */
+	public static RelationalArgument createRangeVariable() {
+		return new RelationalArgument(RANGE_VARIABLE_PREFIX
+				+ rangeIndex_++);
+	}
+
+	/**
 	 * Creates an unbound variable (equivalent to an anon variable).
 	 * 
 	 * @param i
@@ -549,5 +583,25 @@ public class RelationalArgument implements Comparable<RelationalArgument>,
 
 	public static boolean isRangeVariable(String arg) {
 		return arg.startsWith(RANGE_VARIABLE_PREFIX);
+	}
+
+	/**
+	 * Resets the rage index to 0.
+	 */
+	public static void resetRangeIndex() {
+		rangeIndex_ = 0;
+	}
+
+	/**
+	 * Simple min-max operation of discovering the limits of a range.
+	 * 
+	 * @param range
+	 *            The range to stretch.
+	 * @param baseVal
+	 *            The value being evaluated.
+	 */
+	public static void unifyRange(double[] range, double baseVal) {
+		range[0] = Math.min(range[0], baseVal);
+		range[1] = Math.max(range[1], baseVal);
 	}
 }

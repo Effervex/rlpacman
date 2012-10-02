@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/rlPacMan/PacManEnvironment.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package rlPacMan;
 
 import relationalFramework.FiredAction;
@@ -73,78 +94,7 @@ public class PacManEnvironment extends RRLEnvironment {
 			rete.assertString("(distance " + thingName + " " + distance + ")");
 		}
 	}
-
-	// /**
-	// * Runs the hand-coded policy until a pre-goal is obtained.
-	// *
-	// * @return The score achieved by the policy.
-	// */
-	// private int handCodedPolicy() {
-	// RelationalPolicy handCodedPolicy = StateSpec.getInstance()
-	// .getHandCodedPolicy();
-	//
-	// // A special case for testing the policy for score
-	// if (testHandCodedPolicy_)
-	// testHandCodedPolicy(handCodedPolicy);
-	//
-	// // Run the policy through the environment until goal is satisfied.
-	// PolicyActor handCodedAgent = new PolicyActor();
-	// ObjectObservations.getInstance().objectArray = new RelationalPolicy[] {
-	// handCodedPolicy };
-	// handCodedAgent.agent_message("Optimal");
-	// handCodedAgent.agent_message("SetPolicy");
-	// Action act = handCodedAgent.agent_start(formObservations());
-	// // Loop until the task is complete
-	// Reward_observation_terminal rot = env_step(act);
-	// while ((rot == null) || !rot.isTerminal()) {
-	// handCodedAgent.agent_step(rot.r, rot.o);
-	// rot = env_step(act);
-	// }
-	// int score = model_.m_player.m_score;
-	//
-	// // Return the state to normal
-	// model_.m_highScore = 0;
-	// resetEnvironment();
-	// return score;
-	// }
-	//
-	// /**
-	// * Tests the optimal policy a number of times to find the average
-	// * performance.
-	// *
-	// * @param handCodedPolicy
-	// * The optimal policy.
-	// */
-	// private void testHandCodedPolicy(RelationalPolicy handCodedPolicy) {
-	// int repetitions = ProgramArgument.POLICY_REPEATS.intValue()
-	// * ProgramArgument.TEST_ITERATIONS.intValue();
-	// double score = 0;
-	// for (int i = 0; i < repetitions; i++) {
-	// PolicyActor handCodedAgent = new PolicyActor();
-	// ObjectObservations.getInstance().objectArray = new RelationalPolicy[] {
-	// handCodedPolicy };
-	// handCodedAgent.agent_message("Optimal");
-	// handCodedAgent.agent_message("SetPolicy");
-	// Action act = handCodedAgent.agent_start(formObservations());
-	// // Loop until the task is complete
-	// Reward_observation_terminal rot = env_step(act);
-	// while ((rot == null) || !rot.isTerminal()) {
-	// handCodedAgent.agent_step(rot.r, rot.o);
-	// rot = env_step(act);
-	// score += rot.r;
-	// }
-	//
-	// // Return the state to normal
-	// model_.m_highScore = 0;
-	// resetEnvironment();
-	// System.out.println("Hand-coded testing " + (100.0 * (i + 1))
-	// / repetitions + "% complete");
-	// }
-	// System.out.println("Hand coded policy achieves average score of:");
-	// System.out.println(score / repetitions);
-	// System.exit(1);
-	// }
-
+	
 	/**
 	 * Draws the agent's action switch.
 	 * 

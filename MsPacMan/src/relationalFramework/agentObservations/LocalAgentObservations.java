@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/agentObservations/LocalAgentObservations.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework.agentObservations;
 
 import relationalFramework.RangeBound;
@@ -30,13 +51,12 @@ import jess.Fact;
 import jess.Rete;
 import cerrla.LocalCrossEntropyDistribution;
 import cerrla.ProgramArgument;
-import cerrla.RLGGMerger;
-import cerrla.MergedFact;
 import cerrla.modular.GeneralGoalCondition;
 import cerrla.modular.GoalCondition;
 import cerrla.modular.SpecificGoalCondition;
 
 import util.MultiMap;
+import util.Pair;
 
 /**
  * A part of AgentObservations. The LocalAgentObservations contain observation
@@ -84,7 +104,7 @@ public class LocalAgentObservations extends SettlingScan implements
 	private transient LocalCrossEntropyDistribution lced_;
 
 	/** The observed ranges. */
-	private Map<RangeContext, double[]> rangeContexts_;
+	private Map<RangeContext, Pair<RelationalArgument, double[]>> rangeContexts_;
 
 	/** A static collection of all the active local agent observations. */
 	private transient static Map<GoalCondition, LocalAgentObservations> localAOManager_;
@@ -103,7 +123,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		variantGoalActionConditions_ = MultiMap.createSortedSetMultiMap();
 		observedGoalPredicates_ = MultiMap.createSortedSetMultiMap();
 		localInvariants_ = new InvariantObservations();
-		rangeContexts_ = new HashMap<RangeContext, double[]>();
+		rangeContexts_ = new HashMap<RangeContext, Pair<RelationalArgument, double[]>>();
 
 		EnvironmentAgentObservations.loadAgentObservations();
 
@@ -342,11 +362,8 @@ public class LocalAgentObservations extends SettlingScan implements
 
 		// Revise the invariant/variants (return true if the method return not
 		// null)
-		changed = InvariantObservations.intersectActionConditions(action,
-				action, goalActionConds,
-				invariantGoalActionConditions_.get(action.getFactName()),
-				variantGoalActionConditions_.get(action.getFactName()), null,
-				goalReplacements);
+		changed = InvariantObservations.intersectActionConditions(goalActionConds,
+				invariantGoalActionConditions_.get(action.getFactName()), variantGoalActionConditions_.get(action.getFactName()));
 
 		// If it changed, recreate the specialisations
 		if (changed) {
@@ -690,7 +707,7 @@ public class LocalAgentObservations extends SettlingScan implements
 				if (rc.getAction().equals(action)) {
 					if (!first)
 						localBuf.write(", ");
-					localBuf.write(rc.toString(rangeContexts_.get(rc)));
+					localBuf.write(rc.toString(rangeContexts_.get(rc).objB_));
 					first = false;
 				}
 			}
@@ -791,11 +808,9 @@ public class LocalAgentObservations extends SettlingScan implements
 		// duplicates/negation
 		if (condition != null) {
 			condition.swapNegated();
-			Collection<MergedFact> negUnification = RLGGMerger.getInstance()
-					.unifyFactToState(condition, simplified, null, null, false);
-			condition.swapNegated();
-			if (!negUnification.isEmpty())
+			if (ruleConds.contains(condition))
 				return null;
+			condition.swapNegated();
 
 			// Need to check type conditions
 			if (!checkConditionTypes(simplified, condition))
@@ -830,7 +845,6 @@ public class LocalAgentObservations extends SettlingScan implements
 				return null;
 
 		// TODO Need to remove redundant negated predicates (bounded by type)
-
 
 		return simplified;
 	}
@@ -918,7 +932,7 @@ public class LocalAgentObservations extends SettlingScan implements
 		LocalAgentObservations lao = localAOManager_.get(gc);
 
 		// Get the range from the actions
-		double[] range = lao.rangeContexts_.get(rangeContext);
+		double[] range = lao.rangeContexts_.get(rangeContext).objB_;
 		if (range == null) {
 			// Use a global range
 			rangeContext = new RangeContext(rangeContext);

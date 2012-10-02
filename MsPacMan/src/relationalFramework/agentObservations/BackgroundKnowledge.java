@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/agentObservations/BackgroundKnowledge.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework.agentObservations;
 
 import relationalFramework.RelationalArgument;
@@ -13,12 +34,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import org.apache.commons.collections.BidiMap;
-import org.apache.commons.collections.bidimap.DualHashBidiMap;
-
-import cerrla.RLGGMerger;
-import cerrla.MergedFact;
 
 /**
  * A class representing background knowledge assertions
@@ -168,21 +183,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 	}
 
 	/**
-	 * Gets the rule in conjugate form, such that the postcondition is negated.
-	 * 
-	 * @return A collection of all conditions with the postcondition negated.
-	 */
-	private Collection<RelationalPredicate> getConjugatedConditions() {
-		Collection<RelationalPredicate> backgroundConditions = new ArrayList<RelationalPredicate>(
-				preConds_);
-		RelationalPredicate negated = new RelationalPredicate(postCondition_);
-		negated.swapNegated();
-		backgroundConditions.add(negated);
-
-		return backgroundConditions;
-	}
-
-	/**
 	 * Gets the fact predicates relevant to this background knowledge. That's
 	 * both sides if equivalence relation otherwise just the left side preds.
 	 * 
@@ -196,103 +196,6 @@ public class BackgroundKnowledge implements Comparable<BackgroundKnowledge>,
 		if (equivalentRule_)
 			relevantPreds.add(postCondition_.getFactName());
 		return relevantPreds;
-	}
-
-	/**
-	 * Simplifies a set of rule conditions using this background knowledge.
-	 * 
-	 * @param ruleConds
-	 *            The rule conditions to simplify.
-	 * @return True if the conditions were simplified.
-	 */
-	@SuppressWarnings("unchecked")
-	public boolean simplify(Collection<RelationalPredicate> ruleConds) {
-		BidiMap replacementTerms = new DualHashBidiMap();
-
-		// Unify with the preConds to check if they're there
-		Collection<RelationalPredicate> allFacts = getAllFacts();
-		Collection<MergedFact> unified = RLGGMerger.getInstance().unifyStates(
-				allFacts, ruleConds, replacementTerms);
-		if (unified.size() == allFacts.size()) {
-			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
-			for (MergedFact unifact : unified) {
-				if (nonPreferred.contains(unifact.getBaseFact()))
-					ruleConds.remove(unifact.getUnityFact());
-			}
-			return true;
-		}
-
-		// Equivalent rule simplification
-		if (equivalentRule_) {
-			// Unify with post conds and if a result, insert the replacement
-			Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
-			replacementTerms.clear();
-			unified = RLGGMerger.getInstance().unifyStates(nonPreferred,
-					ruleConds, replacementTerms);
-			// If the post cond fully unified
-			if (unified.size() == nonPreferred.size()) {
-				// Remove the post conds.
-				for (MergedFact unifact : unified) {
-					ruleConds.remove(unifact.getUnityFact());
-					replacementTerms = unifact.getResultReplacements();
-				}
-
-				// Add the preconds (with replacements)
-				replacementTerms = replacementTerms.inverseBidiMap();
-				for (RelationalPredicate resultFact : getPreferredFacts()) {
-					RelationalPredicate cloneFact = new RelationalPredicate(
-							resultFact);
-					cloneFact.replaceArguments(replacementTerms, false, false);
-					if (!ruleConds.contains(cloneFact))
-						ruleConds.add(cloneFact);
-				}
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	private Collection<RelationalPredicate> getAllFacts() {
-		ArrayList<RelationalPredicate> allFacts = new ArrayList<RelationalPredicate>(
-				preConds_);
-		allFacts.add(postCondition_);
-		return allFacts;
-	}
-
-	/**
-	 * Checks if a rule is illegal in regards to this background knowledge.
-	 * 
-	 * @param ruleConds
-	 *            The rule conditions to evaluate.
-	 * @param fixRule
-	 *            If the rule should be modified to become legal.
-	 * @return True if the conditions are illegal.
-	 */
-	public boolean checkIllegalRule(Collection<RelationalPredicate> ruleConds,
-			boolean fixRule) {
-		// Check for illegal rules
-		BidiMap replacementTerms = new DualHashBidiMap();
-		Collection<RelationalPredicate> conjugated = getConjugatedConditions();
-		Collection<MergedFact> unified = RLGGMerger.getInstance().unifyStates(
-				conjugated, ruleConds, replacementTerms);
-		// If the rule is found to be illegal using the conjugated
-		// conditions, remove the illegal condition
-		if (unified.size() == conjugated.size()) {
-			if (fixRule) {
-				// Fix up the rule (remove illegals)
-				Collection<RelationalPredicate> nonPreferred = getNonPreferredFacts();
-				for (MergedFact unifact : unified) {
-					RelationalPredicate negUniFact = new RelationalPredicate(
-							unifact.getBaseFact());
-					negUniFact.swapNegated();
-					if (nonPreferred.contains(negUniFact))
-						ruleConds.remove(unifact.getUnityFact());
-				}
-			}
-			return true;
-		}
-		return false;
 	}
 
 	public boolean isEquivalence() {

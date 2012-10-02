@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/cerrla/CERRLA.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package cerrla;
 
 import java.io.File;
@@ -187,8 +208,9 @@ public class CERRLA implements RRLAgent {
 	/**
 	 * Recreates the current policy.
 	 * 
-	 * @param currentPolicy
-	 *            The policy to recreate.
+	 * @param existingPolicies
+	 *            The existing policies for each agent being evaluated per
+	 *            episode.
 	 * @return The recreated policy. May or may not be the same object.
 	 */
 	private ModularPolicy recreateCurrentPolicy(
@@ -263,6 +285,9 @@ public class CERRLA implements RRLAgent {
 		return modularPolicy;
 	}
 
+	/**
+	 * Removes all links to the various objects being used by CERRLA.
+	 */
 	@Override
 	public void cleanup() {
 		// Save the final output
@@ -282,6 +307,10 @@ public class CERRLA implements RRLAgent {
 		startedAgents_.clear();
 	}
 
+	/**
+	 * At the end of the episode, record the reward and recreate the policy if
+	 * necessary.
+	 */
 	@Override
 	public void endEpisode(RRLObservations observations) {
 		AlgorithmState state = mainGoalCECortex_.getState();
@@ -308,6 +337,9 @@ public class CERRLA implements RRLAgent {
 		startedAgents_.clear();
 	}
 
+	/**
+	 * Cease all learning.
+	 */
 	@Override
 	public void freeze(boolean b) {
 		for (ModularBehaviour modB : goalMappedGenerators_.values()) {
@@ -317,11 +349,19 @@ public class CERRLA implements RRLAgent {
 		onlineTestingIter_ = -1;
 	}
 
+	/**
+	 * Get the number of episodes that have passed for the agent.
+	 */
 	@Override
 	public int getNumEpisodes() {
 		return mainGoalCECortex_.getCurrentEpisode();
 	}
 
+	/**
+	 * Initialise the agent.
+	 * 
+	 * @param run The current experiment run number.
+	 */
 	@Override
 	public void initialise(int run) {
 		currentRunIndex_ = run;
@@ -357,27 +397,41 @@ public class CERRLA implements RRLAgent {
 
 			try {
 				mainGoalCECortex_.getPolicyGenerator().loadGreedyGenerator(
-						genFile, ProgramArgument.TEST_BEST_POLICY.booleanValue());
+						genFile,
+						ProgramArgument.TEST_BEST_POLICY.booleanValue());
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
 
+	/**
+	 * Is CERRLA converged?
+	 */
 	@Override
 	public boolean isLearningComplete() {
 		return mainGoalCECortex_.isLearningComplete();
 	}
 
+	/**
+	 * Set the state of rule specialisation.
+	 * 
+	 * @param b True if the agent may specialise new rules, false otherwise.
+	 */
 	@Override
 	public void setSpecialisations(boolean b) {
-		for (ModularBehaviour modB : goalMappedGenerators_
-				.values()) {
+		for (ModularBehaviour modB : goalMappedGenerators_.values()) {
 			if (modB instanceof LocalCrossEntropyDistribution)
 				((LocalCrossEntropyDistribution) modB).setSpecialisation(b);
 		}
 	}
 
+	/**
+	 * Start the current episode.
+	 * 
+	 * @param observations The initial state observations.
+	 * @return The agent's selected action(s).
+	 */
 	@Override
 	public RRLActions startEpisode(RRLObservations observations) {
 		// Check for module stuff
@@ -446,6 +500,12 @@ public class CERRLA implements RRLAgent {
 		return evaluatePolicy(observations);
 	}
 
+	/**
+	 * One time step in the episode.
+	 * 
+	 * @param observations The current state observations.
+	 * @return The agent's selected actions.
+	 */
 	@Override
 	public RRLActions stepEpisode(RRLObservations observations) {
 		String playerID = observations.getAgentTurn();

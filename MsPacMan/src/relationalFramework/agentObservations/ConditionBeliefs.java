@@ -1,3 +1,24 @@
+/*
+ *    This file is part of the CERRLA algorithm
+ *
+ *    CERRLA is free software; you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation; either version 3 of the License, or
+ *    (at your option) any later version.
+ *
+ *    CERRLA is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *
+ *    You should have received a copy of the GNU General Public License
+ *    along with CERRLA. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *    src/relationalFramework/agentObservations/ConditionBeliefs.java
+ *    Copyright (C) 2012 Samuel Sarjant
+ */
 package relationalFramework.agentObservations;
 
 import relationalFramework.RelationalArgument;
@@ -18,8 +39,6 @@ import java.util.TreeSet;
 
 import org.apache.commons.collections.BidiMap;
 import org.apache.commons.collections.bidimap.DualHashBidiMap;
-
-import cerrla.RLGGMerger;
 
 import util.MultiMap;
 
@@ -246,7 +265,6 @@ public class ConditionBeliefs implements Serializable {
 			}
 
 			// If the sets are equal, the relations are equivalent!
-			// TODO Need to investigate why exactly I changed to set comparison
 			if (isEquivalentConditions(extraCond, otherCond, negationType,
 					conditionBeliefs, negatedConditionBeliefs, replacementMap)) {
 				// Swap the facts if the otherCond is simpler
@@ -435,14 +453,6 @@ public class ConditionBeliefs implements Serializable {
 			Map<String, ConditionBeliefs> conditionBeliefs,
 			Map<String, Map<IntegerArray, ConditionBeliefs>> negatedConditionBeliefs,
 			BidiMap replacementMap) {
-		// First check the potential equivalence doesn't involve obvious type
-		// relations
-		// if (extraCond == null
-		// && (obviousTypeEquivalence(cbFact_, otherCond) ||
-		// obviousTypeEquivalence(
-		// otherCond, cbFact_)))
-		// return false;
-
 		// Get the conditions for this cond.
 		Set<RelationalPredicate> thisAlwaysTrue = getAlwaysTrue(extraCond);
 		Set<RelationalPredicate> thisSometimesTrue = getOccasionallyTrue(extraCond);
@@ -469,34 +479,6 @@ public class ConditionBeliefs implements Serializable {
 
 		return thisAlwaysTrue.equals(thatAlwaysTrue)
 				&& thisSometimesTrue.equals(thatSometimesTrue);
-	}
-
-	/**
-	 * Checks if the typeFact is an obvious type fact of baseFact.
-	 * 
-	 * @param baseFact
-	 *            The base fact to check.
-	 * @param typeFact
-	 *            The type fact to check.
-	 * @return True if typeFact is an obvious (defined) type of baseFact.
-	 */
-	private boolean obviousTypeEquivalence(RelationalPredicate baseFact,
-			RelationalPredicate typeFact) {
-		if (!StateSpec.getInstance().isTypePredicate(typeFact.getFactName()))
-			return false;
-
-		RelationalArgument typeArg = typeFact.getRelationalArguments()[0];
-		RelationalArgument[] baseArgs = baseFact.getRelationalArguments();
-		String[] argTypes = baseFact.getArgTypes();
-		for (int i = 0; i < baseArgs.length; i++) {
-			// Arg found
-			if (baseArgs[i].equals(typeArg)) {
-				// Is obvious type?
-				if (argTypes[i].equals(typeFact.getFactName()))
-					return true;
-			}
-		}
-		return false;
 	}
 
 	/**
@@ -810,29 +792,6 @@ public class ConditionBeliefs implements Serializable {
 	}
 
 	/**
-	 * If a relation should be created. Ignore relations that are simply
-	 * themselves (A -> A) and ignore obvious type relations.
-	 * 
-	 * @param thisFact
-	 *            The current fact being examined.
-	 * @param relatedFact
-	 *            The related fact.
-	 * @return True if the relation should be created, false otherwise.
-	 */
-	private static boolean shouldCreateRelation(RelationalPredicate thisFact,
-			RelationalPredicate relatedFact) {
-		// Don't make rules to itself.
-		if (thisFact.equals(relatedFact))
-			return false;
-
-		// If the fact is a type predicate, go for it.
-		if (StateSpec.getInstance().isTypePredicate(thisFact.getFactName()))
-			return true;
-
-		return true;
-	}
-
-	/**
 	 * A small class for holding data regarding individual typed condition
 	 * beliefs.
 	 * 
@@ -1022,16 +981,6 @@ public class ConditionBeliefs implements Serializable {
 				untrueFacts.removeAll(trueFacts);
 				untrueFacts.removeAll(generalities_);
 			}
-
-			// Collection<RelationalPredicate> oldState = new
-			// ArrayList<RelationalPredicate>(
-			// alwaysTrue_);
-			// Collection<RelationalPredicate> newState = new
-			// ArrayList<RelationalPredicate>(
-			// trueFacts);
-			// int result = RLGGMerger.getInstance().rlggUnification(oldState,
-			// newState,
-			// new DualHashBidiMap(), new RelationalArgument[0]);
 
 			// Filter the disallowed facts
 			trueFacts.removeAll(disallowed_);
