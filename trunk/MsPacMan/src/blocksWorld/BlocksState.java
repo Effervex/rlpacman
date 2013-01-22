@@ -91,22 +91,24 @@ public class BlocksState {
 	public String toString() {
 		// The last column of the blocksChars denotes if there is a block in
 		// the row.
-		char[][] blocksChars = new char[length + 1][length];
+		String[][] blocksChars = new String[length + 1][length];
 		Map<Integer, Point> posMap = new HashMap<Integer, Point>();
 		int column = 0;
 		int i = 0;
 		while (posMap.size() < length) {
-			column = recursiveBuildString(i, intState_, column, posMap, blocksChars);
+			column = recursiveBuildString(i, intState_, column, posMap,
+					blocksChars);
 			i++;
 		}
 
 		// Print the char map
 		StringBuffer buffer = new StringBuffer();
 		for (int y = length - 1; y >= 0; y--) {
-			if (blocksChars[length][y] == '+') {
+			if (blocksChars[length][y] != null
+					&& blocksChars[length][y].equals("+")) {
 				buffer.append("\t\t");
 				for (int x = 0; x < column; x++) {
-					if (blocksChars[x][y] == 0)
+					if (blocksChars[x][y] == null)
 						buffer.append("   ");
 					else
 						buffer.append("[" + blocksChars[x][y] + "]");
@@ -135,23 +137,23 @@ public class BlocksState {
 	 *            a row has any blocks in it.
 	 * @return The new value of column (same or + 1).
 	 */
-	protected int recursiveBuildString(int currBlock, Integer[] blocks, int column,
-			Map<Integer, Point> posMap, char[][] blocksChars) {
+	protected int recursiveBuildString(int currBlock, Integer[] blocks,
+			int column, Map<Integer, Point> posMap, String[][] blocksChars) {
 		if (!posMap.containsKey(currBlock)) {
 			if (blocks[currBlock] == 0) {
 				posMap.put(currBlock, new Point(column, 0));
-				blocksChars[column][0] = (char) ('a' + currBlock);
-				blocksChars[blocks.length][0] = '+';
+				blocksChars[column][0] = "b" + currBlock;
+				blocksChars[blocks.length][0] = "+";
 				column++;
 			} else {
 				int underBlock = blocks[currBlock] - 1;
-				column = recursiveBuildString(underBlock, blocks, column, posMap,
-						blocksChars);
+				column = recursiveBuildString(underBlock, blocks, column,
+						posMap, blocksChars);
 				Point pos = new Point(posMap.get(underBlock));
 				pos.y++;
 				posMap.put(currBlock, pos);
-				blocksChars[pos.x][pos.y] = (char) ('a' + currBlock);
-				blocksChars[blocks.length][pos.y] = '+';
+				blocksChars[pos.x][pos.y] = "b" + currBlock;
+				blocksChars[blocks.length][pos.y] = "+";
 			}
 		}
 		return column;

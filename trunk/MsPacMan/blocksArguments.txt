@@ -1,4 +1,4 @@
-blocksWorld.BlocksWorld
+blocksWorldAlternative.BlocksWorld
 10
 -1
-10,"goal onab"
+10,"goal on$A$B"

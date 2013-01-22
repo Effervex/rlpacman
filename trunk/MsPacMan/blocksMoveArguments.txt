@@ -1,6 +1,4 @@
-blocksWorldMove.BlocksWorld
+blocksWorld.BlocksWorld
 10
 -1
-blocksMoveElites.txt
-blocksMoveTest.txt
-10,"goal on$A$B"
+10,"goal onab"

@@ -3,4 +3,4 @@ jCloisterZone.Carcassonne
 -1
 carcassonneElites.txt
 carcassonneTest.txt
-"multi AI 6"
+200

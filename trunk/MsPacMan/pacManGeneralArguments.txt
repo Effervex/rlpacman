@@ -1,6 +1,6 @@
-rlPacManGeneral.PacMan
+rlPacMan.PacMan
 10
-3
+-1
 pacManElites.txt
 pacManTest.txt
-"goal levelMax"
+"goal lvl10",50
