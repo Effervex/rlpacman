@@ -130,15 +130,14 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		for (int i = 0; i < state_.length; i++) {
 			// On the floor
 			if (intState[i] == 0) {
-				rete.assertString("(on " + (char) ('a' + i) + " floor)");
+				rete.assertString("(on b" + i + " floor)");
 			} else {
 				// On another block
-				rete.assertString("(on " + (char) ('a' + i) + " "
-						+ (char) ('a' + intState[i] - 1) + ")");
+				rete.assertString("(on b" + i + " b" + (intState[i] - 1) + ")");
 			}
 
 			// Assert the blocks
-			rete.assertString("(block " + (char) ('a' + i) + ")");
+			rete.assertString("(block b" + i + ")");
 		}
 	}
 
@@ -246,7 +245,7 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		if (params != null) {
 			goalArgs_ = new ArrayList<String>(params.length);
 			for (int param : params)
-				goalArgs_.add((char) ('a' + (param - 1)) + "");
+				goalArgs_.add("b" + (param - 1) + "");
 		}
 
 		// Check this isn't the goal state
@@ -339,8 +338,10 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 	/**
 	 * Resolve the action on the integer representation.
 	 * 
-	 * @param newState The state of the world to alter. 
-	 * @param actionFact The action being resolved.
+	 * @param newState
+	 *            The state of the world to alter.
+	 * @param actionFact
+	 *            The action being resolved.
 	 */
 	protected void resolveAction(BlocksState newState,
 			RelationalPredicate actionFact) {
@@ -352,7 +353,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 			if (actionFact.getArguments()[i].equals("floor"))
 				indices[i] = -1;
 			else
-				indices[i] = (actionFact.getArguments()[i].charAt(0)) - ('a');
+				indices[i] = Integer.parseInt(actionFact.getArguments()[i]
+						.substring(1));
 		}
 
 		// Perform the action
@@ -414,7 +416,8 @@ public class BlocksWorldEnvironment extends RRLEnvironment {
 		}
 
 		precalculateBlockRatios(maxBlocks_);
-		optimalPolicy_ = createOptimalPolicy(StateSpec.getInstance().getGoalName());
+		optimalPolicy_ = createOptimalPolicy(StateSpec.getInstance()
+				.getGoalName());
 	}
 
 	/**

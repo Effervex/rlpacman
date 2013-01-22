@@ -246,7 +246,8 @@ public class InvariantObservations implements Serializable {
 
 		invariants.clear();
 		invariants.addAll(mergeState);
-		variants.addAll(remainFacts);
+		changed |= variants.addAll(remainFacts);
+		changed |= variants.addAll(actionConds);
 		return changed;
 	}
 

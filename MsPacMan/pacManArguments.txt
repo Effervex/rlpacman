@@ -1,4 +1,4 @@
-rlPacMan.PacMan
+rlPacManAlternative.PacMan
 10
 -1
 pacManElites.txt

@@ -1,6 +1,6 @@
 mario.RLMario
-10
+7-10
 -1
 marioElites.txt
 marioTest.txt
-"Diff 1"
+"goal Diff1"
